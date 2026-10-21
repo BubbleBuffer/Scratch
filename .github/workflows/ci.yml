@@ -1,22 +1,26 @@
-# CI test gate: every push to any branch of this repository.
+# CI for the public Scratch repository, on GitHub-hosted runners.
 #
-# Every job runs on build01 (CT 102, runners started by build01-dispatcher).
-# GitHub-hosted runners are not used (billing blocked; decided 2026-10-13 to
-# keep CI on build01). The runner's persistent _work keeps the Cargo target/
-# and the Pub cache warm, sccache wraps rustc, and the Flutter SDK comes from
-# the runner's tool cache. The dispatcher caps how many notes-app jobs run at
-# once; extra jobs queue.
+# Runs on pushes to main, on pull requests (forks included: hosted runners
+# only, read-only token, no secrets) and on demand. Mirrors the private
+# repository's test gate: Rust format, lints and the workspace tests, then
+# Flutter analyze, the add-on import check, the generated-bindings check and
+# the fast Flutter test tier.
 #
-# No pull_request trigger: a PR from a branch of this repository is already
-# tested by that branch's push run (same head commit), and a PR from a fork
-# must never reach build01, a persistent self-hosted host.
-#
-# Goldens are not run here: their baselines are rendered on Windows.
+# Skipped on purpose:
+#   - notes-tauri (prototypes/tauri): a bake-off prototype that needs the GTK
+#     and WebKitGTK dev packages; the private gate excludes it too.
+#   - Flutter goldens: their baselines are rendered on Windows.
+#   - rustfmt is report-only and clippy warnings do not fail the job (see
+#     the rust job).
+#   - Flutter perf (timing budgets) and drive (a long-lived session host)
+#     tags: not part of the fast tier.
 name: ci
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -25,89 +29,98 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
 jobs:
   rust:
     name: rust
-    runs-on: [self-hosted, build01]
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: notes-app
-          clean: false
-      # Next to notes-app, so crates/agent's ../../../BubblePaw-base-agent path resolves.
-      - uses: actions/checkout@v4
-        with:
-          repository: BubbleBuffer/BubblePaw-base
-          ref: release
-          path: BubblePaw-base-agent
-          ssh-key: ${{ secrets.BUBBLEPAW_DEPLOY_KEY }}
-          persist-credentials: false
-          clean: false
-      - name: cargo test --workspace
-        working-directory: notes-app
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTC_WRAPPER: sccache
-        # notes-tauri (prototypes/tauri) needs the GTK and WebKitGTK dev
-        # packages, which build01 does not have. It is a bake-off prototype.
-        run: cargo test --workspace --locked --exclude notes-tauri --no-fail-fast
-
-  flutter:
-    name: flutter
-    runs-on: [self-hosted, build01]
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
-          path: notes-app
-          clean: false
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust
+      # Report-only for now: the tree is not rustfmt-clean yet (the private
+      # gate does not check formatting). Drop continue-on-error once it is.
+      - name: cargo fmt --check (report only)
+        continue-on-error: true
+        run: cargo fmt --all --check
+      # Lints are reported as warnings, not denied: the private gate has no
+      # clippy step and the tree has open clippy warnings.
+      - name: cargo clippy
+        run: cargo clippy --workspace --exclude notes-tauri --all-targets --locked
+      - name: cargo test --workspace
+        run: cargo test --workspace --locked --exclude notes-tauri --no-fail-fast
+
+  flutter:
+    name: flutter
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
       - uses: actions/checkout@v4
         with:
-          repository: BubbleBuffer/BubblePaw-base
-          ref: release
-          path: BubblePaw-base-agent
-          ssh-key: ${{ secrets.BUBBLEPAW_DEPLOY_KEY }}
+          path: scratch
           persist-credentials: false
-          clean: false
+      # The agent tests run BubblePaw's fake extension. Build it from the
+      # BubblePaw-Core revision that Cargo.lock pins.
+      - name: BubblePaw-Core revision
+        id: core
+        working-directory: scratch
+        run: |
+          rev=$(grep -oE 'BubblePaw-Core\?rev=[0-9a-f]{40}' Cargo.lock | head -1 | cut -d= -f2)
+          test -n "$rev"
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: BubbleBuffer/BubblePaw-Core
+          ref: ${{ steps.core.outputs.rev }}
+          path: BubblePaw-Core
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: flutter
+          workspaces: |
+            scratch
+            BubblePaw-Core
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          # build01 keeps the SDK in its persistent tool cache.
-          cache: false
+          cache: true
       # The harness loads target/release/libnotes_bridge.so (app/test/harness.dart);
       # ai_test.dart runs target/release/examples/fake_agent.
       - name: Build host bridge and test fixtures
-        working-directory: notes-app
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTC_WRAPPER: sccache
+        working-directory: scratch
         run: |
-          cargo build --release -p notes_bridge
-          cargo build --release -p vault_mcp --examples
-      # The agent tests look for BubblePaw's fake extension in its debug target.
+          cargo build --release --locked -p notes_bridge
+          cargo build --release --locked -p vault_mcp --examples
       - name: Build BubblePaw fake extension
-        working-directory: BubblePaw-base-agent
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTC_WRAPPER: sccache
+        working-directory: BubblePaw-Core
         run: cargo build -p bubblepaw-runner --bin bubblepaw-fake-extension
       - name: flutter pub get
-        working-directory: notes-app/app
+        working-directory: scratch/app
         run: |
-          # gradle.properties pins the PC's Android Studio JBR; build01 uses JAVA_HOME.
+          # gradle.properties pins a local Android Studio JBR; the runner uses JAVA_HOME.
           sed -i '/^org\.gradle\.java\.home=/d' android/gradle.properties
           flutter pub get
       - name: flutter analyze
-        working-directory: notes-app/app
+        working-directory: scratch/app
         run: flutter analyze
       - name: Add-on import boundaries
-        working-directory: notes-app
+        working-directory: scratch
         run: |
           dart scripts/check-addon-imports.dart
           dart scripts/check-addon-imports.dart --self-test
       - name: Generated bindings are fresh
-        working-directory: notes-app
+        working-directory: scratch
         run: |
           if ! flutter_rust_bridge_codegen --version 2>/dev/null | grep -q '2\.13\.0'; then
             cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
@@ -115,16 +128,13 @@ jobs:
           bash scripts/regen-bindings.sh
           git diff --exit-code -- app/rust/src/frb_generated.rs app/lib/src/rust
       - name: flutter test (fast tier, goldens excluded)
-        working-directory: notes-app/app
+        working-directory: scratch/app
         env:
-          # Same as tool/test.sh: the bridge and fake agent in the shared target/release.
-          NOTES_BRIDGE_LIB: ${{ github.workspace }}/notes-app/target/release/libnotes_bridge.so
-          NOTES_FAKE_AGENT: ${{ github.workspace }}/notes-app/target/release/examples/fake_agent
+          NOTES_BRIDGE_LIB: ${{ github.workspace }}/scratch/target/release/libnotes_bridge.so
+          NOTES_FAKE_AGENT: ${{ github.workspace }}/scratch/target/release/examples/fake_agent
+          NOTES_FAKE_EXTENSION: ${{ github.workspace }}/BubblePaw-Core/target/debug/bubblepaw-fake-extension
         run: |
-          # Goldens are rendered on Windows. Skip golden-named files and any file
-          # that compares against a golden image. The fast tier also leaves out
-          # perf (timing budgets) and drive (a long-lived session host), as
-          # tool/test.sh does.
+          # Skip golden-named files and any file that compares against a golden image.
           files=()
           while IFS= read -r f; do
             case "$f" in *golden*) echo "skip (golden name): $f"; continue ;; esac
@@ -132,8 +142,6 @@ jobs:
             files+=("$f")
           done < <(find test -name '*_test.dart' ! -path 'test/goldens/*' | sort)
           echo "running ${#files[@]} test files"
-          echo "nproc=$(nproc)"
           jobs=$(( $(nproc) / 2 ))
           [ "$jobs" -lt 1 ] && jobs=1
-          echo "jobs=$jobs"
           flutter test --concurrency="$jobs" -x 'golden || perf || drive' "${files[@]}"
