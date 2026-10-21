@@ -331,7 +331,13 @@ pub struct Agent {
     extension: Option<Arc<ExtensionProvider>>,
     claude_detection: claude::ClaudeDetection,
     vault: Arc<Vault>,
+    /// The configured default (`AgentConfig::default_model`, else
+    /// [`DEFAULT_MODEL`]); a hub host prefers the vault's default for `hub`.
     default_model: String,
+    /// The runner whose vault default model applies to runs without one:
+    /// `hub` on a hub host. Desktop hosts get the model from the app, which
+    /// resolves the device override and the vault value itself.
+    vault_default_runner: Option<&'static str>,
     system_prompt: String,
     /// Stops each running [`Agent::forward_events`] task.
     forwarders: Mutex<Vec<CancellationToken>>,
@@ -604,6 +610,8 @@ impl Agent {
             claude_detection,
             vault,
             default_model,
+            vault_default_runner: (config.host_kind == HostKind::Hub)
+                .then_some(vault_core::AGENT_RUNNER_HUB),
             system_prompt,
             forwarders: Mutex::new(Vec::new()),
             runtime,
@@ -640,8 +648,23 @@ impl Agent {
         info
     }
 
-    pub fn default_model(&self) -> &str {
-        &self.default_model
+    /// The model of runs that name none. On a hub: the vault's default
+    /// model for `hub`, else the configured `[agent] default_model`, else
+    /// [`DEFAULT_MODEL`]. On a desktop host: the configured default.
+    pub fn default_model(&self) -> String {
+        self.vault_default_model()
+            .unwrap_or_else(|| self.default_model.clone())
+    }
+
+    fn vault_default_model(&self) -> Option<String> {
+        let runner = self.vault_default_runner?;
+        match self.vault.agent_defaults() {
+            Ok(defaults) => defaults.model_for(runner).map(str::to_owned),
+            Err(error) => {
+                eprintln!("agent defaults unreadable: {error}");
+                None
+            }
+        }
     }
 
     pub fn claude_detection(&self) -> &claude::ClaudeDetection {
@@ -659,12 +682,13 @@ impl Agent {
             }
         }
         let mut models = self.providers.models();
-        if !models.iter().any(|m| m.id == self.default_model) {
+        let default_model = self.default_model();
+        if !models.iter().any(|m| m.id == default_model) {
             models.insert(
                 0,
                 ModelInfo {
-                    id: self.default_model.clone(),
-                    name: self.default_model.clone(),
+                    id: default_model.clone(),
+                    name: default_model,
                 },
             );
         }
@@ -832,6 +856,9 @@ impl Agent {
         client: ClientInfo,
     ) -> Result<Sent> {
         let text = context::encode(text, context, &self.store)?;
+        let model = model
+            .filter(|m| !m.trim().is_empty())
+            .or_else(|| self.vault_default_model());
         let model = self.replay_model(session, model)?;
         let _context = self.runtime.enter();
         let options = RunOptions {

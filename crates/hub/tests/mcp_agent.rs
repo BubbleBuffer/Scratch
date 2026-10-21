@@ -1614,3 +1614,31 @@ async fn deleting_an_active_session_cancels_suspended_js_without_waiting_for_its
     assert_eq!(returned(&unaffected), "other session still works");
     env.stop().await;
 }
+
+/// Integration spec phase 3: the vault's default runner (synced) wins over
+/// the server's `mcp_agent_default_host`; `this_device` means the hub here.
+#[tokio::test]
+async fn vault_default_runner_replaces_the_configured_default_host() {
+    let env = Env::with_default_host(true, true, "preferred-workstation").await;
+    let token = env.ann();
+    let session = env.initialize(&token).await;
+    let vault = env.server.hub().vault().clone();
+    for runner in ["this_device", "hub"] {
+        vault
+            .set_agent_default_runner(Some(runner.into()))
+            .unwrap();
+        let reply = env
+            .call(&token, Some(&session), "js", json!({"code":"return 23;"}))
+            .await;
+        assert_eq!(returned(&reply), 23, "runner {runner}");
+    }
+    vault.set_agent_default_runner(None).unwrap();
+    let reply = env
+        .call(&token, Some(&session), "js", json!({"code":"return 23;"}))
+        .await;
+    assert!(
+        tool_error(&reply).contains("preferred-workstation"),
+        "cleared: the configured host again"
+    );
+    env.stop().await;
+}

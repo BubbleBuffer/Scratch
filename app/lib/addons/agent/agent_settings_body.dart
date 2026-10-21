@@ -3,12 +3,15 @@ import '../../services/addon_services.dart';
 // it runs (this computer, or the hub this vault syncs with when that is an
 // https:// hub with a device token), its default model (listed from the
 // default host, even while the tab is on the other one), and for this
-// computer the Claude Code extension and projects. Saved in ai_settings.json.
+// computer the Claude Code extension and projects. The default runner and
+// model are vault settings (synced); "On this device" overrides them here
+// only (ai_settings.json, like the rest of this section).
 // Permission preferences remain dormant while the app always uses Bypass.
 
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../ui/toast.dart';
 import '../../ui/ui.dart';
 import '../../core/file_dialogs.dart';
 import 'agent_store.dart';
@@ -50,6 +53,7 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
     // the default host's, read here when the tab is on the other host.
     widget.store.retryDefaultHostModels();
     widget.store.addListener(_onStore);
+    widget.store.refreshVaultDefaults();
     if (widget.store.enabled) widget.store.ensureOpen();
   }
 
@@ -96,6 +100,24 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
     setState(() {});
   }
 
+  Future<void> _write(Future<void> Function() f) async {
+    try {
+      await f();
+    } catch (e) {
+      if (mounted) {
+        showErrorToast(context, 'Could not change this setting. Try again.');
+      }
+    }
+    widget.onChanged();
+    if (mounted) setState(() {});
+  }
+
+  static String _from(AgentDefaultSource? source) => switch (source) {
+    AgentDefaultSource.device => 'set on this device',
+    AgentDefaultSource.vault => 'the vault setting',
+    _ => 'the built-in default',
+  };
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
@@ -122,14 +144,18 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
     );
     final hub = store.hubLink;
     final onHub = store.host == AgentHost.hub;
+    final resolved = store.resolvedHost;
+    final vaultHost = store.vaultDefaults.host ?? builtInAgentHost;
+    final hostOverride = s.agentHostOverride;
     // Default model: the default host's list, not the tab's.
-    final defaultOnHub = store.defaultHost == AgentHost.hub;
+    final def = store.defaultHost;
+    final defaultOnHub = def == AgentHost.hub;
     final (:ids, :unavailable) = store.defaultHostModels();
     final models = ids ?? const <String>[];
-    final stored = s.agentModel.trim();
-    final current = stored.isEmpty
-        ? (models.isEmpty ? '' : models.first)
-        : stored;
+    final vaultModel = store.vaultDefaults.models[def];
+    final modelOverride = s.agentModelOverrides[def];
+    final effective = store.resolvedModel(def);
+    final vaultCurrent = vaultModel ?? (models.isEmpty ? '' : models.first);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -142,25 +168,60 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
             onChanged: (v) => _set((s) => s.agentEnabled = v),
           ),
         ),
-        if (s.agentEnabled)
+        if (s.agentEnabled) ...[
           SettingsRow(
             label: 'Agent runs on',
-            description: hub == null
-                ? 'This computer. The hub becomes available when this vault syncs with an https:// hub.'
-                : s.agentHost == AgentHost.hub
-                ? 'Default for new chats: the hub at ${hub.url}, with its own models, sign-ins and settings. Each chat can pick before its first message.'
-                : 'Default for new chats: this computer. Each chat can pick the hub before its first message.',
+            description: vaultHost == AgentHost.hub
+                ? 'Default for new chats on every device of this vault: the hub this vault syncs with. Each chat can pick before its first message.'
+                : 'Default for new chats on every device of this vault: the device in use. Each chat can pick before its first message.',
             trailing: SelectButton<AgentHost>(
               key: const ValueKey('agent-host'),
               title: 'Agent runs on',
-              value: store.defaultHost,
-              options: hub == null ? const [AgentHost.local] : AgentHost.values,
+              value: vaultHost,
+              options: AgentHost.values,
               labelOf: (h) => h.label,
-              onChanged: hub == null
-                  ? null
-                  : (h) => _set((s) => s.agentHost = h),
+              onChanged: (h) => _write(() => store.setVaultDefaultHost(h)),
             ),
           ),
+          SettingsRow(
+            label: 'On this device',
+            description: hostOverride == null
+                ? 'Follows the vault setting.'
+                : 'Overrides the vault setting on this device only.',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SelectButton<AgentHost?>(
+                  key: const ValueKey('agent-host-override'),
+                  title: 'On this device',
+                  value: hostOverride,
+                  options: [
+                    AgentHost.local,
+                    if (hub != null || hostOverride == AgentHost.hub)
+                      AgentHost.hub,
+                  ],
+                  labelOf: (h) => h?.label ?? 'Vault setting',
+                  onChanged: (h) => _set((s) => s.agentHostOverride = h),
+                ),
+                if (hostOverride != null) ...[
+                  const SizedBox(width: 8),
+                  SecondaryButton(
+                    key: const ValueKey('agent-host-override-clear'),
+                    label: 'Clear',
+                    onTap: () => _set((s) => s.agentHostOverride = null),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (resolved.fellBack)
+            Text(
+              "${resolved.wanted.label} (${_from(resolved.source)}) isn't reachable from this device, so new chats run on ${resolved.host.label}."
+              "${hub == null ? ' The hub becomes available when this vault syncs with an https:// hub.' : ''}",
+              key: const ValueKey('agent-host-fallback'),
+              style: tsRaw(12, 16, 400, c.textSecondary),
+            ),
+        ],
         if (s.agentEnabled && onHub && store.openError != null)
           Text(
             store.openError!,
@@ -175,33 +236,85 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
           ),
         if (s.agentEnabled) ...[
           _models(context),
-          if (models.isNotEmpty || unavailable)
+          if (models.isNotEmpty || unavailable) ...[
             SettingsRow(
               label: 'Default model',
               description: defaultOnHub
-                  ? "New chats on the hub use it, or the hub's first model if it doesn't offer it. Each chat can pick another."
-                  : "New chats on this computer and AI tasks use it, or this computer's first model if it doesn't offer it. Each chat can pick another.",
+                  ? "For new chats on the hub, on every device of this vault; the hub's first model if it doesn't offer it. Each chat can pick another."
+                  : "For new chats on this computer and AI tasks, on every device of this vault; this computer's first model if it doesn't offer it. Each chat can pick another.",
               trailing: models.isNotEmpty
                   ? SelectButton<String>(
                       key: const ValueKey('agent-default-model'),
                       title: 'Default model',
-                      value: models.contains(current) ? current : models.first,
+                      value: models.contains(vaultCurrent)
+                          ? vaultCurrent
+                          : models.first,
                       options: models,
                       labelOf: store.modelLabel,
-                      onChanged: (m) => _set((s) => s.agentModel = m),
+                      onChanged: (m) =>
+                          _write(() => store.setVaultDefaultModel(def, m)),
                     )
                   : Text(
-                      stored.isEmpty ? 'Not set' : store.modelLabel(stored),
+                      vaultModel == null
+                          ? 'Not set'
+                          : store.modelLabel(vaultModel),
                       key: const ValueKey('agent-default-model-stored'),
                       style: tsRaw(13, 18, 400, c.textSecondary),
                     ),
             ),
+            SettingsRow(
+              label: 'Model on this device',
+              description: modelOverride == null
+                  ? 'Follows the vault setting.'
+                  : 'Overrides the vault setting on this device only.',
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (models.isNotEmpty || modelOverride != null)
+                    SelectButton<String?>(
+                      key: const ValueKey('agent-model-override'),
+                      title: 'Model on this device',
+                      value: modelOverride,
+                      options: [
+                        ...models,
+                        if (modelOverride != null &&
+                            !models.contains(modelOverride))
+                          modelOverride,
+                      ],
+                      labelOf: (m) =>
+                          m == null ? 'Vault setting' : store.modelLabel(m),
+                      onChanged: (m) {
+                        store.setModelOverride(def, m);
+                        widget.onChanged();
+                      },
+                    ),
+                  if (modelOverride != null) ...[
+                    const SizedBox(width: 8),
+                    SecondaryButton(
+                      key: const ValueKey('agent-model-override-clear'),
+                      label: 'Clear',
+                      onTap: () {
+                        store.setModelOverride(def, null);
+                        widget.onChanged();
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           if (models.isEmpty && unavailable)
             Text(
               defaultOnHub
                   ? "Can't list the hub's models right now."
                   : "Can't list this computer's models right now.",
               key: const ValueKey('agent-default-model-unavailable'),
+              style: tsRaw(12, 16, 400, c.textSecondary),
+            ),
+          if (effective.model != null)
+            Text(
+              'New chats here use ${store.modelLabel(effective.model!)} (${_from(effective.source)}).',
+              key: const ValueKey('agent-default-model-effective'),
               style: tsRaw(12, 16, 400, c.textSecondary),
             ),
         ],

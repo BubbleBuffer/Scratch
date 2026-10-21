@@ -166,8 +166,10 @@ Future<void> signOutFromHub(
         AgentStore.existing(sync.vault)?.settings ??
         AiStore.settingsOf(sync.vault) ??
         AiSettings.beside(s.file);
-    if (ai.agentHost == AgentHost.hub) {
-      ai.update((s) => s.agentHost = AgentHost.local);
+    // A Hub override can't apply without a hub: this device follows the
+    // vault again (which falls back to this computer while no hub is set).
+    if (ai.agentHostOverride == AgentHost.hub) {
+      ai.update((s) => s.agentHostOverride = null);
     }
     await sync.disconnect();
   }

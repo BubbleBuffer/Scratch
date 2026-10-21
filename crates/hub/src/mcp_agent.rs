@@ -137,18 +137,24 @@ fn selected_host(state: &AppState, args: &Value, query: Option<&str>) -> Result<
             .find(|(key, _)| key == "host")
             .map(|(_, value)| value.into_owned())
     });
+    // An explicit host wins, then the vault's default runner (synced; the
+    // hub treats `this_device` as itself), then the server's
+    // `mcp_agent_default_host`, then `hub`.
     let selected = match args.get("host") {
-        Some(Value::String(host)) => host.as_str(),
+        Some(Value::String(host)) => host.clone(),
         Some(_) => return Err("host must be a string. Available hosts: hub".into()),
-        None => url_host.as_deref().unwrap_or_else(|| {
-            if state.mcp_agent.default_host.is_empty() {
-                "hub"
-            } else {
-                &state.mcp_agent.default_host
-            }
-        }),
+        None => match url_host {
+            Some(host) => host,
+            None => state.agent.vault_default_host().unwrap_or_else(|| {
+                if state.mcp_agent.default_host.is_empty() {
+                    "hub".to_owned()
+                } else {
+                    state.mcp_agent.default_host.clone()
+                }
+            }),
+        },
     };
-    Ok(selected.to_owned())
+    Ok(selected)
 }
 
 async fn host(state: &AppState, args: &Value, query: Option<&str>) -> Result<Shared, String> {

@@ -11,7 +11,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'types.dart';
 
 // These functions are ignored because they are not marked as `pub`: `live_hit_key_from`, `live_query_update_from`, `poll_mounts`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// A new ULID-style id (the core's page id format).
 String newId() => RustLib.instance.api.crateApiVaultNewId();
@@ -61,6 +61,8 @@ abstract class NotesVault implements RustOpaqueInterface {
   });
 
   Future<AgendaSettings> agendaSettings({required String collection});
+
+  Future<VaultAgentDefaults> agentDefaults();
 
   /// Appends a timestamped child line to the day's top-level Log toggle.
   Future<String> appendLog({
@@ -436,6 +438,10 @@ abstract class NotesVault implements RustOpaqueInterface {
     bigPageBlocks: bigPageBlocks,
   );
 
+  /// One-time migration of old per-device values: written only when the
+  /// vault has no agent defaults. Returns whether it wrote.
+  Future<bool> seedAgentDefaults({required VaultAgentDefaults seed});
+
   /// Seeding progress: page documents written so far in `root`.
   static int seedProgress({required String root}) =>
       RustLib.instance.api.crateApiVaultNotesVaultSeedProgress(root: root);
@@ -457,6 +463,10 @@ abstract class NotesVault implements RustOpaqueInterface {
     required String collection,
     required AgendaSettings settings,
   });
+
+  Future<void> setAgentDefaultModel({required String runner, String? model});
+
+  Future<void> setAgentDefaultRunner({String? runner});
 
   Future<void> setConflictAutoResolve({required bool enabled});
 
@@ -679,4 +689,43 @@ class LiveQueryUpdate {
           moved == other.moved &&
           changed == other.changed &&
           total == other.total;
+}
+
+/// The vault's synced agent defaults (integration spec, phase 3). Runners
+/// are `hub` and `this_device`; a device override lives in the app.
+class VaultAgentDefaults {
+  final String? runner;
+  final List<VaultAgentModel> models;
+
+  const VaultAgentDefaults({this.runner, required this.models});
+
+  @override
+  int get hashCode => runner.hashCode ^ models.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is VaultAgentDefaults &&
+          runtimeType == other.runtimeType &&
+          runner == other.runner &&
+          models == other.models;
+}
+
+/// One runner's default `provider/model`.
+class VaultAgentModel {
+  final String runner;
+  final String model;
+
+  const VaultAgentModel({required this.runner, required this.model});
+
+  @override
+  int get hashCode => runner.hashCode ^ model.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is VaultAgentModel &&
+          runtimeType == other.runtimeType &&
+          runner == other.runner &&
+          model == other.model;
 }

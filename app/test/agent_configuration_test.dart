@@ -33,7 +33,10 @@ void main() {
       final restored = AiSettings.load(file);
       expect(restored.agentHiddenModels, {'codex/model'});
       expect(restored.agentCustomModels, ['claude-code/custom']);
-      expect(restored.agentModel, 'codex/model');
+      expect(settings.legacyAgentModel, 'codex/model');
+      expect(settings.agentModelOverrides, isEmpty,
+          reason: 'old values are not device overrides');
+      expect(restored.legacyAgentModel, 'codex/model');
     },
   );
 
@@ -72,7 +75,7 @@ void main() {
     await pumpApp(t, mobile: false);
     final store = await openAgentStore(
       t,
-      settings: fakeAgentSettings()..agentModel = '',
+      settings: fakeAgentSettings()..agentModelOverrides.clear(),
     );
     store.models = const [
       AgentModel(id: 'codex/implicit', name: 'Implicit'),
@@ -95,7 +98,7 @@ void main() {
     final fake = fakeAgentSettings();
     settings
       ..agentEnabled = fake.agentEnabled
-      ..agentModel = fake.agentModel
+      ..agentModelOverrides.addAll(fake.agentModelOverrides)
       ..agentBunPath = fake.agentBunPath
       ..agentClaudeCodeDir = fake.agentClaudeCodeDir;
     final store = await openAgentStore(t, settings: settings);

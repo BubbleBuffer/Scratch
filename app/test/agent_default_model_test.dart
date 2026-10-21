@@ -37,11 +37,12 @@ void main() {
     final fake = fakeAgentSettings();
     settings.update((s) => s
       ..agentEnabled = true
-      ..agentHost = AgentHost.local
-      ..agentModel = 'codex/local-a'
+      ..agentHostOverride = AgentHost.local
       ..agentBunPath = fake.agentBunPath
       ..agentClaudeCodeDir = fake.agentClaudeCodeDir);
     final store = AgentStore.attach(tv.vault, settings);
+    // The default model is a vault setting now (the row reads and writes it).
+    await real(t, () => store.setVaultDefaultModel(AgentHost.local, 'codex/local-a'));
     final app = tv.app.settings;
     addTearDown(() => app
       ..clientUrl = null
@@ -90,7 +91,13 @@ void main() {
 
       picker.onChanged!('codex/local-b');
       await settle(t);
-      expect(AiSettings.load(file).agentModel, 'codex/local-b');
+      await settleUntil(
+        t,
+        () => store.vaultDefaults.models[AgentHost.local] == 'codex/local-b',
+      );
+      expect(store.vaultDefaults.models[AgentHost.local], 'codex/local-b');
+      expect(AiSettings.load(file).agentModelOverrides, isEmpty,
+          reason: 'the row writes the vault, not this device');
       expect(
         t.widget<SelectButton<String>>(key('agent-default-model')).value,
         'codex/local-b',
@@ -125,8 +132,8 @@ void main() {
       );
       expect(key('agent-default-model-unavailable'), findsOneWidget);
       expect(store.defaultHostModels().unavailable, isTrue);
-      expect(settings.agentModel, 'codex/local-a');
-      expect(AiSettings.load(file).agentModel, 'codex/local-a',
+      expect(store.vaultDefaults.models[AgentHost.local], 'codex/local-a');
+      expect(AiSettings.load(file).agentModelOverrides, isEmpty,
           reason: 'nothing overwrote the setting');
     } finally {
       await closeAi(t, ai);

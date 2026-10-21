@@ -1,9 +1,11 @@
 // AI settings of this device: which runner does AI tasks here and where
 // its program is, the DeepSeek key, the vault's MCP endpoint and the
-// in-app agent (on or off, where it runs, default model, Claude Code
-// extension, approvals). Kept in
+// in-app agent (on or off, this device's override of where it runs and of
+// the default model, Claude Code extension, approvals). Kept in
 // `<data dir>/ai_settings.json` next to settings.json (per device, never
-// synced; the DeepSeek key stays on this device).
+// synced; the DeepSeek key stays on this device). The default runner and
+// default model themselves are vault settings, synced (see
+// [resolveAgentHost]); this file only holds the device's overrides.
 
 import 'dart:convert';
 import 'dart:io';
@@ -48,11 +50,104 @@ enum AgentPermissionMode {
 
 /// Where the in-app agent runs.
 enum AgentHost {
-  local('This computer'),
-  hub('Hub');
+  local('This computer', 'this_device'),
+  hub('Hub', 'hub');
 
-  const AgentHost(this.label);
+  const AgentHost(this.label, this.runner);
   final String label;
+
+  /// The runner name in the vault's synced agent defaults.
+  final String runner;
+
+  /// The host a vault runner name means on this device (null: unknown).
+  static AgentHost? ofRunner(String? runner) =>
+      values.where((h) => h.runner == runner).firstOrNull;
+}
+
+/// Where an effective agent default came from.
+enum AgentDefaultSource { device, vault, builtIn }
+
+/// The vault's synced agent defaults, as this device reads them.
+class VaultAgentDefaultsView {
+  const VaultAgentDefaultsView({this.host, this.models = const {}});
+  static const none = VaultAgentDefaultsView();
+
+  /// The default runner (null: not set in the vault).
+  final AgentHost? host;
+
+  /// Default `provider/model` per runner.
+  final Map<AgentHost, String> models;
+
+  @override
+  bool operator ==(Object other) =>
+      other is VaultAgentDefaultsView &&
+      other.host == host &&
+      mapEquals(other.models, models);
+
+  @override
+  int get hashCode => Object.hash(
+    host,
+    Object.hashAllUnordered(
+      models.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
+  );
+}
+
+/// The default runner on this device and why.
+class ResolvedAgentHost {
+  const ResolvedAgentHost(this.host, this.wanted, this.source);
+
+  /// Where new chats run here.
+  final AgentHost host;
+
+  /// What the device override, the vault or the built-in default asks for.
+  final AgentHost wanted;
+  final AgentDefaultSource source;
+
+  /// The wanted runner isn't reachable here, so [host] is used instead.
+  bool get fellBack => host != wanted;
+}
+
+/// The built-in default runner: this computer, or the Hub on Android.
+AgentHost get builtInAgentHost =>
+    hubAgentPlatform ? AgentHost.hub : AgentHost.local;
+
+/// Precedence (integration spec, phase 3): this device's override, then the
+/// vault's value, then the built-in default; then, when that runner isn't in
+/// [usable] (reachable here), the built-in default or the first usable one.
+ResolvedAgentHost resolveAgentHost({
+  AgentHost? device,
+  AgentHost? vault,
+  AgentHost? builtIn,
+  required List<AgentHost> usable,
+}) {
+  final fallback = builtIn ?? builtInAgentHost;
+  final (wanted, source) = device != null
+      ? (device, AgentDefaultSource.device)
+      : vault != null
+      ? (vault, AgentDefaultSource.vault)
+      : (fallback, AgentDefaultSource.builtIn);
+  final host = usable.contains(wanted)
+      ? wanted
+      : usable.contains(fallback) || usable.isEmpty
+      ? fallback
+      : usable.first;
+  return ResolvedAgentHost(host, wanted, source);
+}
+
+/// The default model for [runner]: this device's override, then the vault's
+/// value (null model: none set; the host's own default applies).
+({String? model, AgentDefaultSource? source}) resolveAgentModel(
+  AgentHost runner, {
+  Map<AgentHost, String> device = const {},
+  Map<AgentHost, String> vault = const {},
+}) {
+  String? clean(String? m) => (m == null || m.trim().isEmpty) ? null : m.trim();
+  final d = clean(device[runner]);
+  if (d != null) return (model: d, source: AgentDefaultSource.device);
+  final v = clean(vault[runner]);
+  if (v != null) return (model: v, source: AgentDefaultSource.vault);
+  return (model: null, source: null);
 }
 
 /// Whether this platform runs the local agent engine.
@@ -106,8 +201,17 @@ class AiSettings extends ChangeNotifier {
   /// on Android, including installs whose old settings saved it as off).
   bool agentEnabled = agentPlatform;
 
-  /// `provider/model`; empty: the agent's built-in default.
-  String agentModel = '';
+  /// This device's override of the vault's default model, per runner
+  /// (missing: follow the vault).
+  Map<AgentHost, String> agentModelOverrides = {};
+
+  /// Values saved by builds before the synced defaults (`agentHost`,
+  /// `agentModel`). Kept until [AgentStore] copies them into the vault once
+  /// (only when the vault has none) and clears them; never an override.
+  AgentHost? legacyAgentHost;
+  String? legacyAgentModel;
+  bool get hasLegacyAgentDefaults =>
+      legacyAgentHost != null || legacyAgentModel != null;
 
   /// Model visibility and extra provider/model ids, on this device for either host.
   Set<String> agentHiddenModels = {};
@@ -126,11 +230,10 @@ class AiSettings extends ChangeNotifier {
   String desktopRoot =
       Platform.environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'] ?? '';
 
-  /// Where new chats run ("Agent runs on"): here, or on the hub this vault
-  /// syncs with (only when that is an `https://` hub with a device token).
-  /// A chat can switch before its first message and then keeps its host.
-  // Android's effective host is always Hub; this preference is desktop-only.
-  AgentHost agentHost = AgentHost.local;
+  /// This device's override of the vault's default runner ("Agent runs
+  /// on"; null: follow the vault). A chat can switch before its first
+  /// message and then keeps its host. Android always runs on the Hub.
+  AgentHost? agentHostOverride;
 
   /// The settings beside [settingsFile] (the app's settings.json).
   static AiSettings beside(File? settingsFile) {
@@ -168,7 +271,17 @@ class AiSettings extends ChangeNotifier {
     agentEnabled =
         hubAgentPlatform ||
         (localAgentPlatform && ((j['agentEnabled'] as bool?) ?? true));
-    agentModel = (j['agentModel'] as String?) ?? '';
+    agentModelOverrides = {
+      for (final e
+          in ((j['agentModelOverrides'] as Map?) ?? const {}).entries)
+        if (AgentHost.ofRunner(e.key as String?) case final h?)
+          if (e.value is String && (e.value as String).trim().isNotEmpty)
+            h: (e.value as String).trim(),
+    };
+    final legacyModel = j['agentModel'];
+    legacyAgentModel = legacyModel is String && legacyModel.trim().isNotEmpty
+        ? legacyModel.trim()
+        : null;
     agentHiddenModels =
         (j['agentHiddenModels'] as List?)?.whereType<String>().toSet() ?? {};
     agentCustomModels =
@@ -187,10 +300,12 @@ class AiSettings extends ChangeNotifier {
         _ => AgentPermissionMode.auto,
       },
     );
-    agentHost = AgentHost.values.firstWhere(
-      (h) => h.name == j['agentHost'],
-      orElse: () => AgentHost.local,
-    );
+    agentHostOverride = AgentHost.values
+        .where((h) => h.name == j['agentHostOverride'])
+        .firstOrNull;
+    legacyAgentHost = AgentHost.values
+        .where((h) => h.name == j['agentHost'])
+        .firstOrNull;
     desktopTools = (j['desktopTools'] as bool?) ?? true;
     desktopRoot = (j['desktopRoot'] as String?) ?? desktopRoot;
   }
@@ -206,13 +321,18 @@ class AiSettings extends ChangeNotifier {
     'mcpAddress': mcpAddress,
     'timeoutMinutes': timeoutMinutes,
     'agentEnabled': agentEnabled,
-    'agentModel': agentModel,
+    if (legacyAgentModel != null) 'agentModel': legacyAgentModel,
+    if (agentModelOverrides.isNotEmpty)
+      'agentModelOverrides': {
+        for (final e in agentModelOverrides.entries) e.key.runner: e.value,
+      },
     'agentHiddenModels': agentHiddenModels.toList(),
     'agentCustomModels': agentCustomModels,
     'agentBunPath': agentBunPath,
     'agentClaudeCodeDir': agentClaudeCodeDir,
     'agentPermissionMode': agentPermissionMode.name,
-    'agentHost': agentHost.name,
+    if (legacyAgentHost != null) 'agentHost': legacyAgentHost!.name,
+    if (agentHostOverride != null) 'agentHostOverride': agentHostOverride!.name,
     'desktopTools': desktopTools,
     'desktopRoot': desktopRoot,
   };

@@ -18,6 +18,21 @@ use crate::convert::*;
 use crate::frb_generated::StreamSink;
 use crate::local_runner::LocalRunner;
 
+/// The vault's synced agent defaults (integration spec, phase 3). Runners
+/// are `hub` and `this_device`; a device override lives in the app.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VaultAgentDefaults {
+    pub runner: Option<String>,
+    pub models: Vec<VaultAgentModel>,
+}
+
+/// One runner's default `provider/model`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VaultAgentModel {
+    pub runner: String,
+    pub model: String,
+}
+
 /// A search hit's identity, including the source that owns its local id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HitKey {
@@ -1080,6 +1095,41 @@ impl NotesVault {
 
     pub fn set_conflict_auto_resolve(&self, enabled: bool) -> Result<(), String> {
         self.inner.set_conflict_auto_resolve(enabled).map_err(err)
+    }
+
+    pub fn agent_defaults(&self) -> Result<VaultAgentDefaults, String> {
+        let d = self.inner.agent_defaults().map_err(err)?;
+        Ok(VaultAgentDefaults {
+            runner: d.runner,
+            models: d
+                .models
+                .into_iter()
+                .map(|(runner, model)| VaultAgentModel { runner, model })
+                .collect(),
+        })
+    }
+
+    pub fn set_agent_default_runner(&self, runner: Option<String>) -> Result<(), String> {
+        self.inner.set_agent_default_runner(runner).map_err(err)
+    }
+
+    pub fn set_agent_default_model(
+        &self,
+        runner: String,
+        model: Option<String>,
+    ) -> Result<(), String> {
+        self.inner.set_agent_default_model(runner, model).map_err(err)
+    }
+
+    /// One-time migration of old per-device values: written only when the
+    /// vault has no agent defaults. Returns whether it wrote.
+    pub fn seed_agent_defaults(&self, seed: VaultAgentDefaults) -> Result<bool, String> {
+        self.inner
+            .seed_agent_defaults(vault_core::AgentDefaults {
+                runner: seed.runner,
+                models: seed.models.into_iter().map(|m| (m.runner, m.model)).collect(),
+            })
+            .map_err(err)
     }
 
     pub fn attachment_ids(&self) -> Result<Vec<String>, String> {

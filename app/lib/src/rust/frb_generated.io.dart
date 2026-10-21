@@ -372,6 +372,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt dco_decode_box_autoadd_u_64(dynamic raw);
 
   @protected
+  VaultAgentDefaults dco_decode_box_autoadd_vault_agent_defaults(dynamic raw);
+
+  @protected
   ViewDef dco_decode_box_autoadd_view_def(dynamic raw);
 
   @protected
@@ -665,6 +668,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TrashedPage> dco_decode_list_trashed_page(dynamic raw);
 
   @protected
+  List<VaultAgentModel> dco_decode_list_vault_agent_model(dynamic raw);
+
+  @protected
   List<VersionInfo> dco_decode_list_version_info(dynamic raw);
 
   @protected
@@ -897,6 +903,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ValueKind dco_decode_value_kind(dynamic raw);
+
+  @protected
+  VaultAgentDefaults dco_decode_vault_agent_defaults(dynamic raw);
+
+  @protected
+  VaultAgentModel dco_decode_vault_agent_model(dynamic raw);
 
   @protected
   VersionInfo dco_decode_version_info(dynamic raw);
@@ -1287,6 +1299,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
+  VaultAgentDefaults sse_decode_box_autoadd_vault_agent_defaults(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ViewDef sse_decode_box_autoadd_view_def(SseDeserializer deserializer);
 
   @protected
@@ -1648,6 +1665,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TrashedPage> sse_decode_list_trashed_page(SseDeserializer deserializer);
 
   @protected
+  List<VaultAgentModel> sse_decode_list_vault_agent_model(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<VersionInfo> sse_decode_list_version_info(SseDeserializer deserializer);
 
   @protected
@@ -1906,6 +1928,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ValueKind sse_decode_value_kind(SseDeserializer deserializer);
+
+  @protected
+  VaultAgentDefaults sse_decode_vault_agent_defaults(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  VaultAgentModel sse_decode_vault_agent_model(SseDeserializer deserializer);
 
   @protected
   VersionInfo sse_decode_version_info(SseDeserializer deserializer);
@@ -2388,6 +2418,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_vault_agent_defaults(
+    VaultAgentDefaults self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_view_def(ViewDef self, SseSerializer serializer);
 
   @protected
@@ -2847,6 +2883,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_vault_agent_model(
+    List<VaultAgentModel> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_version_info(
     List<VersionInfo> self,
     SseSerializer serializer,
@@ -3163,6 +3205,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_value_kind(ValueKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_vault_agent_defaults(
+    VaultAgentDefaults self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_vault_agent_model(
+    VaultAgentModel self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_version_info(VersionInfo self, SseSerializer serializer);

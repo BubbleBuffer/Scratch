@@ -59,7 +59,10 @@ class MobileAgentSettings extends StatelessWidget {
         final models = store.hubLink != null
             ? store.shownModels()
             : const <String>[];
-        final current = store.settings.agentModel.trim();
+        // The vault's default model for the Hub (synced), and this phone's
+        // override of it.
+        final current = store.vaultDefaults.models[AgentHost.hub] ?? '';
+        final override = store.settings.agentModelOverrides[AgentHost.hub];
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -105,10 +108,10 @@ class MobileAgentSettings extends StatelessWidget {
                 key: const ValueKey('agent-host-info'),
                 style: tsRaw(12, 16, 400, c.textSecondary),
               ),
-            if (models.isNotEmpty)
+            if (models.isNotEmpty) ...[
               SettingsRow(
                 label: 'Default model',
-                description: 'New chats use it. Each chat can pick another.',
+                description: 'New chats on the hub use it, on every device of this vault. Each chat can pick another.',
                 stack: true,
                 trailing: SelectButton<String>(
                   key: const ValueKey('agent-default-model'),
@@ -117,9 +120,44 @@ class MobileAgentSettings extends StatelessWidget {
                   options: models,
                   labelOf: store.modelLabel,
                   onChanged: (m) =>
-                      store.settings.update((s) => s.agentModel = m),
+                      store.setVaultDefaultModel(AgentHost.hub, m),
                 ),
               ),
+              SettingsRow(
+                label: 'Model on this device',
+                description: override == null
+                    ? 'Follows the vault setting.'
+                    : 'Overrides the vault setting on this device only.',
+                stack: true,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SelectButton<String?>(
+                      key: const ValueKey('agent-model-override'),
+                      title: 'Model on this device',
+                      value: override,
+                      options: [
+                        ...models,
+                        if (override != null && !models.contains(override))
+                          override,
+                      ],
+                      labelOf: (m) =>
+                          m == null ? 'Vault setting' : store.modelLabel(m),
+                      onChanged: (m) => store.setModelOverride(AgentHost.hub, m),
+                    ),
+                    if (override != null) ...[
+                      const SizedBox(width: 8),
+                      SecondaryButton(
+                        key: const ValueKey('agent-model-override-clear'),
+                        label: 'Clear',
+                        height: 44,
+                        onTap: () => store.setModelOverride(AgentHost.hub, null),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ],
         );
       },

@@ -58,7 +58,7 @@ AiSettings fakeAgentSettings() {
   )..createSync(recursive: true);
   return AiSettings()
     ..agentEnabled = true
-    ..agentModel = 'claude-code/code-model'
+    ..agentModelOverrides[AgentHost.local] = 'claude-code/code-model'
     ..agentBunPath = fakeExtension()
     ..agentClaudeCodeDir = dir.path;
 }
@@ -510,7 +510,7 @@ void main() {
     );
 
     // Render the selected Hub state without opening an external connection.
-    store.settings.agentHost = AgentHost.hub;
+    store.settings.agentHostOverride = AgentHost.hub;
     tv.app.settings
       ..clientUrl = 'https://notes.example.com'
       ..clientToken = 'test-token';

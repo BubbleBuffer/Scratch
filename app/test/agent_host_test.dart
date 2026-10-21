@@ -28,22 +28,38 @@ void main() {
 
   test('the agent runs on the hub only when chosen and the hub is usable', () {
     final hub = HubLink.of(syncsWith('https://notes.example.com', 'tok'));
-    final here = AiSettings();
-    final there = AiSettings()..agentHost = AgentHost.hub;
-    expect(here.agentHost, AgentHost.local, reason: 'the default');
-    expect(agentHostFor(here, hub), AgentHost.local);
-    expect(agentHostFor(there, hub), AgentHost.hub);
-    expect(agentHostFor(there, null), AgentHost.local, reason: 'no usable hub: this computer');
+    final both = [AgentHost.local, if (hub != null) AgentHost.hub];
+    final local = [AgentHost.local];
+    ResolvedAgentHost pick({AgentHost? device, AgentHost? vault, required List<AgentHost> usable}) =>
+        resolveAgentHost(
+          device: device,
+          vault: vault,
+          builtIn: AgentHost.local,
+          usable: usable,
+        );
+    expect(pick(usable: both).host, AgentHost.local, reason: 'the default');
+    expect(pick(device: AgentHost.hub, usable: both).host, AgentHost.hub);
+    expect(pick(vault: AgentHost.hub, usable: both).host, AgentHost.hub,
+        reason: 'the vault default applies without a device override');
+    expect(pick(device: AgentHost.local, vault: AgentHost.hub, usable: both).host,
+        AgentHost.local, reason: 'the device override wins over the vault');
+    final none = pick(device: AgentHost.hub, usable: local);
+    expect(none.host, AgentHost.local, reason: 'no usable hub: this computer');
+    expect(none.wanted, AgentHost.hub);
+    expect(none.fellBack, isTrue);
   });
 
-  test('the host setting is saved in ai_settings.json', () {
+  test('the device override is saved in ai_settings.json', () {
     final dir = Directory.systemTemp.createTempSync('agent_host_test');
     addTearDown(() => dir.deleteSync(recursive: true));
     final file = File('${dir.path}${Platform.pathSeparator}ai_settings.json');
-    AiSettings.load(file).update((s) => s.agentHost = AgentHost.hub);
-    expect(AiSettings.load(file).agentHost, AgentHost.hub);
+    AiSettings.load(file).update((s) => s.agentHostOverride = AgentHost.hub);
+    expect(AiSettings.load(file).agentHostOverride, AgentHost.hub);
+    file.writeAsStringSync('{"agentHostOverride": "moon"}');
+    expect(AiSettings.load(file).agentHostOverride, isNull,
+        reason: 'an unknown runner is no override');
     file.writeAsStringSync('{"agentHost": "moon"}');
-    expect(AiSettings.load(file).agentHost, AgentHost.local);
+    expect(AiSettings.load(file).legacyAgentHost, isNull);
   });
 
   test('computer access defaults to home and round-trips with its root', () {

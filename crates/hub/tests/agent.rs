@@ -706,3 +706,66 @@ async fn host_info_reports_the_hubs_base_pack() {
     assert!(!info.tools.iter().any(|name| name.starts_with("fs_")));
     assert!(!info.can_run_tasks);
 }
+
+/// Integration spec phase 3: a run that names no model uses the vault's
+/// default model for `hub` (synced from a peer), over `[agent] default_model`;
+/// an explicit model still wins.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn runs_without_a_model_use_the_vault_default_for_hub() {
+    let mut e = env().await;
+    let dir = TempDir::new("defaults_peer");
+    let peer = dir.open();
+    let device = peer.device_id();
+    let token = e.server().hub().pair("laptop").unwrap();
+    let mut c = connect(&e.url, &token, &device).await.unwrap();
+    c.call("subscribe", Value::Null).await.unwrap();
+
+    async fn run_model(c: &mut Client, model: Option<&str>) -> String {
+        let s: w::AgentSession = get(c
+            .call("create_session", json!({"title": "Defaults"}))
+            .await
+            .unwrap());
+        let mut params = json!({"session_id": s.id, "text": "hello"});
+        if let Some(m) = model {
+            params["model"] = json!(m);
+        }
+        c.call("send", params).await.unwrap();
+        loop {
+            if c.event(|e| e.session_id == s.id).await.kind == "run_finished" {
+                break;
+            }
+        }
+        let st: w::AgentSessionState = get(c
+            .call("session_state", json!({"session_id": s.id}))
+            .await
+            .unwrap());
+        st.runs.last().expect("a run").model.clone()
+    }
+
+    assert_eq!(run_model(&mut c, None).await, "scripted/scripted", "config default");
+
+    peer.set_agent_default_runner(Some("this_device".into())).unwrap();
+    peer.set_agent_default_model("hub".into(), Some("scripted/vault-pick".into()))
+        .unwrap();
+    peer.set_agent_default_model("this_device".into(), Some("scripted/desktop-only".into()))
+        .unwrap();
+    let client = Arc::new(SyncClient::new(peer.clone(), &e.url, &token));
+    sync(&client).await;
+    let hub_defaults = e.server().hub().vault().agent_defaults().unwrap();
+    assert_eq!(hub_defaults.model_for("hub"), Some("scripted/vault-pick"));
+
+    assert_eq!(run_model(&mut c, None).await, "scripted/vault-pick", "vault default");
+    assert_eq!(
+        run_model(&mut c, Some("scripted/scripted")).await,
+        "scripted/scripted",
+        "an explicit model wins"
+    );
+    let models: Vec<w::AgentModel> = get(c.call("models", Value::Null).await.unwrap());
+    assert!(models.iter().any(|m| m.id == "scripted/vault-pick"), "{models:?}");
+
+    peer.set_agent_default_model("hub".into(), None).unwrap();
+    sync(&client).await;
+    assert_eq!(run_model(&mut c, None).await, "scripted/scripted", "cleared: config default");
+    drop(c);
+    e.server.take().unwrap().stop().await;
+}

@@ -7,6 +7,7 @@
 //! thread. Design notes: `wiki/architecture/core-state.md`.
 
 mod agenda;
+mod agent_defaults;
 mod attach;
 mod blockdiff;
 mod calendars;
@@ -59,6 +60,7 @@ mod vault;
 pub use error::{Result, VaultError};
 pub use conflict_diff::{ConflictDiff, ConflictDiffSide, ConflictDiffBlock, ConflictDiffChange, ConflictDiffSpan};
 pub use conflict_settings::{CONFLICT_LOG_RETENTION_DAYS, CONFLICT_LOG_RETENTION_MS};
+pub use agent_defaults::{AgentDefaults, AGENT_RUNNER_HUB, AGENT_RUNNER_THIS_DEVICE};
 pub use ids::{is_page_id, new_id, node_record_id, schedule_occurrence_id};
 pub use mdio::normalize_markdown;
 /// Roles of the hidden system pages (`role:` in their markdown).

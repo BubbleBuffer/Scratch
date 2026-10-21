@@ -41,6 +41,8 @@ import '../../core/vault.dart';
 import '../../ui/app_name.dart';
 import '../../src/rust/api/agent.dart' hide AgentPermissionMode;
 import '../../src/rust/api/agent.dart' as bridge show AgentPermissionMode;
+import '../../src/rust/api/vault.dart' as bridge
+    show VaultAgentDefaults, VaultAgentModel;
 import '../../state/app_state.dart';
 import 'dev_replay.dart';
 import 'agent_chat_prefs.dart';
@@ -126,18 +128,12 @@ class HubLink {
   }
 }
 
-/// Where the agent runs with [settings] when the vault's hub is [hub]: on
-/// the hub only when chosen and usable, else here (the desktop preference).
-AgentHost agentHostFor(AiSettings settings, HubLink? hub) =>
-    settings.agentHost == AgentHost.hub && hub != null
-    ? AgentHost.hub
-    : AgentHost.local;
-
 class AgentStore extends ChangeNotifier {
   AgentStore._(this.vault, this._settings, this._dataDir) {
     _settings.addListener(_onSettings);
     _key = _configKey();
     _hubKey = _hubConnectionKey();
+    unawaited(_loadVaultDefaults());
   }
 
   final Vault vault;
@@ -186,7 +182,124 @@ class AgentStore extends ChangeNotifier {
     _settings = settings..addListener(_onSettings);
     // May run while widgets build: notify after the frame's work.
     _settingsChanged(deferNotify: true);
+    if (settings.hasLegacyAgentDefaults) unawaited(_loadVaultDefaults());
   }
+
+  // ------------------------------- synced default runner and model
+
+  /// The vault's agent defaults as last read (synced settings page).
+  VaultAgentDefaultsView _vaultDefaults = VaultAgentDefaultsView.none;
+  VaultAgentDefaultsView get vaultDefaults => _vaultDefaults;
+  Future<void>? _vaultDefaultsRead;
+
+  /// Reads the vault's agent defaults again (after a sync, or when Settings
+  /// or the tab opens). Copies this device's pre-sync values in once.
+  Future<void> refreshVaultDefaults() async {
+    final pending = _vaultDefaultsRead;
+    if (pending != null) await pending;
+    await _loadVaultDefaults();
+  }
+
+  Future<void> _loadVaultDefaults() => _vaultDefaultsRead ??= () async {
+    try {
+      await _migrateLegacyDefaults();
+      final d = await vault.run((v) => v.agentDefaults());
+      final view = VaultAgentDefaultsView(
+        host: AgentHost.ofRunner(d.runner),
+        models: {
+          for (final m in d.models)
+            ?AgentHost.ofRunner(m.runner): m.model,
+        },
+      );
+      if (_disposed || view == _vaultDefaults) return;
+      _vaultDefaults = view;
+      _settingsChanged(deferNotify: true);
+    } catch (e) {
+      debugPrint('agent defaults: $e');
+    } finally {
+      _vaultDefaultsRead = null;
+    }
+  }();
+
+  /// Old builds kept "Agent runs on" and the default model on each device.
+  /// They go into the vault once, only when it has none, and are then
+  /// dropped here (not kept as overrides). Android's old host is ignored:
+  /// it always ran on the Hub.
+  Future<void> _migrateLegacyDefaults() async {
+    final s = settings;
+    if (!s.hasLegacyAgentDefaults) return;
+    final legacyHost = hubAgentPlatform ? null : s.legacyAgentHost;
+    final modelHost = legacyHost ?? builtInAgentHost;
+    final model = s.legacyAgentModel;
+    await vault.run(
+      (v) => v.seedAgentDefaults(
+        seed: bridge.VaultAgentDefaults(
+          runner: legacyHost?.runner,
+          models: [
+            if (model != null)
+              bridge.VaultAgentModel(runner: modelHost.runner, model: model),
+          ],
+        ),
+      ),
+      writes: true,
+    );
+    if (identical(s, settings)) {
+      s.update((s) {
+        s.legacyAgentHost = null;
+        s.legacyAgentModel = null;
+      });
+    }
+  }
+
+  /// Sets the vault's default runner (synced to every device).
+  Future<void> setVaultDefaultHost(AgentHost? h) async {
+    await vault.run(
+      (v) => v.setAgentDefaultRunner(runner: h?.runner),
+      writes: true,
+    );
+    await refreshVaultDefaults();
+  }
+
+  /// Sets the vault's default model for [runner] (null: clear it).
+  Future<void> setVaultDefaultModel(AgentHost runner, String? model) async {
+    await vault.run(
+      (v) => v.setAgentDefaultModel(runner: runner.runner, model: model),
+      writes: true,
+    );
+    await refreshVaultDefaults();
+  }
+
+  /// Sets or clears (null) this device's override of the default runner.
+  void setHostOverride(AgentHost? h) =>
+      settings.update((s) => s.agentHostOverride = h);
+
+  /// Sets or clears (null) this device's override of [runner]'s model.
+  void setModelOverride(AgentHost runner, String? model) =>
+      settings.update((s) {
+        final m = model?.trim() ?? '';
+        if (m.isEmpty) {
+          s.agentModelOverrides.remove(runner);
+        } else {
+          s.agentModelOverrides[runner] = m;
+        }
+      });
+
+  /// The default runner here: device override, vault value, built-in
+  /// default, then a reachable fallback ([ResolvedAgentHost.fellBack]).
+  ResolvedAgentHost get resolvedHost => resolveAgentHost(
+    device: hubAgentPlatform ? null : settings.agentHostOverride,
+    vault: _vaultDefaults.host,
+    usable: usableHosts,
+  );
+
+  /// [runner]'s default model: device override, then the vault's value.
+  ({String? model, AgentDefaultSource? source}) resolvedModel(
+    AgentHost runner,
+  ) => resolveAgentModel(
+    runner,
+    device: settings.agentModelOverrides,
+    vault: _vaultDefaults.models,
+  );
 
   /// Follows the app settings (the hub connection) from now on. Until
   /// then they are read from `settings.json` in the data folder.
@@ -211,9 +324,9 @@ class AgentStore extends ChangeNotifier {
   HubLink? get hubLink =>
       HubLink.of(_appSettings(), allowLoopback: hubAgentPlatform && kDebugMode);
 
-  /// Where new chats run: "Agent runs on" (Android: always the Hub).
+  /// Where new chats run: [resolvedHost] (Android: always the Hub).
   AgentHost get defaultHost =>
-      hubAgentPlatform ? AgentHost.hub : agentHostFor(settings, hubLink);
+      hubAgentPlatform ? AgentHost.hub : resolvedHost.host;
 
   /// The host the tab switched to away from [defaultHost] (null: none).
   AgentHost? _hostOverride;
@@ -668,7 +781,7 @@ class AgentStore extends ChangeNotifier {
   /// The default model on the connected host: the "Default model" setting
   /// when this host offers it, else the host's first model.
   String? get defaultModel {
-    final def = settings.agentModel.trim();
+    final def = resolvedModel(host).model ?? '';
     final ids = allModelIds;
     if (ids.isEmpty) return def.isEmpty ? null : def;
     return ids.contains(def) ? def : ids.first;
@@ -699,6 +812,8 @@ class AgentStore extends ChangeNotifier {
 
   /// Starts a chat on the default host and opens it ("New chat").
   Future<AgentSession?> newChat() async {
+    // Another device may have changed the synced default since.
+    await refreshVaultDefaults();
     await _switchHost(defaultHost);
     return createSession();
   }
@@ -895,7 +1010,7 @@ class AgentStore extends ChangeNotifier {
       host,
       hub?.url,
       hub?.token,
-      settings.agentModel.trim(),
+      resolvedModel(AgentHost.local).model ?? '',
       settings.agentBunPath.trim(),
       settings.agentClaudeCodeDir.trim(),
       settings.desktopTools,
@@ -998,7 +1113,7 @@ class AgentStore extends ChangeNotifier {
             vault: vault.raw,
             dataDir: _folder(),
             settings: AgentSettings(
-              defaultModel: s.agentModel.trim(),
+              defaultModel: resolvedModel(AgentHost.local).model ?? '',
               bunPath: opt(s.agentBunPath),
               claudeCodeDir: opt(s.agentClaudeCodeDir),
               permissionMode: bridge.AgentPermissionMode.bypass,

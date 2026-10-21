@@ -43,7 +43,7 @@ AgentStore storeWith(
 
 AiSettings closedSettings({AgentHost host = AgentHost.local}) => AiSettings()
   ..agentEnabled = false
-  ..agentHost = host;
+  ..agentHostOverride = host;
 
 /// A chat [id] with no messages, or with one user message.
 AgentSessionState chatState(
@@ -250,7 +250,8 @@ void main() {
 
   appTest('the default model follows the connected runner\'s list', (t) async {
     final tv = await pumpApp(t, mobile: false);
-    final settings = closedSettings()..agentModel = 'codex/b';
+    final settings = closedSettings()
+      ..agentModelOverrides[AgentHost.local] = 'codex/b';
     final store = storeWith(tv, settings: settings, app: AppSettings());
     store.models = const [
       AgentModel(id: 'codex/a', name: 'A'),
@@ -259,14 +260,14 @@ void main() {
     expect(store.defaultModel, 'codex/b', reason: 'the setting is listed');
     expect(store.modelOf(null), 'codex/b');
 
-    settings.agentModel = 'codex/gone';
+    settings.agentModelOverrides[AgentHost.local] = 'codex/gone';
     expect(store.defaultModel, 'codex/a', reason: 'not listed: the first model');
     expect(store.modelOf(null), 'codex/a');
 
     store.models = const [];
     expect(store.defaultModel, 'codex/gone', reason: 'no list yet: the setting');
 
-    settings.agentModel = '';
+    settings.agentModelOverrides.clear();
     expect(store.defaultModel, isNull);
 
     store.models = const [
@@ -276,7 +277,7 @@ void main() {
     expect(store.defaultModel, 'codex/a', reason: 'no setting: the first model');
 
     settings.agentCustomModels = ['claude-code/custom'];
-    settings.agentModel = 'claude-code/custom';
+    settings.agentModelOverrides[AgentHost.local] = 'claude-code/custom';
     expect(store.defaultModel, 'claude-code/custom', reason: 'custom models count');
 
     store.pickModel(null, 'codex/b');

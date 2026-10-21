@@ -225,7 +225,7 @@ void main() {
             deviceLabel: 'Desktop',
           );
           AiSettings.beside(settings.file)
-              .update((s) => s.agentHost = AgentHost.hub);
+              .update((s) => s.agentHostOverride = AgentHost.hub);
           final signout = signOutFromHub(sync, settings, auth);
           if (status == HttpStatus.noContent) {
             await signout;
@@ -237,7 +237,7 @@ void main() {
           expect(restored.clientUrl, isNull);
           expect(restored.clientToken, isNull);
           expect(restored.clientDeviceLabel, isNull);
-          expect(AiSettings.beside(settings.file).agentHost, AgentHost.local);
+          expect(AiSettings.beside(settings.file).agentHostOverride, isNull);
           expect(sync.connected, isFalse);
           expect(sync.disconnected, isTrue);
         } finally {
