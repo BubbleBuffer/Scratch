@@ -355,7 +355,9 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
         // Imports can be much larger than ordinary calls. Release this parsed
         // copy before the shared dispatcher parses the original body.
         drop(msg);
-        return crate::mcp::dispatch_vault(state, input, actor, false).await;
+        // OAuth callers get the Everything tool set.
+        let set = vault_tools::ToolSet::Everything;
+        return crate::mcp::dispatch_vault(state, input, actor, set).await;
     }
     if input.total > MAX_BODY {
         return (StatusCode::PAYLOAD_TOO_LARGE, "request too large").into_response();

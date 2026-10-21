@@ -33,3 +33,35 @@ impl Tool for ConfirmTool {
         Ok(ToolResult::text(format!("confirmed: {text}")))
     }
 }
+
+/// The sleeping test tool's name.
+pub const SLEEP_TOOL: &str = "test_sleep";
+
+/// Waits `ms` milliseconds (default 60 s), then returns `slept`. Lets tests
+/// hold a run open, to cancel it or let it hit a time limit.
+pub struct SleepTool;
+
+#[async_trait]
+impl Tool for SleepTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: SLEEP_TOOL.into(),
+            description: "Test tool: waits `ms` milliseconds.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {"ms": {"type": "integer"}},
+            }),
+            read_only: true,
+            approval: Approval::None,
+        }
+    }
+
+    async fn invoke(&self, context: ToolContext, input: Value) -> Result<ToolResult> {
+        let ms = input["ms"].as_u64().unwrap_or(60_000);
+        tokio::select! {
+            _ = tokio::time::sleep(std::time::Duration::from_millis(ms)) => {}
+            _ = context.cancellation.cancelled() => anyhow::bail!("cancelled"),
+        }
+        Ok(ToolResult::text("slept"))
+    }
+}

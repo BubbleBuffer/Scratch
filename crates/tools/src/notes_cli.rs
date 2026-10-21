@@ -10,6 +10,8 @@ use anyhow::{anyhow, bail, Result};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
+use crate::notes_setup::{self, Agent};
+
 #[path = "notes_cli/import.rs"]
 pub mod import;
 #[path = "notes_cli/wiki.rs"]
@@ -215,6 +217,8 @@ memory update PATH [--new-path PATH] [--description TEXT] [--type TYPE] [--name 
 memory index [--project PROJECT] [--max-chars N]\n\
 memory import PROJECTS_DIR --map MAP [--dry-run] [--offline]\n\
 wiki import [--project NAME] [--dry-run] [--exclude GLOB]... [--report FILE] [DIR]\n\
+jobs create [--tools read|write|everything] [PROMPT | < prompt] | get JOB | wait JOB [--timeout-ms N] | cancel JOB | list [--limit N]\n\
+setup claude|codex  connect Claude Code or Codex to this computer's notes hub (uses the desktop app's sign-in)\n\
 Credentials: NOTES_TOKEN or token in notes/config.toml; hub: NOTES_HUB_URL or hub in config.";
 
 struct Parsed {
@@ -269,6 +273,8 @@ fn parse(args: &[String]) -> Result<Parsed> {
                     | "map"
                     | "report"
                     | "exclude"
+                    | "tools"
+                    | "timeout-ms"
             ) {
                 bail!("unknown option; use notes --help");
             }
@@ -352,6 +358,10 @@ pub fn run(args: &[String]) -> Result<String> {
     if is_rules(&parsed) {
         return Ok(rules_text());
     }
+    // Setup reads the desktop app's sign-in itself, so it runs before Config::load.
+    if is_setup(&parsed) {
+        return setup_command(&parsed);
+    }
     let cwd = std::env::current_dir().map_err(|_| anyhow!("cannot determine current directory"))?;
     if is_wiki(&parsed) {
         return wiki_command(parsed, &cwd, Config::load);
@@ -407,6 +417,9 @@ pub fn run_with_config(
     if is_rules(&parsed) {
         return Ok(rules_text());
     }
+    if is_setup(&parsed) {
+        return setup_command(&parsed);
+    }
     if is_wiki(&parsed) {
         return wiki_command(parsed, cwd, || Ok(config));
     }
@@ -441,6 +454,24 @@ fn wiki_command(p: Parsed, cwd: &Path, config: impl FnOnce() -> Result<Config>) 
         dir: p.words.get(2).map(PathBuf::from),
     };
     wiki::run(&opts, cwd, config)
+}
+
+fn is_setup(parsed: &Parsed) -> bool {
+    parsed.words.first().map(String::as_str) == Some("setup")
+}
+
+/// `notes setup claude|codex`: no options, no token argument, no stdin.
+fn setup_command(p: &Parsed) -> Result<String> {
+    const USAGE: &str = "usage: notes setup claude|codex";
+    let agent = match (p.words.len(), p.words.get(1).map(String::as_str)) {
+        (2, Some("claude")) => Agent::Claude,
+        (2, Some("codex")) => Agent::Codex,
+        _ => bail!(USAGE),
+    };
+    if p.json || !p.options.is_empty() {
+        bail!(USAGE);
+    }
+    notes_setup::setup(agent)
 }
 
 /// `notes memory rules`: answered locally, before any config or hub access.
@@ -602,6 +633,7 @@ fn execute(p: &Parsed, stdin: Option<&str>, cwd: &Path, config: Config) -> Resul
             )
         }
         "memory" => memory_command(p, stdin)?,
+        "jobs" => jobs_command(p, stdin)?,
         _ => bail!("unknown command; use notes --help"),
     };
     let result = client.call(name, &arguments)?;
@@ -612,6 +644,62 @@ fn execute(p: &Parsed, stdin: Option<&str>, cwd: &Path, config: Config) -> Resul
     } else {
         tool_text(&result)
     }
+}
+
+/// `notes jobs ...`: the hub's `jobs` tool.
+fn jobs_command(p: &Parsed, stdin: Option<&str>) -> Result<(&'static str, Value)> {
+    let action = p.words.get(1).map(String::as_str).unwrap_or_default();
+    let a = match action {
+        "create" => {
+            allowed(p, &["tools"])?;
+            let prompt = match p.words.len() {
+                2 => stdin_required(stdin)
+                    .map_err(|_| anyhow!("give the prompt as an argument or on standard input"))?
+                    .to_string(),
+                3 => p.words[2].clone(),
+                _ => bail!("invalid command arguments; use notes --help"),
+            };
+            let mut a = json!({"action":"create", "prompt":prompt});
+            if let Some(tools) = p.options.get("tools") {
+                if !matches!(tools.as_str(), "read" | "write" | "everything") {
+                    bail!("--tools must be read, write or everything");
+                }
+                a["tools"] = json!(tools);
+            }
+            a
+        }
+        "get" | "cancel" => {
+            require_words(p, 3)?;
+            allowed(p, &[])?;
+            json!({"action":action, "job":p.words[2]})
+        }
+        "wait" => {
+            require_words(p, 3)?;
+            allowed(p, &["timeout-ms"])?;
+            let mut a = json!({"action":"wait", "job":p.words[2]});
+            if let Some(ms) = p.options.get("timeout-ms") {
+                let ms = ms
+                    .parse::<u32>()
+                    .map_err(|_| anyhow!("--timeout-ms must be a nonnegative integer"))?;
+                a["timeout_ms"] = json!(ms);
+            }
+            a
+        }
+        "list" => {
+            require_words(p, 2)?;
+            allowed(p, &["limit"])?;
+            let mut a = json!({"action":"list"});
+            if let Some(n) = p.options.get("limit") {
+                let n = n
+                    .parse::<u32>()
+                    .map_err(|_| anyhow!("--limit must be a nonnegative integer"))?;
+                a["limit"] = json!(n);
+            }
+            a
+        }
+        _ => bail!("jobs needs create, get, wait, cancel or list; use notes --help"),
+    };
+    Ok(("jobs", a))
 }
 
 fn numeric_options(p: &Parsed, a: &mut Value) -> Result<()> {

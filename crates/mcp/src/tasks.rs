@@ -12,6 +12,12 @@
 //!   page itself.
 //! - The runner (desktop) claims the oldest queued task, runs it, and
 //!   writes the result into the row's body and the target page.
+//! - A task may be pinned to one device (`node` = its device id: "Ask AI"
+//!   on a computer whose default runner is this computer); only that device
+//!   claims it. Rows whose node is `hub` are jobs ([`crate::jobs`]); a job
+//!   about a page uses the same placeholder.
+//! - A task can be cancelled ([`cancel`]): a queued one is never claimed,
+//!   and a running one's result is dropped when it ends.
 
 use serde::{Deserialize, Serialize};
 use vault_core::{
@@ -31,6 +37,10 @@ pub const QUEUED: &str = "queued";
 pub const RUNNING: &str = "running";
 pub const DONE: &str = "done";
 pub const FAILED: &str = "failed";
+/// Jobs only (see [`crate::jobs`]): cancelled by their owner.
+pub const CANCELLED: &str = "cancelled";
+/// Jobs only: the hub restarted while the job ran.
+pub const INTERRUPTED: &str = "interrupted";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
@@ -44,6 +54,10 @@ pub struct Task {
     /// `agent` (the desktop BubblePaw agent), `claude`, `codex`, `deepseek`,
     /// or empty for the desktop's default.
     pub runner: String,
+    /// Where it runs: empty (any desktop), a device id (only that device),
+    /// or `hub` (a job, see [`crate::jobs`]).
+    #[serde(default)]
+    pub node: String,
     pub status: String,
     /// The device that claimed it.
     pub device: String,
@@ -82,6 +96,8 @@ pub fn schema() -> Vec<PropDef> {
                 opt(RUNNING, "Running", "blue"),
                 opt(DONE, "Done", "green"),
                 opt(FAILED, "Failed", "red"),
+                opt(CANCELLED, "Cancelled", "default"),
+                opt(INTERRUPTED, "Interrupted", "yellow"),
             ],
         ),
         def("prompt", "Prompt", PropKind::Text, vec![]),
@@ -91,7 +107,42 @@ pub fn schema() -> Vec<PropDef> {
         def("error", "Error", PropKind::Text, vec![]),
         def("block", "Block", PropKind::Text, vec![]),
         def("created", "Created", PropKind::CreatedTime, vec![]),
+        // Jobs (crate::jobs): the node that runs it (`hub`), the principal
+        // that created it, its tool set, its session and when it ended.
+        def("node", "Node", PropKind::Text, vec![]),
+        def("owner", "Owner", PropKind::Text, vec![]),
+        def("tools", "Tools", PropKind::Text, vec![]),
+        def("session", "Session", PropKind::Text, vec![]),
+        def("finished", "Finished", PropKind::Text, vec![]),
     ]
+}
+
+/// Adds the properties and status options of [`schema`] that an older
+/// tasks database lacks (it was written once, when it was created).
+/// Existing properties, options and values stay as they are.
+pub fn migrate_schema(v: &Vault, collection: &PageId) -> Result<()> {
+    let mut current = v.get_schema(collection.clone())?;
+    let mut changed = false;
+    for want in schema() {
+        match current.iter_mut().find(|d| d.key == want.key) {
+            Some(have) => {
+                for o in want.options {
+                    if !have.options.iter().any(|x| x.id == o.id) {
+                        have.options.push(o);
+                        changed = true;
+                    }
+                }
+            }
+            None => {
+                current.push(want);
+                changed = true;
+            }
+        }
+    }
+    if changed {
+        v.set_schema(collection.clone(), current)?;
+    }
+    Ok(())
 }
 
 /// The tasks database, if it exists (the oldest one if two devices made
@@ -121,6 +172,7 @@ pub fn collection(v: &Vault) -> Result<Option<PageId>> {
 /// The tasks database, created if missing.
 pub fn ensure_collection(v: &Vault) -> Result<PageId> {
     if let Some(c) = collection(v)? {
+        migrate_schema(v, &c)?;
         return Ok(c);
     }
     let id = v.create_page(None, TITLE.into())?;
@@ -131,7 +183,7 @@ pub fn ensure_collection(v: &Vault) -> Result<PageId> {
     Ok(id)
 }
 
-fn text(p: &[vault_core::Property], key: &str) -> String {
+pub(crate) fn text(p: &[vault_core::Property], key: &str) -> String {
     p.iter()
         .find(|x| x.key == key)
         .and_then(|x| match &x.value {
@@ -157,6 +209,7 @@ fn task_of(row: &PageSummary) -> Task {
         page,
         block,
         runner: text(p, "runner"),
+        node: text(p, "node"),
         status: text(p, "status"),
         device: text(p, "device"),
         error: text(p, "error"),
@@ -183,7 +236,7 @@ pub fn get(v: &Vault, id: &str) -> Result<Task> {
     Ok(task_of(&summary))
 }
 
-fn first_line(s: &str, max: usize) -> String {
+pub(crate) fn first_line(s: &str, max: usize) -> String {
     let line = s
         .lines()
         .find(|l| !l.trim().is_empty())
@@ -201,6 +254,8 @@ fn placeholder_text(status: &str, prompt: &str) -> String {
         QUEUED => "AI task queued",
         RUNNING => "AI is working on this",
         FAILED => "AI task failed",
+        CANCELLED => "AI task cancelled",
+        INTERRUPTED => "AI task interrupted",
         _ => "AI task",
     };
     format!("{what}: {}", first_line(prompt, 100))
@@ -225,6 +280,20 @@ pub fn create(
     page: &PageId,
     after: Option<&str>,
     runner: &str,
+) -> Result<Task> {
+    create_on(v, prompt, page, after, runner, "")
+}
+
+/// [`create`] for `node`: empty (any desktop claims it), a device id (only
+/// that device claims it) or `hub` (a job; the jobs API sets its owner and
+/// tool set).
+pub fn create_on(
+    v: &Vault,
+    prompt: &str,
+    page: &PageId,
+    after: Option<&str>,
+    runner: &str,
+    node: &str,
 ) -> Result<Task> {
     let prompt = prompt.trim();
     if prompt.is_empty() {
@@ -312,6 +381,9 @@ pub fn create(
     if !runner.is_empty() {
         v.set_property(row.clone(), "runner".into(), PropValue::Text(runner.into()))?;
     }
+    if !node.is_empty() {
+        v.set_property(row.clone(), "node".into(), PropValue::Text(node.into()))?;
+    }
     get(v, &row)
 }
 
@@ -327,7 +399,7 @@ fn parent_of(blocks: &[Block], parent: Option<&str>, id: &str) -> Option<Option<
     None
 }
 
-fn with_status(status: &str) -> Option<Filter> {
+pub(crate) fn with_status(status: &str) -> Option<Filter> {
     Some(Filter::Cond(Condition {
         prop: "status".into(),
         op: FilterOp::Is,
@@ -364,7 +436,7 @@ fn set_status(v: &Vault, t: &Task, status: &str) -> Result<()> {
 }
 
 /// Sets the placeholder's text for `status` (if the block still exists).
-fn set_placeholder(v: &Vault, t: &Task, status: &str) -> Result<()> {
+pub(crate) fn set_placeholder(v: &Vault, t: &Task, status: &str) -> Result<()> {
     let (Some(page), Some(block)) = (&t.page, &t.block) else {
         return Ok(());
     };
@@ -375,7 +447,7 @@ fn set_placeholder(v: &Vault, t: &Task, status: &str) -> Result<()> {
         return Ok(());
     }
     let text = match status {
-        FAILED => format!(
+        FAILED | INTERRUPTED if !t.error.trim().is_empty() => format!(
             "{} ({})",
             placeholder_text(status, &t.prompt),
             first_line(&t.error, 200)
@@ -387,7 +459,7 @@ fn set_placeholder(v: &Vault, t: &Task, status: &str) -> Result<()> {
         text,
         marks: vec![],
     }];
-    if status == FAILED {
+    if status == FAILED || status == INTERRUPTED {
         ops.push(BlockOp::SetColor {
             id: block.clone(),
             color: Some("red_background".into()),
@@ -397,7 +469,8 @@ fn set_placeholder(v: &Vault, t: &Task, status: &str) -> Result<()> {
     Ok(())
 }
 
-/// Claims the oldest queued task for `device` (marks it running).
+/// Claims the oldest queued task for `device` (marks it running): one with
+/// no node, or one pinned to `device`.
 pub fn claim_next(v: &Vault, device: &str) -> Result<Option<Task>> {
     let Some(c) = collection(v)? else {
         return Ok(None);
@@ -406,11 +479,16 @@ pub fn claim_next(v: &Vault, device: &str) -> Result<Option<Task>> {
         prop: "$created".into(),
         descending: false,
     }];
+    // Jobs (node `hub`) run only on the hub, pinned tasks only on their
+    // device.
     let Some(row) = v
-        .query(Some(c), with_status(QUEUED), sorts, 0, 1)?
+        .query(Some(c), with_status(QUEUED), sorts, 0, 200)?
         .rows
         .into_iter()
-        .next()
+        .find(|r| {
+            let node = text(&r.properties, "node");
+            node.is_empty() || (node == device && node != crate::jobs::NODE_HUB)
+        })
     else {
         return Ok(None);
     };
@@ -503,12 +581,61 @@ fn create_placeholder_at_end(v: &Vault, page: &PageId, prompt: &str) -> Result<S
     Ok(id)
 }
 
+/// Cancels a desktop task that hasn't ended (queued or running): it is
+/// never claimed, and a running one's result is dropped when it ends. Jobs
+/// (node `hub`) are cancelled through the hub's jobs API instead. Returns
+/// whether the task was still going.
+pub fn cancel(v: &Vault, id: &str) -> Result<bool> {
+    let t = get(v, id)?;
+    if t.node == crate::jobs::NODE_HUB {
+        return err("this task runs on the hub: cancel it there");
+    }
+    if t.status != QUEUED && t.status != RUNNING {
+        return Ok(false);
+    }
+    v.set_property(
+        t.id.clone(),
+        "status".into(),
+        PropValue::Select(CANCELLED.into()),
+    )?;
+    set_placeholder(v, &t, CANCELLED)?;
+    Ok(true)
+}
+
+/// Writes a finished task's result `md` into its page: in place of the
+/// placeholder, or at the end when the placeholder is gone. An empty result
+/// removes the placeholder (the agent edited the vault itself).
+pub(crate) fn write_result(v: &Vault, t: &Task, md: &str) -> Result<()> {
+    let md = md.trim().to_string();
+    let Some(page) = &t.page else {
+        return Ok(());
+    };
+    let Ok(p) = v.load_page(page.clone()) else {
+        return Ok(());
+    };
+    let placeholder = t.block.as_deref().filter(|b| find(&p.blocks, b).is_some());
+    match (placeholder, md.is_empty()) {
+        (Some(b), _) => {
+            v.replace_markdown(page.clone(), vec![b.to_string()], md)?;
+        }
+        (None, false) => {
+            v.insert_markdown(page.clone(), None, None, true, md)?;
+        }
+        (None, true) => {}
+    }
+    Ok(())
+}
+
 /// Ends a task. `Ok(markdown)`: the result goes into the task's row and
 /// replaces the placeholder in the target page (an empty result removes
 /// the placeholder: the agent edited the vault itself). `Err(message)`:
-/// the task fails and the placeholder says why.
+/// the task fails and the placeholder says why. A cancelled task stays
+/// cancelled and its result is dropped.
 pub fn finish(v: &Vault, id: &str, result: std::result::Result<String, String>) -> Result<()> {
     let t = get(v, id)?;
+    if t.status == CANCELLED {
+        return Ok(());
+    }
     match result {
         Ok(md) => {
             let md = md.trim().to_string();
@@ -518,20 +645,7 @@ pub fn finish(v: &Vault, id: &str, result: std::result::Result<String, String>) 
                 md.clone()
             };
             v.replace_markdown(t.id.clone(), vec![], body)?;
-            if let Some(page) = &t.page {
-                if let Ok(p) = v.load_page(page.clone()) {
-                    let placeholder = t.block.as_deref().filter(|b| find(&p.blocks, b).is_some());
-                    match (placeholder, md.is_empty()) {
-                        (Some(b), _) => {
-                            v.replace_markdown(page.clone(), vec![b.to_string()], md)?;
-                        }
-                        (None, false) => {
-                            v.insert_markdown(page.clone(), None, None, true, md)?;
-                        }
-                        (None, true) => {}
-                    }
-                }
-            }
+            write_result(v, &t, &md)?;
             v.remove_property(t.id.clone(), "error".into())?;
             set_status(v, &t, DONE)
         }

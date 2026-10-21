@@ -4,6 +4,7 @@
 
 import 'package:flutter/widgets.dart';
 
+import '../../core/tool_sets.dart';
 import '../../services/legacy_host.dart' show openPage, pickPage;
 import '../../ui/app_name.dart';
 import '../../ui/database/widgets.dart' show ChipBtn, MenuField, Pill;
@@ -139,6 +140,7 @@ class _SchedulePageState extends State<SchedulePage> {
                       ),
                     ),
                     _Section(label: 'Runs on', child: _RunnerSection(c: c)),
+                    _Section(label: 'Tools', child: _ToolsSection(c: c)),
                     _Section(
                       label: 'Step',
                       child: _StepSection(c: c, titleField: _stepTitle),
@@ -454,6 +456,46 @@ class _RunnerSection extends StatelessWidget {
                 : '${node.kindLabel} · last seen ${_ago(node.lastSeen, now)}',
             selected: node.id == runner,
             onTap: () => c.setRunner(node.id),
+          ),
+      ],
+    );
+  }
+}
+
+// ---- Tools ---------------------------------------------------------------
+
+/// The tool sets a schedule can pick: those that can run its note step
+/// (Read cannot create pages). Everything is always offered.
+final scheduleToolSets = [
+  for (final s in toolSets)
+    if (s != 'read') s,
+];
+
+class _ToolsSection extends StatelessWidget {
+  const _ToolsSection({required this.c});
+  final ScheduleController c;
+
+  @override
+  Widget build(BuildContext context) {
+    final def = c.def;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (def.toolSet == null && def.tools.isNotEmpty)
+          _NodeRow(
+            key: const ValueKey('schedule-tools-list'),
+            name: 'Listed tools',
+            detail: def.tools.join(', '),
+            selected: true,
+            onTap: () {},
+          ),
+        for (final set in scheduleToolSets)
+          _NodeRow(
+            key: ValueKey('schedule-tools-$set'),
+            name: toolSetLabel(set),
+            detail: toolSetDescription(set),
+            selected: def.toolSet == set,
+            onTap: () => c.setToolSet(set),
           ),
       ],
     );

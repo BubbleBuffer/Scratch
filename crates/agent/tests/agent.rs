@@ -72,6 +72,7 @@ fn open_with(
                 scripted: Some((steps, "All done.".into())),
                 extra_tools: extra,
                 confirm_tool,
+                ..TestHooks::default()
             },
             ..AgentConfig::default()
         },
@@ -473,4 +474,30 @@ fn test_confirm_tool_exists_only_with_its_flag_and_reports_a_denial() {
     assert!(seen.iter().any(|k| matches!(k,
         EventKind::ToolFinished { name, result, .. } if name == "js" && result.content.contains("Not today"))),
         "{seen:?}");
+}
+
+#[test]
+fn ai_task_runs_never_wait_for_approval() {
+    // The app's permission mode is Manual, yet an AI task (Ask AI on this
+    // device) runs like a hub job: nobody is there to approve.
+    let t = temp();
+    let v = &t.vault;
+    let page = v.create_page(None, "Approvals".into()).unwrap();
+    let task = tasks::create(v, "Confirm it", &page, None, vault_agent::tasks::RUNNER).unwrap();
+    tasks::claim_next(v, &v.device_id()).unwrap().unwrap();
+    let agent = open_with(
+        &t,
+        vec![js(r#"return await tools.test_confirm({text: "go"});"#)],
+        vec![],
+        true,
+    );
+    let run = agent.run_task(v, &task.id).unwrap();
+    assert!(run.ok, "{run:?}");
+    assert_eq!(run.text, "All done.");
+    let state = agent.session_state(&run.session_id).unwrap();
+    assert!(
+        state.messages.iter().any(|m| m.content.contains("confirmed: go")),
+        "{:?}",
+        state.messages
+    );
 }

@@ -342,6 +342,7 @@ mod desktop {
                     confirm_tool: s.test_tools,
                     ..TestHooks::default()
                 },
+                tool_set: None,
             };
             let agent = Agent::open(vault.inner.clone(), config).map_err(e)?;
             Ok(Local(Arc::new(agent)))

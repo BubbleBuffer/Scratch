@@ -317,6 +317,36 @@ void main() {
       expect(storage.writes, ['$schedulePageId/$scheduleAddonId/trigger']);
     });
 
+    testWidgets('Tools offers the sets that can run the step, Everything always', (
+      tester,
+    ) async {
+      final storage = seededStorage(def: weeklyDefJson());
+      await pumpPage(
+        tester,
+        storage: storage,
+        backend: hubBackend(states: {schedulePageId: acceptedLive}),
+      );
+
+      // A schedule from before tool sets shows its list, selected.
+      expect(_key('schedule-tools-list'), findsOneWidget);
+      expect(_key('schedule-tools-write'), findsOneWidget);
+      expect(_key('schedule-tools-everything'), findsOneWidget);
+      // Read cannot create the note, so it is not offered.
+      expect(_key('schedule-tools-read'), findsNothing);
+
+      await tester.ensureVisible(_key('schedule-tools-everything'));
+      await settleSchedule(tester);
+      await tester.tap(_key('schedule-tools-everything'));
+      await settleSchedule(tester);
+
+      expect(
+        storage.object(schedulePageId, scheduleAddonId)['tools'],
+        'everything',
+      );
+      expect(storage.writes, ['$schedulePageId/$scheduleAddonId/tools']);
+      expect(_key('schedule-tools-list'), findsNothing);
+    });
+
     testWidgets('a weekday chip adds the day to BYDAY', (tester) async {
       final storage = seededStorage();
       await pumpPage(

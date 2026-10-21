@@ -25,7 +25,7 @@ Steps for this Windows PC, once the production hub serves `/mcp`.
    notes-hub --agent-token add <name> --scope write
    ```
 
-   Names use lowercase letters, digits and hyphens. Add `--config <file>` if the hub does not use the default config. `--scope read` gives only the read tools.
+   Names use lowercase letters, digits and hyphens. Add `--config <file>` if the hub does not use the default config. `--scope read` gives only the read tools; `--scope everything` also gets tools added later.
 
 2. **Add the marketplace and install the plugin.** In Claude Code, with `<repo>` as the local checkout (for example `V:/projects/notes-app`):
 

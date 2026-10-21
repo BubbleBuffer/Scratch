@@ -7,8 +7,10 @@ import '../../core/change_feed.dart';
 import '../../core/models.dart';
 import '../../registry/note_type_registry.dart';
 import '../../services/addon_services.dart';
+import '../../ui/toast.dart';
 import '../../ui/ui.dart';
 import 'item_card.dart';
+import 'task_agent.dart';
 import 'task_composer.dart';
 import 'task_data.dart';
 
@@ -33,6 +35,7 @@ class TaskNote extends StatefulWidget {
 
 class _TaskNoteState extends State<TaskNote> {
   TaskData? _task;
+  AiTask? _run;
   CalendarSettings? _calendars;
   ChangeFeed? _feed;
   String? _error;
@@ -68,11 +71,15 @@ class _TaskNoteState extends State<TaskNote> {
     final generation = ++_generation;
     try {
       final vault = const AddonServices().vault(context);
+      final runs = const AddonServices().agentRuns(context);
       final data = await loadTask(vault, widget.args.pageId);
       final calendars = await vault.listCalendars();
+      final runId = data.agentRun;
+      final run = runId == null ? null : await runs.run(runId);
       if (mounted && generation == _generation) {
         setState(() {
           _task = data;
+          _run = run;
           _calendars = calendars;
           _error = null;
         });
@@ -107,11 +114,19 @@ class _TaskNoteState extends State<TaskNote> {
     if (_busy) return;
     _busy = true;
     try {
-      await saveTask(
-        const AddonServices().vault(context),
-        widget.args.pageId,
-        task,
-      );
+      final vault = const AddonServices().vault(context);
+      final runs = const AddonServices().agentRuns(context);
+      final before = _task?.assignee ?? 'me';
+      await saveTask(vault, widget.args.pageId, task);
+      try {
+        await followTaskAssignee(runs, vault, widget.args.pageId,
+            from: before, to: task.assignee, title: title.isEmpty ? widget.args.title : title);
+      } catch (e) {
+        if (mounted) {
+          showErrorToast(
+              context, task.assignee == 'agent' ? "The agent couldn't start: $e" : "Couldn't stop the agent: $e");
+        }
+      }
       await _load();
     } finally {
       _busy = false;
@@ -149,6 +164,7 @@ class _TaskNoteState extends State<TaskNote> {
                                 initial: data,
                                 calendars: _calendars!,
                                 onSave: _save,
+                                agentRun: _run,
                               ),
                               if (_error != null) _status(context),
                             ],

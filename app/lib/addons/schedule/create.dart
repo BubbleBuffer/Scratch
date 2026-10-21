@@ -72,7 +72,7 @@ Future<String> createWeeklySchedule(
       missed: missedLatest,
     ),
     runner: hub?.id,
-    tools: const ['create_page'],
+    toolSet: 'write',
     steps: [
       ScheduleStep(
         id: 'note',

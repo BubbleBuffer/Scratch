@@ -1121,6 +1121,17 @@ impl NotesVault {
         self.inner.set_agent_default_model(runner, model).map_err(err)
     }
 
+    /// The tool set a runner's agent gets: read, write or everything
+    /// (the default). The runner reads it at its next engine start.
+    pub fn agent_tool_set(&self, runner: String) -> Result<String, String> {
+        self.inner.agent_tool_set(&runner).map_err(err)
+    }
+
+    /// Sets a runner's tool set; `None` returns it to everything.
+    pub fn set_agent_tool_set(&self, runner: String, set: Option<String>) -> Result<(), String> {
+        self.inner.set_agent_tool_set(runner, set).map_err(err)
+    }
+
     /// One-time migration of old per-device values: written only when the
     /// vault has no agent defaults. Returns whether it wrote.
     pub fn seed_agent_defaults(&self, seed: VaultAgentDefaults) -> Result<bool, String> {

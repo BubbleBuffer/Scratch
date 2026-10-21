@@ -5,6 +5,10 @@
 //! stay in `raw`. The acceptance hash covers `runner`, `tools` and `steps`, with
 //! object keys sorted and array order kept.
 //!
+//! `tools` limits what the steps may use: a built-in tool set (`read`, `write` or
+//! `everything`, the same sets as agent tokens) or, as first written, a list of
+//! tool names. Every step's tool must be in it; a run checks again before acting.
+//!
 //! Times: `trigger.at` is a wall time in `trigger.tz`. A wall time in a DST gap runs
 //! at the transition, the first valid instant after the gap. A wall time in an
 //! overlap runs at the earlier instant.
@@ -24,9 +28,12 @@ use jiff::tz::{AmbiguousOffset, TimeZone};
 use jiff::Timestamp;
 use notes_agent_wire::{ScheduleOccurrence, SchedulePreview};
 use serde_json::{json, Value};
+use vault_tools::ToolSet;
 
 const FORMAT_VERSION: u64 = 1;
 const STEP_KIND_NOTE: &str = "note.from_template";
+/// The vault tool the `note.from_template` step runs as.
+pub const NOTE_STEP_TOOL: &str = "create_page";
 /// Limit on explicitly requested previews. Catch-up scans include every due date.
 const MAX_OCCURRENCES: usize = 10_000;
 
@@ -37,8 +44,52 @@ pub struct Schedule {
     pub runner: String,
     /// `latest` or `skip`.
     pub missed: String,
+    pub tools: ScheduleTools,
     pub step: NoteStep,
     trigger: Trigger,
+}
+
+/// What a schedule's steps may use.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ScheduleTools {
+    /// A built-in tool set, as agent tokens use.
+    Set(ToolSet),
+    /// Tool names, as the format was first written. Old names count as the
+    /// tool they run.
+    List(Vec<String>),
+}
+
+impl ScheduleTools {
+    /// Reads the stored `tools` value: a set name or a list of names.
+    fn parse(value: Option<&Value>) -> Result<Self> {
+        match value {
+            Some(Value::String(name)) => name
+                .parse::<ToolSet>()
+                .map(ScheduleTools::Set)
+                .map_err(|e| anyhow::anyhow!("tools: {e}")),
+            Some(Value::Array(items)) => items
+                .iter()
+                .map(|t| {
+                    t.as_str()
+                        .map(str::to_owned)
+                        .context("tools must be strings")
+                })
+                .collect::<Result<Vec<_>>>()
+                .map(ScheduleTools::List),
+            _ => bail!("tools must be a tool set (read, write or everything) or a list"),
+        }
+    }
+
+    /// Whether a step may run tool `name`.
+    pub fn allows(&self, name: &str) -> bool {
+        match self {
+            ScheduleTools::Set(set) => set.allows(name),
+            ScheduleTools::List(names) => {
+                let wanted = vault_tools::canonical(name);
+                names.iter().any(|t| vault_tools::canonical(t) == wanted)
+            }
+        }
+    }
 }
 
 /// The `note.from_template` step. Template and parent are link text as stored.
@@ -108,19 +159,17 @@ impl Schedule {
             "unsupported schedule format version {version}"
         );
         let runner = text(&raw, "runner")?;
-        let tools = raw
-            .get("tools")
-            .and_then(Value::as_array)
-            .context("tools must be a list")?;
-        let mut has_create_page = false;
-        for tool in tools {
-            let name = tool.as_str().context("tools must be strings")?;
-            has_create_page |= name == "create_page";
+        let tools = ScheduleTools::parse(raw.get("tools"))?;
+        match &tools {
+            ScheduleTools::Set(set) => ensure!(
+                tools.allows(NOTE_STEP_TOOL),
+                "the {set} tool set cannot create pages; the note step needs write or everything"
+            ),
+            ScheduleTools::List(_) => ensure!(
+                tools.allows(NOTE_STEP_TOOL),
+                "tools must include create_page; the note step creates a page"
+            ),
         }
-        ensure!(
-            has_create_page,
-            "tools must include create_page; the note step creates a page"
-        );
         let (trigger, missed) = parse_trigger(raw.get("trigger").context("trigger is missing")?)?;
         let steps = raw
             .get("steps")
@@ -132,6 +181,7 @@ impl Schedule {
         Ok(Self {
             runner,
             missed,
+            tools,
             step,
             trigger,
             raw,
@@ -914,6 +964,26 @@ mod tests {
         let error = Schedule::parse(no_create_page).unwrap_err().to_string();
         assert!(error.contains("create_page"), "{error}");
 
+        // Tool sets: Write and Everything allow the note step, Read does not,
+        // and an unknown set name is refused.
+        for set in ["write", "everything"] {
+            let mut with_set = raw("2026-10-19T08:00", None);
+            with_set["tools"] = json!(set);
+            let parsed = Schedule::parse(with_set).unwrap();
+            assert_eq!(parsed.tools, ScheduleTools::Set(set.parse().unwrap()));
+        }
+        let mut read_set = raw("2026-10-19T08:00", None);
+        read_set["tools"] = json!("read");
+        let error = Schedule::parse(read_set).unwrap_err().to_string();
+        assert!(error.contains("read tool set cannot create pages"), "{error}");
+        let mut unknown_set = raw("2026-10-19T08:00", None);
+        unknown_set["tools"] = json!("admin");
+        let error = Schedule::parse(unknown_set).unwrap_err().to_string();
+        assert!(error.contains("read, write or everything"), "{error}");
+        let mut not_a_list = raw("2026-10-19T08:00", None);
+        not_a_list["tools"] = json!(3);
+        assert!(Schedule::parse(not_a_list).is_err());
+
         let mut two_steps = raw("2026-10-19T08:00", None);
         let copy = two_steps["steps"][0].clone();
         two_steps["steps"].as_array_mut().unwrap().push(copy);
@@ -1531,5 +1601,18 @@ mod tests {
                 NAMES[(day + 3).rem_euclid(7) as usize]
             );
         }
+    }
+
+    #[test]
+    fn schedule_tools_allow_by_set_or_list() {
+        let list = ScheduleTools::List(vec!["create_page".into(), "append_blocks".into()]);
+        assert!(list.allows("create_page"));
+        // An old name counts as the tool it runs.
+        assert!(list.allows("edit_page"));
+        assert!(!list.allows("trash_page"));
+        assert!(!ScheduleTools::Set(ToolSet::Read).allows("create_page"));
+        assert!(ScheduleTools::Set(ToolSet::Write).allows("trash_page"));
+        assert!(!ScheduleTools::Set(ToolSet::Write).allows("js"));
+        assert!(ScheduleTools::Set(ToolSet::Everything).allows("js"));
     }
 }

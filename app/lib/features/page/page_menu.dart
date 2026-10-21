@@ -1,6 +1,6 @@
 // The page's "•••" menu:
 // small text and full width switches, lock, favourites, copy link,
-// duplicate, move to, undo, page history, deleted pages, delete, import
+// duplicate, move to, Ask AI (about the page), undo, page history, deleted pages, delete, import
 // and export, then Send feedback. The switches apply in place; the other rows close the menu
 // and hand their action to the editor. A popover on desktop, a sheet on
 // mobile.
@@ -11,16 +11,18 @@ import '../../state/app_state.dart';
 import '../../state/pages_store.dart';
 import '../../ui/icon_x.dart';
 import '../../ui/ui.dart';
+import '../ai/ask_ai.dart' show AiMark;
 import '../settings/controls.dart' show Toggle;
 
-enum PageMenuAction { favorite, copyLink, duplicate, moveTo, undo, history, trash, delete, import, export, feedback }
+enum PageMenuAction { favorite, copyLink, duplicate, moveTo, askAi, undo, history, trash, delete, import, export, feedback }
 
 Future<PageMenuAction?> showPageMenu(BuildContext context, Rect? anchor,
-    {required String pageId, required bool favorite, required bool canUndo}) {
+    {required String pageId, required bool favorite, required bool canUndo, bool canAskAi = false}) {
   Widget body(BuildContext ctx) => PageMenu(
         pageId: pageId,
         favorite: favorite,
         canUndo: canUndo,
+        canAskAi: canAskAi,
         sheet: context.mobile,
         onAction: (a) => Navigator.of(ctx).pop(a),
       );
@@ -39,9 +41,13 @@ class PageMenu extends StatefulWidget {
     required this.canUndo,
     required this.onAction,
     this.sheet = false,
+    this.canAskAi = false,
   });
   final String pageId;
   final bool favorite, canUndo, sheet;
+
+  /// Shows "Ask AI" (an answer about the page, written at its end).
+  final bool canAskAi;
   final ValueChanged<PageMenuAction> onAction;
 
   @override
@@ -162,6 +168,7 @@ class _PageMenuState extends State<PageMenu> {
       row('copy-link', ico(Ico.link), 'Copy link', () => onAction(PageMenuAction.copyLink), shortcut: 'Ctrl+L'),
       row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: 'Ctrl+D'),
       row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo), shortcut: 'Ctrl+Shift+P'),
+      if (widget.canAskAi) row('ask-ai', AiMark(size: iconSize), 'Ask AI', () => onAction(PageMenuAction.askAi)),
       sep(),
       row('undo', ico(Ico.undo), 'Undo', canUndo ? () => onAction(PageMenuAction.undo) : null, shortcut: 'Ctrl+Z'),
       row('history', icx(Ix.history), 'Page history', () => onAction(PageMenuAction.history)),

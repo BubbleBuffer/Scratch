@@ -8,6 +8,10 @@ const taskType = 'task';
 const taskAddonId = 'tasks';
 const taskStatuses = ['todo', 'doing', 'done'];
 
+/// The type data key naming the agent's run for a task assigned to it
+/// (an AI tasks row or hub job id; see task_agent.dart).
+const taskRunKey = 'agent_run';
+
 String taskDateString(DateTime date, {bool timed = false}) => timed
     ? date.toUtc().toIso8601String()
     : '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -21,11 +25,16 @@ class TaskData {
     this.durationMin,
     this.assignee = 'me',
     this.calendar,
+    this.agentRun,
   });
 
   final String status, assignee;
   final bool checkbox;
   final String? date, calendar;
+
+  /// The agent's run for this task ([taskRunKey]); only task_agent.dart
+  /// writes it, so [toJson] leaves it out.
+  final String? agentRun;
   final int? durationMin;
   bool get done => status == 'done';
   bool get hasTime => date?.contains('T') ?? false;
@@ -52,6 +61,9 @@ class TaskData {
       assignee: value['assignee'] == 'agent' ? 'agent' : 'me',
       calendar: value['calendar'] is String
           ? value['calendar'] as String
+          : null,
+      agentRun: value[taskRunKey] is String
+          ? value[taskRunKey] as String
           : null,
     );
   }

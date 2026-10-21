@@ -8,6 +8,7 @@ import '../core/models.dart';
 import '../registry/block_registry.dart';
 import '../ui/icon_x.dart';
 import '../ui/ui.dart';
+import '../features/ai/ask_ai.dart' show AiMark;
 import 'color_menu.dart';
 
 /// A block type's icon: its [Ico], or its short text ("H1").
@@ -120,6 +121,7 @@ class SelectionToolbar extends StatelessWidget {
     required this.onTurnInto,
     this.onColor,
     this.onAskAgent,
+    this.onAskAi,
   });
   final String kind;
   final Set<BMarkKind> active;
@@ -127,6 +129,9 @@ class SelectionToolbar extends StatelessWidget {
   final VoidCallback onLink;
   final VoidCallback onTurnInto;
   final VoidCallback? onAskAgent;
+
+  /// Ask AI about the selection (its answer goes after the block).
+  final VoidCallback? onAskAi;
 
   /// Opens the colour menu under the given anchor.
   final ValueChanged<BuildContext>? onColor;
@@ -230,15 +235,28 @@ class SelectionToolbar extends StatelessWidget {
             ),
           ),
         ],
-        if (onAskAgent != null) ...[
-          const VLine(),
+        if (onAskAgent != null || onAskAi != null) const VLine(),
+        if (onAskAi != null)
+          AppTooltip(
+            label: 'Ask AI',
+            child: Semantics(
+              button: true,
+              label: 'Ask AI',
+              child: Hover(
+                key: const ValueKey('fmt-ask-ai'),
+                onTap: onAskAi,
+                radius: Radii.sm,
+                child: const SizedBox(width: 28, height: 28, child: Center(child: AiMark(size: 16))),
+              ),
+            ),
+          ),
+        if (onAskAgent != null)
           IconBtn(Ico.comment,
               key: const ValueKey('fmt-ask-agent'),
               onTap: onAskAgent,
               glyph: 16,
               radius: Radii.sm,
               semanticLabel: 'Ask agent'),
-        ],
       ]),
     );
   }
@@ -394,6 +412,7 @@ class BlockMenu extends StatefulWidget {
     required this.onTurnInto,
     required this.onColor,
     this.onAskAgent,
+    this.onAskAi,
     this.count = 1,
     this.color,
   });
@@ -402,6 +421,9 @@ class BlockMenu extends StatefulWidget {
   final ValueChanged<String> onTurnInto;
   final ValueChanged<String> onColor;
   final VoidCallback? onAskAgent;
+
+  /// Ask AI about the block(s); the answer goes after them.
+  final VoidCallback? onAskAi;
 
   /// How many blocks the menu acts on.
   final int count;
@@ -452,6 +474,9 @@ class _BlockMenuState extends State<BlockMenu> {
         MenuItem(key: const ValueKey('menu-set-date'), icon: Ico.clock, label: 'Set date',
             onTap: () => widget.onAction(BlockAction.setDate)),
       if (canTurn || type.colorable) const MenuSeparator(),
+      if (widget.onAskAi != null)
+        MenuItem(key: const ValueKey('menu-ask-ai'), leading: const AiMark(size: 18),
+            label: 'Ask AI', onTap: widget.onAskAi!),
       if (widget.onAskAgent != null)
         MenuItem(key: const ValueKey('menu-ask-agent'), icon: Ico.comment,
             label: 'Ask agent', onTap: widget.onAskAgent),
@@ -501,11 +526,14 @@ class SheetResult {
 
 class BlockSheet extends StatefulWidget {
   const BlockSheet({super.key, required this.kind, this.count = 1, this.color,
-      this.onAskAgent});
+      this.onAskAgent, this.onAskAi});
   final String kind;
   final int count;
   final String? color;
   final VoidCallback? onAskAgent;
+
+  /// Ask AI about the block(s); the answer goes after them.
+  final VoidCallback? onAskAi;
 
   @override
   State<BlockSheet> createState() => _BlockSheetState();
@@ -536,6 +564,12 @@ class _BlockSheetState extends State<BlockSheet> {
           ]
         : [
             if (widget.count > 1) SheetHeader('${widget.count} blocks'),
+            if (widget.onAskAi != null)
+              SheetItem(key: const ValueKey('sheet-ask-ai'), leading: const AiMark(size: 20),
+                  label: 'Ask AI', onTap: () {
+                    Navigator.of(context).pop();
+                    widget.onAskAi!();
+                  }),
             if (widget.onAskAgent != null)
               SheetItem(key: const ValueKey('sheet-ask-agent'), icon: Ico.comment,
                   label: 'Ask agent', onTap: () {

@@ -12,6 +12,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/tool_sets.dart';
+
 /// Who does AI tasks on this device.
 enum AiRunner {
   none('Off'),
@@ -69,7 +71,11 @@ enum AgentDefaultSource { device, vault, builtIn }
 
 /// The vault's synced agent defaults, as this device reads them.
 class VaultAgentDefaultsView {
-  const VaultAgentDefaultsView({this.host, this.models = const {}});
+  const VaultAgentDefaultsView({
+    this.host,
+    this.models = const {},
+    this.toolSets = const {},
+  });
   static const none = VaultAgentDefaultsView();
 
   /// The default runner (null: not set in the vault).
@@ -78,17 +84,29 @@ class VaultAgentDefaultsView {
   /// Default `provider/model` per runner.
   final Map<AgentHost, String> models;
 
+  /// Tool set per runner (`read`, `write`, `everything`); a runner not
+  /// listed has the default, [defaultAgentToolSet].
+  final Map<AgentHost, String> toolSets;
+
+  /// The tool set [runner]'s agent gets.
+  String toolSetFor(AgentHost runner) =>
+      toolSets[runner] ?? defaultAgentToolSet;
+
   @override
   bool operator ==(Object other) =>
       other is VaultAgentDefaultsView &&
       other.host == host &&
-      mapEquals(other.models, models);
+      mapEquals(other.models, models) &&
+      mapEquals(other.toolSets, toolSets);
 
   @override
   int get hashCode => Object.hash(
     host,
     Object.hashAllUnordered(
       models.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
+    Object.hashAllUnordered(
+      toolSets.entries.map((e) => Object.hash(e.key, e.value)),
     ),
   );
 }

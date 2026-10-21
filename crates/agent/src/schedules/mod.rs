@@ -426,6 +426,12 @@ impl Scheduler {
         now: Timestamp,
     ) -> ScheduleRun {
         let result = (|| -> Result<(String, bool)> {
+            // The step runs only with a tool its schedule's tools allow.
+            anyhow::ensure!(
+                schedule.tools.allows(format::NOTE_STEP_TOOL),
+                "the schedule's tools do not allow {}",
+                format::NOTE_STEP_TOOL
+            );
             let id = vault_core::schedule_occurrence_id(page, &occurrence.to_string());
             self.vault
                 .create_page_from_identified(

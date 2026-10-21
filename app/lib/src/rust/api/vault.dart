@@ -64,6 +64,10 @@ abstract class NotesVault implements RustOpaqueInterface {
 
   Future<VaultAgentDefaults> agentDefaults();
 
+  /// The tool set a runner's agent gets: read, write or everything
+  /// (the default). The runner reads it at its next engine start.
+  Future<String> agentToolSet({required String runner});
+
   /// Appends a timestamped child line to the day's top-level Log toggle.
   Future<String> appendLog({
     required PlatformInt64 dayMs,
@@ -467,6 +471,9 @@ abstract class NotesVault implements RustOpaqueInterface {
   Future<void> setAgentDefaultModel({required String runner, String? model});
 
   Future<void> setAgentDefaultRunner({String? runner});
+
+  /// Sets a runner's tool set; `None` returns it to everything.
+  Future<void> setAgentToolSet({required String runner, String? set_});
 
   Future<void> setConflictAutoResolve({required bool enabled});
 

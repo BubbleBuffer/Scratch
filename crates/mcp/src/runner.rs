@@ -75,6 +75,44 @@ pub fn default_command(kind: &str, program: Option<&str>) -> Option<AgentCommand
     })
 }
 
+/// The model argument for `kind` from a synced default model
+/// (`provider/model`, as the agent stores it): `codex/<m>` gives Codex
+/// `-m <m>`, `claude-code/<m>` gives Claude Code `--model <m>`. A model of
+/// another provider, or none, adds nothing (the program's own default).
+pub fn model_args(kind: &str, model: Option<&str>) -> Vec<String> {
+    let model = model.map(str::trim).unwrap_or_default();
+    let (flag, prefix) = match kind {
+        "codex" => ("-m", "codex/"),
+        "claude" => ("--model", "claude-code/"),
+        _ => return Vec::new(),
+    };
+    match model.strip_prefix(prefix).map(str::trim) {
+        Some(m) if !m.is_empty() => vec![flag.to_string(), m.to_string()],
+        _ => Vec::new(),
+    }
+}
+
+/// [`default_command`] with the synced default `model` ([`model_args`]),
+/// put before the arguments that end the command line.
+pub fn default_command_with_model(
+    kind: &str,
+    program: Option<&str>,
+    model: Option<&str>,
+) -> Option<AgentCommand> {
+    let mut cmd = default_command(kind, program)?;
+    let extra = model_args(kind, model);
+    if !extra.is_empty() {
+        // Codex's prompt comes from stdin as the last argument `-`; Claude's
+        // flags may go anywhere after `-p`.
+        let at = match kind {
+            "codex" => cmd.args.len().saturating_sub(1),
+            _ => cmd.args.len(),
+        };
+        cmd.args.splice(at..at, extra);
+    }
+    Some(cmd)
+}
+
 #[derive(Debug, Clone)]
 pub struct RunContext {
     /// The vault's MCP endpoint (`http://127.0.0.1:47101/mcp`) and token;

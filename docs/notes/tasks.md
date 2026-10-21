@@ -59,6 +59,6 @@ Supply `item` and at least one of `due` or `done`:
 - `due`: `YYYY-MM-DD` (all day) or `YYYY-MM-DD HH:MM` (host local time).
 - `done`: `true` or `false`.
 
-Both may be supplied together. A to-do changes its date mention and checkbox. A task note changes its date or status (`done` when completed, `todo` when reopened), preserving its other task fields. A row changes its date or completion property. Ordinary date mentions cannot be changed with `update_task`; edit their blocks with `edit_page`.
+Both may be supplied together. A to-do changes its date mention and checkbox. A task note changes its date or status (`done` when completed, `todo` when reopened), preserving its other task fields. A row changes its date or completion property. Ordinary date mentions cannot be changed with `update_task`; edit their blocks with `edit_page`. `update_task` never starts an agent run: a task assigned to `agent` runs only when the app assigns it.
 
 The app's existing Today, calendar, overdue and completion views keep their behavior. Undated rows are held only in the rebuildable local index; this adds no page-document or sync format.

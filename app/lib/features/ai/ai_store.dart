@@ -1,10 +1,16 @@
 // AI on this device: the vault's MCP endpoint, AI tasks and merges.
 //
-// - Tasks are rows of the synced "AI tasks" collection (vault_mcp::tasks):
-//   any device queues one ("Ask AI" in the `/` menu); a desktop whose
-//   settings name a runner claims it, runs the agent and writes the answer
-//   into the page in place of the task's placeholder. Status (queued,
-//   running, done, failed) is in the row, so every device sees it.
+// - Tasks are rows of the synced "AI tasks" collection (vault_mcp::tasks).
+//   "Ask AI" (the `/` menu, the selection toolbar, the block menu and the
+//   page menu) and tasks assigned to the agent start one, on the synced
+//   default runner ([AiStore.runsOn]; phones: always the Hub):
+//   - this computer: a row pinned to this device, which runs it with its
+//     AI tasks runner and the synced model and tool set of `this_device`;
+//   - the Hub: a hub job about the page (hub_jobs_client.dart), run with
+//     the hub runner's model and tool set.
+//   Either way the answer replaces the task's placeholder in the page.
+//   Status (queued, running, done, failed, cancelled) is in the row, so
+//   every device sees it.
 // - The in-app agent (runner "Agent", the default while it is on) runs the
 //   task in an agent session of its own and writes the answer itself.
 // - Claude Code and Codex run as programs with an argument list (no shell)
@@ -35,6 +41,7 @@ import '../../src/rust/api/agent.dart' show aiRunTaskWithAgent;
 import '../../state/app_state.dart';
 import '../../addons/agent/api.dart';
 import 'ai_settings.dart';
+import 'hub_jobs_client.dart';
 
 export '../../src/rust/api/ai.dart' show AiTask, MergeText;
 
@@ -44,9 +51,28 @@ abstract final class AiStatus {
   static const running = 'running';
   static const done = 'done';
   static const failed = 'failed';
+  static const cancelled = 'cancelled';
+  static const interrupted = 'interrupted';
+
+  /// Whether a run with [status] has not ended yet.
+  static bool active(String status) => status == queued || status == running;
 }
 
-class AiStore extends ChangeNotifier {
+/// Starts and stops the agent's runs for add-ons (a task assigned to the
+/// agent): [AiStore] on the synced default runner.
+abstract interface class AgentRuns {
+  /// Starts a run of [prompt] about [page]; its answer goes after block
+  /// [after] or at the page's end. Completes with the run's id.
+  Future<String> ask(String prompt, String page, {String? after});
+
+  /// Stops run [id] if it has not ended.
+  Future<void> cancel(String id);
+
+  /// Run [id] as this device has it (null: not synced here yet).
+  Future<AiTask?> run(String id);
+}
+
+class AiStore extends ChangeNotifier implements AgentRuns {
   AiStore._(this.vault, this.feed, this._settings) {
     _settings.addListener(notifyListeners);
     feed?.addListener(_onChanges);
@@ -89,6 +115,14 @@ class AiStore extends ChangeNotifier {
   /// Overrides the agents' working folder (tests).
   @visibleForTesting
   static String? workDirOverride;
+
+  /// Makes the hub jobs client (tests use a fake hub).
+  @visibleForTesting
+  static HubJobs Function(HubLink hub, String deviceId)? hubJobsOverride;
+
+  /// A sync round before a hub job, so the hub has the page as it is here
+  /// (boot sets it).
+  Future<void> Function()? syncBeforeHubJob;
 
   NotesMcp? _mcp;
   String? mcpUrl;
@@ -183,15 +217,81 @@ class AiStore extends ChangeNotifier {
 
   // -------------------------------------------------------------- tasks
 
-  /// Queues [prompt] about [page]; its placeholder goes after block
-  /// [after] (an empty paragraph there becomes it) or at the page's end.
-  Future<AiTask> ask(String prompt, String page, {String? after}) async {
+  /// Where Ask AI and tasks assigned to the agent run: the synced default
+  /// runner (device override, vault, built-in, reachable fallback; phones:
+  /// the Hub).
+  AgentHost get runsOn => _agents.defaultHost;
+
+  /// The hub, when this device can create hub jobs.
+  HubLink? get hubLink => _agents.hubLink;
+
+  /// Starts [prompt] about [page] on [runsOn]; its placeholder goes after
+  /// block [after] (an empty paragraph there becomes it) or at the page's
+  /// end. Completes with the run's id (the AI tasks row, or the hub job,
+  /// which is a row too once it syncs here).
+  @override
+  Future<String> ask(String prompt, String page, {String? after}) async {
+    // The synced defaults as they are now (another device may have changed
+    // them).
+    await _agents.refreshVaultDefaults();
+    if (runsOn == AgentHost.hub) {
+      final job = await _hubJob(prompt, page, after);
+      unawaited(refresh());
+      return job.id;
+    }
+    // This computer runs it. A device without agents (not a desktop)
+    // leaves it to any desktop, as before.
     final t = await vault.run(
-        (v) => aiCreateTask(vault: v, prompt: prompt, page: page, after: after, runner: ''),
+        (v) => canRun
+            ? aiCreateTaskHere(vault: v, prompt: prompt, page: page, after: after)
+            : aiCreateTask(vault: v, prompt: prompt, page: page, after: after, runner: ''),
         writes: true);
     await refresh();
     unawaited(pump());
-    return t;
+    return t.id;
+  }
+
+  HubJobs _jobs(HubLink hub) =>
+      (hubJobsOverride ?? (h, d) => HubJobsClient(hubUrl: h.url, token: h.token, deviceId: d))(hub, vault.deviceId);
+
+  Future<HubJob> _hubJob(String prompt, String page, String? after) async {
+    final hub = hubLink;
+    if (hub == null) throw 'Sign in to your hub in Settings > Sync first: the agent runs there.';
+    await vault.flush();
+    final sync = syncBeforeHubJob;
+    if (sync != null) {
+      try {
+        await sync();
+      } catch (e) {
+        AppLog.info('sync before a hub job failed: $e');
+      }
+    }
+    return _jobs(hub).create(prompt: prompt, page: page, after: after);
+  }
+
+  @override
+  Future<AiTask?> run(String id) async {
+    try {
+      return await vault.run((v) => aiGetTask(vault: v, id: id));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Stops run [id]: a hub job on the hub, a task on this device here
+  /// (marked cancelled; a late answer is dropped).
+  @override
+  Future<void> cancel(String id) async {
+    final t = await run(id);
+    if (t != null && !AiStatus.active(t.status)) return;
+    if (t == null || t.node == 'hub') {
+      final hub = hubLink;
+      if (hub == null) throw 'Sign in to your hub in Settings > Sync to stop the agent there.';
+      await _jobs(hub).cancel(id);
+    } else {
+      await vault.run((v) => aiCancelTask(vault: v, id: id), writes: true);
+    }
+    await refresh();
   }
 
   Future<void> retry(String id) async {
@@ -293,9 +393,20 @@ class AiStore extends ChangeNotifier {
       if (runner == AiRunner.deepseek) return (true, await _deepSeek(prompt));
       var url = '', token = '';
       if (tools && runner.usesMcp) {
-        url = mcpUrl ?? await _startMcp() ?? '';
-        if (url.isNotEmpty) token = await this.token();
+        // An endpoint with only the synced tool set of this computer's
+        // runner (`tool_sets.this_device`).
+        await _agents.refreshVaultDefaults();
+        final set = _agents.vaultDefaults.toolSetFor(AgentHost.local);
+        try {
+          url = await (_mcp ??= NotesMcp(vault: vault.raw)).taskUrl(toolSet: set);
+          token = await this.token();
+        } catch (e) {
+          return (false, '$e');
+        }
       }
+      // The synced model of this computer's runner, when it is one of
+      // this runner's (`claude-code/…`, `codex/…`).
+      final model = tools ? _agents.resolvedModel(AgentHost.local).model : null;
       final work = workDirOverride ?? '${Directory.systemTemp.path}${Platform.pathSeparator}notes-ai';
       final r = await vault.run((_) => aiRunAgent(
             kind: runner.name,
@@ -305,6 +416,7 @@ class AiStore extends ChangeNotifier {
             mcpToken: token,
             workDir: work,
             timeoutSecs: settings.timeoutMinutes * 60,
+            model: model,
           ));
       return (r.ok, r.text);
     } catch (e) {

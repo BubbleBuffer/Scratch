@@ -13,6 +13,7 @@ import '../shell/page_stack.dart';
 // Transitional host UI contracts. Features move behind their own add-on APIs
 // later; an add-on never imports these host implementations directly.
 export '../features/ai/ai_settings.dart';
+export '../features/ai/ai_store.dart' show AgentRuns, AiStatus, AiTask;
 export '../features/settings/settings_store.dart' show AppSettings;
 export '../features/settings/controls.dart'
     show
@@ -46,6 +47,9 @@ class AddonServices {
   AppSettings settings(BuildContext context) => AppSettings.read(context);
   AiSettings? aiSettingsOf(Vault vault) => AiStore.settingsOf(vault);
   Future<void> pumpAi(BuildContext context) => AiStore.of(context.app).pump();
+
+  /// Starts and stops the agent's runs (on the synced default runner).
+  AgentRuns agentRuns(BuildContext context) => AiStore.of(context.app);
   bool addonEnabled(String id) =>
       activeAddonContext?.installedIds.contains(id) ?? true;
   void closeRoute(BuildContext context, String name) {

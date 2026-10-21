@@ -277,7 +277,28 @@ static TOOLS: LazyLock<Vec<ToolDef>> = LazyLock::new(|| vec![
         approval: Approval::None,
         surfaces: ALL_SURFACES,
     },
+    ToolDef {
+        name: "jobs",
+        description: "Runs an agent job on the hub's runner and follows it. action create starts a run of prompt (returns the job, queued); get returns a job with its status and, once completed, its result; wait blocks until the job ends or timeout_ms passes (at most 60000); cancel stops a queued or running job; list shows your jobs, newest first. The run gets your tool set, narrowed by the runner's; tools may narrow it further, never widen it. Read-only callers can't create jobs. Limits: one running job per caller, 4 queued per hub, runs stop after 1 hour, ended jobs are kept 30 days. You only see your own jobs. Jobs run only on the hub: notes_help topic jobs.",
+        schema: || json!({"type":"object", "properties": {
+            "action":{"type":"string", "enum":["create","get","wait","cancel","list"], "description":"What to do"},
+            "prompt":{"type":"string", "description":"create: the task for the agent"},
+            "tools":{"type":"string", "enum":["read","write","everything"], "description":"create: the tool set for the run; default and maximum your own"},
+            "page":{"type":"string", "description":"create: a page id the job is about; its reply is written into that page"},
+            "after":{"type":"string", "description":"create with page: the block id the reply goes after (default: the page's end)"},
+            "job":{"type":"string", "description":"get, wait, cancel: the job id create returned"},
+            "timeout_ms":{"type":"integer", "minimum":0, "maximum":60000, "default":30000, "description":"wait: how long to wait"},
+            "limit":{"type":"integer", "minimum":1, "maximum":100, "default":20, "description":"list: jobs to return"}
+        }, "required": ["action"]}),
+        read_only: false,
+        destructive_hint: false,
+        approval: Approval::None,
+        surfaces: &[Surface::Mcp],
+    },
 ]);
+
+/// What a host that runs no jobs answers to the `jobs` tool.
+pub const JOBS_NEED_A_HUB: &str = "jobs run on the hub: connect to the hub's /mcp with an agent token";
 
 /// Tools that are callable over MCP but never listed. `memory_list` is the
 /// memory index the CLI reads (it was an alias of the old memory_search
@@ -561,6 +582,8 @@ fn dispatch(v: &Vault, name: &str, a: &Value) -> Result<String> {
         "feedback_submit" => crate::feedback::submit(v, a, "stdio"),
         "feedback_list" => crate::feedback::list(v, a),
         "notes_help" => crate::help::notes_help(a),
+        // The hub answers jobs itself (it knows the caller and runs them).
+        "jobs" => err(JOBS_NEED_A_HUB),
         _ => err(format!("unknown tool: {name}")),
     }
 }

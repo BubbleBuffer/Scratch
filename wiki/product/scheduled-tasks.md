@@ -22,7 +22,7 @@ schedule:
     tz: Europe/Berlin
     missed: latest                   # latest | skip
   runner: hub                        # a node record id
-  tools: [create_page, read_page, search_notes]
+  tools: write                       # read | write | everything, or a list of tool names
   steps:
     - id: note
       do: note.from_template
@@ -42,7 +42,7 @@ Rules that let the format grow without breaking:
 - Every step has an `id` and a `do`. A runner that does not know a step's `do` refuses the whole schedule. It never runs part of it.
 - Step outputs are read as `{{steps.<id>.<field>}}`. Each step kind documents its outputs.
 - `if` holds one expression over step outputs and date fields. v1 of conditions has only "is set", "equals" and "not".
-- `tools` limits every step. The note step counts as the tool `create_page`.
+- `tools` limits every step. It is a tool set, the same as agent tokens use: `read`, `write` or `everything` (every tool the runner serves, including later ones). A list of tool names, as schedules were first written, still works; old names count as the tool they run. The note step counts as the tool `create_page`, so it needs `write`, `everything` or a list naming it; the runner refuses the schedule otherwise, and checks again before each run. The schedule page's Tools section offers Write and Everything (Read cannot create the note) and shows an older list as "Listed tools". New schedules get `write`. A runner from before tool sets refuses a `tools` string as invalid until it is updated.
 - The note body is free text for the user. The runner does not read it.
 
 Run results:
@@ -82,6 +82,7 @@ The live-queries lane's generic unsupported card is not yet on this branch; olde
 - 2026-10-15: each schedule names one runner device, and the hub is the default.
 - 2026-10-15: the runner accepts a schedule once, pinned to a hash of its runner, tools and steps; a synced edit to any of them pauses it until accepted again.
 - 2026-10-15: no Bypass; each schedule lists the tools it may use, and unattended runs use exactly those and never prompt.
+- 2026-10-21 (integration spec phase 5): `tools` picks one of the built-in tool sets (Read, Write, Everything); Everything is always offered.
 - 2026-10-15: for a recurring schedule, `at` is only the anchor and counts as a run only if it matches the rule.
 
 Plans, open questions and the full decision record are in the internal wiki (notes vault, notes-app > Product > Scheduled tasks).

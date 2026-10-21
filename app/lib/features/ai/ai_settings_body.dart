@@ -1,6 +1,7 @@
 // Settings > AI: who answers AI tasks on this device (Claude Code, Codex,
-// DeepSeek), the vault's MCP endpoint for AI apps, and the recent tasks
-// with their status. Phones only list tasks: desktops answer them.
+// DeepSeek), the vault's MCP endpoint for AI apps, the hub's agent tokens,
+// and the recent tasks with their status. Phones only list tasks: desktops
+// answer them.
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -9,9 +10,11 @@ import '../../state/app_state.dart';
 import '../../ui/ui.dart';
 import '../settings/controls.dart';
 import '../../shell/addons.dart';
+import 'agent_tokens_section.dart';
 import 'ai_settings.dart';
 import 'ai_store.dart';
 import 'ask_ai.dart';
+import 'connect_agent_section.dart';
 
 class AiSettingsBody extends StatelessWidget {
   const AiSettingsBody({super.key});
@@ -51,10 +54,11 @@ class AiSettingsBody extends StatelessWidget {
               _McpSection(store: store),
             ],
             for (final section in beforeTasks) section.build(context),
-            SettingsHeading(
-              'Recent tasks',
+            ConnectAgentSection(
               top: AiStore.canRun || beforeTasks.isNotEmpty ? 24 : 0,
             ),
+            AgentTokensSection(top: 24),
+            const SettingsHeading('Recent tasks', top: 24),
             _TaskList(store: store),
           ],
         );

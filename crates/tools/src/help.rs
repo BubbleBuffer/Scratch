@@ -83,6 +83,11 @@ static TOPICS: &[Topic] = &[
         body: doc!("memory.md"),
     },
     Topic {
+        id: "jobs",
+        summary: "Agent jobs on the hub: starting a run, following it, its result, tool sets and limits.",
+        body: doc!("jobs.md"),
+    },
+    Topic {
         id: "tools",
         summary: "Every vault tool with its arguments (generated from the tool registry).",
         body: Body::Generated(tool_list),

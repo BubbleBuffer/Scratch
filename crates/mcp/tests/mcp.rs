@@ -59,7 +59,7 @@ fn id_in(text: &str) -> String {
 }
 
 /// The listed MCP tools, in serving order.
-const LISTED: [&str; 15] = [
+const LISTED: [&str; 16] = [
     "search_notes",
     "read_page",
     "create_page",
@@ -75,6 +75,7 @@ const LISTED: [&str; 15] = [
     "memory_delete",
     "feedback_submit",
     "notes_help",
+    "jobs",
 ];
 
 /// Old tool names: callable, never listed. feedback_list and import_markdown
@@ -239,7 +240,7 @@ fn stdio_in_process_protocol() {
         .collect();
     assert_eq!(
         tools, LISTED,
-        "tools/list must be exactly the 17 names, in order"
+        "tools/list must be exactly the 16 names, in order"
     );
     for old in OLD_NAMES {
         assert!(!tools.contains(&old), "old name {old} must stay unlisted");

@@ -16,6 +16,7 @@
 
 pub mod endpoint;
 pub mod http;
+pub mod jobs;
 pub mod merge;
 pub use vault_tools::props;
 pub mod proxy;

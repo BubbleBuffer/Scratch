@@ -1,6 +1,12 @@
 //! Agent tokens: `.vault/hub/agent-tokens.json` in the hub's vault. Each
-//! entry is `{name, scope, sha256, created}`. `add` shows the plaintext
-//! token once and keeps only its SHA-256; nothing else can recover it.
+//! entry is `{name, scope, sha256, created}`, plus `expires` and `last_used`
+//! once set. `add` shows the plaintext token once and keeps only its
+//! SHA-256; nothing else can recover it.
+//!
+//! A token past its `expires` time is refused by [`AgentTokens::authenticate`]
+//! and stays listed until it is revoked. `authenticate` writes `last_used` at
+//! most once per [`LAST_USED_EVERY_MS`] per token, so a busy agent does not
+//! rewrite the file on every request.
 //!
 //! The file is re-read when its size or mtime changes, and every mutation
 //! re-reads it first. Two [`AgentTokens`] on the same file (the server and
@@ -11,14 +17,14 @@
 //! Mutations (`add`, `revoke`) also hold an exclusive lock on the stable
 //! file `agent-tokens.lock` beside the JSON, across their reload and save,
 //! so two processes cannot both reload, then overwrite each other. Reads
-//! (`list`, `authenticate`) take no file lock: the JSON is replaced by
-//! rename, so a reader sees the old file or the new one.
+//! (`list`, and `authenticate` when it has no `last_used` to write) take no
+//! file lock: the JSON is replaced by rename, so a reader sees the old file
+//! or the new one.
 
 use std::fmt;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -30,41 +36,19 @@ const FILE: &str = "agent-tokens.json";
 /// Never renamed or removed: the lock lives on this inode.
 const LOCK_FILE: &str = "agent-tokens.lock";
 const MAX_NAME: usize = 40;
+/// How stale a token's `last_used` may get before `authenticate` rewrites it.
+pub const LAST_USED_EVERY_MS: i64 = 60_000;
+const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
-/// What a token may do.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum AgentScope {
-    Read,
-    Write,
-}
+/// The lifetimes offered when a token is created, in days; `None` is never.
+pub const EXPIRY_CHOICES_DAYS: [Option<u32>; 4] = [None, Some(30), Some(90), Some(365)];
+/// The lifetime a new token gets when none is chosen.
+pub const DEFAULT_EXPIRY_DAYS: Option<u32> = Some(90);
 
-impl AgentScope {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            AgentScope::Read => "read",
-            AgentScope::Write => "write",
-        }
-    }
-}
-
-impl fmt::Display for AgentScope {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl FromStr for AgentScope {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<AgentScope, String> {
-        match s {
-            "read" => Ok(AgentScope::Read),
-            "write" => Ok(AgentScope::Write),
-            _ => Err(format!("scope must be read or write, not {s:?}")),
-        }
-    }
-}
+/// What a token may do: its tool set. Token files keep the `scope` field;
+/// `read` and `write` files from before tool sets read unchanged, and
+/// `everything` is the third value.
+pub type AgentScope = vault_tools::ToolSet;
 
 /// A token's public identity, as `list` and `authenticate` return it. The
 /// hash is not part of it.
@@ -74,6 +58,18 @@ pub struct AgentToken {
     pub scope: AgentScope,
     /// Unix milliseconds when the token was added.
     pub created: i64,
+    /// Unix milliseconds from which the token is refused; `None` never expires.
+    pub expires: Option<i64>,
+    /// Unix milliseconds of the last accepted use, to within
+    /// [`LAST_USED_EVERY_MS`]; `None` if it was never used.
+    pub last_used: Option<i64>,
+}
+
+impl AgentToken {
+    /// Whether the token is refused at `now_ms` because it expired.
+    pub fn expired_at(&self, now_ms: i64) -> bool {
+        self.expires.is_some_and(|e| now_ms >= e)
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -83,6 +79,10 @@ struct Entry {
     scope: AgentScope,
     sha256: String,
     created: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    expires: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_used: Option<i64>,
 }
 
 impl Entry {
@@ -91,6 +91,8 @@ impl Entry {
             name: self.name.clone(),
             scope: self.scope,
             created: self.created,
+            expires: self.expires,
+            last_used: self.last_used,
         }
     }
 }
@@ -194,9 +196,20 @@ impl AgentTokens {
         self.refresh(&mut self.lock())
     }
 
-    /// A new token named `name` with `scope`. Returns the plaintext token,
-    /// which is not kept anywhere; show it to the user now.
+    /// A new token named `name` with `scope` that never expires. Returns
+    /// the plaintext token, which is not kept anywhere; show it to the user now.
     pub fn add(&self, name: &str, scope: AgentScope) -> Result<String> {
+        self.add_expiring(name, scope, None).map(|(token, _)| token)
+    }
+
+    /// A new token that expires `expires_in_days` from now (`None`: never).
+    /// Returns the plaintext token and the new token's identity.
+    pub fn add_expiring(
+        &self,
+        name: &str,
+        scope: AgentScope,
+        expires_in_days: Option<u32>,
+    ) -> Result<(String, AgentToken)> {
         check_name(name)?;
         let _file_lock = self.lock_file()?;
         let mut cache = self.lock();
@@ -206,14 +219,19 @@ impl AgentTokens {
             return Err(AgentTokenError::Duplicate(name.to_string()));
         }
         let token = random_hex(32)?;
-        entries.push(Entry {
+        let created = now_ms();
+        let entry = Entry {
             name: name.to_string(),
             scope,
             sha256: sha256_hex(token.as_bytes()),
-            created: now_ms(),
-        });
+            created,
+            expires: expires_in_days.map(|d| created.saturating_add(i64::from(d) * DAY_MS)),
+            last_used: None,
+        };
+        let identity = entry.identity();
+        entries.push(entry);
         self.save(&mut cache, entries)?;
-        Ok(token)
+        Ok((token, identity))
     }
 
     /// Every token's identity, in the order they were added.
@@ -239,20 +257,65 @@ impl AgentTokens {
         Ok(true)
     }
 
-    /// The identity of the token `token` belongs to, or `None`. An `Err`
-    /// means the file could not be used, and the caller must refuse.
+    /// The identity of the token `token` belongs to, or `None` for an
+    /// unknown or expired token. An `Err` means the file could not be used,
+    /// and the caller must refuse. An accepted use updates `last_used` when
+    /// it is older than [`LAST_USED_EVERY_MS`]; a failure to write it is
+    /// logged and does not refuse the token.
     pub fn authenticate(&self, token: &str) -> Result<Option<AgentToken>> {
-        let mut cache = self.lock();
-        self.refresh(&mut cache)?;
-        let hash = sha256_hex(token.as_bytes());
-        let mut found = None;
-        // Every entry is compared, so timing does not show which one matched.
-        for e in &cache.entries {
-            if ct_eq(e.sha256.as_bytes(), hash.as_bytes()) {
-                found = Some(e.identity());
+        let now = now_ms();
+        let found = {
+            let mut cache = self.lock();
+            self.refresh(&mut cache)?;
+            let hash = sha256_hex(token.as_bytes());
+            let mut found = None;
+            // Every entry is compared, so timing does not show which one matched.
+            for e in &cache.entries {
+                if ct_eq(e.sha256.as_bytes(), hash.as_bytes()) {
+                    found = Some(e.identity());
+                }
+            }
+            found
+        };
+        let Some(who) = found else {
+            return Ok(None);
+        };
+        if who.expired_at(now) {
+            return Ok(None);
+        }
+        if who
+            .last_used
+            .is_none_or(|t| now.saturating_sub(t) >= LAST_USED_EVERY_MS)
+        {
+            // The cache mutex is released here: the file lock comes first.
+            if let Err(e) = self.touch(&who.name, now) {
+                if self.log_failures {
+                    tracing::warn!(token = %who.name, "agent token last-used not saved: {e}");
+                }
             }
         }
-        Ok(found)
+        Ok(Some(who))
+    }
+
+    /// Records a use of `name` at `now`, under the file lock and against the
+    /// file as it is now. Does nothing if the token is gone or a use within
+    /// [`LAST_USED_EVERY_MS`] is already recorded.
+    fn touch(&self, name: &str, now: i64) -> Result<()> {
+        let _file_lock = self.lock_file()?;
+        let mut cache = self.lock();
+        self.reload(&mut cache)?;
+        let mut entries = cache.entries.clone();
+        let Some(e) = entries.iter_mut().find(|e| e.name == name) else {
+            return Ok(());
+        };
+        if e
+            .last_used
+            .is_some_and(|t| now.saturating_sub(t) < LAST_USED_EVERY_MS)
+        {
+            return Ok(());
+        }
+        e.last_used = Some(now);
+        self.save(&mut cache, entries)
     }
 
     fn lock(&self) -> MutexGuard<'_, Cache> {
@@ -614,10 +677,15 @@ mod tests {
         // The mtimes are set explicitly, so there is no sleep and no tie.
         use std::time::Duration;
 
-        fn file_with(name: &str, token: &str) -> String {
+        // A use just recorded, so `authenticate` has no `last_used` to write
+        // and stays a plain read.
+        let used = now_ms();
+        let file_with = |name: &str, token: &str| -> String {
             let sha = sha256_hex(token.as_bytes());
-            format!(r#"[{{"name":"{name}","scope":"read","sha256":"{sha}","created":1}}]"#)
-        }
+            format!(
+                r#"[{{"name":"{name}","scope":"read","sha256":"{sha}","created":1,"last_used":{used}}}]"#
+            )
+        };
 
         let root = TempRoot::new();
         fs::create_dir_all(root.file().parent().unwrap()).unwrap();
@@ -769,5 +837,88 @@ mod tests {
         let extra = format!(r#"[{{"name":"ok","scope":"read","sha256":"{h}","created":1,"x":1}}]"#);
         assert!(parse(extra.as_bytes()).is_err());
         assert!(parse(b"").is_err());
+
+        // Files written before expiry and last-used still parse.
+        let timed = format!(
+            r#"[{{"name":"ok","scope":"read","sha256":"{h}","created":1,"expires":2,"last_used":3}}]"#
+        );
+        let e = &parse(timed.as_bytes()).unwrap()[0];
+        assert_eq!((e.expires, e.last_used), (Some(2), Some(3)));
+        // Tool sets: old read and write files map to the Read and Write sets,
+        // and `everything` is the third value, written back under `scope`.
+        for (scope, set) in [
+            ("read", AgentScope::Read),
+            ("write", AgentScope::Write),
+            ("everything", AgentScope::Everything),
+        ] {
+            let one = format!("[{}]", entry_json("ok", &h, scope));
+            let parsed = parse(one.as_bytes()).unwrap();
+            assert_eq!(parsed[0].scope, set);
+            let back = serde_json::to_value(&parsed[0]).unwrap();
+            assert_eq!(back["scope"], scope);
+        }
+    }
+
+    #[test]
+    fn expired_tokens_are_refused_but_listed() {
+        let root = TempRoot::new();
+        let store = AgentTokens::open(&root.0).unwrap();
+        let (token, who) = store
+            .add_expiring("month", AgentScope::Write, Some(30))
+            .unwrap();
+        let expires = who.expires.expect("expiry set");
+        assert_eq!(expires - who.created, 30 * DAY_MS);
+        assert!(!who.expired_at(expires - 1));
+        assert!(who.expired_at(expires));
+        assert!(store.authenticate(&token).unwrap().is_some());
+
+        let never = store.add("forever", AgentScope::Read).unwrap();
+        assert_eq!(store.list().unwrap()[1].expires, None);
+
+        // Move the expiry into the past, as time passing would.
+        let text = fs::read_to_string(root.file()).unwrap();
+        let text = text.replace(
+            &format!("\"expires\": {expires}"),
+            "\"expires\": 1000",
+        );
+        assert!(text.contains("\"expires\": 1000"));
+        fs::write(root.file(), text).unwrap();
+        assert!(store.authenticate(&token).unwrap().is_none());
+        assert!(store.authenticate(&never).unwrap().is_some());
+        let names: Vec<String> = store.list().unwrap().into_iter().map(|t| t.name).collect();
+        assert_eq!(names, vec!["month", "forever"]);
+    }
+
+    #[test]
+    fn last_used_is_written_at_most_once_a_minute() {
+        let root = TempRoot::new();
+        let store = AgentTokens::open(&root.0).unwrap();
+        let token = store.add("busy", AgentScope::Read).unwrap();
+        assert_eq!(store.list().unwrap()[0].last_used, None);
+
+        let before = now_ms();
+        store.authenticate(&token).unwrap().unwrap();
+        let first = store.list().unwrap()[0].last_used.expect("recorded");
+        assert!(first >= before);
+
+        // Further uses within the minute leave the file alone.
+        let bytes = fs::read(root.file()).unwrap();
+        for _ in 0..5 {
+            store.authenticate(&token).unwrap().unwrap();
+        }
+        assert_eq!(fs::read(root.file()).unwrap(), bytes);
+
+        // A use a minute after the recorded one is written.
+        let stale = first - LAST_USED_EVERY_MS;
+        let text = String::from_utf8(bytes)
+            .unwrap()
+            .replace(&format!("\"last_used\": {first}"), &format!("\"last_used\": {stale}"));
+        fs::write(root.file(), text).unwrap();
+        store.authenticate(&token).unwrap().unwrap();
+        let second = store.list().unwrap()[0].last_used.unwrap();
+        assert!(second >= first, "{second} should be at least {first}");
+
+        // A failed lookup records nothing.
+        assert!(store.authenticate("nope").unwrap().is_none());
     }
 }

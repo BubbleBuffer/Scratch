@@ -48,7 +48,10 @@ Future<void> startSyncAtBoot(SyncStore sync, AppSettings s) async {
     // The agent first: AI tasks with the Agent runner use it.
     final agent = AgentStore.attach(sync.vault, ai)..useAppSettings(s);
     if (agent.enabled) await agent.ensureOpen();
-    await AiStore.attach(sync.vault, sync.feed, ai).start();
+    // A hub job (Ask AI or a task assigned to the agent on the Hub) reads
+    // the hub's copy of the page: one sync round first.
+    final store = AiStore.attach(sync.vault, sync.feed, ai)..syncBeforeHubJob = () => sync.syncOnce();
+    await store.start();
   } catch (e) {
     AppLog.info('ai failed: $e');
   }

@@ -7,7 +7,9 @@
 use std::path::PathBuf;
 use std::slice::Iter;
 
-use notes_hub::agent_tokens::{AgentScope, AgentTokens};
+use notes_hub::agent_tokens::{
+    AgentScope, AgentTokens, DEFAULT_EXPIRY_DAYS, EXPIRY_CHOICES_DAYS,
+};
 use notes_hub::{open_hub, Config};
 
 const USAGE: &str = "usage:
@@ -15,8 +17,11 @@ const USAGE: &str = "usage:
   notes-hub [--config <file>] --devices          list devices
   notes-hub [--config <file>] --unpair <label>   revoke a device's tokens
   notes-hub [--config <file>] --pair <label>     emergency: create a token without login
-  notes-hub [--config <file>] --agent-token add <name> --scope read|write
-  notes-hub [--config <file>] --agent-token list     (name, scope, created in Unix ms)
+  notes-hub [--config <file>] --agent-token add <name> --scope read|write|everything
+                                                 [--expires 30d|90d|365d|never]
+                                                 (default 90d)
+  notes-hub [--config <file>] --agent-token list     (name, scope, created, expires, last used:
+                                                 Unix ms, - for none)
   notes-hub [--config <file>] --agent-token revoke <name>";
 
 enum Cmd {
@@ -28,7 +33,11 @@ enum Cmd {
 }
 
 enum AgentTokenCmd {
-    Add { name: String, scope: AgentScope },
+    Add {
+        name: String,
+        scope: AgentScope,
+        expires_days: Option<u32>,
+    },
     List,
     Revoke(String),
 }
@@ -61,7 +70,24 @@ fn parse(args: &[String]) -> Result<(Option<PathBuf>, Cmd), String> {
     Ok((config, cmd.unwrap_or(Cmd::Serve)))
 }
 
-/// `add <name> --scope read|write`, `list` or `revoke <name>`.
+/// `30d`, `90d`, `365d` or `never`.
+fn parse_expiry(s: &str) -> Result<Option<u32>, String> {
+    let days = match s {
+        "never" => Some(None),
+        _ => s
+            .strip_suffix('d')
+            .and_then(|d| d.parse::<u32>().ok())
+            .map(Some),
+    };
+    match days {
+        Some(d) if EXPIRY_CHOICES_DAYS.contains(&d) => Ok(d),
+        _ => Err(format!(
+            "--expires must be 30d, 90d, 365d or never, not {s:?}\n{USAGE}"
+        )),
+    }
+}
+
+/// `add <name> --scope read|write|everything [--expires …]`, `list` or `revoke <name>`.
 fn parse_agent_token(it: &mut Iter<'_, String>) -> Result<AgentTokenCmd, String> {
     match take(it)?.as_str() {
         "add" => {
@@ -72,7 +98,16 @@ fn parse_agent_token(it: &mut Iter<'_, String>) -> Result<AgentTokenCmd, String>
             let scope = take(it)?
                 .parse::<AgentScope>()
                 .map_err(|e| format!("{e}\n{USAGE}"))?;
-            Ok(AgentTokenCmd::Add { name, scope })
+            let mut expires_days = DEFAULT_EXPIRY_DAYS;
+            if it.as_slice().first().map(String::as_str) == Some("--expires") {
+                it.next();
+                expires_days = parse_expiry(&take(it)?)?;
+            }
+            Ok(AgentTokenCmd::Add {
+                name,
+                scope,
+                expires_days,
+            })
         }
         "list" => Ok(AgentTokenCmd::List),
         "revoke" => Ok(AgentTokenCmd::Revoke(take(it)?)),
@@ -129,17 +164,35 @@ fn run() -> Result<(), String> {
 fn agent_token(config: &Config, cmd: AgentTokenCmd) -> Result<(), String> {
     let store = AgentTokens::open(config.vault_dir()).map_err(|e| e.to_string())?;
     match cmd {
-        AgentTokenCmd::Add { name, scope } => {
-            let token = store.add(&name, scope).map_err(|e| e.to_string())?;
+        AgentTokenCmd::Add {
+            name,
+            scope,
+            expires_days,
+        } => {
+            let (token, _) = store
+                .add_expiring(&name, scope, expires_days)
+                .map_err(|e| e.to_string())?;
+            let lifetime = match expires_days {
+                Some(d) => format!("expires in {d} days"),
+                None => "never expires".to_string(),
+            };
             eprintln!(
-                "notes-hub: agent token {name:?} ({scope}) added. It is shown once and not \
-                 stored, so copy it now."
+                "notes-hub: agent token {name:?} ({scope}, {lifetime}) added. It is shown once \
+                 and not stored, so copy it now."
             );
             println!("{token}");
         }
         AgentTokenCmd::List => {
+            let opt = |v: Option<i64>| v.map_or_else(|| "-".to_string(), |v| v.to_string());
             for t in store.list().map_err(|e| e.to_string())? {
-                println!("{}\t{}\t{}", t.name, t.scope, t.created);
+                println!(
+                    "{}\t{}\t{}\t{}\t{}",
+                    t.name,
+                    t.scope,
+                    t.created,
+                    opt(t.expires),
+                    opt(t.last_used)
+                );
             }
         }
         AgentTokenCmd::Revoke(name) => {

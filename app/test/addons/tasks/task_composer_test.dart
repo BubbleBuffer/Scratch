@@ -265,6 +265,8 @@ void main() {
       expect(task.status, 'todo');
       expect(task.checkbox, isTrue);
       expect(task.assignee, 'agent');
+      // Assigning the agent started one run, linked to the task.
+      expect(task.agentRun, isNotNull);
       expect(
         task.date,
         DateTime(2026, 10, 8, 10, 30).toUtc().toIso8601String(),

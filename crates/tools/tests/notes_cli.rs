@@ -1206,3 +1206,31 @@ async fn importer_resolves_twins_preserves_extras_and_follows_moved_page_identit
     );
     env.server.stop().await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn jobs_commands_reach_the_hubs_jobs_tool() {
+    // The test hub runs no agent, so create is refused by the hub itself.
+    let env = Env::new().await;
+    let off = env
+        .cli_at(&["jobs", "create", "Summarise"], None, &env.data.0)
+        .await
+        .unwrap_err();
+    assert!(format!("{off:#}").contains("agent is off"), "{off:#}");
+    let listed = env.cli(&["jobs", "list", "--limit", "5"], None).await;
+    let listed: serde_json::Value = serde_json::from_str(listed.trim()).unwrap_or_default();
+    assert_eq!(listed["jobs"], serde_json::json!([]), "{listed}");
+    let missing = env
+        .cli_at(&["jobs", "wait", "nope", "--timeout-ms", "0"], None, &env.data.0)
+        .await
+        .unwrap_err();
+    assert!(format!("{missing:#}").contains("no such job"), "{missing:#}");
+    for bad in [
+        vec!["jobs"],
+        vec!["jobs", "get"],
+        vec!["jobs", "create", "x", "--tools", "all"],
+        vec!["jobs", "list", "--tools", "read"],
+    ] {
+        assert!(env.cli_at(&bad, None, &env.data.0).await.is_err(), "{bad:?}");
+    }
+    env.server.stop().await;
+}

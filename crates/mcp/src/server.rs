@@ -4,9 +4,9 @@
 //! and [`McpServer::handle_body`] takes the bytes of one HTTP POST body and
 //! returns the status and body to send back.
 //!
-//! A request can be read-only ([`McpServer::handle_with`] with
-//! `readonly: true`): `tools/list` then shows only the registry's read-only tools, and
-//! `tools/call` of any other tool is refused with a JSON-RPC error.
+//! A request carries a tool set ([`McpServer::handle_with`]): `tools/list`
+//! shows only the set's tools, and `tools/call` of any other tool is refused
+//! with a JSON-RPC error. The local server serves Everything.
 
 use std::sync::Arc;
 
@@ -14,6 +14,7 @@ use serde_json::{json, Value};
 use vault_core::Vault;
 
 use crate::tools;
+use vault_tools::ToolSet;
 use crate::Result;
 
 /// Protocol versions this server speaks, newest first. `initialize`
@@ -34,6 +35,9 @@ enum Source {
 
 pub struct McpServer {
     source: Source,
+    /// The tools [`McpServer::handle`] and [`McpServer::handle_body`] list
+    /// and call (Everything unless [`McpServer::with_tool_set`] narrows it).
+    set: ToolSet,
 }
 
 /// The reply to one HTTP POST body: the status and the JSON text (empty
@@ -49,43 +53,52 @@ impl McpServer {
     pub fn new(vault: Arc<Vault>) -> McpServer {
         McpServer {
             source: Source::Open(vault),
+            set: ToolSet::Everything,
         }
+    }
+
+    /// This server with only the tools of `set` listed and callable (the
+    /// desktop gives Claude Code and Codex AI tasks the runner's set).
+    pub fn with_tool_set(mut self, set: ToolSet) -> McpServer {
+        self.set = set;
+        self
     }
 
     /// Opens the vault at `root` for each tool call (see `Source::PerCall`).
     pub fn per_call(root: String) -> McpServer {
         McpServer {
             source: Source::PerCall(root),
+            set: ToolSet::Everything,
         }
     }
 
     /// Handles one JSON-RPC message (or a batch array). Returns the reply,
     /// or None when there is nothing to answer (notifications, responses).
     pub fn handle(&self, msg: Value) -> Option<Value> {
-        self.handle_with(msg, false, |name, args| self.run(name, args))
+        self.handle_with(msg, self.set, |name, args| self.run(name, args))
     }
 
     /// Like [`McpServer::handle`], but the tools run through `call` (the
-    /// hub uses it to attribute edits to a user) and, when `readonly`, only
-    /// the read-only tools are listed or callable. `call` runs once per
-    /// `tools/call` that is allowed.
-    pub fn handle_with<F>(&self, msg: Value, readonly: bool, call: F) -> Option<Value>
+    /// hub uses it to attribute edits to a user) and only the tools in `set`
+    /// are listed or callable. `call` runs once per `tools/call` that is
+    /// allowed.
+    pub fn handle_with<F>(&self, msg: Value, set: ToolSet, call: F) -> Option<Value>
     where
         F: Fn(&str, &Value) -> Result<String>,
     {
-        tools::with_transport("stdio", || dispatch(msg, readonly, &call))
+        tools::with_transport("stdio", || dispatch(msg, set, &call))
     }
 
     /// Handles the bytes of one HTTP POST body: a parse error is `400` with a
     /// JSON-RPC error, a reply is `200` with JSON, and nothing to answer is
     /// `202` with an empty body.
     pub fn handle_body(&self, body: &[u8]) -> BodyReply {
-        self.handle_body_with(body, false, |name, args| self.run(name, args))
+        self.handle_body_with(body, self.set, |name, args| self.run(name, args))
     }
 
-    /// [`McpServer::handle_body`] with `readonly` and `call` as in
+    /// [`McpServer::handle_body`] with `set` and `call` as in
     /// [`McpServer::handle_with`].
-    pub fn handle_body_with<F>(&self, body: &[u8], readonly: bool, call: F) -> BodyReply
+    pub fn handle_body_with<F>(&self, body: &[u8], set: ToolSet, call: F) -> BodyReply
     where
         F: Fn(&str, &Value) -> Result<String>,
     {
@@ -99,7 +112,7 @@ impl McpServer {
                 };
             }
         };
-        match tools::with_transport("http", || dispatch(msg, readonly, &call)) {
+        match tools::with_transport("http", || dispatch(msg, set, &call)) {
             Some(r) => BodyReply {
                 status: 200,
                 body: r.to_string(),
@@ -139,14 +152,14 @@ impl McpServer {
 
 /// The JSON-RPC dispatch shared by every entry point. A batch answers with
 /// the array of its replies, or nothing when none of its messages needs one.
-fn dispatch<F>(msg: Value, readonly: bool, call: &F) -> Option<Value>
+fn dispatch<F>(msg: Value, set: ToolSet, call: &F) -> Option<Value>
 where
     F: Fn(&str, &Value) -> Result<String>,
 {
     if let Value::Array(items) = msg {
         let out: Vec<Value> = items
             .into_iter()
-            .filter_map(|m| dispatch(m, readonly, call))
+            .filter_map(|m| dispatch(m, set, call))
             .collect();
         return (!out.is_empty()).then_some(Value::Array(out));
     }
@@ -160,19 +173,15 @@ where
     Some(match method {
         "initialize" => ok(id, initialize(&params)),
         "ping" => ok(id, json!({})),
-        "tools/list" => ok(id, json!({ "tools": tools::definitions_for(readonly) })),
+        "tools/list" => ok(id, json!({ "tools": tools::definitions_for(set) })),
         "tools/call" => match params.get("name").and_then(Value::as_str) {
             None => error(id, -32602, "missing tool name"),
             Some(name) => {
                 let args = params.get("arguments").cloned().unwrap_or(json!({}));
                 if !tools::exists(name) {
                     error(id, -32602, &format!("unknown tool: {name}"))
-                } else if !tools::allowed(name, readonly) {
-                    error(
-                        id,
-                        -32602,
-                        &format!("tool not available in read-only scope: {name}"),
-                    )
+                } else if !tools::allowed(name, set) {
+                    error(id, -32602, &set.refusal(name))
                 } else {
                     ok(id, tool_result(call(name, &args)))
                 }

@@ -37,6 +37,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
 
 import '../../core/debounce.dart';
 import '../../core/paths.dart';
+import '../../core/tool_sets.dart';
 import '../../core/vault.dart';
 import '../../ui/app_name.dart';
 import '../../src/rust/api/agent.dart' hide AgentPermissionMode;
@@ -203,12 +204,24 @@ class AgentStore extends ChangeNotifier {
   Future<void> _loadVaultDefaults() => _vaultDefaultsRead ??= () async {
     try {
       await _migrateLegacyDefaults();
-      final d = await vault.run((v) => v.agentDefaults());
+      final (d, sets) = await vault.run(
+        (v) async => (
+          await v.agentDefaults(),
+          {
+            for (final h in AgentHost.values)
+              h: await v.agentToolSet(runner: h.runner),
+          },
+        ),
+      );
       final view = VaultAgentDefaultsView(
         host: AgentHost.ofRunner(d.runner),
         models: {
           for (final m in d.models)
             ?AgentHost.ofRunner(m.runner): m.model,
+        },
+        toolSets: {
+          for (final e in sets.entries)
+            if (e.value != defaultAgentToolSet) e.key: e.value,
         },
       );
       if (_disposed || view == _vaultDefaults) return;
@@ -264,6 +277,19 @@ class AgentStore extends ChangeNotifier {
   Future<void> setVaultDefaultModel(AgentHost runner, String? model) async {
     await vault.run(
       (v) => v.setAgentDefaultModel(runner: runner.runner, model: model),
+      writes: true,
+    );
+    await refreshVaultDefaults();
+  }
+
+  /// Sets [runner]'s tool set in the vault (synced). Each runner reads it
+  /// when its agent starts; this computer's agent restarts on the change.
+  Future<void> setVaultToolSet(AgentHost runner, String set) async {
+    await vault.run(
+      (v) => v.setAgentToolSet(
+        runner: runner.runner,
+        set_: set == defaultAgentToolSet ? null : set,
+      ),
       writes: true,
     );
     await refreshVaultDefaults();
@@ -1015,6 +1041,7 @@ class AgentStore extends ChangeNotifier {
       settings.agentClaudeCodeDir.trim(),
       settings.desktopTools,
       settings.desktopRoot.trim(),
+      vaultDefaults.toolSetFor(AgentHost.local),
       _dataDir,
     ].join('\u0000');
   }

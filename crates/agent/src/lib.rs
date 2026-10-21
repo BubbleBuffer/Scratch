@@ -89,6 +89,8 @@ pub struct TestHooks {
     /// Registers [`testing::ConfirmTool`] (`test_confirm`), which asks for
     /// approval.
     pub confirm_tool: bool,
+    /// Registers [`testing::SleepTool`] (`test_sleep`), which waits `ms`.
+    pub sleep_tool: bool,
 }
 
 /// Host capabilities and per-device agent settings.
@@ -107,7 +109,35 @@ pub struct AgentConfig {
     /// The Claude Code extension folder (holding `src/main.ts`).
     pub claude_code_dir: Option<PathBuf>,
     pub permission_mode: PermissionMode,
+    /// The tool set this engine registers, in place of its runner's set from
+    /// the vault. The hub's job engines set it (each job gets an engine of
+    /// its set); None reads the runner's set.
+    pub tool_set: Option<vault_tools::ToolSet>,
     pub test: TestHooks,
+}
+
+/// The vault runner an engine of `host_kind` is: `hub` or `this_device`.
+pub fn runner_of(host_kind: HostKind) -> &'static str {
+    match host_kind {
+        HostKind::Hub => vault_core::AGENT_RUNNER_HUB,
+        HostKind::Desktop => vault_core::AGENT_RUNNER_THIS_DEVICE,
+    }
+}
+
+/// The tool set this runner uses, as the vault stores it (Everything when
+/// unset). An unreadable value falls back to Read, the narrowest set.
+pub fn runner_tool_set(vault: &Vault, host_kind: HostKind) -> vault_tools::ToolSet {
+    match vault
+        .agent_tool_set(runner_of(host_kind))
+        .map_err(|e| e.to_string())
+        .and_then(|s| s.parse::<vault_tools::ToolSet>())
+    {
+        Ok(set) => set,
+        Err(error) => {
+            eprintln!("agent tool set unreadable, using read: {error}");
+            vault_tools::ToolSet::Read
+        }
+    }
 }
 
 /// The client every command from the desktop app names.
@@ -381,8 +411,14 @@ impl Agent {
         let artifacts = Arc::new(ArtifactStore::new(&workspace, dir.join("artifacts"))?);
         let repl = Arc::new(CodeMode::new(workspace.clone(), artifacts)?);
 
+        // This runner's tool set, from the vault, read once per engine start.
+        // The conversation tools (js, history_*, chat_read, ui_*) are in every
+        // set; desktop and project tools come only with Everything.
+        let tool_set = config
+            .tool_set
+            .unwrap_or_else(|| runner_tool_set(&vault, config.host_kind));
         let mut tools = ToolRegistry::new();
-        tools::register_vault_tools(&mut tools, vault.clone(), records.clone())?;
+        tools::register_vault_tools(&mut tools, vault.clone(), records.clone(), tool_set)?;
         context::register_tools(&mut tools, store.clone(), records.clone(), vault.clone())?;
         ui::register(&mut tools, ui.clone(), vault.clone(), records.clone())?;
         let permission_file = dir.join("permission-mode.json");
@@ -396,6 +432,7 @@ impl Agent {
         let mut system_prompt = execution_prompt(execution_mode, enable_js);
         for pack in &config.packs {
             match pack {
+                ToolPack::Desktop { .. } if tool_set != vault_tools::ToolSet::Everything => {}
                 ToolPack::Desktop { root } => {
                     let project_store =
                         Arc::new(projects::Projects::open(dir.join("projects.json"), root)?);
@@ -417,6 +454,14 @@ impl Agent {
         for tool in config.test.extra_tools {
             tools.register_host(Arc::new(tools::RecordedTool::new(
                 tool,
+                records.clone(),
+                vault.clone(),
+                false,
+            )))?;
+        }
+        if config.test.sleep_tool {
+            tools.register_host(Arc::new(tools::RecordedTool::new(
+                Arc::new(testing::SleepTool),
                 records.clone(),
                 vault.clone(),
                 false,

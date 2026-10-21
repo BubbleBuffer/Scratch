@@ -100,6 +100,8 @@ pub(crate) struct AgentHost {
     next_socket: AtomicU64,
     scheduler: Option<Arc<vault_agent::schedules::Scheduler>>,
     scheduler_error: Option<String>,
+    /// The engines jobs run on, one per tool set (`crate::jobs`).
+    job_engines: tokio::sync::Mutex<HashMap<vault_tools::ToolSet, Shared>>,
 }
 
 fn opt_path(s: &str) -> Option<PathBuf> {
@@ -131,6 +133,7 @@ impl AgentHost {
             next_socket: AtomicU64::new(1),
             scheduler,
             scheduler_error,
+            job_engines: tokio::sync::Mutex::new(HashMap::new()),
         }
     }
 
@@ -162,7 +165,42 @@ impl AgentHost {
             host_kind: HostKind::Hub,
             // Hub hosts never register WorkspaceTools or the desktop process pack.
             packs: vec![],
+            tool_set: None,
             test: self.hooks.as_ref().map(|h| h()).unwrap_or_default(),
+        }
+    }
+
+    /// The engine that runs jobs with tool set `set`, opening it if needed.
+    /// It registers exactly that set's tools (not the hub runner's set), and
+    /// keeps its sessions apart from the chats' (`<data_dir>/jobs/<set>/`).
+    pub(crate) async fn job_engine(&self, set: vault_tools::ToolSet) -> Result<Shared, String> {
+        if !self.enabled {
+            return Err("the agent is off on this hub ([agent] enabled = false)".into());
+        }
+        let mut engines = self.job_engines.lock().await;
+        if let Some(a) = engines.get(&set) {
+            return Ok(a.clone());
+        }
+        let config = AgentConfig {
+            data_dir: self.data_dir.join("jobs").join(set.as_str()),
+            tool_set: Some(set),
+            ..self.config()
+        };
+        let execution_mode = self.execution_mode;
+        let enable_js = self.enable_js;
+        let vault = self.vault.clone();
+        let opened = tokio::task::spawn_blocking(move || {
+            Agent::open_with_execution(vault, config, execution_mode, enable_js)
+        })
+        .await;
+        match opened {
+            Ok(Ok(agent)) => {
+                let agent = Shared(Some(Arc::new(agent)));
+                engines.insert(set, agent.clone());
+                Ok(agent)
+            }
+            Ok(Err(e)) => Err(format!("the job engine failed to open: {e:#}")),
+            Err(e) => Err(format!("the job engine failed to open: {e}")),
         }
     }
 
@@ -247,9 +285,14 @@ impl AgentHost {
             s.close.cancel();
         }
         let agent = self.slot.lock().await.take();
+        let engines: Vec<Shared> = self.job_engines.lock().await.drain().map(|(_, a)| a).collect();
         // Off the runtime, so the agent's own runtime can stop.
         let _ = tokio::task::spawn_blocking(move || {
-            let _ = std::thread::spawn(move || drop(agent)).join();
+            let _ = std::thread::spawn(move || {
+                drop(agent);
+                drop(engines);
+            })
+            .join();
         })
         .await;
     }
@@ -279,7 +322,7 @@ fn check_device(hub: &Hub, token: &str, device: &str) -> Result<(), (StatusCode,
     Err((status, body))
 }
 
-async fn check(hub: &Arc<Hub>, token: &str, device: &str) -> Result<(), (StatusCode, String)> {
+pub(crate) async fn check(hub: &Arc<Hub>, token: &str, device: &str) -> Result<(), (StatusCode, String)> {
     let (hub, token, device) = (hub.clone(), token.to_string(), device.to_string());
     tokio::task::spawn_blocking(move || check_device(&hub, &token, &device))
         .await

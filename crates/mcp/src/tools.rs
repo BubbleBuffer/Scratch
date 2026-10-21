@@ -3,6 +3,7 @@
 use serde_json::{json, Value};
 use std::cell::Cell;
 use vault_core::{PageId, Vault};
+use vault_tools::ToolSet;
 
 use crate::Result;
 
@@ -24,13 +25,12 @@ pub fn definitions() -> Vec<Value> {
         .collect()
 }
 
-/// The `tools/list` entries for a read-only scope (only the registry's
-/// read-only tools) or for the full scope (the same as [`definitions`]).
-pub fn definitions_for(readonly: bool) -> Vec<Value> {
+/// The `tools/list` entries a caller with tool set `set` sees: the
+/// registry's read-only tools for Read, every served tool for Write and
+/// Everything (the same as [`definitions`]).
+pub fn definitions_for(set: ToolSet) -> Vec<Value> {
     let mut all = definitions();
-    if readonly {
-        all.retain(|t| t["annotations"]["readOnlyHint"] == true);
-    }
+    all.retain(|t| t["name"].as_str().is_some_and(|n| set.allows(n)));
     all
 }
 
@@ -52,10 +52,10 @@ pub(crate) fn with_transport<T>(transport: &'static str, call: impl FnOnce() -> 
     call()
 }
 
-/// Whether a request in the given scope may use tool `name` (a listed tool,
+/// Whether a caller with tool set `set` may use tool `name` (a listed tool,
 /// a hidden one, or an old name's alias, by the tool it runs).
-pub fn allowed(name: &str, readonly: bool) -> bool {
-    !readonly || vault_tools::lookup(name).is_some_and(|t| t.read_only)
+pub fn allowed(name: &str, set: ToolSet) -> bool {
+    set.allows(name)
 }
 
 /// Whether `name` can be called over MCP, including hidden tools and the

@@ -5,7 +5,8 @@ import '../../services/addon_services.dart';
 // default host, even while the tab is on the other one), and for this
 // computer the Claude Code extension and projects. The default runner and
 // model are vault settings (synced); "On this device" overrides them here
-// only (ai_settings.json, like the rest of this section).
+// only (ai_settings.json, like the rest of this section). Each runner's
+// tool set is a vault setting too, read by that runner when its agent starts.
 // Permission preferences remain dormant while the app always uses Bypass.
 
 import 'package:flutter/scheduler.dart';
@@ -14,6 +15,7 @@ import 'package:flutter/widgets.dart';
 import '../../ui/toast.dart';
 import '../../ui/ui.dart';
 import '../../core/file_dialogs.dart';
+import '../../core/tool_sets.dart';
 import 'agent_store.dart';
 
 class AgentSettingsSection extends StatefulWidget {
@@ -317,6 +319,7 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
               key: const ValueKey('agent-default-model-effective'),
               style: tsRaw(12, 16, 400, c.textSecondary),
             ),
+          for (final h in AgentHost.values) _toolSet(h),
         ],
         if (s.agentEnabled && !onHub) ...[
           field(
@@ -361,6 +364,28 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
             ),
         ],
       ],
+    );
+  }
+
+  /// [runner]'s tool set, synced in the vault. The conversation tools come
+  /// with every set; computer access only with Everything.
+  Widget _toolSet(AgentHost runner) {
+    final store = widget.store;
+    final set = store.vaultDefaults.toolSetFor(runner);
+    final onHub = runner == AgentHost.hub;
+    return SettingsRow(
+      label: onHub ? 'Tools on the hub' : 'Tools on this computer',
+      description:
+          '${toolSetDescription(set)} '
+          '${onHub ? 'Applies after the hub restarts.' : 'Applies to new chats; other computers pick it up when their agent next starts.'}',
+      trailing: SelectButton<String>(
+        key: ValueKey('agent-tool-set-${runner.runner}'),
+        title: onHub ? 'Tools on the hub' : 'Tools on this computer',
+        value: set,
+        options: toolSets,
+        labelOf: toolSetLabel,
+        onChanged: (v) => _write(() => store.setVaultToolSet(runner, v)),
+      ),
     );
   }
 

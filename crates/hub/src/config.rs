@@ -42,6 +42,11 @@ pub struct Config {
     pub mcp_agent_default_host: String,
     pub agent: AgentSection,
     pub schedules: SchedulesSection,
+    /// The jobs API's limits; fixed (not read from the file or environment),
+    /// tests shorten them.
+    #[doc(hidden)]
+    #[serde(skip)]
+    pub job_limits: crate::jobs::JobLimits,
 }
 
 /// `[schedules]`: provider-independent automation on this hub.
@@ -151,6 +156,7 @@ impl Default for Config {
             mcp_agent_default_host: "hub".into(),
             agent: AgentSection::default(),
             schedules: SchedulesSection::default(),
+            job_limits: crate::jobs::JobLimits::default(),
         }
     }
 }

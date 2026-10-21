@@ -394,6 +394,42 @@ class PageEditorState extends State<PageScreen>
     unawaited(askAgent(context));
   }
 
+  /// Ask AI about the selected text, the selected blocks or [block]; the
+  /// answer goes after the last of them.
+  void askAiForSelection({Node? block}) {
+    final d = doc;
+    if (d == null || readOnly) return;
+    var blocks = d.flat.where((n) => selected.contains(n.id)).toList();
+    if (blocks.isEmpty && block != null) blocks = [block];
+    String text;
+    if (blocks.isNotEmpty) {
+      text = blocks.map((n) => _ctl[n.id]?.text ?? n.text).join('\n');
+    } else {
+      final n = focusedNode;
+      if (n == null) return;
+      final controller = _ctl[n.id];
+      final selection = controller?.selection;
+      blocks = [n];
+      text = controller != null && selection != null && selection.isValid && !selection.isCollapsed
+          ? selection.textInside(controller.text)
+          : controller?.text ?? n.text;
+    }
+    setState(() {
+      menuBlockId = null;
+      if (!selectMode) selected.clear();
+    });
+    unawaited(_askAi(after: blocks.last.id, selection: text));
+  }
+
+  /// The Ask AI box about this page (saved first, so the run reads it as
+  /// shown); the answer goes after block [after] or at the page's end.
+  Future<void> _askAi({String? after, String? selection}) async {
+    _saveTitle();
+    await session.save();
+    if (!mounted) return;
+    await showAskAi(context, pageId: widget.pageId, after: after, selection: selection);
+  }
+
   /// A notification can target a retained sheet, including a hidden to-do.
   void _revealNavigationBlock(String id) {
     highlightBlocks([id]);
@@ -2063,6 +2099,12 @@ class PageEditorState extends State<PageScreen>
         kind: n.kind,
         count: multi ? selected.length : 1,
         color: n.color,
+        onAskAi: readOnly
+            ? null
+            : () {
+                askedAgent = true;
+                askAiForSelection(block: n);
+              },
         onAskAgent: _canAskAgent
             ? () {
                 askedAgent = true;
@@ -3337,6 +3379,7 @@ class PageEditorState extends State<PageScreen>
       pageId: widget.pageId,
       favorite: _favorite,
       canUndo: canUndo,
+      canAskAi: !readOnly,
     );
     if (a == null || !mounted) return;
     switch (a) {
@@ -3355,6 +3398,8 @@ class PageEditorState extends State<PageScreen>
         navOpenPage(context, id, titleCtl.text, stack: true);
       case PageMenuAction.moveTo:
         await showMoveTo(context, widget.pageId, anchor: rect);
+      case PageMenuAction.askAi:
+        await _askAi();
       case PageMenuAction.undo:
         undo();
       case PageMenuAction.history:
@@ -4539,6 +4584,7 @@ class PageEditorState extends State<PageScreen>
               onTurnInto: openTurnIntoMenu,
               onColor: openColorMenu,
               onAskAgent: _canAskAgent ? askAgentForSelection : null,
+              onAskAi: readOnly ? null : askAiForSelection,
             ),
           ),
         ),
@@ -4601,6 +4647,7 @@ class PageEditorState extends State<PageScreen>
               onAskAgent: _canAskAgent
                   ? () => askAgentForSelection(block: mn)
                   : null,
+              onAskAi: readOnly ? null : () => askAiForSelection(block: mn),
             ),
           ),
         );

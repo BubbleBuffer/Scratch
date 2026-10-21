@@ -155,6 +155,8 @@ void main() {
 
       // Retry with a runner that is off: it stays queued.
       store.settings.update((s) => s.runner = AiRunner.none);
+      await tester.ensureVisible(key('ai-retry-${t.id}'));
+      await settle(tester);
       await tapAndSettle(tester, key('ai-retry-${t.id}'));
       await settleUntil(tester, () => store.tasks.first.status == AiStatus.queued);
       expect(find.text('Queued'), findsOneWidget);

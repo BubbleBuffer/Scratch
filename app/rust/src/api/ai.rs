@@ -37,13 +37,16 @@ pub struct NotesMcp {
     root: String,
     http: Mutex<Option<McpHttp>>,
     addr: Mutex<String>,
+    /// The endpoint AI tasks run by Claude Code or Codex get: loopback, a
+    /// free port, only the runner's tool set, and the tool set it serves.
+    task_http: Mutex<Option<(String, McpHttp)>>,
 }
 
 impl NotesMcp {
     #[frb(sync)]
     pub fn new(vault: &NotesVault) -> NotesMcp {
         let root = vault.inner.root();
-        NotesMcp { vault: vault.inner.clone(), root, http: Mutex::new(None), addr: Mutex::new(String::new()) }
+        NotesMcp { vault: vault.inner.clone(), root, http: Mutex::new(None), addr: Mutex::new(String::new()), task_http: Mutex::new(None) }
     }
 
     /// Starts serving on `addr` (restarts if running) and returns the URL.
@@ -59,12 +62,39 @@ impl NotesMcp {
         Ok(url)
     }
 
-    /// Stops serving and removes the endpoint file.
+    /// Stops serving and removes the endpoint file (the AI tasks' endpoint
+    /// stops too).
     pub fn stop(&self) {
         if let Some(h) = lock(&self.http).take() {
             endpoint::clear_endpoint(&self.root, &h.url());
             h.stop();
         }
+        if let Some((_, h)) = lock(&self.task_http).take() {
+            h.stop();
+        }
+    }
+
+    /// The URL of the endpoint AI tasks run by Claude Code or Codex get:
+    /// 127.0.0.1 on a free port, the same token, and only `tool_set`'s tools
+    /// (`read`, `write` or `everything`; the runner's set). Started, or
+    /// restarted for another set, on demand. It writes no endpoint file.
+    pub fn task_url(&self, tool_set: String) -> Result<String, String> {
+        let set: vault_tools::ToolSet = tool_set.trim().parse()?;
+        let mut slot = lock(&self.task_http);
+        if let Some((have, h)) = slot.as_ref() {
+            if *have == set.as_str() {
+                return Ok(h.url());
+            }
+        }
+        if let Some((_, h)) = slot.take() {
+            h.stop();
+        }
+        let token = endpoint::token(&self.root).map_err(err)?;
+        let server = Arc::new(McpServer::new(self.vault.clone()).with_tool_set(set));
+        let http = McpHttp::serve("127.0.0.1:0", server, token, HttpOptions::default()).map_err(err)?;
+        let url = http.url();
+        *slot = Some((set.as_str().to_string(), http));
+        Ok(url)
     }
 
     /// The URL while running.
@@ -82,6 +112,10 @@ impl NotesMcp {
     /// configured with the old one stop working.
     pub fn rotate_token(&self) -> Result<String, String> {
         let t = endpoint::rotate_token(&self.root).map_err(err)?;
+        // The AI tasks' endpoint starts again with the new token when needed.
+        if let Some((_, h)) = lock(&self.task_http).take() {
+            h.stop();
+        }
         let running = lock(&self.http).is_some();
         if running {
             let addr = lock(&self.addr).clone();
@@ -110,6 +144,9 @@ pub struct AiTask {
     pub error: String,
     pub created_ms: i64,
     pub updated_ms: i64,
+    /// Where it runs: "" (any desktop), a device id (only that device) or
+    /// "hub" (a hub job).
+    pub node: String,
 }
 
 fn task(t: tasks::Task) -> AiTask {
@@ -124,6 +161,7 @@ fn task(t: tasks::Task) -> AiTask {
         error: t.error,
         created_ms: t.created_ms,
         updated_ms: t.updated_ms,
+        node: t.node,
     }
 }
 
@@ -137,6 +175,25 @@ pub fn ai_create_task(
     runner: String,
 ) -> Result<AiTask, String> {
     tasks::create(&vault.inner, &prompt, &page, after.as_deref(), &runner).map(task).map_err(err)
+}
+
+/// [`ai_create_task`] pinned to this device: only this device claims it
+/// ("Ask AI" when the default runner is this computer).
+pub fn ai_create_task_here(
+    vault: &NotesVault,
+    prompt: String,
+    page: String,
+    after: Option<String>,
+) -> Result<AiTask, String> {
+    let v = &vault.inner;
+    tasks::create_on(v, &prompt, &page, after.as_deref(), "", &v.device_id()).map(task).map_err(err)
+}
+
+/// Cancels a desktop task that hasn't ended: it is never claimed, and a
+/// running one's result is dropped. Returns whether it was still going.
+/// Hub jobs are cancelled on the hub.
+pub fn ai_cancel_task(vault: &NotesVault, id: String) -> Result<bool, String> {
+    tasks::cancel(&vault.inner, &id).map_err(err)
 }
 
 /// The newest tasks first.
@@ -203,7 +260,9 @@ pub struct AgentRun {
 
 /// Runs a command-line agent with `prompt` on stdin. `kind` picks the
 /// built-in arguments ("claude", "codex") unless `args` is given;
-/// `program` overrides the executable. No shell is involved.
+/// `program` overrides the executable. `model` is the synced default model
+/// (`codex/<m>` or `claude-code/<m>`; another provider's adds nothing). No
+/// shell is involved.
 #[allow(clippy::too_many_arguments)]
 pub fn ai_run_agent(
     kind: String,
@@ -214,8 +273,9 @@ pub fn ai_run_agent(
     mcp_token: String,
     work_dir: String,
     timeout_secs: u32,
+    model: Option<String>,
 ) -> Result<AgentRun, String> {
-    let cmd = match (args, runner::default_command(&kind, program.as_deref())) {
+    let cmd = match (args, runner::default_command_with_model(&kind, program.as_deref(), model.as_deref())) {
         (Some(args), d) => AgentCommand {
             program: program.filter(|p| !p.trim().is_empty()).or(d.map(|d| d.program)).unwrap_or(kind),
             args,

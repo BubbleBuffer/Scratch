@@ -12,7 +12,7 @@ use futures_util::StreamExt;
 use serde_json::Value;
 use vault_mcp::McpServer;
 
-use crate::agent_tokens::AgentScope;
+use vault_tools::ToolSet;
 use crate::mcp_log;
 use crate::mcp_oauth::AuthError;
 use crate::AppState;
@@ -167,21 +167,40 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
     let Some(token) = token else {
         return unauthorized(&state, false);
     };
+    // A signed-in device (its device token and `X-Device`, checked like
+    // `/sync`) may call `jobs` only: "Ask AI" and tasks assigned to the agent
+    // start hub jobs this way. Its set is Everything, which the job narrows
+    // to the hub runner's set.
+    let device = req
+        .headers()
+        .get(vault_sync::DEVICE_HEADER)
+        .and_then(|h| h.to_str().ok())
+        .map(str::trim)
+        .filter(|d| !d.is_empty())
+        .map(str::to_owned);
+    if let Some(device) = device {
+        if crate::agent::check(&state.hub, &token, &device).await.is_err() {
+            return unauthorized(&state, true);
+        }
+        let input = match read_body(req.into_body(), state.import_source_limit_bytes).await {
+            Ok(body) => body,
+            Err(_) => return (StatusCode::PAYLOAD_TOO_LARGE, "request too large").into_response(),
+        };
+        let actor = format!("{}{device}", crate::jobs::DEVICE_PREFIX);
+        return dispatch_vault(state, input, actor, ToolSet::Everything).await;
+    }
     // File metadata and reloads run off the async executor, as do vault calls.
     let st = state.clone();
     let agent_token = token.clone();
     let identity =
         tokio::task::spawn_blocking(move || st.agent_tokens.authenticate(&agent_token)).await;
-    let (actor, read_only) = match identity {
-        Ok(Ok(Some(identity))) => (
-            format!("agent:{}", identity.name),
-            identity.scope == AgentScope::Read,
-        ),
+    let (actor, set) = match identity {
+        Ok(Ok(Some(identity))) => (format!("agent:{}", identity.name), identity.scope),
         Ok(Ok(None)) => match &state.mcp_oauth {
             Some(oauth) => match oauth.authenticate(&token).await {
                 Ok(user) => (
                     format!("oauth:{}", user.email.as_deref().unwrap_or(&user.sub)),
-                    false,
+                    ToolSet::Everything,
                 ),
                 Err(AuthError::InvalidToken) => return unauthorized(&state, true),
                 Err(AuthError::Forbidden) => {
@@ -200,7 +219,7 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
         Ok(body) => body,
         Err(_) => return (StatusCode::PAYLOAD_TOO_LARGE, "request too large").into_response(),
     };
-    dispatch_vault(state, input, actor, read_only).await
+    dispatch_vault(state, input, actor, set).await
 }
 
 /// Both MCP endpoints use the same vault dispatch, import limits and attribution.
@@ -208,7 +227,7 @@ pub(crate) async fn dispatch_vault(
     state: Arc<AppState>,
     input: ImportBody,
     actor: String,
-    read_only: bool,
+    set: ToolSet,
 ) -> Response {
     let started = Instant::now();
     let request: Option<Value> = serde_json::from_slice(&input.bytes).ok();
@@ -230,8 +249,18 @@ pub(crate) async fn dispatch_vault(
     let reply = tokio::task::spawn_blocking(move || {
         let vault = state.hub.vault();
         let mcp = McpServer::new(vault.clone());
-        mcp.handle_body_with(&input.bytes, read_only, |name, args| {
+        mcp.handle_body_with(&input.bytes, set, |name, args| {
             vault.with_actor(&actor, || {
+                // The hub answers jobs itself: it knows the caller and runs them.
+                if vault_tools::canonical(name) == "jobs" {
+                    return state.jobs.call(&actor, set, args).map_err(vault_mcp::McpError);
+                }
+                // Devices reach the vault through sync; on /mcp they start jobs.
+                if actor.starts_with(crate::jobs::DEVICE_PREFIX) {
+                    return Err(vault_mcp::McpError(
+                        "a device token calls only the jobs tool on /mcp".into(),
+                    ));
+                }
                 if let Some(import) = vault_tools::import_args(name, args) {
                     let args = &import?;
                     if let Some(&index) = input.oversized.first() {
@@ -254,7 +283,7 @@ pub(crate) async fn dispatch_vault(
     .await;
     match reply {
         Ok(reply) => {
-            mcp_log::log_vault(&calls, read_only, &reply.body, started);
+            mcp_log::log_vault(&calls, set, &reply.body, started);
             (
                 StatusCode::from_u16(reply.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
                 [(header::CONTENT_TYPE, "application/json")],

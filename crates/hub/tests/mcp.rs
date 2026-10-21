@@ -24,6 +24,7 @@ struct Env {
     url: String,
     read: String,
     write: String,
+    everything: String,
     _data: TempDir,
 }
 
@@ -49,6 +50,7 @@ impl Env {
         let store = AgentTokens::open(config.vault_dir()).unwrap();
         let read = store.add("reader", AgentScope::Read).unwrap();
         let write = store.add("writer", AgentScope::Write).unwrap();
+        let everything = store.add("everything", AgentScope::Everything).unwrap();
         let server = notes_hub::start_on(listener, config).await.unwrap();
         let url = format!("http://{}/mcp", server.addr());
         Self {
@@ -58,6 +60,7 @@ impl Env {
             url,
             read,
             write,
+            everything,
             _data: data,
         }
     }
@@ -134,7 +137,7 @@ async fn initialize_and_scoped_tool_lists() {
         .collect();
     assert_eq!(
         listed, LISTED,
-        "tools/list over HTTP is exactly the 15 names, in order"
+        "tools/list over HTTP is exactly the 16 names, in order"
     );
     assert!(
         !listed.contains(&"feedback_list"),
@@ -143,8 +146,69 @@ async fn initialize_and_scoped_tool_lists() {
     env.server.stop().await;
 }
 
-/// The 15 listed MCP tools, in serving order.
-const LISTED: [&str; 15] = [
+/// The names a token's `tools/list` shows, in serving order.
+async fn listed_names(env: &Env, token: &str) -> Vec<String> {
+    let list = env.rpc(token, "tools/list", json!({})).await;
+    list["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[tokio::test]
+async fn a_token_lists_and_calls_only_its_tool_set() {
+    let env = Env::new().await;
+    // Everything sees every tool /mcp serves; on /mcp that is every vault
+    // tool, the same as Write (old write tokens are unchanged).
+    assert_eq!(listed_names(&env, &env.everything).await, LISTED);
+    assert_eq!(listed_names(&env, &env.write).await, LISTED);
+    let read = listed_names(&env, &env.read).await;
+    assert_eq!(read, ["search_notes", "read_page", "memory_read", "notes_help"]);
+
+    // Everything calls listed write tools, hidden tools and old names.
+    let created = env
+        .call(
+            &env.everything,
+            "create_page",
+            json!({"title":"Set target","markdown":"setneedle"}),
+        )
+        .await;
+    let page = id_in(tool_text(&created));
+    tool_text(&env.call(&env.everything, "feedback_list", json!({"limit":1})).await);
+    tool_text(
+        &env.call(
+            &env.everything,
+            "append_blocks",
+            json!({"page": page, "markdown": "everythingappended"}),
+        )
+        .await,
+    );
+
+    // A read token is refused a write tool with a clear JSON-RPC error.
+    let refused = env
+        .call(&env.read, "create_page", json!({"title":"Refused"}))
+        .await;
+    assert_eq!(refused["error"]["code"], -32602, "{refused}");
+    assert_eq!(
+        refused["error"]["message"],
+        "tool not available in read-only scope: create_page"
+    );
+    let read_back = env
+        .call(&env.read, "read_page", json!({"page": page}))
+        .await;
+    assert!(tool_text(&read_back).contains("everythingappended"));
+
+    // The token list reports the set under `scope`.
+    let listed = env.store.list().unwrap();
+    let everything = listed.iter().find(|t| t.name == "everything").unwrap();
+    assert_eq!(everything.scope, AgentScope::Everything);
+    env.server.stop().await;
+}
+
+/// The 16 listed MCP tools, in serving order.
+const LISTED: [&str; 16] = [
     "search_notes",
     "read_page",
     "create_page",
@@ -160,6 +224,7 @@ const LISTED: [&str; 15] = [
     "memory_delete",
     "feedback_submit",
     "notes_help",
+    "jobs",
 ];
 
 #[tokio::test]

@@ -341,3 +341,89 @@ fn merge_proposal_from_the_agent() {
     // Nothing was written.
     assert_eq!(texts(v, &page), ["Meet at 10"]);
 }
+
+#[test]
+fn ask_ai_on_this_device_is_pinned_and_cancellable() {
+    let t = Temp::new();
+    let a = app(&t);
+    let v = &a.v;
+    let me = v.device_id();
+    let page = v.create_page(None, "Notes".into()).unwrap();
+    // Pinned to this device: no other desktop claims it.
+    let task = tasks::create_on(v, "Explain this", &page, None, "", &me).unwrap();
+    assert_eq!(task.node, me);
+    assert!(tasks::claim_next(v, "another-desktop").unwrap().is_none());
+    let got = tasks::claim_next(v, &me).unwrap().unwrap();
+    assert_eq!(got.id, task.id);
+
+    // Cancelled while running: the late result is dropped and the
+    // placeholder says it was cancelled.
+    assert!(tasks::cancel(v, &got.id).unwrap());
+    assert_eq!(tasks::get(v, &got.id).unwrap().status, tasks::CANCELLED);
+    tasks::finish(v, &got.id, Ok("Too late".into())).unwrap();
+    let after = texts(v, &page);
+    assert!(after.iter().all(|t| !t.contains("Too late")), "{after:?}");
+    assert!(after.iter().any(|t| t.contains("AI task cancelled")), "{after:?}");
+    assert_eq!(tasks::get(v, &got.id).unwrap().status, tasks::CANCELLED);
+    // A second cancel does nothing.
+    assert!(!tasks::cancel(v, &got.id).unwrap());
+
+    // A hub job is cancelled on the hub, not here.
+    let hub = tasks::create_on(v, "On the hub", &page, None, "", "hub").unwrap();
+    assert!(tasks::cancel(v, &hub.id).is_err());
+    assert!(tasks::claim_next(v, "hub").unwrap().is_none());
+}
+
+#[test]
+fn the_synced_model_goes_on_the_command_line() {
+    let codex = runner::default_command_with_model("codex", None, Some("codex/gpt-6-luna")).unwrap();
+    let n = codex.args.len();
+    assert_eq!(&codex.args[n - 3..], ["-m", "gpt-6-luna", "-"]);
+    let claude =
+        runner::default_command_with_model("claude", None, Some("claude-code/sonnet")).unwrap();
+    assert_eq!(&claude.args[claude.args.len() - 2..], ["--model", "sonnet"]);
+    // Another provider's model, or none, leaves the program's default.
+    let plain = runner::default_command("codex", None).unwrap();
+    for m in [None, Some(""), Some("deepseek/v4"), Some("codex/")] {
+        assert_eq!(runner::default_command_with_model("codex", None, m).unwrap(), plain);
+    }
+    assert!(runner::model_args("claude", Some("codex/x")).is_empty());
+}
+
+#[test]
+fn a_task_endpoint_has_only_the_runner_set() {
+    let t = Temp::new();
+    let a = app(&t);
+    let v = &a.v;
+    // An endpoint narrowed to Read, as for `tool_sets.this_device = read`.
+    let read = McpHttp::serve(
+        "127.0.0.1:0",
+        Arc::new(McpServer::new(v.clone()).with_tool_set(vault_tools::ToolSet::Read)),
+        a.token.clone(),
+        HttpOptions::default(),
+    )
+    .unwrap();
+    let page = v.create_page(None, "Read only".into()).unwrap();
+    let task = tasks::create(v, "FAKE:edit", &page, None, "").unwrap();
+    let claimed = tasks::claim_next(v, &v.device_id()).unwrap().unwrap();
+    assert_eq!(claimed.id, task.id);
+    let prompt = tasks::agent_prompt(v, &claimed, tasks::PromptTools::Mcp).unwrap();
+    let ctx = RunContext {
+        mcp_url: read.url(),
+        ..a.ctx(Duration::from_secs(60))
+    };
+    let out = runner::run(&claude_like(), &prompt, &ctx).unwrap();
+    // The edit was refused (the agent exits with an error, or the tool
+    // reports one): the page never gets the paragraph.
+    let _ = out;
+    let md = v.page_markdown(page.clone()).unwrap();
+    assert!(!md.contains("Edited by the fake agent"), "{md}");
+    // The full endpoint lets the same agent edit.
+    let task = tasks::create(v, "FAKE:edit", &page, None, "").unwrap();
+    let claimed = tasks::claim_next(v, &v.device_id()).unwrap().unwrap();
+    assert_eq!(claimed.id, task.id);
+    let prompt = tasks::agent_prompt(v, &claimed, tasks::PromptTools::Mcp).unwrap();
+    let out = runner::run(&claude_like(), &prompt, &a.ctx(Duration::from_secs(60))).unwrap();
+    assert!(out.ok(), "{out:?}");
+    assert!(v.page_markdown(page).unwrap().contains("Edited by the fake agent"));
+}

@@ -47,6 +47,25 @@ void main() {
     });
   });
 
+  group('tools', () {
+    test('a tool set is the tools string and replaces a tool list', () {
+      final before = weeklyDefJson();
+      final def = ScheduleDef.fromJson(before, tz: 'UTC');
+      expect(def.tools, ['create_page']);
+      expect(def.toolSet, isNull);
+
+      final edited = def.copyWith(toolSet: 'everything');
+      final changes = changedKeys(before, edited.toJson());
+      expect(changes.keys, ['tools']);
+      expect(changes['tools'], 'everything');
+
+      final back = ScheduleDef.fromJson(edited.toJson(), tz: 'UTC');
+      expect(back.toolSet, 'everything');
+      expect(back.tools, isEmpty);
+      expect(fakeHash(back), isNot(fakeHash(def)));
+    });
+  });
+
   group('rule text', () {
     test('a weekly rule with two weekdays', () {
       final rule = ScheduleRule.parse('FREQ=WEEKLY;BYDAY=MO')!.withByDay([

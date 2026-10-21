@@ -302,6 +302,84 @@ fn desktop_tools_are_always_shown_with_the_host_approval_policy() {
         .contains("not a sandbox"));
 }
 
+/// The conversation tools every tool set keeps.
+const CONVERSATION_TOOLS: [&str; 8] = [
+    "chat_read",
+    "ui_open_page",
+    "ui_highlight",
+    "history_chapters",
+    "history_search",
+    "history_read",
+    "environments",
+    "js",
+];
+
+fn sorted(names: &[String]) -> Vec<String> {
+    let mut names = names.to_vec();
+    names.sort();
+    names
+}
+
+#[test]
+fn each_runner_registers_only_its_vault_tool_set() {
+    let _serial = serial_guard();
+    let f = Fixture::new();
+    // Read on this computer: the read-only vault tools and the conversation
+    // tools, and no desktop or project tools even with the desktop pack.
+    f.vault
+        .set_agent_tool_set("this_device".into(), Some("read".into()))
+        .unwrap();
+    let agent = f.open(true, PermissionMode::Bypass);
+    let mut expected: Vec<String> = ["search_notes", "read_page", "memory_read", "notes_help"]
+        .into_iter()
+        .chain(CONVERSATION_TOOLS)
+        .map(String::from)
+        .collect();
+    expected.sort();
+    assert_eq!(sorted(&agent.host_info().tools), expected);
+    let value = script(
+        &agent,
+        "return {create: typeof tools.create_page, read: typeof tools.read_page, exec: typeof tools.exec};",
+    );
+    assert_eq!(
+        value,
+        json!({"create":"undefined", "read":"function", "exec":"undefined"})
+    );
+    drop(agent);
+
+    // Write: every vault tool, still no desktop tools.
+    f.vault
+        .set_agent_tool_set("this_device".into(), Some("write".into()))
+        .unwrap();
+    let agent = f.open(true, PermissionMode::Bypass);
+    assert_host_tool_names(&agent.host_info().tools, false);
+    assert!(agent.host_info().packs.is_empty());
+    drop(agent);
+
+    // The hub's set is its own: Read there leaves this computer on Write.
+    f.vault
+        .set_agent_tool_set("hub".into(), Some("read".into()))
+        .unwrap();
+    let hub = Agent::open(
+        f.vault.clone(),
+        AgentConfig {
+            data_dir: f.data.clone(),
+            host_kind: HostKind::Hub,
+            ..AgentConfig::default()
+        },
+    )
+    .unwrap();
+    assert!(!hub.host_info().tools.iter().any(|t| t == "create_page"));
+    drop(hub);
+
+    // Clearing it is Everything again: the desktop tools come back.
+    f.vault
+        .set_agent_tool_set("this_device".into(), None)
+        .unwrap();
+    let agent = f.open(true, PermissionMode::Bypass);
+    assert_host_tool_names(&agent.host_info().tools, true);
+}
+
 #[test]
 fn base_host_has_no_desktop_tools() {
     let _serial = serial_guard();

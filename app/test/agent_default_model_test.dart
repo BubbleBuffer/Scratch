@@ -2,6 +2,8 @@
 // host ("Agent runs on"), not those of the host the AI tab is on. The other
 // host's list is read through `AgentStore.debugHostModels`; the hub is a
 // closed loopback port, so the tab's hub agent never opens.
+// Each runner also has a tool set (integration spec phase 5), a vault
+// setting next to its default model.
 
 import 'dart:io';
 
@@ -135,6 +137,54 @@ void main() {
       expect(store.vaultDefaults.models[AgentHost.local], 'codex/local-a');
       expect(AiSettings.load(file).agentModelOverrides, isEmpty,
           reason: 'nothing overwrote the setting');
+    } finally {
+      await closeAi(t, ai);
+    }
+  });
+
+  appTest('each runner offers the tool sets, Everything by default, and a '
+      'pick is a vault setting', (t) async {
+    final tv = await pumpApp(t, mobile: false);
+    AgentStore.debugHostModels = (h) async => _local;
+    addTearDown(() => AgentStore.debugHostModels = null);
+    final (store, settings, _) = await tabOnHub(t, tv);
+    final ai = await aiStore(t, settings: settings);
+    try {
+      await openAiSettings(t);
+      for (final runner in ['this_device', 'hub']) {
+        await t.ensureVisible(key('agent-tool-set-$runner'));
+        final picker =
+            t.widget<SelectButton<String>>(key('agent-tool-set-$runner'));
+        expect(picker.options, ['read', 'write', 'everything']);
+        expect(picker.value, 'everything', reason: 'the default');
+      }
+      expect(find.textContaining('Applies after the hub restarts.'),
+          findsOneWidget);
+
+      t.widget<SelectButton<String>>(key('agent-tool-set-hub')).onChanged!(
+          'read');
+      await settle(t);
+      await settleUntil(
+          t, () => store.vaultDefaults.toolSetFor(AgentHost.hub) == 'read');
+      expect(
+        await real(t, () => tv.vault.run((v) => v.agentToolSet(runner: 'hub'))),
+        'read',
+      );
+      expect(store.vaultDefaults.toolSetFor(AgentHost.local), 'everything',
+          reason: 'each runner has its own set');
+      expect(
+        t.widget<SelectButton<String>>(key('agent-tool-set-hub')).value,
+        'read',
+      );
+
+      t.widget<SelectButton<String>>(key('agent-tool-set-hub')).onChanged!(
+          'everything');
+      await settle(t);
+      await settleUntil(t, () => store.vaultDefaults.toolSets.isEmpty);
+      expect(
+        await real(t, () => tv.vault.run((v) => v.agentToolSet(runner: 'hub'))),
+        'everything',
+      );
     } finally {
       await closeAi(t, ai);
     }

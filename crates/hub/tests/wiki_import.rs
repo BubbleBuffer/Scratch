@@ -53,6 +53,13 @@ fn files(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, std::time::SystemTime)> {
             let path = entry.path();
             if path.is_dir() {
                 visit(root, &path, out);
+            } else if matches!(
+                path.file_name().and_then(|n| n.to_str()),
+                // Agent-token bookkeeping: each accepted token records its
+                // last use (at most once a minute), which is not a vault write.
+                Some("agent-tokens.json" | "agent-tokens.lock")
+            ) {
+                continue;
             } else {
                 out.insert(
                     path.strip_prefix(root).unwrap().to_owned(),

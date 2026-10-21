@@ -312,6 +312,7 @@ class ScheduleDef {
     required this.trigger,
     this.runner,
     this.tools = const [],
+    this.toolSet,
     this.steps = const [],
     Map<String, Object?> extra = const {},
   }) : _extra = Map.of(extra);
@@ -337,6 +338,7 @@ class ScheduleDef {
       trigger: ScheduleTrigger.fromJson(trigger, tz: tz),
       runner: runner is String && runner.isNotEmpty ? runner : null,
       tools: tools is List ? tools.whereType<String>().toList() : const [],
+      toolSet: tools is String && tools.isNotEmpty ? tools : null,
       steps: steps is List
           ? [
               for (final (i, s) in steps.indexed)
@@ -360,7 +362,14 @@ class ScheduleDef {
   final int version;
   final ScheduleTrigger trigger;
   final String? runner;
+
+  /// The tool names of a schedule written before tool sets; empty when
+  /// [toolSet] is set.
   final List<String> tools;
+
+  /// The built-in tool set the steps may use (`read`, `write` or
+  /// `everything`), stored as the `tools` string. Null for a tool list.
+  final String? toolSet;
   final List<ScheduleStep> steps;
   final Map<String, Object?> _extra;
 
@@ -371,12 +380,15 @@ class ScheduleDef {
     int? version,
     ScheduleTrigger? trigger,
     Object? runner = _keep,
+    String? toolSet,
     List<ScheduleStep>? steps,
   }) => ScheduleDef(
     version: version ?? this.version,
     trigger: trigger ?? this.trigger,
     runner: identical(runner, _keep) ? this.runner : runner as String?,
-    tools: tools,
+    // Picking a set replaces a tool list.
+    tools: toolSet == null ? tools : const [],
+    toolSet: toolSet ?? this.toolSet,
     steps: steps ?? this.steps,
     extra: _extra,
   );
@@ -388,7 +400,10 @@ class ScheduleDef {
     'version': version,
     'trigger': trigger.toJson(),
     if (runner != null) 'runner': runner,
-    if (tools.isNotEmpty) 'tools': tools,
+    if (toolSet != null)
+      'tools': toolSet
+    else if (tools.isNotEmpty)
+      'tools': tools,
     if (steps.isNotEmpty) 'steps': [for (final s in steps) s.toJson()],
   };
 }

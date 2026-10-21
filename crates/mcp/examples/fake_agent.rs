@@ -9,6 +9,7 @@
 //!
 //! - `FAKE:fail`: prints to stderr and exits with code 3.
 //! - `FAKE:sleep`: sleeps for a minute (timeouts).
+//! - `FAKE:args`: answers `Args: ` and its arguments (the model flags).
 //! - `FAKE:edit`: appends a paragraph to the task's page over MCP and
 //!   answers nothing.
 //! - a merge prompt ("Two devices edited"): answers `**Merged** by the fake agent`.
@@ -70,6 +71,9 @@ fn main() {
     }
     let answer = if prompt.contains("Two devices edited") {
         "**Merged** by the fake agent".to_string()
+    } else if prompt.contains("FAKE:args") {
+        // Placeholders are already replaced; file paths differ per run.
+        format!("Args: {}", args.join(" "))
     } else {
         let client = endpoint(&args).map(|(u, t)| McpClient::new(&u, &t));
         let page = page_id(&prompt);

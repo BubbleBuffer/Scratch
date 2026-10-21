@@ -5,8 +5,10 @@
 //! Routes, config and the login sequence: `wiki/architecture/hub.md`.
 
 pub mod agent;
+mod agent_token_api;
 pub mod agent_tokens;
 pub mod config;
+mod jobs;
 mod login;
 mod mcp;
 mod mcp_agent;
@@ -37,6 +39,8 @@ use vault_sync::{Hub, HubRequest};
 
 pub use agent::AgentTestHooks;
 pub use config::{AgentSection, Config, McpOAuthConfig, OidcConfig, SchedulesSection};
+#[doc(hidden)]
+pub use jobs::JobLimits;
 
 /// Shared by every handler.
 pub(crate) struct AppState {
@@ -54,6 +58,8 @@ pub(crate) struct AppState {
     pub mcp_agent: mcp_agent::Gateway,
     pub scheduler: Option<Arc<vault_agent::schedules::Scheduler>>,
     schedule_runner: std::sync::Mutex<Option<vault_agent::schedules::RunningScheduler>>,
+    /// The jobs API (`jobs` tool) and its worker's state.
+    pub jobs: jobs::Jobs,
 }
 
 /// Opens (creating it on first start) the vault replica at
@@ -101,6 +107,7 @@ impl Server {
     /// requests and shuts the agent down.
     pub async fn stop(mut self) {
         self.state.stopping.store(true, Ordering::SeqCst);
+        self.state.jobs.stop();
         let runner = self.state.schedule_runner.lock().unwrap().take();
         let _ = tokio::task::spawn_blocking(move || drop(runner)).await;
         if let Some(s) = self.stop.take() {
@@ -223,6 +230,7 @@ pub async fn start_with(
     } else {
         None
     };
+    let hub_vault = hub.vault().clone();
     let state = Arc::new(AppState {
         hub,
         stopping: AtomicBool::new(false),
@@ -239,7 +247,13 @@ pub async fn start_with(
         ),
         scheduler,
         schedule_runner: std::sync::Mutex::new(schedule_runner),
+        jobs: jobs::Jobs::new(
+            hub_vault,
+            config.job_limits.clone(),
+            config.agent.enabled,
+        ),
     });
+    tokio::spawn(jobs::run_worker(state.clone()));
     if state.agent.enabled() {
         // Open now so a failure shows in the log at start; a failed open is
         // retried by the next `/agent/ws` connection.
@@ -336,6 +350,14 @@ fn router(state: Arc<AppState>) -> Router {
         .route("/auth/redeem", post(login::redeem))
         .route("/auth/signout", post(login::signout))
         .route("/agent/ws", get(agent::ws))
+        .route(
+            "/agent-tokens",
+            get(agent_token_api::list).post(agent_token_api::create),
+        )
+        .route(
+            "/agent-tokens/{name}",
+            axum::routing::delete(agent_token_api::revoke),
+        )
         .route("/mcp", axum::routing::any(mcp::handle))
         .route("/mcp/agent", axum::routing::any(mcp_agent::handle))
         .route(

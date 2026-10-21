@@ -72,7 +72,7 @@ class InMemoryScheduleStorage implements ScheduleStorage {
 /// hash is the engine's; this one only has to change when those parts change.
 String fakeHash(ScheduleDef def) => 'fake:${jsonEncode({
   'runner': def.runner,
-  'tools': def.tools,
+  'tools': def.toJson()['tools'],
   'steps': [for (final s in def.steps) s.toJson()],
 })}';
 

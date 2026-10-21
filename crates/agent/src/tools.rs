@@ -62,14 +62,18 @@ impl Tool for VaultTool {
     }
 }
 
-/// Registers every vault tool as a host tool and marks the always-shown set.
+/// Registers the vault tools in `set` as host tools and marks the
+/// always-shown ones among them.
 pub fn register_vault_tools(
     registry: &mut ToolRegistry,
     vault: Arc<Vault>,
     records: Arc<crate::records::Records>,
+    set: vault_tools::ToolSet,
 ) -> Result<()> {
-    registry.show_always(ALWAYS_SHOWN.iter().copied());
-    for def in vault_tools::definitions_for(vault_tools::Surface::InAppAgent) {
+    registry.show_always(ALWAYS_SHOWN.iter().copied().filter(|n| set.allows(n)));
+    for def in vault_tools::definitions_for(vault_tools::Surface::InAppAgent)
+        .filter(|def| set.allows(def.name))
+    {
         registry.register_host(Arc::new(RecordedTool::new(
             Arc::new(VaultTool::new(def, vault.clone())),
             records.clone(),
@@ -579,7 +583,13 @@ mod presentation_tests {
             .unwrap(),
         );
         let mut registry = ToolRegistry::new();
-        register_vault_tools(&mut registry, vault.clone(), records.clone()).unwrap();
+        register_vault_tools(
+            &mut registry,
+            vault.clone(),
+            records.clone(),
+            vault_tools::ToolSet::Everything,
+        )
+        .unwrap();
         crate::ui::register(
             &mut registry,
             Arc::new(crate::ui::Ui::new()),

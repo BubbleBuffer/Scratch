@@ -337,6 +337,13 @@ class ScheduleController extends ChangeNotifier {
     await _commit(def.copyWith(runner: runnerId));
   }
 
+  /// Sets the tool set the steps may use. The runner accepts the changed
+  /// schedule again before it runs.
+  Future<void> setToolSet(String set) async {
+    if (set == def.toolSet) return;
+    await _commit(def.copyWith(toolSet: set));
+  }
+
   /// Sets the title template of the first step.
   Future<void> setStepTitle(String title) =>
       _editFirst((s) => s.copyWith(title: title));

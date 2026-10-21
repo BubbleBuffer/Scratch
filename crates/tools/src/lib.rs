@@ -9,18 +9,21 @@ pub mod harness;
 pub mod help;
 mod memory;
 pub mod notes_cli;
+pub mod notes_setup;
 pub mod outline;
 mod organize;
 pub mod props;
 mod query;
+mod tool_sets;
 mod tools;
 pub mod wiki_import;
 
 pub use agenda::{resolve_agenda_item, resolve_daily_note, AgendaTarget};
+pub use tool_sets::ToolSet;
 pub use tools::{
     alias, aliases, call, call_on, canonical, definitions, definitions_for, get, hidden,
     import_args, lookup, resolve_page, set_link_base, Alias, Approval, Surface, ToolDef,
-    CREATE_PAGE_ROOTS_ERROR, IN_APP_TRANSPORT,
+    CREATE_PAGE_ROOTS_ERROR, IN_APP_TRANSPORT, JOBS_NEED_A_HUB,
 };
 
 /// A tool error, preserving the message reported by the vault action.
@@ -112,7 +115,7 @@ mod tests {
         );
     }
 
-    const LISTED: [&str; 15] = [
+    const LISTED: [&str; 16] = [
         "search_notes",
         "read_page",
         "create_page",
@@ -128,18 +131,20 @@ mod tests {
         "memory_delete",
         "feedback_submit",
         "notes_help",
+        "jobs",
     ];
 
     #[test]
-    fn listed_names_are_the_fifteen_in_order() {
+    fn listed_names_are_the_sixteen_in_order() {
         let names: Vec<&str> = definitions().iter().map(|t| t.name).collect();
         assert_eq!(names, LISTED);
         let mcp: Vec<&str> = definitions_for(Surface::Mcp).map(|t| t.name).collect();
         assert_eq!(mcp, LISTED);
+        // Jobs are for outside agents: the in-app agent has no jobs tool.
         let app: Vec<&str> = definitions_for(Surface::InAppAgent)
             .map(|t| t.name)
             .collect();
-        assert_eq!(app, LISTED);
+        assert_eq!(app, LISTED[..15]);
     }
 
     #[test]
@@ -173,13 +178,15 @@ mod tests {
 
     #[test]
     fn mcp_only_tools_are_not_served_in_app() {
-        // Every listed tool, feedback_submit included, is on both surfaces.
+        // Every listed tool but jobs, feedback_submit included, is on both surfaces.
         let mcp: Vec<_> = definitions_for(Surface::Mcp).map(|t| t.name).collect();
         let app: Vec<_> = definitions_for(Surface::InAppAgent)
             .map(|t| t.name)
             .collect();
         assert!(app.contains(&"feedback_submit"));
-        for tool in definitions() {
+        // jobs is MCP only: jobs come from outside agents.
+        assert!(mcp.contains(&"jobs") && !app.contains(&"jobs"));
+        for tool in definitions().iter().filter(|t| t.name != "jobs") {
             assert!(
                 mcp.contains(&tool.name) && app.contains(&tool.name),
                 "{}",

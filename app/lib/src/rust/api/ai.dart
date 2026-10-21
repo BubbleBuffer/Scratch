@@ -32,6 +32,26 @@ Future<AiTask> aiCreateTask({
   runner: runner,
 );
 
+/// [`ai_create_task`] pinned to this device: only this device claims it
+/// ("Ask AI" when the default runner is this computer).
+Future<AiTask> aiCreateTaskHere({
+  required NotesVault vault,
+  required String prompt,
+  required String page,
+  String? after,
+}) => RustLib.instance.api.crateApiAiAiCreateTaskHere(
+  vault: vault,
+  prompt: prompt,
+  page: page,
+  after: after,
+);
+
+/// Cancels a desktop task that hasn't ended: it is never claimed, and a
+/// running one's result is dropped. Returns whether it was still going.
+/// Hub jobs are cancelled on the hub.
+Future<bool> aiCancelTask({required NotesVault vault, required String id}) =>
+    RustLib.instance.api.crateApiAiAiCancelTask(vault: vault, id: id);
+
 /// The newest tasks first.
 Future<List<AiTask>> aiListTasks({
   required NotesVault vault,
@@ -82,7 +102,9 @@ List<String>? aiDefaultArgs({required String kind}) =>
 
 /// Runs a command-line agent with `prompt` on stdin. `kind` picks the
 /// built-in arguments ("claude", "codex") unless `args` is given;
-/// `program` overrides the executable. No shell is involved.
+/// `program` overrides the executable. `model` is the synced default model
+/// (`codex/<m>` or `claude-code/<m>`; another provider's adds nothing). No
+/// shell is involved.
 Future<AgentRun> aiRunAgent({
   required String kind,
   String? program,
@@ -92,6 +114,7 @@ Future<AgentRun> aiRunAgent({
   required String mcpToken,
   required String workDir,
   required int timeoutSecs,
+  String? model,
 }) => RustLib.instance.api.crateApiAiAiRunAgent(
   kind: kind,
   program: program,
@@ -101,6 +124,7 @@ Future<AgentRun> aiRunAgent({
   mcpToken: mcpToken,
   workDir: workDir,
   timeoutSecs: timeoutSecs,
+  model: model,
 );
 
 /// The prompt asking an agent to merge the conflict on `block` of `page`.
@@ -133,8 +157,15 @@ abstract class NotesMcp implements RustOpaqueInterface {
   /// Starts serving on `addr` (restarts if running) and returns the URL.
   Future<String> start({required String addr});
 
-  /// Stops serving and removes the endpoint file.
+  /// Stops serving and removes the endpoint file (the AI tasks' endpoint
+  /// stops too).
   Future<void> stop();
+
+  /// The URL of the endpoint AI tasks run by Claude Code or Codex get:
+  /// 127.0.0.1 on a free port, the same token, and only `tool_set`'s tools
+  /// (`read`, `write` or `everything`; the runner's set). Started, or
+  /// restarted for another set, on demand. It writes no endpoint file.
+  Future<String> taskUrl({required String toolSet});
 
   /// The bearer token (created on first use, kept in `.vault/mcp/token`).
   Future<String> token();
@@ -198,6 +229,10 @@ class AiTask {
   final PlatformInt64 createdMs;
   final PlatformInt64 updatedMs;
 
+  /// Where it runs: "" (any desktop), a device id (only that device) or
+  /// "hub" (a hub job).
+  final String node;
+
   const AiTask({
     required this.id,
     required this.prompt,
@@ -209,6 +244,7 @@ class AiTask {
     required this.error,
     required this.createdMs,
     required this.updatedMs,
+    required this.node,
   });
 
   @override
@@ -222,7 +258,8 @@ class AiTask {
       device.hashCode ^
       error.hashCode ^
       createdMs.hashCode ^
-      updatedMs.hashCode;
+      updatedMs.hashCode ^
+      node.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -238,7 +275,8 @@ class AiTask {
           device == other.device &&
           error == other.error &&
           createdMs == other.createdMs &&
-          updatedMs == other.updatedMs;
+          updatedMs == other.updatedMs &&
+          node == other.node;
 }
 
 /// A proposed ordinary page edit: text and marks. Conflict confirmation is

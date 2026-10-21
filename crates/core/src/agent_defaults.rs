@@ -5,6 +5,11 @@
 //! and the hub read the same value. A device may override them locally
 //! (the app keeps that in its own settings, never here).
 //!
+//! Each runner's tool set (integration spec, phase 5) sits beside them, under
+//! `tool_sets.<runner>`: `read`, `write` or `everything` (the sets of
+//! `vault_tools::ToolSet`, which this crate cannot depend on). A missing
+//! value is Everything. Each runner reads its own set when its engine starts.
+//!
 //! Runner values are `hub` and `this_device`. `this_device` means "the
 //! device that starts the run"; the hub and its MCP gateway treat it as
 //! `hub`. Node device ids are left to phase 6.
@@ -18,6 +23,9 @@ pub const AGENT_RUNNER_THIS_DEVICE: &str = "this_device";
 const ADDON: &str = "agent";
 const RUNNER_KEY: &str = "default_runner";
 const MODELS_KEY: &str = "default_models";
+const TOOL_SETS_KEY: &str = "tool_sets";
+/// The tool set names a runner may store (see `vault_tools::ToolSet`).
+pub const AGENT_TOOL_SETS: [&str; 3] = ["read", "write", "everything"];
 
 /// The vault's agent defaults. `None` / a missing key: not set.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -46,6 +54,36 @@ fn check_runner(runner: &str) -> Result<()> {
             "unknown agent runner {runner:?} (expected hub or this_device)"
         )))
     }
+}
+
+fn check_tool_set(set: &str) -> Result<()> {
+    if AGENT_TOOL_SETS.contains(&set) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "unknown tool set {set:?} (expected read, write or everything)"
+        )))
+    }
+}
+
+/// Runner to tool set, keeping only known runners and sets.
+fn tool_sets_in(doc: &PageDoc) -> BTreeMap<String, String> {
+    let data = doc.type_data_value();
+    let mut out = BTreeMap::new();
+    if let Some(map) = data
+        .get(ADDON)
+        .and_then(|a| a.get(TOOL_SETS_KEY))
+        .and_then(|v| v.as_object())
+    {
+        for (runner, set) in map {
+            if let Some(set) = clean(set.as_str()) {
+                if check_runner(runner).is_ok() && check_tool_set(&set).is_ok() {
+                    out.insert(runner.clone(), set);
+                }
+            }
+        }
+    }
+    out
 }
 
 fn clean(value: Option<&str>) -> Option<String> {
@@ -115,6 +153,47 @@ impl Vault {
                 Some(m) => doc.type_data_set(ADDON, &path, &serde_json::json!(m)),
                 None => {
                     if agent_defaults_in(doc).models.contains_key(&runner) {
+                        doc.type_data_delete(ADDON, &path)
+                    } else {
+                        Ok(())
+                    }
+                }
+            }
+        })
+    }
+
+    /// Each runner's tool set, as stored (runners without one use
+    /// Everything). Reading an empty vault does not create the settings page.
+    pub fn agent_tool_sets(&self) -> Result<BTreeMap<String, String>> {
+        match self.find_by_role("calendars".into())? {
+            Some(page) => self.inner.read(&page, |doc| tool_sets_in(doc)),
+            None => Ok(BTreeMap::new()),
+        }
+    }
+
+    /// The tool set `runner` uses: the stored one, else `everything`.
+    pub fn agent_tool_set(&self, runner: &str) -> Result<String> {
+        check_runner(runner)?;
+        Ok(self
+            .agent_tool_sets()?
+            .remove(runner)
+            .unwrap_or_else(|| "everything".into()))
+    }
+
+    /// Sets the tool set of `runner`; `None` or empty clears it (Everything).
+    pub fn set_agent_tool_set(&self, runner: String, set: Option<String>) -> Result<()> {
+        check_runner(&runner)?;
+        let set = clean(set.as_deref());
+        if let Some(s) = &set {
+            check_tool_set(s)?;
+        }
+        let page = self.settings_page()?;
+        self.inner.edit(&page, |doc| {
+            let path = [TOOL_SETS_KEY.to_owned(), runner.clone()];
+            match &set {
+                Some(s) => doc.type_data_set(ADDON, &path, &serde_json::json!(s)),
+                None => {
+                    if tool_sets_in(doc).contains_key(&runner) {
                         doc.type_data_delete(ADDON, &path)
                     } else {
                         Ok(())
@@ -266,5 +345,27 @@ mod tests {
         let (_dir2, empty) = vault();
         assert!(!empty.seed_agent_defaults(AgentDefaults::default()).unwrap());
         assert!(empty.agent_defaults().unwrap().is_empty());
+    }
+
+    #[test]
+    fn tool_sets_per_runner_default_to_everything() {
+        let (_t, v) = vault();
+        assert!(v.agent_tool_sets().unwrap().is_empty());
+        assert_eq!(v.agent_tool_set("hub").unwrap(), "everything");
+        v.set_agent_tool_set("hub".into(), Some("read".into())).unwrap();
+        v.set_agent_tool_set("this_device".into(), Some("write".into()))
+            .unwrap();
+        assert_eq!(v.agent_tool_set("hub").unwrap(), "read");
+        assert_eq!(v.agent_tool_set("this_device").unwrap(), "write");
+        assert!(v
+            .set_agent_tool_set("hub".into(), Some("admin".into()))
+            .is_err());
+        assert!(v
+            .set_agent_tool_set("laptop".into(), Some("read".into()))
+            .is_err());
+        // Tool sets sit beside the defaults and leave them alone.
+        assert!(v.agent_defaults().unwrap().is_empty());
+        v.set_agent_tool_set("hub".into(), None).unwrap();
+        assert_eq!(v.agent_tool_set("hub").unwrap(), "everything");
     }
 }

@@ -6,7 +6,9 @@ import 'package:flutter/widgets.dart';
 import '../../core/models.dart';
 import '../../core/debounce.dart';
 import '../../services/addon_services.dart';
+import '../../ui/toast.dart';
 import '../../ui/ui.dart';
+import 'task_agent.dart';
 import 'task_data.dart';
 
 class TaskComposer extends StatefulWidget {
@@ -60,10 +62,18 @@ class _TaskComposerState extends State<TaskComposer> {
 
   Future<void> _create(String title, TaskData task, bool openFull) async {
     final vault = const AddonServices().vault(context);
+    final runs = const AddonServices().agentRuns(context);
     // A metadata-write retry completes this page rather than creating a duplicate.
     _createdPage ??= await vault.createPage(title: title, pageType: taskType);
     await vault.renamePage(_createdPage!, title);
     await saveTask(vault, _createdPage!, task);
+    if (task.assignee == 'agent') {
+      try {
+        await followTaskAssignee(runs, vault, _createdPage!, from: 'me', to: 'agent', title: title);
+      } catch (e) {
+        if (mounted) showErrorToast(context, "The agent couldn't start: $e");
+      }
+    }
     if (!mounted) return;
     if (openFull) {
       (widget.onOpenFull ?? widget.onCreated)?.call(_createdPage!);
@@ -144,9 +154,13 @@ class TaskFields extends StatefulWidget {
     required this.onSave,
     this.composer = false,
     this.fromToday = false,
+    this.agentRun,
   });
   final TaskData initial;
   final CalendarSettings calendars;
+
+  /// The agent's run for this task, for its status line.
+  final AiTask? agentRun;
   final Future<void> Function(String title, TaskData task, bool openFull)
   onSave;
   final bool composer, fromToday;
@@ -494,11 +508,17 @@ class _TaskFieldsState extends State<TaskFields> {
                   : (value) => _change(() => _assignee = value),
             ),
           ),
-          if (_assignee == 'agent')
+          if (_assignee == 'agent' || widget.initial.assignee == 'agent')
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                'Scheduled runs come later.',
+                taskAgentNote(
+                  composer: widget.composer,
+                  saved: widget.initial,
+                  assignee: _assignee,
+                  run: widget.agentRun,
+                ),
+                key: const ValueKey('task-agent-note'),
                 style: ts(context.type.uiSmall, c.textTertiary),
               ),
             ),

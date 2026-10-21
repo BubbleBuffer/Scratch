@@ -87,7 +87,7 @@ impl Call {
 /// Logs the calls of a vault request whose reply body is `body`. A call the
 /// vault never ran (no name, unknown, or denied in this scope) is classified
 /// from the request; the others from their reply, matched by id.
-pub(crate) fn log_vault(calls: &[Call], read_only: bool, body: &str, started: Instant) {
+pub(crate) fn log_vault(calls: &[Call], set: vault_tools::ToolSet, body: &str, started: Instant) {
     if calls.is_empty() {
         return;
     }
@@ -105,7 +105,7 @@ pub(crate) fn log_vault(calls: &[Call], read_only: bool, body: &str, started: In
         let outcome = match call.tool.as_deref() {
             None => Outcome::InvalidArgs,
             Some(name) if !vault_mcp::tools::exists(name) => Outcome::UnknownTool,
-            Some(name) if !vault_mcp::tools::allowed(name, read_only) => Outcome::Denied,
+            Some(name) if !vault_mcp::tools::allowed(name, set) => Outcome::Denied,
             Some(_) => reply.map_or(Outcome::Internal, outcome_of),
         };
         call.log(outcome, reply.map_or(0, result_bytes), started);

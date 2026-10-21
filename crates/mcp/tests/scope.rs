@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use vault_core::*;
 use vault_mcp::tools;
 use vault_mcp::McpServer;
+use vault_tools::ToolSet;
 
 /// The read-only scope's listed tools: the registry's read-only tools, in
 /// name order (see `read_scope_is_the_registry_read_only_tools`).
@@ -83,7 +84,7 @@ fn read_scope_allows_old_read_names_and_refuses_write_aliases() {
     let target = v.create_page(None, "Target".into()).unwrap();
     let calls = Cell::new(0);
     let run = |name: &str, args: Value| {
-        s.handle_with(call_msg(name, args), true, |n, a| {
+        s.handle_with(call_msg(name, args), ToolSet::Read, |n, a| {
             calls.set(calls.get() + 1);
             vault_tools::call(&v, n, a).map_err(Into::into)
         })
@@ -128,7 +129,7 @@ fn read_scope_lists_only_read_tools() {
     let t = Temp::new();
     let (s, v) = server(&t);
     let reply = s
-        .handle_with(list_msg(), true, |n, a| {
+        .handle_with(list_msg(), ToolSet::Read, |n, a| {
             vault_tools::call(&v, n, a).map_err(Into::into)
         })
         .expect("reply");
@@ -143,14 +144,14 @@ fn full_scope_lists_every_tool_as_handle_does() {
     let (s, v) = server(&t);
     let all = s.handle(list_msg()).expect("reply");
     let full = s
-        .handle_with(list_msg(), false, |n, a| {
+        .handle_with(list_msg(), ToolSet::Write, |n, a| {
             vault_tools::call(&v, n, a).map_err(Into::into)
         })
         .expect("reply");
     assert_eq!(all, full);
     assert_eq!(list(&all).len(), vault_tools::definitions().len());
     assert_eq!(
-        tools::definitions_for(false).len(),
+        tools::definitions_for(ToolSet::Write).len(),
         vault_tools::definitions().len()
     );
 }
@@ -163,7 +164,7 @@ fn feedback_transport_is_scoped_to_each_dispatch() {
         call_msg("feedback_submit", json!({"summary":"HTTP report"}))
             .to_string()
             .as_bytes(),
-        false,
+        ToolSet::Write,
         |n, a| tools::call(&v, n, a),
     );
     let http: Value = serde_json::from_str(&http.body).unwrap();
@@ -195,7 +196,7 @@ fn read_scope_refuses_write_tools_without_running_them() {
     let reply = s
         .handle_with(
             call_msg("create_page", json!({ "title": "Nope", "markdown": "x" })),
-            true,
+            ToolSet::Read,
             |n, a| {
                 calls.set(calls.get() + 1);
                 vault_tools::call(&v, n, a).map_err(Into::into)
@@ -224,7 +225,7 @@ fn read_scope_runs_read_tools_through_the_closure() {
     let (s, v) = server(&t);
     let calls = Cell::new(0);
     let reply = s
-        .handle_with(call_msg("search_notes", json!({})), true, |n, a| {
+        .handle_with(call_msg("search_notes", json!({})), ToolSet::Read, |n, a| {
             calls.set(calls.get() + 1);
             vault_tools::call(&v, n, a).map_err(Into::into)
         })
@@ -237,9 +238,9 @@ fn read_scope_runs_read_tools_through_the_closure() {
 fn unknown_tool_is_unknown_in_both_scopes() {
     let t = Temp::new();
     let (s, _v) = server(&t);
-    for readonly in [false, true] {
+    for set in ToolSet::ALL {
         let reply = s
-            .handle_with(call_msg("nope", json!({})), readonly, |_, _| {
+            .handle_with(call_msg("nope", json!({})), set, |_, _| {
                 Ok(String::new())
             })
             .expect("reply");
@@ -253,7 +254,7 @@ fn closure_result_is_wrapped_as_the_tool_result() {
     let t = Temp::new();
     let (s, _v) = server(&t);
     let ok = s
-        .handle_with(call_msg("list_pages", json!({})), false, |_, _| {
+        .handle_with(call_msg("list_pages", json!({})), ToolSet::Write, |_, _| {
             Ok("hello".into())
         })
         .expect("reply");
@@ -262,7 +263,7 @@ fn closure_result_is_wrapped_as_the_tool_result() {
         json!({ "content": [{ "type": "text", "text": "hello" }], "isError": false })
     );
     let err = s
-        .handle_with(call_msg("list_pages", json!({})), false, |_, _| {
+        .handle_with(call_msg("list_pages", json!({})), ToolSet::Write, |_, _| {
             Err(vault_mcp::McpError("boom".into()))
         })
         .expect("reply");
@@ -282,7 +283,7 @@ fn read_scope_applies_to_each_batch_item() {
         call_msg("search_notes", json!({ "query": "x" })),
     ]);
     let reply = s
-        .handle_with(batch, true, |n, a| {
+        .handle_with(batch, ToolSet::Read, |n, a| {
             vault_tools::call(&v, n, a).map_err(Into::into)
         })
         .expect("reply");
@@ -359,7 +360,7 @@ fn handle_body_batch_rules_match_the_desktop_endpoint() {
 fn handle_body_with_read_scope_hides_and_refuses_writes() {
     let t = Temp::new();
     let (s, v) = server(&t);
-    let r = s.handle_body_with(list_msg().to_string().as_bytes(), true, |n, a| {
+    let r = s.handle_body_with(list_msg().to_string().as_bytes(), ToolSet::Read, |n, a| {
         vault_tools::call(&v, n, a).map_err(Into::into)
     });
     assert_eq!(r.status, 200);
@@ -367,7 +368,7 @@ fn handle_body_with_read_scope_hides_and_refuses_writes() {
     assert_eq!(list(&parsed).len(), READ_SCOPE.len());
 
     let write = call_msg("trash_page", json!({ "page": "x" })).to_string();
-    let r = s.handle_body_with(write.as_bytes(), true, |_, _| panic!("must not run"));
+    let r = s.handle_body_with(write.as_bytes(), ToolSet::Read, |_, _| panic!("must not run"));
     assert_eq!(r.status, 200);
     let parsed: Value = serde_json::from_str(&r.body).unwrap();
     assert_eq!(parsed["error"]["code"], -32602);
