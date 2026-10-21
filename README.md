@@ -1,19 +1,38 @@
-# Scratch app
+# Scratch
+
+How I always wanted to organise my life: notes, tasks, plans and project work in one place, local-first, with a hub I host myself and AI tools as first-class users.
 
 > **Pre-alpha. Not ready for real use.** Scratch is unstable and changes often. Vault, sync and hub data formats may change without a migration path, so keep your own backups and expect to start over. There are no support, security or compatibility promises, and issues or pull requests may go unanswered.
 
-A private notes vault with a Rust core, Flutter app and self-hosted hub. See the [project wiki](wiki/index.md) for architecture and current state.
+- **Pages and blocks.** Everything is a page made of blocks, kept as plain files on your device. No raw syntax to write.
+- **Databases.** Pages with properties, collected into databases with views.
+- **Your own hub.** Devices sync through a small server you run yourself. See [Running your own hub](wiki/architecture/hub.md).
+- **Agent tab.** A built-in agent that reads and edits the vault with you.
+- **MCP access.** Claude, ChatGPT and other AI tools use the vault over MCP through the hub.
+- **Windows, Android and a CLI.** A Windows app with an installer, an Android app, and the `notes` command line tool.
 
-The `notes` CLI uses a scoped hub token from `notes/config.toml` or `NOTES_TOKEN`. From a project repository, `notes wiki import` mirrors `wiki/` (or `docs/`) into that project's row in the vault's Projects database. Worktrees share the main repository's project name. Repeating the import updates pages in place; unchanged pages create no edits, and missing files remain in the vault as reported orphans. The repository stays the source.
+How it works now: the [project wiki](wiki/index.md).
 
+## Build
+
+You need stable Rust, Flutter 3.47.5 and `flutter_rust_bridge_codegen` 2.13.0. Windows builds need Visual Studio 2022 with ATL; Android builds need NDK 27.3.13750724 and JDK 17. The Rust workspace fetches its agent crates from [BubblePaw-Core](https://github.com/BubbleBuffer/BubblePaw-Core) on GitHub.
+
+```sh
+cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+cargo test --workspace --locked --exclude notes-tauri    # Rust tests
+
+cd app && flutter pub get
+flutter build windows --release                          # Windows app
+flutter build apk --release                              # Android (debug-signed without a release keystore)
+
+cargo build --release --locked -p vault_tools --bin notes   # notes CLI
+cargo build --release --locked -p notes_hub                 # hub server (notes-hub)
 ```
-notes wiki import [--project NAME] [--dry-run] [--exclude GLOB] [--report report.md] [DIR]
-```
 
-Repeat `--exclude` as needed. Secret files are never packed. Non-markdown files are stored only when linked from an imported page; other files are counted as not imported, with their relative paths listed in `--report`. Skipped files include reasons. `--dry-run` diagnoses an import against an empty temporary vault; its counts do not predict changes to the real vault. The `notes-app` project is excluded.
-
-The [Claude Code plugin](integrations/claude-plugin/README.md) starts a silent wiki import at most once per project per UTC day, when the CLI is installed and configured. It runs separately with a 120-second deadline. Turn it off with the plugin's `wiki_import` option or `NOTES_WIKI_IMPORT=0`.
+The Windows installer is described in [Windows installer](wiki/architecture/windows-install.md).
 
 ## Licence
 
-Scratch is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version (`AGPL-3.0-or-later`); see [LICENSE](LICENSE). Bundled third-party components and their licences are listed in [THIRD_PARTY.md](THIRD_PARTY.md).
+`AGPL-3.0-or-later`; see [LICENSE](LICENSE). Bundled third-party components and their licences are listed in [THIRD_PARTY.md](THIRD_PARTY.md).
+
+Scratch is made by [BubbleBuffer](https://github.com/BubbleBuffer).
