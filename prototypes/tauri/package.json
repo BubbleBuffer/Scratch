@@ -1,0 +1,25 @@
+{
+  "name": "notes-tauri",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri",
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test",
+    "bridge": "cargo build -p notes-tauri --release --example bridge"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "solid-js": "^1.9"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tauri-apps/cli": "^2",
+    "typescript": "^5.6",
+    "vite": "^6",
+    "vite-plugin-solid": "^2.11"
+  }
+}

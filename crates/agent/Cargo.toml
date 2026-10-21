@@ -1,0 +1,36 @@
+[package]
+name = "vault_agent"
+description = "A BubblePaw agent over a notes vault: vault tools in js, sessions, providers, approvals, live events and AI tasks."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+name = "vault_agent"
+
+[dependencies]
+vault_core = { path = "../core" }
+vault_tools = { path = "../tools" }
+vault_mcp = { path = "../mcp" }
+notes_agent_wire = { path = "../agent_wire" }
+# Interim: path dependencies into the BubblePaw worktree (branch
+# agent-integration) until that branch lands; then a git dependency.
+# The runner's `web` feature stays off.
+bubblepaw-core = { path = "../../../BubblePaw-base-agent/crates/bubblepaw-core" }
+bubblepaw-runner = { path = "../../../BubblePaw-base-agent/crates/bubblepaw-runner" }
+anyhow = "1"
+async-trait = "0.1"
+futures-core = "0.3"
+serde = "1"
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+chrono = "0.4"
+# Bundle tzdb on every target, including Android (platform defaults use its system db).
+jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+similar = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+
+[dev-dependencies]
+tempfile = "3"

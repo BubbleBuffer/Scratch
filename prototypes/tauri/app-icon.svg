@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280">
+<title>Scratch</title>
+<desc>A notebook cat: the cover is a faceted cat head with calico ears, spiral rings and an apricot bookmark.</desc>
+<metadata id="pawth-style" type="application/json">{"version":1,"kit":"kits/bubblebuffer.kit.svg"}</metadata>
+<metadata id="pawth-icon" type="application/json">{"version":1,"template":"android-adaptive"}</metadata>
+<g id="background" data-name="Background" data-icon-layer="background">
+<rect id="tile" data-name="Ivory tile" x="0" y="0" width="1280" height="1280" fill="#F2EBDD"/>
+</g>
+<g id="safe-fit" data-name="Safe-circle fit" transform="translate(640 640) scale(0.8882) translate(-668 -608)">
+<g id="pages" data-name="Page block" data-part="book/pages">
+<path id="pages-fill" data-name="Pages" d="M402.4  825.4L445.6  868.6H805.6L848.8  825.4V436.6L928  515.8V861.4L863.2  947.8H481.6Z" fill="#FFFAF1"/>
+<path id="page-line" data-name="Page edge line" d="M888.4  454.6V848.8L839.8  908.2H442" fill="none" stroke="#E4DCCD" stroke-width="26.07" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="pages-outline" data-name="Page outline" d="M402.4  825.4L445.6  868.6H805.6L848.8  825.4V436.6L928  515.8V861.4L863.2  947.8H481.6Z" fill="none" stroke="#282A2F" stroke-width="46.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g id="ribbon" data-name="Bookmark" data-part="book/ribbon">
+<path id="ribbon-fill" data-name="Apricot ribbon" d="M694  895.6V1005.4L739  973L784  1005.4V895.6" fill="#DE945F" stroke="#282A2F" stroke-width="42.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g id="cover" data-name="Cat cover" data-part="book/cover">
+<path id="cover-fill" data-name="Cover" d="M402.4  436.6L445.6  274.6H481.6L571.6  391.6H679.6L769.6  274.6H805.6L848.8  436.6V825.4L805.6  868.6H445.6L402.4  825.4Z" fill="#FFFAF1"/>
+<path id="cover-facet" data-name="Quiet lower facet" d="M402.4  769.6L463.6  814.6H848.8V825.4L805.6  868.6H445.6L402.4  825.4Z" fill="#E4DCCD"/>
+</g>
+<g id="book-ears" data-name="Notebook ears" data-part="book/ears">
+<path id="ear-left" data-name="Charcoal ear patch" d="M406  443.8L445.6  274.6H481.6L582.4  404.2L535.6  434.8L472.6  447.4Z" fill="#282A2F"/>
+<path id="ear-left-inset" data-name="Left milk ear inset" d="M449.2  386.2L467.2  321.4L519.4  389.8Z" fill="#FFFAF1"/>
+<path id="ear-right" data-name="Apricot ear patch" d="M845.2  443.8L805.6  274.6H769.6L668.8  404.2L715.6  434.8L778.6  447.4Z" fill="#DE945F"/>
+<path id="ear-right-inset" data-name="Right milk ear inset" d="M802  386.2L784  321.4L731.8  389.8Z" fill="#FFFAF1"/>
+</g>
+<g id="cover-contour" data-name="Cover outline" data-part="book/outline">
+<path id="cover-outline" data-name="Outline" d="M402.4  436.6L445.6  274.6H481.6L571.6  391.6H679.6L769.6  274.6H805.6L848.8  436.6V825.4L805.6  868.6H445.6L402.4  825.4Z" fill="none" stroke="#282A2F" stroke-width="46.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g id="rings" data-name="Notebook rings" data-part="book/rings">
+<g id="ring-1" data-name="Ring 1">
+<rect id="ring-1-loop" data-name="Loop" x="352" y="478" width="100.8" height="39.6" rx="19.8" fill="#282A2F"/>
+<circle id="ring-1-hole" data-name="Hole" cx="431.2" cy="497.8" r="9" fill="#FFFAF1"/>
+</g>
+<g id="ring-2" data-name="Ring 2">
+<rect id="ring-2-loop" data-name="Loop" x="352" y="577" width="100.8" height="39.6" rx="19.8" fill="#282A2F"/>
+<circle id="ring-2-hole" data-name="Hole" cx="431.2" cy="596.8" r="9" fill="#FFFAF1"/>
+</g>
+<g id="ring-3" data-name="Ring 3">
+<rect id="ring-3-loop" data-name="Loop" x="352" y="676" width="100.8" height="39.6" rx="19.8" fill="#282A2F"/>
+<circle id="ring-3-hole" data-name="Hole" cx="431.2" cy="695.8" r="9" fill="#FFFAF1"/>
+</g>
+</g>
+<g id="cover-face" data-name="Cover face" data-part="face/happy">
+<path id="eye-left" data-name="Left happy eye" d="M481.6  562.6L529.3  514.9H545.5L593.2  562.6" fill="none" stroke="#282A2F" stroke-width="42.7" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="eye-right" data-name="Right happy eye" d="M658  562.6L705.7  514.9H721.9L769.6  562.6" fill="none" stroke="#282A2F" stroke-width="42.7" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="nose" data-name="Soft triangular nose" d="M610.3  605.8H640.9Q648.1  605.8  642.7  612.1L631  622.9Q625.6  627.4  620.2  622.9L608.5  612.1Q603.1  605.8  610.3  605.8Z" fill="#DE945F"/>
+<path id="smile" data-name="Double smile" d="M556.3  638.2C556.3  717.4  625.6  717.4  625.6  643.6C625.6  717.4  694.9  717.4  694.9  638.2" fill="none" stroke="#282A2F" stroke-width="42.7" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="cheek-left" data-name="Left rosy cheek" d="M472.6  627.4L505  634.6" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="cheek-right" data-name="Right rosy cheek" d="M746.2  634.6L778.6  627.4" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+</svg>

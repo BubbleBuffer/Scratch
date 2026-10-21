@@ -1,0 +1,23 @@
+{
+  "name": "notes",
+  "version": "0.6.5",
+  "description": "Connects Claude Code to the notes hub: its MCP tools, a memory index at session start, and the memory rules.",
+  "author": {
+    "name": "BubbleBuffer"
+  },
+  "userConfig": {
+    "hub_url": {
+      "type": "string",
+      "title": "Hub URL",
+      "description": "Base URL of the notes hub, without a trailing slash.",
+      "default": "https://notes.breadcat.cc"
+    },
+    "hub_token": {
+      "type": "string",
+      "title": "Agent token",
+      "description": "Agent token from `notes-hub --agent-token add`.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

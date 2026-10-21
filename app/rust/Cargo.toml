@@ -1,0 +1,40 @@
+[package]
+name = "notes_bridge"
+description = "flutter_rust_bridge layer between the Flutter app and vault_core / vault_sync."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+flutter_rust_bridge = "=2.13.0"
+vault_core = { path = "../../crates/core" }
+vault_sync = { path = "../../crates/sync" }
+vault_mcp = { path = "../../crates/mcp" }
+vault_tools = { path = "../../crates/tools" }
+# The agent's wire format and the hub client (agent_remote.rs), on every
+# target: tokio-tungstenite with rustls (ring, webpki roots, no native-tls).
+notes_agent_wire = { path = "../../crates/agent_wire" }
+serde = "1"
+serde_json = "1"
+jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "time", "macros"] }
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+# The schedule format (crates/agent/src/schedules/format.rs) compiles here on every target.
+anyhow = "1"
+
+# The desktop agent (api/agent.rs); other targets get "not available" bodies.
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+vault_agent = { path = "../../crates/agent" }
+
+[dev-dependencies]
+notes_hub = { path = "../../crates/hub" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

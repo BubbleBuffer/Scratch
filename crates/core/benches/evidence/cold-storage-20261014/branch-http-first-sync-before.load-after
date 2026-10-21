@@ -1,0 +1,2 @@
+source: fallback /proc/loadavg on this runner (ssh disabled)
+2026-10-14T00:21:02Z load average: 6.64, 5.02, 3.35

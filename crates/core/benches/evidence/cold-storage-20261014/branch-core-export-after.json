@@ -1,0 +1,189 @@
+{
+  "label": "branch-core-export-after",
+  "command": [
+    "/home/builder/work/cold-storage-20261014/profile/bin/branch-profile",
+    "/home/builder/work/cold-storage-20261014/profile/branch-core-export-after",
+    "10000",
+    "2000",
+    "--only",
+    "core-export"
+  ],
+  "binary_sha256": "58c8567662a228628664a203f6227af2610a37ea4241823069d080757dfd3d2c",
+  "exit": 0,
+  "wall_seconds": 23.411045480985194,
+  "fixture": {
+    "files": 30013,
+    "bytes": 214712362,
+    "symlinks": 0
+  },
+  "phases": [
+    {
+      "metrics": {
+        "enabled": true,
+        "labels": {
+          "cold.decode": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 42531151,
+            "inclusive_ns": 2325797657
+          },
+          "cold.dict_read_io": {
+            "bytes": 81764352,
+            "calls": 9981,
+            "exclusive_ns": 162553080,
+            "inclusive_ns": 162553080
+          },
+          "cold.read": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 8298757,
+            "inclusive_ns": 4004706918
+          },
+          "cold.read_io": {
+            "bytes": 126777760,
+            "calls": 10001,
+            "exclusive_ns": 1670610504,
+            "inclusive_ns": 1670610504
+          },
+          "disk.read_page_file": {
+            "bytes": 35882765,
+            "calls": 10001,
+            "exclusive_ns": 1427213082,
+            "inclusive_ns": 1427213082
+          },
+          "full_copy.export_cached_hot": {
+            "bytes": 5793817,
+            "calls": 10001,
+            "exclusive_ns": 411049474,
+            "inclusive_ns": 411049474
+          },
+          "full_copy.read_disk_hot": {
+            "bytes": 35882765,
+            "calls": 10001,
+            "exclusive_ns": 171990576,
+            "inclusive_ns": 171990576
+          },
+          "full_copy.read_logs": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 53207515,
+            "inclusive_ns": 53207515
+          },
+          "full_copy.rebuild_import": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 3897629,
+            "inclusive_ns": 6422866156
+          },
+          "full_copy.total": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 302197448,
+            "inclusive_ns": 11904415725
+          },
+          "full_copy.verify_compare": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 44298064,
+            "inclusive_ns": 532208082
+          },
+          "full_copy.verify_head": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 6189556,
+            "inclusive_ns": 6189556
+          },
+          "hash.fnv1a": {
+            "bytes": 669269661,
+            "calls": 39984,
+            "exclusive_ns": 775914742,
+            "inclusive_ns": 775914742
+          },
+          "loro.deep_value": {
+            "bytes": 0,
+            "calls": 20002,
+            "exclusive_ns": 487910018,
+            "inclusive_ns": 487910018
+          },
+          "loro.export_snapshot": {
+            "bytes": 309797149,
+            "calls": 10001,
+            "exclusive_ns": 6319928738,
+            "inclusive_ns": 6319928738
+          },
+          "loro.import_batch": {
+            "bytes": 41676582,
+            "calls": 10001,
+            "exclusive_ns": 1467192625,
+            "inclusive_ns": 1467192625
+          },
+          "loro.import_initial_blob": {
+            "bytes": 496690322,
+            "calls": 20002,
+            "exclusive_ns": 5736439716,
+            "inclusive_ns": 5736439716
+          },
+          "pagedoc.from_bytes": {
+            "bytes": 0,
+            "calls": 20002,
+            "exclusive_ns": 454062819,
+            "inclusive_ns": 7657695160
+          },
+          "stat.page_file": {
+            "bytes": 0,
+            "calls": 60006,
+            "exclusive_ns": 478485914,
+            "inclusive_ns": 478485914
+          },
+          "sync.export_updates": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 453264285,
+            "inclusive_ns": 22473446753
+          },
+          "vault.read_doc_locked": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 243831564,
+            "inclusive_ns": 3266029283
+          },
+          "vault.refresh_cold_state": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 365907370,
+            "inclusive_ns": 12406767862
+          },
+          "wait.flush_lock": {
+            "bytes": 0,
+            "calls": 20002,
+            "exclusive_ns": 41123050,
+            "inclusive_ns": 41123050
+          },
+          "wait.slot_state": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 550392,
+            "inclusive_ns": 550392
+          },
+          "zstd.decompress_dict": {
+            "bytes": 459879741,
+            "calls": 9981,
+            "exclusive_ns": 1342711900,
+            "inclusive_ns": 1342711900
+          },
+          "zstd.decompress_plain": {
+            "bytes": 927816,
+            "calls": 20,
+            "exclusive_ns": 2086784,
+            "inclusive_ns": 2086784
+          }
+        },
+        "phase": 2,
+        "threads": "times are summed across threads and can exceed phase wall time",
+        "units": "ns"
+      },
+      "phase": "core_export"
+    }
+  ],
+  "load_source": "see adjacent load files"
+}

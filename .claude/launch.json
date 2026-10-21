@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "design-directions",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1", "--directory", "design/directions"],
+      "port": 8765
+    },
+    {
+      "name": "design-directions-alt",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8775", "--bind", "127.0.0.1", "--directory", "design/directions"],
+      "port": 8775
+    }
+  ]
+}

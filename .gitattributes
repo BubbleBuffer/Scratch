@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Generated flutter_rust_bridge bindings: keep our side on merge, then run scripts/regen-bindings.sh.
+# Needs `git config merge.ours.driver true` in each clone (git does not store driver config).
+app/rust/src/frb_generated.rs merge=ours
+app/lib/src/rust/frb_generated*.dart merge=ours

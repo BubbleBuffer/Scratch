@@ -1,0 +1,15 @@
+[Unit]
+Description=Pull and verify notes-hub backups from VPS
+
+[Service]
+Type=oneshot
+UMask=0077
+Environment=BACKUP_DIR=%h/backups/notes-hub
+Environment=RETENTION_DAYS=30
+EnvironmentFile=-%h/.config/notes-hub/pull-backup.env
+ExecStart=%h/.local/libexec/notes-hub/pull-notes-hub-backup.sh
+TimeoutStartSec=1h
+NoNewPrivileges=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

@@ -1,0 +1,13 @@
+light home    #282A2F on #DE945F: 5.82:1 PASS
+light work    #F3EFE7 on #2F3138: 11.32:1 PASS
+light trips   #282A2F on #DDA39D: 6.70:1 PASS
+light reading #FFFAF1 on #5F7062: 5.07:1 PASS
+light garden  #282A2F on #F0D29C: 9.85:1 PASS
+light textPrimary on sheet #282A2F on #FFFAF1: 13.81:1 PASS
+dark home    #1E2024 on #DB8C56: 6.14:1 PASS
+dark work    #282A2F on #DCD4C8: 9.77:1 PASS
+dark trips   #1E2024 on #D29891: 6.71:1 PASS
+dark reading #FFFAF1 on #5F7062: 5.07:1 PASS
+dark garden  #1E2024 on #E3C48B: 9.74:1 PASS
+dark textPrimary on sheet #F3EFE7 on #30333A: 11.03:1 PASS
+All 12 pairs meet WCAG 4.5:1. No A patch inks needed adjustment.

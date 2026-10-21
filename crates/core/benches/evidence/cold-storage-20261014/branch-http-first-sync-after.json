@@ -1,0 +1,429 @@
+{
+  "label": "branch-http-first-sync-after",
+  "command": [
+    "/home/builder/work/cold-storage-20261014/profile/bin/branch-profile",
+    "/home/builder/work/cold-storage-20261014/profile/branch-http-first-sync-after",
+    "10000",
+    "2000",
+    "--only",
+    "http-first-sync"
+  ],
+  "binary_sha256": "58c8567662a228628664a203f6227af2610a37ea4241823069d080757dfd3d2c",
+  "exit": 0,
+  "wall_seconds": 55.40243160101818,
+  "fixture": {
+    "files": 30013,
+    "bytes": 214712362,
+    "symlinks": 0
+  },
+  "phases": [
+    {
+      "metrics": {
+        "enabled": true,
+        "labels": {
+          "archive.cold_page": {
+            "bytes": 0,
+            "calls": 20,
+            "exclusive_ns": 93520695,
+            "inclusive_ns": 976859309
+          },
+          "archive.dict_train": {
+            "bytes": 0,
+            "calls": 10,
+            "exclusive_ns": 69543212,
+            "inclusive_ns": 69579782
+          },
+          "archive.prepare_cold": {
+            "bytes": 0,
+            "calls": 20,
+            "exclusive_ns": 327880,
+            "inclusive_ns": 9061363
+          },
+          "archive.write_cold_io": {
+            "bytes": 262159,
+            "calls": 20,
+            "exclusive_ns": 17460277,
+            "inclusive_ns": 17460277
+          },
+          "client.http.body_read": {
+            "bytes": 0,
+            "calls": 38,
+            "exclusive_ns": 219701487,
+            "inclusive_ns": 219701487
+          },
+          "client.http.send": {
+            "bytes": 0,
+            "calls": 38,
+            "exclusive_ns": 25908433666,
+            "inclusive_ns": 25908433666
+          },
+          "client.import_batch": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 46235,
+            "inclusive_ns": 27164206241
+          },
+          "client.local_versions": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 101457135,
+            "inclusive_ns": 101457135
+          },
+          "client.request.encode": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 25639907,
+            "inclusive_ns": 25639907
+          },
+          "client.request.raw_bytes": {
+            "bytes": 7782902,
+            "calls": 0,
+            "exclusive_ns": 0,
+            "inclusive_ns": 0
+          },
+          "client.request.wire_bytes": {
+            "bytes": 3686650,
+            "calls": 0,
+            "exclusive_ns": 0,
+            "inclusive_ns": 0
+          },
+          "client.request.zstd_compress": {
+            "bytes": 0,
+            "calls": 36,
+            "exclusive_ns": 52460898,
+            "inclusive_ns": 52460898
+          },
+          "client.response.decode": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 29941297,
+            "inclusive_ns": 29941297
+          },
+          "client.response.wire_bytes": {
+            "bytes": 182664608,
+            "calls": 0,
+            "exclusive_ns": 0,
+            "inclusive_ns": 0
+          },
+          "client.response.zstd_decompress": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 563676680,
+            "inclusive_ns": 563676680
+          },
+          "client.sync_once": {
+            "bytes": 0,
+            "calls": 1,
+            "exclusive_ns": 249205043,
+            "inclusive_ns": 54314722354
+          },
+          "cold.decode": {
+            "bytes": 0,
+            "calls": 10021,
+            "exclusive_ns": 42966783,
+            "inclusive_ns": 2262642226
+          },
+          "cold.dict_read_io": {
+            "bytes": 81764352,
+            "calls": 9981,
+            "exclusive_ns": 189097397,
+            "inclusive_ns": 189097397
+          },
+          "cold.read": {
+            "bytes": 0,
+            "calls": 10021,
+            "exclusive_ns": 8660913,
+            "inclusive_ns": 4152118237
+          },
+          "cold.read_io": {
+            "bytes": 127039919,
+            "calls": 10021,
+            "exclusive_ns": 1880815098,
+            "inclusive_ns": 1880815098
+          },
+          "disk.read_page_file": {
+            "bytes": 37118183,
+            "calls": 10041,
+            "exclusive_ns": 1849341976,
+            "inclusive_ns": 1849341976
+          },
+          "disk.write_page_doc": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 10018142236,
+            "inclusive_ns": 10018142236
+          },
+          "disk.write_page_docs": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 7257566965,
+            "inclusive_ns": 17275855712
+          },
+          "full_copy.export_cached_hot": {
+            "bytes": 5793817,
+            "calls": 10001,
+            "exclusive_ns": 382600423,
+            "inclusive_ns": 382600423
+          },
+          "full_copy.read_disk_hot": {
+            "bytes": 35882765,
+            "calls": 10001,
+            "exclusive_ns": 160995118,
+            "inclusive_ns": 160995118
+          },
+          "full_copy.read_logs": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 54605678,
+            "inclusive_ns": 54605678
+          },
+          "full_copy.rebuild_import": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 4097625,
+            "inclusive_ns": 6385064340
+          },
+          "full_copy.total": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 277544518,
+            "inclusive_ns": 11906928541
+          },
+          "full_copy.verify_compare": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 42807616,
+            "inclusive_ns": 491631877
+          },
+          "full_copy.verify_head": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 6040884,
+            "inclusive_ns": 6040884
+          },
+          "hash.fnv1a": {
+            "bytes": 671636941,
+            "calls": 40215,
+            "exclusive_ns": 782236628,
+            "inclusive_ns": 782236628
+          },
+          "hash.sha256": {
+            "bytes": 2368,
+            "calls": 37,
+            "exclusive_ns": 250308,
+            "inclusive_ns": 250308
+          },
+          "history.hot_snapshot": {
+            "bytes": 0,
+            "calls": 20,
+            "exclusive_ns": 5535728,
+            "inclusive_ns": 53834170
+          },
+          "history.verify_compare": {
+            "bytes": 0,
+            "calls": 10,
+            "exclusive_ns": 1038589,
+            "inclusive_ns": 1038589
+          },
+          "hub.auth.check": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 165615,
+            "inclusive_ns": 415923
+          },
+          "hub.handle": {
+            "bytes": 0,
+            "calls": 38,
+            "exclusive_ns": 9823796,
+            "inclusive_ns": 25887481956
+          },
+          "hub.request.decode": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 19331872,
+            "inclusive_ns": 19331872
+          },
+          "hub.request.wire_bytes": {
+            "bytes": 3686650,
+            "calls": 0,
+            "exclusive_ns": 0,
+            "inclusive_ns": 0
+          },
+          "hub.request.zstd_decompress": {
+            "bytes": 0,
+            "calls": 36,
+            "exclusive_ns": 10829013,
+            "inclusive_ns": 10829013
+          },
+          "hub.response.encode": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 263718184,
+            "inclusive_ns": 263718184
+          },
+          "hub.response.wire_bytes": {
+            "bytes": 182664599,
+            "calls": 0,
+            "exclusive_ns": 0,
+            "inclusive_ns": 0
+          },
+          "hub.response.zstd_compress": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 2781137293,
+            "inclusive_ns": 2781137293
+          },
+          "hub.sync": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 260286747,
+            "inclusive_ns": 22802225875
+          },
+          "hub.sync.export_bytes": {
+            "bytes": 309797149,
+            "calls": 0,
+            "exclusive_ns": 0,
+            "inclusive_ns": 0
+          },
+          "hub.sync.export_updates": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 7871979,
+            "inclusive_ns": 22405127854
+          },
+          "hub.sync.page_versions": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 136811274,
+            "inclusive_ns": 136811274
+          },
+          "loro.deep_value": {
+            "bytes": 0,
+            "calls": 20002,
+            "exclusive_ns": 448824261,
+            "inclusive_ns": 448824261
+          },
+          "loro.export_shallow_snapshot": {
+            "bytes": 0,
+            "calls": 30,
+            "exclusive_ns": 35567304,
+            "inclusive_ns": 35567304
+          },
+          "loro.export_snapshot": {
+            "bytes": 309797149,
+            "calls": 10011,
+            "exclusive_ns": 5917500480,
+            "inclusive_ns": 5917500480
+          },
+          "loro.export_updates": {
+            "bytes": 0,
+            "calls": 10,
+            "exclusive_ns": 307143,
+            "inclusive_ns": 307143
+          },
+          "loro.fork_at": {
+            "bytes": 0,
+            "calls": 10,
+            "exclusive_ns": 9783987,
+            "inclusive_ns": 9783987
+          },
+          "loro.import_batch": {
+            "bytes": 41676582,
+            "calls": 10001,
+            "exclusive_ns": 1420642978,
+            "inclusive_ns": 1420642978
+          },
+          "loro.import_initial_blob": {
+            "bytes": 807856781,
+            "calls": 30083,
+            "exclusive_ns": 7593208686,
+            "inclusive_ns": 7593208686
+          },
+          "pagedoc.from_bytes": {
+            "bytes": 0,
+            "calls": 30083,
+            "exclusive_ns": 1192710847,
+            "inclusive_ns": 10206562511
+          },
+          "stat.page_file": {
+            "bytes": 0,
+            "calls": 60146,
+            "exclusive_ns": 484517810,
+            "inclusive_ns": 484517810
+          },
+          "sync.export_updates": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 405637557,
+            "inclusive_ns": 22397255875
+          },
+          "sync.import_batch": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 256425503,
+            "inclusive_ns": 27164160006
+          },
+          "sync.import_cold": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 9631878791,
+            "inclusive_ns": 26907734503
+          },
+          "sync.read_cold": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 5156990709,
+            "inclusive_ns": 7754606953
+          },
+          "vault.read_doc_locked": {
+            "bytes": 0,
+            "calls": 10041,
+            "exclusive_ns": 242328535,
+            "inclusive_ns": 3673219513
+          },
+          "vault.refresh_cold_state": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 336545868,
+            "inclusive_ns": 12384557547
+          },
+          "wait.flush_lock": {
+            "bytes": 0,
+            "calls": 20079,
+            "exclusive_ns": 826918218,
+            "inclusive_ns": 826918218
+          },
+          "wait.slot_state": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 615538,
+            "inclusive_ns": 615538
+          },
+          "zstd.compress_plain": {
+            "bytes": 260459,
+            "calls": 20,
+            "exclusive_ns": 7325869,
+            "inclusive_ns": 7325869
+          },
+          "zstd.decompress_dict": {
+            "bytes": 459879741,
+            "calls": 9981,
+            "exclusive_ns": 1245363226,
+            "inclusive_ns": 1245363226
+          },
+          "zstd.decompress_plain": {
+            "bytes": 1841126,
+            "calls": 40,
+            "exclusive_ns": 4422376,
+            "inclusive_ns": 4422376
+          }
+        },
+        "phase": 2,
+        "threads": "times are summed across threads and can exceed phase wall time",
+        "units": "ns"
+      },
+      "phase": "http_first_sync"
+    }
+  ],
+  "load_source": "see adjacent load files"
+}

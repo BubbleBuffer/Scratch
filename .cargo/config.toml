@@ -1,0 +1,4 @@
+[build]
+# Keep every build in the workspace target/ (tools that set their own
+# CARGO_TARGET_DIR should be pointed here too; see wiki/architecture/core-state.md).
+target-dir = "target"

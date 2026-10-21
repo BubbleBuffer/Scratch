@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily notes-hub backup pull at 04:00 local time
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+AccuracySec=1min
+Unit=pull-notes-hub-backup.service
+
+[Install]
+WantedBy=timers.target

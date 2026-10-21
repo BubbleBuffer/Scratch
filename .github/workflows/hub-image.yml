@@ -1,0 +1,143 @@
+# Builds the notes-hub image on pushes to `release`, pushes it to GHCR and
+# deploys it to the VPS through a deploy key locked to /opt/notes-hub/deploy.sh.
+# Secrets: BUBBLEPAW_DEPLOY_KEY (read-only deploy key on BubbleBuffer/BubblePaw-base),
+# VPS_DEPLOY_KEY, VPS_KNOWN_HOSTS. See wiki/architecture/hub-deploy.md.
+#
+# Runs on build01 (persistent self-hosted host), so:
+# - Pushes from forks run in the fork, never here; workflow_dispatch needs write
+#   access; every job is also pinned to this repository.
+# - A real deploy only happens from refs/heads/release.
+# - Docker credentials live in a per-job DOCKER_CONFIG under $RUNNER_TEMP, and
+#   the VPS key and known_hosts in 0600 files there, used with -i and
+#   UserKnownHostsFile; ~/.ssh and ~/.docker of the builder account are never
+#   written. An always() step removes them.
+# - The image builds with build01's default Docker builder (containerd image
+#   store); its layer and cache-mount cache stays on build01 and is trimmed by
+#   the nightly cleanup (20 GB keep). No buildx container builder and no volumes.
+# A dispatch with dry_run builds the image without pushing it, and checks the
+# SSH key handling with `ssh -G` (no connection, no deploy).
+name: hub image
+
+on:
+  push:
+    branches: [release]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build only; no image push, no deploy
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: hub-deploy
+  cancel-in-progress: false
+
+env:
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+  # Repository variables (Settings > Secrets and variables > Actions > Variables).
+  VPS_HOST: ${{ vars.VPS_HOST }}
+  VPS_USER: ${{ vars.VPS_USER }}
+
+jobs:
+  build:
+    if: github.repository == 'BubbleBuffer/notes-app'
+    runs-on: [self-hosted, build01]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: notes-app
+      # Next to notes-app, so crates/agent's ../../../BubblePaw-base-agent path resolves.
+      - uses: actions/checkout@v4
+        with:
+          repository: BubbleBuffer/BubblePaw-base
+          ref: release
+          path: BubblePaw-base-agent
+          ssh-key: ${{ secrets.BUBBLEPAW_DEPLOY_KEY }}
+          persist-credentials: false
+      # The runner context is not available in job-level env, so set it here.
+      - name: Docker config in the job temp dir
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/docker-config"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker-config" >> "$GITHUB_ENV"
+      - uses: docker/login-action@v3
+        if: env.DRY_RUN != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: notes-app
+          file: notes-app/deploy/hub/Dockerfile
+          build-contexts: bubblepaw=BubblePaw-base-agent
+          platforms: linux/amd64
+          push: ${{ env.DRY_RUN != 'true' }}
+          tags: |
+            ghcr.io/bubblebuffer/notes-hub:${{ github.sha }}
+            ghcr.io/bubblebuffer/notes-hub:latest
+      - name: Remove Docker credentials
+        if: always()
+        run: rm -rf "$DOCKER_CONFIG"
+
+  deploy:
+    needs: build
+    # Real deploys only from release; a dry-run dispatch from any ref runs only the
+    # key-handling check (the deploy step below is skipped on dry runs).
+    if: >-
+      github.repository == 'BubbleBuffer/notes-app' &&
+      (github.ref == 'refs/heads/release' ||
+       (github.event_name == 'workflow_dispatch' && inputs.dry_run))
+    runs-on: [self-hosted, build01]
+    timeout-minutes: 15
+    steps:
+      - name: Write deploy key and known_hosts to the job temp dir
+        env:
+          DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/vps-ssh"
+          install -m 700 -d "$dir"
+          ( umask 077
+            printf '%s\n' "$DEPLOY_KEY" > "$dir/deploy"
+            printf '%s\n' "$KNOWN_HOSTS" > "$dir/known_hosts" )
+          chmod 600 "$dir/deploy" "$dir/known_hosts"
+      - name: Check SSH options (dry run, no connection)
+        if: env.DRY_RUN == 'true'
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/vps-ssh"
+          : "${VPS_HOST:?the VPS_HOST repository variable is not set}" "${VPS_USER:?the VPS_USER repository variable is not set}"
+          stat -c '%a %n' "$dir/deploy" "$dir/known_hosts"
+          ssh-keygen -y -f "$dir/deploy" > /dev/null && echo "deploy key parses"
+          ssh -G -i "$dir/deploy" -o IdentitiesOnly=yes -o UserKnownHostsFile="$dir/known_hosts" \
+            -o BatchMode=yes "$VPS_USER@$VPS_HOST" \
+            | grep -E '^(identityfile|identitiesonly|userknownhostsfile|batchmode) '
+          # Host patterns and key types are public; print them so a mismatch is diagnosable.
+          echo "known_hosts lines: $(grep -cv '^\s*\(#\|$\)' "$dir/known_hosts" || true)"
+          awk 'NF && $1 !~ /^#/ { print "  host=" ($1 ~ /^\|1\|/ ? "(hashed)" : $1), "type=" $2 }' "$dir/known_hosts"
+          if ssh-keygen -F "$VPS_HOST" -f "$dir/known_hosts" > /dev/null; then
+            echo "known_hosts has $VPS_HOST"
+          else
+            echo "::error::VPS_KNOWN_HOSTS has no entry for $VPS_HOST; a real deploy would fail host key checking"
+            exit 1
+          fi
+      - name: Deploy to the VPS
+        if: env.DRY_RUN != 'true'
+        env:
+          PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/vps-ssh"
+          : "${VPS_HOST:?the VPS_HOST repository variable is not set}" "${VPS_USER:?the VPS_USER repository variable is not set}"
+          printf '%s\n' "$PULL_TOKEN" | ssh -i "$dir/deploy" -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile="$dir/known_hosts" -o BatchMode=yes \
+            "$VPS_USER@$VPS_HOST" "${{ github.sha }}"
+      - name: Remove deploy key and known_hosts
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/vps-ssh"

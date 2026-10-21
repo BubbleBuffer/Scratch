@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Notes · Vault calendar mockup</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="calendar.css">
+  <link rel="stylesheet" href="today-agenda.css">
+  <script defer src="calendar-data.js"></script>
+  <script defer src="today-agenda.js"></script>
+  <script defer src="calendar.js"></script>
+</head>
+<body>
+  <div class="mock-toolbar" aria-label="Mockup controls">
+    <span class="mock-label">Notes / Calendar <span>Design mockup · fake data</span></span>
+    <label>Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+    <label>Width <select id="width"><option value="desktop">Desktop (1280)</option><option value="phone">Phone (390)</option></select></label>
+    <label>Screen <select id="screen">
+      <option value="month">Month</option><option value="week">Week</option><option value="day">Day</option>
+      <option value="calendars">Calendars</option><option value="task">Task card</option><option value="create">Create task</option>
+      <option value="overflow">Busy day / overflow</option><option value="jump">Jump to date</option>
+      <option value="note">Note with date chip</option><option value="cards">Task card in kanban &amp; embed</option>
+      <option value="today">Today · anchored on today</option>
+      <option value="today-future">Today · next week</option><option value="today-past">Today · last week</option>
+      <option value="today-sync">Today · week strip sync</option><option value="source">Item calendar & source</option>
+      <option value="today-create">Today · create on a future day</option><option value="today-created">Today · future task created</option>
+      <option value="legend">How it fits</option><option value="shortcuts">Keyboard shortcuts</option>
+    </select></label>
+    <button id="legend-toggle" type="button">How it fits</button>
+    <button id="reset" title="Reset all illustrative changes">Reset demo</button>
+  </div>
+  <div class="preview-wrap"><div id="frame" data-width="desktop" aria-label="Notes app mockup">
+    <div id="app"></div><div id="overlay"></div><div id="toast" role="status" aria-live="polite"></div>
+  </div></div>
+  <noscript>This clickable mockup needs JavaScript enabled.</noscript>
+</body>
+</html>

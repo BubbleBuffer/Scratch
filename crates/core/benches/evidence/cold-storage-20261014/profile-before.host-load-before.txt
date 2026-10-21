@@ -1,0 +1,2 @@
+source: ssh home-server uptime, from the Windows PC; surrounds both profile phases
+02:19:08 up 4 days,  1:49,  6 users,  load average: 6.90, 3.86, 2.78

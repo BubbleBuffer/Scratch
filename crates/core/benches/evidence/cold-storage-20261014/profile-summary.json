@@ -1,0 +1,416 @@
+{
+  "master": "f9fdc814167d71fd03ad329b5be75ea1cfbee52a",
+  "before": "3462914282a2405608b1a312f9b218eb17be3a78",
+  "before_tree": "e9e448cdf730a7038d925864187f8ef39995db2b",
+  "after": "036f4e96c3c365ed3b22067f780a70ed549a46f6",
+  "host": "build01",
+  "remote_root": "/home/builder/work/cold-storage-20261014",
+  "builds": {
+    "default": "cargo build --locked --release -p vault_core --example bench -p vault_sync --example sync_bench",
+    "profile": "cargo build --locked --release -p vault_sync --example sync_bench --features storage-metrics",
+    "environment": "CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 RUSTC_WRAPPER=sccache; shared owned target"
+  },
+  "common_benchmark_sha256": {
+    "core/examples/bench.rs": "751ab5f2fdf2f9ecdc9e941e7ffdd7de9e37bf25f228dd1f5f6e7162e814d697",
+    "sync/examples/sync_bench.rs": "6f9a77f7b0738399fc24e92d863fbafb71688b1fab9869c7d0fec935eb2cded8"
+  },
+  "measurements": {
+    "core-export": {
+      "before": {
+        "wall_seconds": 38.28822886798298,
+        "binary_sha256": "2bbf0f4e94c90cc885fb7079aa22131051eac4b3085b255700749de9437ca424",
+        "exit": 0,
+        "metrics": {
+          "hub.sync.export_updates": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "full_copy.total": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 560724743,
+            "inclusive_ns": 25106101973
+          },
+          "full_copy.rebuild_import": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 4525902,
+            "inclusive_ns": 7927337474
+          },
+          "full_copy.verify_head": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "full_copy.verify_fork": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 384669549,
+            "inclusive_ns": 9767013930
+          },
+          "full_copy.verify_compare": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 132193440,
+            "inclusive_ns": 1211504229
+          },
+          "cold.read_io": {
+            "bytes": 126777760,
+            "calls": 10001,
+            "exclusive_ns": 2112009971,
+            "inclusive_ns": 2112009971
+          },
+          "cold.dict_read_io": {
+            "bytes": 81764352,
+            "calls": 9981,
+            "exclusive_ns": 204712776,
+            "inclusive_ns": 204712776
+          },
+          "zstd.decompress_dict": {
+            "bytes": 459879741,
+            "calls": 9981,
+            "exclusive_ns": 1521580657,
+            "inclusive_ns": 1521580657
+          },
+          "zstd.decompress_plain": {
+            "bytes": 927816,
+            "calls": 20,
+            "exclusive_ns": 2597453,
+            "inclusive_ns": 2597453
+          },
+          "hash.fnv1a": {
+            "bytes": 669269661,
+            "calls": 39984,
+            "exclusive_ns": 848491208,
+            "inclusive_ns": 848491208
+          },
+          "loro.export_snapshot": {
+            "bytes": 309797149,
+            "calls": 10001,
+            "exclusive_ns": 6189672647,
+            "inclusive_ns": 6189672647
+          },
+          "client.sync_once": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "client.import_batch": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "disk.write_page_docs": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          }
+        },
+        "verification_seconds": 10.978518159
+      },
+      "after": {
+        "wall_seconds": 23.411045480985194,
+        "binary_sha256": "58c8567662a228628664a203f6227af2610a37ea4241823069d080757dfd3d2c",
+        "exit": 0,
+        "metrics": {
+          "hub.sync.export_updates": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "full_copy.total": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 302197448,
+            "inclusive_ns": 11904415725
+          },
+          "full_copy.rebuild_import": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 3897629,
+            "inclusive_ns": 6422866156
+          },
+          "full_copy.verify_head": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 6189556,
+            "inclusive_ns": 6189556
+          },
+          "full_copy.verify_fork": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "full_copy.verify_compare": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 44298064,
+            "inclusive_ns": 532208082
+          },
+          "cold.read_io": {
+            "bytes": 126777760,
+            "calls": 10001,
+            "exclusive_ns": 1670610504,
+            "inclusive_ns": 1670610504
+          },
+          "cold.dict_read_io": {
+            "bytes": 81764352,
+            "calls": 9981,
+            "exclusive_ns": 162553080,
+            "inclusive_ns": 162553080
+          },
+          "zstd.decompress_dict": {
+            "bytes": 459879741,
+            "calls": 9981,
+            "exclusive_ns": 1342711900,
+            "inclusive_ns": 1342711900
+          },
+          "zstd.decompress_plain": {
+            "bytes": 927816,
+            "calls": 20,
+            "exclusive_ns": 2086784,
+            "inclusive_ns": 2086784
+          },
+          "hash.fnv1a": {
+            "bytes": 669269661,
+            "calls": 39984,
+            "exclusive_ns": 775914742,
+            "inclusive_ns": 775914742
+          },
+          "loro.export_snapshot": {
+            "bytes": 309797149,
+            "calls": 10001,
+            "exclusive_ns": 6319928738,
+            "inclusive_ns": 6319928738
+          },
+          "client.sync_once": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "client.import_batch": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "disk.write_page_docs": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          }
+        },
+        "verification_seconds": 0.538397638
+      }
+    },
+    "http-first-sync": {
+      "before": {
+        "wall_seconds": 64.09293738100678,
+        "binary_sha256": "2bbf0f4e94c90cc885fb7079aa22131051eac4b3085b255700749de9437ca424",
+        "exit": 0,
+        "metrics": {
+          "hub.sync.export_updates": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 10101524,
+            "inclusive_ns": 30096212276
+          },
+          "full_copy.total": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 391570216,
+            "inclusive_ns": 19840824048
+          },
+          "full_copy.rebuild_import": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 3227599,
+            "inclusive_ns": 6168184318
+          },
+          "full_copy.verify_head": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "full_copy.verify_fork": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 284782635,
+            "inclusive_ns": 7333698003
+          },
+          "full_copy.verify_compare": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 101447354,
+            "inclusive_ns": 863316766
+          },
+          "cold.read_io": {
+            "bytes": 127090664,
+            "calls": 10025,
+            "exclusive_ns": 2235746742,
+            "inclusive_ns": 2235746742
+          },
+          "cold.dict_read_io": {
+            "bytes": 81829888,
+            "calls": 9989,
+            "exclusive_ns": 172081433,
+            "inclusive_ns": 172081433
+          },
+          "zstd.decompress_dict": {
+            "bytes": 460056279,
+            "calls": 9985,
+            "exclusive_ns": 1238915962,
+            "inclusive_ns": 1238915962
+          },
+          "zstd.decompress_plain": {
+            "bytes": 1849897,
+            "calls": 40,
+            "exclusive_ns": 4035331,
+            "inclusive_ns": 4035331
+          },
+          "hash.fnv1a": {
+            "bytes": 672174521,
+            "calls": 40247,
+            "exclusive_ns": 768297971,
+            "inclusive_ns": 768297971
+          },
+          "loro.export_snapshot": {
+            "bytes": 309797149,
+            "calls": 10012,
+            "exclusive_ns": 4741245866,
+            "inclusive_ns": 4741245866
+          },
+          "client.sync_once": {
+            "bytes": 0,
+            "calls": 1,
+            "exclusive_ns": 208991941,
+            "inclusive_ns": 63204650378
+          },
+          "client.import_batch": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 62130,
+            "inclusive_ns": 28587906182
+          },
+          "disk.write_page_docs": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 7017624044,
+            "inclusive_ns": 19041991948
+          }
+        },
+        "verification_seconds": 8.197014769
+      },
+      "after": {
+        "wall_seconds": 55.40243160101818,
+        "binary_sha256": "58c8567662a228628664a203f6227af2610a37ea4241823069d080757dfd3d2c",
+        "exit": 0,
+        "metrics": {
+          "hub.sync.export_updates": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 7871979,
+            "inclusive_ns": 22405127854
+          },
+          "full_copy.total": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 277544518,
+            "inclusive_ns": 11906928541
+          },
+          "full_copy.rebuild_import": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 4097625,
+            "inclusive_ns": 6385064340
+          },
+          "full_copy.verify_head": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 6040884,
+            "inclusive_ns": 6040884
+          },
+          "full_copy.verify_fork": {
+            "calls": 0,
+            "bytes": 0,
+            "inclusive_ns": 0,
+            "exclusive_ns": 0
+          },
+          "full_copy.verify_compare": {
+            "bytes": 0,
+            "calls": 10001,
+            "exclusive_ns": 42807616,
+            "inclusive_ns": 491631877
+          },
+          "cold.read_io": {
+            "bytes": 127039919,
+            "calls": 10021,
+            "exclusive_ns": 1880815098,
+            "inclusive_ns": 1880815098
+          },
+          "cold.dict_read_io": {
+            "bytes": 81764352,
+            "calls": 9981,
+            "exclusive_ns": 189097397,
+            "inclusive_ns": 189097397
+          },
+          "zstd.decompress_dict": {
+            "bytes": 459879741,
+            "calls": 9981,
+            "exclusive_ns": 1245363226,
+            "inclusive_ns": 1245363226
+          },
+          "zstd.decompress_plain": {
+            "bytes": 1841126,
+            "calls": 40,
+            "exclusive_ns": 4422376,
+            "inclusive_ns": 4422376
+          },
+          "hash.fnv1a": {
+            "bytes": 671636941,
+            "calls": 40215,
+            "exclusive_ns": 782236628,
+            "inclusive_ns": 782236628
+          },
+          "loro.export_snapshot": {
+            "bytes": 309797149,
+            "calls": 10011,
+            "exclusive_ns": 5917500480,
+            "inclusive_ns": 5917500480
+          },
+          "client.sync_once": {
+            "bytes": 0,
+            "calls": 1,
+            "exclusive_ns": 249205043,
+            "inclusive_ns": 54314722354
+          },
+          "client.import_batch": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 46235,
+            "inclusive_ns": 27164206241
+          },
+          "disk.write_page_docs": {
+            "bytes": 0,
+            "calls": 37,
+            "exclusive_ns": 7257566965,
+            "inclusive_ns": 17275855712
+          }
+        },
+        "verification_seconds": 0.497672761
+      }
+    }
+  },
+  "limits": "One before/after diagnostic per phase under load; inclusive spans overlap. Profiles have storage-metrics, A/B pairs do not. Original fork fallback retained. Host load files surround both phases; adjacent remote phase loads explicitly use runner /proc/loadavg."
+}

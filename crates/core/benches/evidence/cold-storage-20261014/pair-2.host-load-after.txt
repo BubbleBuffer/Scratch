@@ -1,0 +1,2 @@
+source: ssh home-server uptime, run from the Windows PC via ssh.exe
+03:01:56 up 4 days,  2:32,  4 users,  load average: 9.65, 19.70, 25.63

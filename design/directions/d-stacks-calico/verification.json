@@ -1,0 +1,41 @@
+{
+  "shots": [
+    "quiet-desktop-light-home.png",
+    "quiet-desktop-light-page.png",
+    "quiet-desktop-light-stack3.png",
+    "tabs-desktop-light-home.png",
+    "tabs-desktop-light-page.png",
+    "tabs-desktop-light-stack3.png",
+    "patches-desktop-light-home.png",
+    "patches-desktop-light-page.png",
+    "patches-desktop-light-stack3.png",
+    "tabs-desktop-dark-home.png",
+    "tabs-desktop-dark-page.png",
+    "patches-desktop-dark-home.png",
+    "patches-desktop-dark-page.png",
+    "tabs-mobile-light-home.png",
+    "tabs-mobile-light-page.png",
+    "patches-mobile-light-home.png",
+    "patches-mobile-light-page.png",
+    "fun-desktop-light-home.png",
+    "fun-desktop-light-empty.png",
+    "fun-desktop-light-checklist-done.png"
+  ],
+  "checks": [
+    "Fun completion: 14 pieces and All packed captured ~250 ms into the 900 ms animation",
+    "quiet/d/light: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "quiet/d/dark: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "tabs/d/light: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "tabs/d/dark: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "patches/d/light: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "patches/d/dark: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "quiet/m/light: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "quiet/m/dark: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "tabs/m/light: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "tabs/m/dark: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "patches/m/light: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed",
+    "patches/m/dark: navigation, 3 sheets, spines/back, tick/undo, fold, drawer, menu/Escape, horizontal fit passed"
+  ],
+  "consoleErrors": [],
+  "pageErrors": []
+}

@@ -1,0 +1,169 @@
+# Windows desktop app and `notes` CLI, built on a GitHub-hosted runner.
+#
+# Manual only: workflow_dispatch, never push or schedule. GitHub-hosted Windows
+# minutes are scarce and billed at double rate, so a build runs only when asked:
+#   gh workflow run windows-build.yml --ref master
+#
+# Hosted, not build01: build01 is Linux, and the Windows app needs Visual Studio
+# 2022 with the ATL component (flutter_local_notifications_windows includes
+# atlbase.h). The windows-latest image ships that instance.
+#
+# Artifacts, kept 7 days:
+#   notes-windows-<short sha>      app/build/windows/x64/runner/Release (downloads as a zip)
+#   scratch-setup-<short sha>      Scratch-Setup-<version>-<short sha>.exe, the per-user installer
+#                                  (app/windows/installer/scratch.iss; version from app/pubspec.yaml)
+#   notes-cli-windows-<short sha>  notes.exe from crates/tools (package vault_tools, bin notes)
+#
+# Both jobs check out BubblePaw-base at `release` next to the repo, because
+# crates/agent and crates/tools depend on it by path. The read-only deploy key
+# BUBBLEPAW_DEPLOY_KEY is the same one ci.yml uses.
+#
+# Toolchain pins: Flutter 3.47.5 (app/.dart_tool/version, app/.metadata). Rust
+# is the runner's stable toolchain; there is no rust-toolchain file in the repo.
+name: windows-build
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  # A newer manual run cancels an older one still running, so minutes are not doubled.
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: flutter windows app
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: notes-app
+      # Next to notes-app, so crates/agent's ../../../BubblePaw-base-agent path resolves.
+      - uses: actions/checkout@v4
+        with:
+          repository: BubbleBuffer/BubblePaw-base
+          ref: release
+          path: BubblePaw-base-agent
+          ssh-key: ${{ secrets.BUBBLEPAW_DEPLOY_KEY }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.5
+          cache: true
+      - name: Cache cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-windows-${{ hashFiles('notes-app/Cargo.lock') }}
+          restore-keys: cargo-windows-
+      - name: Point pub cache at the runner temp dir
+        run: echo "PUB_CACHE=${{ runner.temp }}/pub-cache" >> "$GITHUB_ENV"
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pub-cache
+          key: pub-windows-${{ hashFiles('notes-app/app/pubspec.lock') }}
+          restore-keys: pub-windows-
+      - name: flutter pub get
+        working-directory: notes-app/app
+        run: |
+          flutter --version
+          flutter pub get
+      # The bindings in app/rust/src are committed (CI checks they are fresh),
+      # so no flutter_rust_bridge codegen runs here. Cargokit builds the bridge crate.
+      - name: flutter build windows --release
+        working-directory: notes-app/app
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: flutter build windows --release
+      - name: Short sha for artifact names
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Upload Release folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: notes-windows-${{ steps.sha.outputs.short }}
+          path: notes-app/app/build/windows/x64/runner/Release
+          if-no-files-found: error
+          retention-days: 7
+      # Per-user Inno Setup installer from the Release folder (app/windows/installer/scratch.iss).
+      # Inno Setup 6 ships on windows-latest; choco installs it if the image ever drops it.
+      - name: Build installer
+        id: installer
+        working-directory: notes-app/app
+        run: |
+          iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -x "$iscc" ]; then
+            choco install innosetup --no-progress -y
+          fi
+          version=$(sed -n 's/^version: *\([0-9][0-9.]*\).*/\1/p' pubspec.yaml)
+          test -n "$version"
+          out="$(cygpath -w "$PWD/build/windows/installer")"
+          src="$(cygpath -w "$PWD/build/windows/x64/runner/Release")"
+          # No MSYS path conversion, so the /Q and /D switches reach ISCC as written.
+          MSYS_NO_PATHCONV=1 "$iscc" /Q "/DAppVersion=$version" "/DSha7=${{ steps.sha.outputs.short }}" \
+            "/DSourceDir=$src" "/DOutputDir=$out" "$(cygpath -w windows/installer/scratch.iss)"
+          ls -l build/windows/installer
+          echo "file=build/windows/installer/Scratch-Setup-$version-${{ steps.sha.outputs.short }}.exe" >> "$GITHUB_OUTPUT"
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: scratch-setup-${{ steps.sha.outputs.short }}
+          path: notes-app/app/${{ steps.installer.outputs.file }}
+          if-no-files-found: error
+          retention-days: 7
+
+  cli:
+    name: notes cli (windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: notes-app
+      - uses: actions/checkout@v4
+        with:
+          repository: BubbleBuffer/BubblePaw-base
+          ref: release
+          path: BubblePaw-base-agent
+          ssh-key: ${{ secrets.BUBBLEPAW_DEPLOY_KEY }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-windows-${{ hashFiles('notes-app/Cargo.lock') }}
+          restore-keys: cargo-windows-
+      - name: Build notes CLI
+        working-directory: notes-app
+        env:
+          CARGO_INCREMENTAL: "0"
+        # The workspace target-dir is set in .cargo/config.toml, so the binary lands in notes-app/target.
+        run: cargo build --release --locked -p vault_tools --bin notes
+      - name: Short sha for artifact names
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Upload notes.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: notes-cli-windows-${{ steps.sha.outputs.short }}
+          path: notes-app/target/release/notes.exe
+          if-no-files-found: error
+          retention-days: 7

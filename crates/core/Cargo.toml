@@ -1,0 +1,32 @@
+[package]
+name = "vault_core"
+description = "Vault storage, page CRDTs, SQLite index and search for the notes app."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+name = "vault_core"
+
+[dependencies]
+loro = "1.16"
+rusqlite = { version = "0.40", features = ["bundled", "array", "functions"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+serde = { version = "1", features = ["derive"] }
+# Already in the tree through loro; used for the big-page block cache.
+serde_json = "1"
+# Cold history compression; the default features include dictionary training.
+zstd = "0.13"
+tracing = "0.1"
+
+[features]
+# Feature-only storage timings (src/storage_metrics.rs). Off by default: the
+# instrumentation compiles to nothing without it.
+storage-metrics = []
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+libc = "0.2"

@@ -1,0 +1,486 @@
+import '../../services/addon_services.dart';
+// Settings > AI > Agent (desktop): whether the in-app agent runs, where
+// it runs (this computer, or the hub this vault syncs with when that is an
+// https:// hub with a device token), and for this computer its default
+// model, the Claude Code extension and projects. Saved in ai_settings.json.
+// Permission preferences remain dormant while the app always uses Bypass.
+
+import 'package:flutter/widgets.dart';
+
+import '../../ui/ui.dart';
+import '../../core/file_dialogs.dart';
+import 'agent_store.dart';
+
+class AgentSettingsSection extends StatefulWidget {
+  const AgentSettingsSection({
+    super.key,
+    required this.store,
+    required this.onChanged,
+  });
+  final AgentStore store;
+
+  /// After a change (the AI store may start running tasks).
+  final VoidCallback onChanged;
+
+  @override
+  State<AgentSettingsSection> createState() => _AgentSettingsSectionState();
+}
+
+class _AgentSettingsSectionState extends State<AgentSettingsSection> {
+  final _customModel = TextEditingController();
+  late final _bun = TextEditingController(
+    text: widget.store.settings.agentBunPath,
+  );
+  late final _dir = TextEditingController(
+    text: widget.store.settings.agentClaudeCodeDir,
+  );
+  final _projectName = TextEditingController();
+  final _projectPath = TextEditingController();
+  final _rename = TextEditingController();
+  bool _adding = false;
+  String? _renaming;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // The model list comes from the open agent.
+    if (widget.store.enabled) widget.store.ensureOpen();
+  }
+
+  @override
+  void dispose() {
+    for (final c in [
+      _customModel,
+      _bun,
+      _dir,
+      _projectName,
+      _projectPath,
+      _rename,
+    ]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _set(void Function(AiSettings s) f) {
+    widget.store.settings.update(f);
+    widget.onChanged();
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = widget.store;
+    final s = store.settings;
+    final c = context.colors;
+    Widget field(
+      String label,
+      String? description,
+      TextEditingController ctl,
+      String key,
+      String placeholder,
+      void Function(AiSettings, String) save,
+    ) => SettingsRow(
+      label: label,
+      description: description,
+      stack: true,
+      trailing: SettingsField(
+        fieldKey: ValueKey(key),
+        controller: ctl,
+        mono: true,
+        placeholder: placeholder,
+        onChanged: (v) => _set((s) => save(s, v.trim())),
+      ),
+    );
+    final hub = store.hubLink;
+    final onHub = store.host == AgentHost.hub;
+    final models = store.shownModels();
+    final current = s.agentModel.trim().isEmpty
+        ? (models.isEmpty ? '' : models.first)
+        : s.agentModel.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SettingsRow(
+          label: 'Use the agent',
+          description: 'Chat with the agent in the Agent section. It reads and edits this vault on this device.',
+          trailing: Toggle(
+            key: const ValueKey('agent-enabled-toggle'),
+            value: s.agentEnabled,
+            onChanged: (v) => _set((s) => s.agentEnabled = v),
+          ),
+        ),
+        if (s.agentEnabled)
+          SettingsRow(
+            label: 'Agent runs on',
+            description: hub == null
+                ? 'This computer. The hub becomes available when this vault syncs with an https:// hub.'
+                : s.agentHost == AgentHost.hub
+                ? 'Default for new chats: the hub at ${hub.url}, with its own models, sign-ins and settings. Each chat can pick before its first message.'
+                : 'Default for new chats: this computer. Each chat can pick the hub before its first message.',
+            trailing: SelectButton<AgentHost>(
+              key: const ValueKey('agent-host'),
+              title: 'Agent runs on',
+              value: store.defaultHost,
+              options: hub == null ? const [AgentHost.local] : AgentHost.values,
+              labelOf: (h) => h.label,
+              onChanged: hub == null
+                  ? null
+                  : (h) => _set((s) => s.agentHost = h),
+            ),
+          ),
+        if (s.agentEnabled && onHub && store.openError != null)
+          Text(
+            store.openError!,
+            key: const ValueKey('agent-settings-error'),
+            style: tsRaw(12, 16, 400, c.inlineCodeText),
+          ),
+        if (s.agentEnabled && store.hostDescription != null)
+          Text(
+            store.hostDescription!,
+            key: const ValueKey('agent-host-info'),
+            style: tsRaw(12, 16, 400, c.textSecondary),
+          ),
+        if (s.agentEnabled) ...[
+          _models(context),
+          if (models.isNotEmpty)
+            SettingsRow(
+              label: 'Default model',
+              description: onHub
+                  ? "New chats on the hub use it, or the hub's first model if it doesn't offer it. Each chat can pick another."
+                  : "New chats and AI tasks use it, or the first model if this computer doesn't offer it. Each chat can pick another.",
+              trailing: SelectButton<String>(
+                key: const ValueKey('agent-default-model'),
+                title: 'Default model',
+                value: models.contains(current) ? current : models.first,
+                options: models,
+                labelOf: store.modelLabel,
+                onChanged: (m) => _set((s) => s.agentModel = m),
+              ),
+            ),
+        ],
+        if (s.agentEnabled && !onHub) ...[
+          field(
+            'Claude Code: bun program',
+            'Optional override. Empty uses the detected bun program.',
+            _bun,
+            'agent-bun-path',
+            store.claudeDetection?.bunPath ?? 'bun',
+            (s, v) => s.agentBunPath = v,
+          ),
+          field(
+            'Claude Code: extension folder',
+            "Optional override. Empty uses the detected Claude Code extension.",
+            _dir,
+            'agent-claude-code-dir',
+            store.claudeDetection?.claudeCodeDir ??
+                'BubblePaw/extensions/claude-code',
+            (s, v) => s.agentClaudeCodeDir = v,
+          ),
+          SettingsRow(
+            label: 'Computer access',
+            description: 'Lets the agent work in projects and run commands. Commands are not sandboxed.',
+            trailing: Toggle(
+              key: const ValueKey('agent-desktop-tools'),
+              value: s.desktopTools,
+              onChanged: (v) => _set((s) => s.desktopTools = v),
+            ),
+          ),
+          if (s.desktopTools && (store.hostInfo?.projects ?? false))
+            _projects(context),
+          if (store.error != null)
+            Text(
+              store.error!,
+              key: const ValueKey('agent-project-error'),
+              style: tsRaw(12, 16, 400, c.inlineCodeText),
+            ),
+          if (store.openError != null)
+            Text(
+              store.openError!,
+              key: const ValueKey('agent-settings-error'),
+              style: tsRaw(12, 16, 400, c.inlineCodeText),
+            ),
+        ],
+      ],
+    );
+  }
+
+  void _addModel() {
+    final id = _customModel.text.trim();
+    final separator = id.indexOf('/');
+    if (separator <= 0 ||
+        separator == id.length - 1 ||
+        id.contains(RegExp(r'\s'))) {
+      return;
+    }
+    _set((s) {
+      if (!s.agentCustomModels.contains(id)) s.agentCustomModels.add(id);
+      s.agentHiddenModels.remove(id);
+    });
+    _customModel.clear();
+  }
+
+  Widget _models(BuildContext context) {
+    final store = widget.store;
+    final settings = store.settings;
+    String group(String id) => switch (id.split('/').first) {
+      'codex' => 'Codex',
+      'claude-code' => 'Claude',
+      _ => 'Custom',
+    };
+    return SettingsRow(
+      label: 'Models',
+      description: 'Choose which models appear in the picker on this device.',
+      stack: true,
+      trailing: Column(
+        key: const ValueKey('agent-models'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final provider in ['Codex', 'Claude', 'Custom'])
+            if (store.allModelIds.any((id) => group(id) == provider)) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: Text(
+                  provider,
+                  style: ts(context.type.uiSmall, context.colors.textSecondary),
+                ),
+              ),
+              for (final id in store.allModelIds.where(
+                (id) => group(id) == provider,
+              ))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          store.modelLabel(id),
+                          style: ts(
+                            context.type.uiSmall,
+                            context.colors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (settings.agentCustomModels.contains(id))
+                        TextBtn(
+                          'Remove',
+                          key: ValueKey('agent-model-remove-$id'),
+                          onTap: () => _set((s) {
+                            s.agentCustomModels.remove(id);
+                            s.agentHiddenModels.remove(id);
+                          }),
+                        ),
+                      const SizedBox(width: 8),
+                      Toggle(
+                        key: ValueKey('agent-model-visible-$id'),
+                        value: !settings.agentHiddenModels.contains(id),
+                        onChanged: (shown) => _set((s) {
+                          if (shown) {
+                            s.agentHiddenModels.remove(id);
+                          } else {
+                            s.agentHiddenModels.add(id);
+                          }
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: SettingsField(
+                  fieldKey: const ValueKey('agent-model-add-field'),
+                  controller: _customModel,
+                  placeholder: 'Add model id: provider/model',
+                  mono: true,
+                  onSubmitted: (_) => _addModel(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextBtn(
+                'Add',
+                key: const ValueKey('agent-model-add'),
+                onTap: _addModel,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickFolder() async {
+    final path = await FileDialogs.instance.pickFolder(
+      title: 'Add a project folder',
+    );
+    if (path == null || !mounted) return;
+    _projectPath.text = path;
+    if (_projectName.text.trim().isEmpty) {
+      _projectName.text =
+          path.split(RegExp(r'[/\\]')).where((p) => p.isNotEmpty).lastOrNull ??
+          'Project';
+    }
+    setState(() => _adding = true);
+  }
+
+  Future<void> _addProject() async {
+    if (_saving ||
+        _projectName.text.trim().isEmpty ||
+        _projectPath.text.trim().isEmpty) {
+      return;
+    }
+    setState(() => _saving = true);
+    await widget.store.addProject(_projectName.text, _projectPath.text);
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      if (widget.store.error == null) {
+        _adding = false;
+        _projectName.clear();
+        _projectPath.clear();
+      }
+    });
+  }
+
+  Future<void> _renameProject(String id) async {
+    if (_saving || _rename.text.trim().isEmpty) return;
+    setState(() => _saving = true);
+    await widget.store.renameProject(id, _rename.text);
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      if (widget.store.error == null) _renaming = null;
+    });
+  }
+
+  Widget _projects(BuildContext context) {
+    final c = context.colors;
+    final store = widget.store;
+    return SettingsRow(
+      label: 'Projects',
+      description: 'Each project is a folder the agent can use as its working directory.',
+      stack: true,
+      trailing: Column(
+        key: const ValueKey('agent-projects'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final project in store.projects)
+            Padding(
+              key: ValueKey('agent-project-${project.id}'),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _renaming == project.id
+                        ? SettingsField(
+                            fieldKey: const ValueKey(
+                              'agent-project-rename-field',
+                            ),
+                            controller: _rename,
+                            onSubmitted: (_) => _renameProject(project.id),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                project.name,
+                                style: tsRaw(14, 20, 400, c.textPrimary),
+                              ),
+                              Text(
+                                project.path,
+                                style: tsRaw(12, 16, 400, c.textSecondary),
+                                softWrap: true,
+                              ),
+                            ],
+                          ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_renaming == project.id) ...[
+                    TextBtn(
+                      'Save',
+                      key: const ValueKey('agent-project-rename-save'),
+                      onTap: _saving ? null : () => _renameProject(project.id),
+                    ),
+                    TextBtn(
+                      'Cancel',
+                      onTap: () => setState(() => _renaming = null),
+                    ),
+                  ] else ...[
+                    TextBtn(
+                      'Rename',
+                      key: ValueKey('agent-project-rename-${project.id}'),
+                      onTap: () => setState(() {
+                        _renaming = project.id;
+                        _rename.text = project.name;
+                      }),
+                    ),
+                    TextBtn(
+                      'Remove',
+                      key: ValueKey('agent-project-remove-${project.id}'),
+                      color: c.inlineCodeText,
+                      onTap: store.projects.length <= 1
+                          ? null
+                          : () => store.removeProject(project.id),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextBtn(
+              'Add project',
+              key: const ValueKey('agent-project-add'),
+              onTap: () => setState(() => _adding = true),
+            ),
+          ),
+          if (_adding) ...[
+            const SizedBox(height: 8),
+            SettingsField(
+              fieldKey: const ValueKey('agent-project-name'),
+              controller: _projectName,
+              placeholder: 'Project name',
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: SettingsField(
+                    fieldKey: const ValueKey('agent-project-path'),
+                    controller: _projectPath,
+                    placeholder: 'Folder path',
+                    mono: true,
+                  ),
+                ),
+                if (FileDialogs.instance.folders) ...[
+                  const SizedBox(width: 8),
+                  TextBtn(
+                    'Browse',
+                    key: const ValueKey('agent-project-browse'),
+                    onTap: _pickFolder,
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                SecondaryButton(
+                  label: 'Add',
+                  key: const ValueKey('agent-project-add-save'),
+                  height: 32,
+                  onTap: _saving ? null : _addProject,
+                ),
+                const SizedBox(width: 8),
+                TextBtn('Cancel', onTap: () => setState(() => _adding = false)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

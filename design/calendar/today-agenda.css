@@ -1,0 +1,57 @@
+/* Today agenda. Tokens and bundled fonts come from calendar.css (Stacks look). */
+.today-view{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;height:100%;background:var(--sheet);overflow:hidden}
+.today-view [hidden]{display:none!important}
+
+/* Today is a sibling of Calendar; its page title uses the shared header type. */
+.today-header{flex-shrink:0;flex-wrap:nowrap;padding:12px 18px;gap:8px;min-width:0}
+.today-header .header-title{flex:none;min-width:0;margin-right:12px}
+.today-toolbar-nav{display:flex;align-items:center;gap:4px;min-width:0}
+.today-month{font:500 16px/1.3 Atkinson,system-ui,sans-serif;white-space:nowrap;padding:6px}
+.today-nav{width:32px;min-width:32px;padding:6px}
+.today-back{font-size:13px;color:var(--accent-text);border:1px solid var(--border);border-radius:999px;padding:4px 10px}
+.today-header .header-actions{display:flex;margin-left:auto;gap:2px}
+
+.today-week-strip{flex-shrink:0;min-width:0;border-bottom:1px solid var(--border);padding:0 18px 6px}
+
+.today-scroll{flex:1;min-height:0;min-width:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;position:relative;padding:0 18px 48px;outline-offset:-2px}
+
+.today-scroll.peeking-yesterday .is-yesterday .today-day-header{position:static}
+.today-day{position:relative;min-width:0;min-height:92px}
+.today-day-header{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px;padding:6px 0;background:var(--sheet);border-bottom:1px solid var(--border)}
+.today-day-title{display:flex;align-items:baseline;gap:6px;min-width:0;font:640 16px/1.3 Bricolage,system-ui,sans-serif;letter-spacing:-.01em;color:var(--ink)}
+.today-day.is-past .today-day-title{color:var(--quiet)}
+.today-day.is-today .today-day-title{color:var(--accent-text)}
+.today-day-date{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.today-day-sep{color:var(--quiet);flex-shrink:0}
+.today-day-tag{font-weight:600;color:var(--accent-text);white-space:nowrap;flex-shrink:0}
+
+.today-add{min-height:26px;padding:3px 8px;font-size:12px;color:var(--muted);opacity:0;transition:opacity .15s ease}
+.today-day-header:hover .today-add,.today-add:focus-visible{opacity:1}
+@media (hover:none){.today-add{opacity:1}}
+#frame[data-width="phone"] .today-add{opacity:1}
+
+.today-day-body{display:flex;flex-direction:column;gap:6px;padding:8px 0 16px}
+.today-item{min-width:0}
+.today-empty{margin:2px 0 0;font-size:13px;color:var(--quiet)}
+
+.today-overdue{margin:0 0 4px;min-width:0}
+.today-overdue-summary{display:flex;align-items:center;gap:8px;list-style:none;min-height:32px;padding:6px 0;cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);border-radius:var(--ctl)}
+.today-overdue-summary::-webkit-details-marker{display:none}
+.today-overdue-summary::before{content:'';width:6px;height:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s ease;margin:0 2px 2px 4px}
+.today-overdue[open]>.today-overdue-summary::before{transform:rotate(45deg)}
+.today-overdue-summary:hover{background:var(--hover)}
+
+@media (prefers-reduced-motion: reduce){
+  .today-add,.today-overdue-summary::before{transition:none}
+}
+
+#frame[data-width="phone"] .today-header{padding:10px 10px;gap:4px;flex-wrap:wrap}
+#frame[data-width="phone"] .today-header .header-title{font-size:23px;flex:none;margin-right:4px}
+#frame[data-width="phone"] .today-month{font-size:14px;padding:4px}
+#frame[data-width="phone"] .today-header .header-actions{display:flex;gap:0}
+#frame[data-width="phone"] .today-header .header-actions [data-action="pages"],#frame[data-width="phone"] .today-header .header-actions [data-action="jump"]{display:none}
+#frame[data-width="phone"] .today-nav{width:28px;min-width:28px;padding:4px}
+#frame[data-width="phone"] .today-back{font-size:12px;min-height:28px;padding:3px 7px}
+#frame[data-width="phone"] .today-week-strip{padding:0 14px 6px}
+#frame[data-width="phone"] .today-scroll{padding:0 14px 40px}
+#frame[data-width="phone"] .today-day-header{min-height:38px}

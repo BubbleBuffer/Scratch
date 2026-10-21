@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280">
+  <metadata id="pawth-kit" type="application/json">{"version":1,"name":"BubbleBuffer","canvas":1280,"roles":{"desk":"#F3EFE7","milk":"#FFFAF1","facet":"#E4DCCF","page":"#D3C8B6","charcoal":"#282A2F","apricot":"#DE945F","apricot-light":"#EBC095","paw":"#DDA39D"},"contour":{"role":"charcoal","width":54.52,"tiers":[41.48,37.93],"join":"bevel","cap":"butt"},"icon":{"template":"android-adaptive"}}</metadata>
+  <defs id="kit-defs" data-name="Kit defs">
+    <linearGradient id="ear-highlight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EBC095"/>
+      <stop offset="1" stop-color="#DE945F"/>
+    </linearGradient>
+  </defs>
+  <rect id="kit-desk" data-name="Background" data-icon-layer="background" x="0" y="0" width="1280" height="1280" fill="#F3EFE7"/>
+
+  <!-- Faceted head: the family silhouette (from NeedleBub), outline closed. -->
+  <g id="part-head-faceted" data-name="Faceted head" data-part="head/faceted">
+    <path id="head-shell" data-name="Warm ivory face" d="M284.4444 414.8148L414.8148 272.5926H450.3704L580.7407 402.963L711.1111 272.5926H746.6667L877.037 414.8148V675.5556L758.5185 865.1852H379.2593L284.4444 770.3704Z" fill="#FFFAF1"/>
+    <path id="head-facet" data-name="Quiet lower facet" d="M284.4444 699.2593L391.1111 794.0741H805.9259L758.5185 865.1852H379.2593L284.4444 770.3704Z" fill="#E4DCCF"/>
+    <path id="head-outline" data-name="Outline" d="M877.037 675.5556V414.8148L746.6667 272.5926H711.1111L580.7407 402.963L450.3704 272.5926H414.8148L284.4444 414.8148V770.3704L379.2593 865.1852H758.5185Z" fill="none" stroke="#282A2F" stroke-width="54.52" stroke-linecap="butt" stroke-linejoin="bevel"/>
+  </g>
+
+  <!-- Calico ears: charcoal left, apricot right (NeedleBub). -->
+  <g id="part-ears-calico" data-name="Calico ears" data-part="ears/calico">
+    <g id="ear-left-group" data-name="Left ear">
+      <path id="ear-left" data-name="Charcoal ear patch" d="M322.9444 436.3148L414.8148 272.5926L450.3704 272.5926L549.7407 394.963L515.98 397.37L460.8704 403.8148L385.4074 419.8704Z" fill="#282A2F" stroke="#282A2F" stroke-width="54.52" stroke-linejoin="miter"/>
+      <path id="ear-inset-left" data-name="Left ivory ear inset" d="M346.3333 401L426.5926 311.3704L494.2222 384L455.54 381.03L406.04 385.41Z" fill="#FFFAF1"/>
+    </g>
+    <g id="ear-right-group" data-name="Right ear">
+      <path id="ear-right" data-name="Apricot ear patch" d="M877.037 414.8148L746.6667 272.5926L711.1111 272.5926L602.7407 415.963L702.1111 428.8148L796.13 430.99L859.0741 446.3704Z" fill="url(#ear-highlight)"/>
+      <path id="ear-inset-right" data-name="Right ivory ear inset" transform="matrix(1 0 0 1 0 4)" d="M808.1481 400L728.8889 322.3704L657.2593 392L709.39 404.05L782.39 406.14Z" fill="#FFFAF1"/>
+    </g>
+  </g>
+
+  <!-- Happy face: ^ ^ eyes, soft nose, double smile, rosy cheeks. -->
+  <g id="part-face-happy" data-name="Happy face" data-part="face/happy">
+    <g id="eyes" data-name="Happy eyes">
+      <path id="eye-left" data-name="Left happy eye" d="M391.1111 568.8889L444.4444 515.5556H462.2222L515.5556 568.8889" fill="none" stroke="#282A2F" stroke-width="41.48" stroke-linecap="round" stroke-linejoin="bevel"/>
+      <path id="eye-right" data-name="Right happy eye" d="M645.9259 568.8889L699.2593 515.5556H717.037L770.3704 568.8889" fill="none" stroke="#282A2F" stroke-width="41.48" stroke-linecap="round" stroke-linejoin="bevel"/>
+    </g>
+    <g id="mouth" data-name="Nose and smile">
+      <path id="nose" data-name="Soft triangular nose" d="M564.1481 616.2963H597.3333Q605.6296 616.2963 599.7037 622.8148L586.6667 635.2593Q580.7407 640.5926 574.8148 635.2593L561.7778 622.8148Q555.8519 616.2963 564.1481 616.2963Z" fill="#DE945F"/>
+      <path id="smile" data-name="Centered double smile" d="M503.7037 651.8519C503.7037 740.7407 580.7407 740.7407 580.7407 657.7778C580.7407 740.7407 657.7778 740.7407 657.7778 651.8519" fill="none" stroke="#282A2F" stroke-width="37.93" stroke-linecap="round"/>
+    </g>
+    <g id="cheeks" data-name="Rosy cheeks">
+      <path id="cheek-left" data-name="Left rosy cheek" d="M367.4074 640L402.963 648.2963" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round"/>
+      <path id="cheek-right" data-name="Right rosy cheek" d="M758.5185 648.2963L794.0741 640" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- NeedleBub's needle and thread. -->
+  <g id="part-object-needle" data-name="Needle and thread" data-part="object/needle" transform="matrix(1 0 0 1 1.5 -31)">
+    <g id="needle-metal" data-name="Needle and eye">
+      <path id="needle-body" data-name="Needle with rounded tip" d="M668.4261 961.843L895.1227 613.2057Q930.1081 563.5922 973.4885 590.4094Q1014.07 617.2275 974.8869 661.4778L729.9985 999.3872Q710.407 1028.8875 679.6197 1010.1153Q648.834 992.6832 668.4261 961.843Z" fill="#282A2F"/>
+      <path id="needle-eye" data-name="Rounded needle eye" transform="matrix(1.492647 0 0 1.492647 -420.391844 -322.884306)" d="M908.8285 636.9507L890.6362 662.4269" fill="none" stroke="#F3EFE7" stroke-width="23.7" stroke-linecap="round"/>
+    </g>
+    <path id="thread" data-name="Apricot thread" transform="matrix(1 0 0 1 -0.84241 16.848202)" d="M936.9522 632.8504C1083.8864 679.7827 1139.8605 800.4645 1069.8929 894.3281C1013.9176 974.7837 901.967 947.9655 929.9561 867.5109" fill="none" stroke="#DE945F" stroke-width="41.48" stroke-linecap="round"/>
+  </g>
+
+  <!-- Notebook: spiral rings through the left edge of the head. -->
+  <g id="part-notebook-rings" data-name="Spiral rings" data-part="notebook/rings">
+    <g id="ring-1" data-name="Ring 1">
+      <rect id="ring-1-loop" data-name="Loop" x="226" y="452" width="118" height="46" rx="23" fill="#282A2F"/>
+      <circle id="ring-1-hole" data-name="Hole" cx="320" cy="475" r="9" fill="#FFFAF1"/>
+    </g>
+    <g id="ring-2" data-name="Ring 2">
+      <rect id="ring-2-loop" data-name="Loop" x="226" y="542" width="118" height="46" rx="23" fill="#282A2F"/>
+      <circle id="ring-2-hole" data-name="Hole" cx="320" cy="565" r="9" fill="#FFFAF1"/>
+    </g>
+    <g id="ring-3" data-name="Ring 3">
+      <rect id="ring-3-loop" data-name="Loop" x="226" y="632" width="118" height="46" rx="23" fill="#282A2F"/>
+      <circle id="ring-3-hole" data-name="Hole" cx="320" cy="655" r="9" fill="#FFFAF1"/>
+    </g>
+  </g>
+
+  <!-- Notebook: page edges along the lower facet. -->
+  <g id="part-notebook-pages" data-name="Page edges" data-part="notebook/pages">
+    <path id="page-line-1" data-name="Page line 1" d="M402 818H788" fill="none" stroke="#D3C8B6" stroke-width="18" stroke-linecap="round"/>
+    <path id="page-line-2" data-name="Page line 2" d="M420 840H772" fill="none" stroke="#D3C8B6" stroke-width="18" stroke-linecap="round"/>
+  </g>
+
+  <!-- Notebook: a pencil where NeedleBub holds its needle, tip down-left. -->
+  <g id="part-object-pencil" data-name="Pencil" data-part="object/pencil" transform="translate(690 1000) rotate(-54)">
+    <path id="pencil-wood" data-name="Wood tip" d="M0 0L120 -52V52Z" fill="#FFFAF1" stroke="#282A2F" stroke-width="37.93" stroke-linejoin="round"/>
+    <path id="pencil-lead" data-name="Lead" d="M-8 0L44 -19V19Z" fill="#282A2F"/>
+    <rect id="pencil-body" data-name="Body" x="120" y="-52" width="260" height="104" fill="#DE945F" stroke="#282A2F" stroke-width="37.93" stroke-linejoin="round"/>
+    <path id="pencil-shine" data-name="Shine" d="M150 -16H350" fill="none" stroke="#EBC095" stroke-width="20" stroke-linecap="round"/>
+    <rect id="pencil-ferrule" data-name="Ferrule" x="380" y="-52" width="40" height="104" fill="#282A2F" stroke="#282A2F" stroke-width="37.93" stroke-linejoin="round"/>
+    <rect id="pencil-eraser" data-name="Eraser" x="420" y="-52" width="66" height="104" rx="24" fill="#DDA39D" stroke="#282A2F" stroke-width="37.93" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Book-cat: the notebook itself is the cat. Cover top rises into ears. -->
+  <g id="part-book-pages" data-name="Page block" data-part="book/pages">
+    <path id="book-pages-block" data-name="Pages" d="M392 912L440 960H840L888 912V480L976 568V952L904 1048H480Z" fill="#FFFAF1"/>
+    <path id="book-pages-line" data-name="Page line" d="M932 500V938L878 1004H436" fill="none" stroke="#D3C8B6" stroke-width="22" stroke-linejoin="round"/>
+    <path id="book-pages-outline" data-name="Page outline" d="M392 912L440 960H840L888 912V480L976 568V952L904 1048H480Z" fill="none" stroke="#282A2F" stroke-width="54.52" stroke-linejoin="bevel"/>
+  </g>
+  <g id="part-book-cover" data-name="Cat cover" data-part="book/cover">
+    <path id="book-cover-fill" data-name="Cover" d="M392 480L440 300H480L580 430H700L800 300H840L888 480V912L840 960H440L392 912Z" fill="#FFFAF1"/>
+    <path id="book-cover-facet" data-name="Quiet lower facet" d="M392 850L460 900H888V912L840 960H440L392 912Z" fill="#E4DCCF"/>
+  </g>
+  <g id="part-book-ears" data-name="Notebook ears" data-part="book/ears">
+    <g id="book-ear-left" data-name="Left ear">
+      <path id="book-ear-left-patch" data-name="Charcoal ear patch" d="M396 488L440 300H480L592 444L540 478L470 492Z" fill="#282A2F"/>
+      <path id="book-ear-left-inset" data-name="Left ivory ear inset" d="M444 424L464 352L522 428Z" fill="#FFFAF1"/>
+    </g>
+    <g id="book-ear-right" data-name="Right ear">
+      <path id="book-ear-right-patch" data-name="Apricot ear patch" d="M884 488L840 300H800L688 444L740 478L810 492Z" fill="url(#ear-highlight)"/>
+      <path id="book-ear-right-inset" data-name="Right ivory ear inset" d="M836 424L816 352L758 428Z" fill="#FFFAF1"/>
+    </g>
+  </g>
+  <g id="part-book-outline" data-name="Cover outline" data-part="book/outline">
+    <path id="book-outline" data-name="Outline" d="M392 480L440 300H480L580 430H700L800 300H840L888 480V912L840 960H440L392 912Z" fill="none" stroke="#282A2F" stroke-width="54.52" stroke-linejoin="bevel"/>
+  </g>
+  <g id="part-book-rings" data-name="Notebook rings" data-part="book/rings">
+    <g id="book-ring-1" data-name="Ring 1"><rect id="book-ring-1-loop" data-name="Loop" x="336" y="526" width="112" height="44" rx="22" fill="#282A2F"/><circle id="book-ring-1-hole" data-name="Hole" cx="424" cy="548" r="9" fill="#FFFAF1"/></g>
+    <g id="book-ring-2" data-name="Ring 2"><rect id="book-ring-2-loop" data-name="Loop" x="336" y="636" width="112" height="44" rx="22" fill="#282A2F"/><circle id="book-ring-2-hole" data-name="Hole" cx="424" cy="658" r="9" fill="#FFFAF1"/></g>
+    <g id="book-ring-3" data-name="Ring 3"><rect id="book-ring-3-loop" data-name="Loop" x="336" y="746" width="112" height="44" rx="22" fill="#282A2F"/><circle id="book-ring-3-hole" data-name="Hole" cx="424" cy="768" r="9" fill="#FFFAF1"/></g>
+  </g>
+  <g id="part-book-ribbon" data-name="Bookmark tail" data-part="book/ribbon">
+    <path id="book-ribbon" data-name="Ribbon" d="M716 990V1112L766 1076L816 1112V990" fill="#DE945F" stroke="#282A2F" stroke-width="37.93" stroke-linejoin="bevel"/>
+  </g>
+  <g id="part-face-cover" data-name="Cover face" data-part="face/cover">
+    <path id="cover-eye-left" data-name="Left happy eye" d="M480 620L533 567H551L604 620" fill="none" stroke="#282A2F" stroke-width="41.48" stroke-linecap="round" stroke-linejoin="bevel"/>
+    <path id="cover-eye-right" data-name="Right happy eye" d="M676 620L729 567H747L800 620" fill="none" stroke="#282A2F" stroke-width="41.48" stroke-linecap="round" stroke-linejoin="bevel"/>
+    <path id="cover-nose" data-name="Soft triangular nose" d="M623 668H657Q665 668 659 675L646 687Q640 692 634 687L621 675Q615 668 623 668Z" fill="#DE945F"/>
+    <path id="cover-smile" data-name="Double smile" d="M563 704C563 792 640 792 640 710C640 792 717 792 717 704" fill="none" stroke="#282A2F" stroke-width="37.93" stroke-linecap="round"/>
+    <path id="cover-cheek-left" data-name="Left rosy cheek" d="M470 692L506 700" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round"/>
+    <path id="cover-cheek-right" data-name="Right rosy cheek" d="M774 700L810 692" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round"/>
+  </g>
+
+  <!-- Option parts: hardcover spine, cover spots, strap, tail, open spread. -->
+  <g id="part-book-spine" data-name="Charcoal spine" data-part="book/spine">
+    <path id="book-spine-band" data-name="Spine" d="M392 480L418 384L476 458V960H440L392 912Z" fill="#282A2F"/>
+  </g>
+  <g id="part-book-corner-spot" data-name="Apricot corner spot" data-part="book/corner-spot">
+    <path id="book-corner-spot-fill" data-name="Spot" d="M888 742V912L840 960H682Q712 800 888 742Z" fill="url(#ear-highlight)"/>
+  </g>
+  <g id="part-book-eye-spot" data-name="Apricot eye spot" data-part="book/eye-spot">
+    <path id="book-eye-spot-fill" data-name="Spot" d="M392 520L478 500L586 540L624 640L572 724L470 742L392 716Z" fill="url(#ear-highlight)"/>
+  </g>
+  <g id="part-book-strap" data-name="Elastic strap" data-part="book/strap">
+    <rect id="book-strap-band" data-name="Strap" x="790" y="500" width="48" height="472" fill="#282A2F"/>
+  </g>
+  <g id="part-book-tail" data-name="Tail bookmark" data-part="book/tail">
+    <path id="book-tail-outline" data-name="Tail outline" d="M800 950C820 1090 990 1090 1000 980C1006 912 936 900 930 950" fill="none" stroke="#282A2F" stroke-width="96" stroke-linecap="round"/>
+    <path id="book-tail-fill" data-name="Tail" d="M800 950C820 1090 990 1090 1000 980C1006 912 936 900 930 950" fill="none" stroke="#DE945F" stroke-width="41.48" stroke-linecap="round"/>
+  </g>
+  <g id="part-spread-cover" data-name="Open cover" data-part="spread/cover">
+    <path id="spread-cover-fill" data-name="Cover" d="M210 930Q430 890 640 950Q850 890 1070 930V1000Q850 960 640 1020Q430 960 210 1000Z" fill="#DE945F" stroke="#282A2F" stroke-width="54.52" stroke-linejoin="bevel"/>
+  </g>
+  <g id="part-spread-pages" data-name="Open pages" data-part="spread/pages">
+    <path id="spread-page-left" data-name="Left page" d="M240 470L280 330H316L400 440Q520 420 640 470V930Q520 890 240 930Z" fill="#FFFAF1" stroke="#282A2F" stroke-width="54.52" stroke-linejoin="bevel"/>
+    <path id="spread-page-right" data-name="Right page" d="M1040 470L1000 330H964L880 440Q760 420 640 470V930Q760 890 1040 930Z" fill="#FFFAF1" stroke="#282A2F" stroke-width="54.52" stroke-linejoin="bevel"/>
+  </g>
+  <g id="part-spread-ears" data-name="Page ears" data-part="spread/ears">
+    <path id="spread-ear-left" data-name="Charcoal ear patch" d="M250 450L280 330H316L392 434L330 456Z" fill="#282A2F"/>
+    <path id="spread-ear-left-inset" data-name="Left ivory ear inset" d="M282 420L300 362L346 424Z" fill="#FFFAF1"/>
+    <path id="spread-ear-right" data-name="Apricot ear patch" d="M1030 450L1000 330H964L888 434L950 456Z" fill="url(#ear-highlight)"/>
+    <path id="spread-ear-right-inset" data-name="Right ivory ear inset" d="M998 420L980 362L934 424Z" fill="#FFFAF1"/>
+  </g>
+  <g id="part-spread-face" data-name="Spread face" data-part="face/spread">
+    <path id="spread-eye-left" data-name="Left happy eye" d="M376 650L429 597H447L500 650" fill="none" stroke="#282A2F" stroke-width="41.48" stroke-linecap="round" stroke-linejoin="bevel"/>
+    <path id="spread-eye-right" data-name="Right happy eye" d="M780 650L833 597H851L904 650" fill="none" stroke="#282A2F" stroke-width="41.48" stroke-linecap="round" stroke-linejoin="bevel"/>
+    <path id="spread-nose" data-name="Soft triangular nose" d="M623 700H657Q665 700 659 707L646 719Q640 724 634 719L621 707Q615 700 623 700Z" fill="#DE945F"/>
+    <path id="spread-smile" data-name="Double smile" d="M563 740C563 828 640 828 640 746C640 828 717 828 717 740" fill="none" stroke="#282A2F" stroke-width="37.93" stroke-linecap="round"/>
+    <path id="spread-cheek-left" data-name="Left rosy cheek" d="M362 726L398 734" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round"/>
+    <path id="spread-cheek-right" data-name="Right rosy cheek" d="M882 734L918 726" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notes icon options</title>
+<style>
+  :root { --desk: #F3EFE7; --milk: #FFFAF1; --ink: #282A2F; --muted: #6B6862; --dark: #1F242C; --light: #E9EEF3; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.lead { margin: 0 0 24px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .card { background: var(--milk); border: 2px solid #E4DCCF; border-radius: 6px; padding: 16px; }
+  .card h2 { font-size: 17px; margin: 0; }
+  .card p { margin: 4px 0 12px; color: var(--muted); font-size: 14px; }
+  .big { display: flex; gap: 12px; }
+  .big img { width: 140px; height: 140px; background: var(--desk); }
+  .big img.round { border-radius: 50%; }
+  .big img.squircle { border-radius: 30%; }
+  .row { display: flex; align-items: end; gap: 14px; padding: 12px; margin-top: 12px; border-radius: 4px; }
+  .row.dark { background: var(--dark); }
+  .row.light { background: var(--light); }
+  .row img { border-radius: 30%; display: block; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Notes icon: book-cat options</h1>
+  <p class="lead">Each option is built in Pawth from parts in the BubbleBuffer kit, and each keeps the family contour and colours. The two rows below each icon show it at launcher sizes (64, 48, 32 and 24 px).</p>
+  <div class="grid" id="grid"></div>
+</main>
+<script>
+  const options = [
+    ['a-spiral', 'A · Spiral notebook', 'Spiral rings down the left, a page block, a bookmark ribbon.'],
+    ['b-hardcover', 'B · Calico hardcover', 'A charcoal spine and an apricot corner spot make the cover itself calico.'],
+    ['c-open-book', 'C · Open book', 'The open pages form the face, the ears sit on the outer corners, and the apricot cover shows underneath.'],
+    ['d-strap-journal', 'D · Strap journal', 'An elastic strap and an apricot patch over one eye.'],
+    ['e-tail-bookmark', 'E · Tail bookmark', 'The bookmark ribbon curls like a tail.'],
+  ];
+  const sizes = [64, 48, 32, 24];
+  document.getElementById('grid').innerHTML = options.map(([file, title, note]) => `
+    <section class="card">
+      <h2>${title}</h2><p>${note}</p>
+      <div class="big"><img class="squircle" src="options/${file}.png" alt="${title}, squircle"><img class="round" src="options/${file}.png" alt="${title}, circle"></div>
+      ${['dark', 'light'].map((tone) => `<div class="row ${tone}">${sizes.map((s) => `<img src="options/${file}.png" width="${s}" height="${s}" alt="">`).join('')}</div>`).join('')}
+    </section>`).join('');
+</script>
+</body>
+</html>

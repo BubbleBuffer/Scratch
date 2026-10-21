@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "template": "android-adaptive",
+  "sourceDocument": "scratch.svg",
+  "sourceRevision": 1,
+  "sizes": {
+    "android": [
+      48,
+      72,
+      96,
+      144,
+      192
+    ],
+    "adaptive": 432,
+    "windows": [
+      16,
+      24,
+      32,
+      48,
+      64,
+      256
+    ],
+    "png": [
+      16,
+      32,
+      48,
+      64,
+      128,
+      256,
+      512,
+      1024
+    ]
+  },
+  "files": [
+    "scratch-icons/android/mipmap-mdpi/ic_launcher.png",
+    "scratch-icons/android/mipmap-mdpi/ic_launcher_round.png",
+    "scratch-icons/android/mipmap-hdpi/ic_launcher.png",
+    "scratch-icons/android/mipmap-hdpi/ic_launcher_round.png",
+    "scratch-icons/android/mipmap-xhdpi/ic_launcher.png",
+    "scratch-icons/android/mipmap-xhdpi/ic_launcher_round.png",
+    "scratch-icons/android/mipmap-xxhdpi/ic_launcher.png",
+    "scratch-icons/android/mipmap-xxhdpi/ic_launcher_round.png",
+    "scratch-icons/android/mipmap-xxxhdpi/ic_launcher.png",
+    "scratch-icons/android/mipmap-xxxhdpi/ic_launcher_round.png",
+    "scratch-icons/android/adaptive/ic_launcher_foreground.png",
+    "scratch-icons/android/adaptive/ic_launcher_background.png",
+    "scratch-icons/android/adaptive/ic_launcher_monochrome.png",
+    "scratch-icons/windows/app_icon.ico",
+    "scratch-icons/png/icon-16.png",
+    "scratch-icons/png/icon-32.png",
+    "scratch-icons/png/icon-48.png",
+    "scratch-icons/png/icon-64.png",
+    "scratch-icons/png/icon-128.png",
+    "scratch-icons/png/icon-256.png",
+    "scratch-icons/png/icon-512.png",
+    "scratch-icons/png/icon-1024.png",
+    "scratch-icons/review.png",
+    "scratch-icons/manifest.json"
+  ]
+}

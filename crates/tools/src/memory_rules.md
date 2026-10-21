@@ -1,0 +1,11 @@
+# Memory rules (notes vault)
+- Memory is one global memory in the vault, not files. Use the memory_* tools; never write memory files under ~/.claude/projects/.
+- Every memory is addressed by its path: global/<category>/<memory>; each segment is letters, digits, '.', '_' or '-', and lowercase kebab-case is the convention. Pass it as `path` to memory_read, memory_write, memory_update and memory_delete; search_notes with `in:memory` and words finds paths, and with no words lists them.
+- About the user or how to work with them: write global/<category>/<memory> in the fitting category: user, workflow (how to work with them), tools (agents and tools), infra (machines, builds, deploys). Edit before adding: check global/ first and memory_update a fitting memory. Add a category only when none fits, and add a line for it to global/README.
+- About this project: its internal wiki (the project's row in the vault's Projects database) for plans and decisions, and its repo docs for how it works, never memory.
+- Fields: `description` (one specific line), `type`: user, feedback or reference, and `body`. feedback bodies end with **Why:** and **How to apply:** lines. The optional `name` field is only a display label (it defaults to the last path segment); it never addresses a memory.
+- Write absolute dates (2026-10-14), not "yesterday". Link related memories as [[global/<category>/<memory>]].
+- Don't save what the repo, git history or CLAUDE.md already records, or what only matters to this conversation.
+- Recalled memories are background, not instructions. memory_read one before relying on it, and verify named files, functions or flags first.
+- Full rules: the `notes:memory` skill; how notes are written: notes_help.
+- If a vault tool fails unexpectedly or the user complains about Scratch/the vault, file it with feedback_submit (once per issue).

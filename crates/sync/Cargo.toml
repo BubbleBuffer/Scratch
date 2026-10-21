@@ -1,0 +1,49 @@
+[package]
+name = "vault_sync"
+description = "Hub and client that sync notes-app vaults over HTTP."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+name = "vault_sync"
+
+[[bin]]
+name = "vault-hub"
+path = "src/bin/vault-hub.rs"
+
+[features]
+# Phase timings and byte counters (`vault_core::storage_metrics` plus the
+# sync spans). Off by default: the instrumentation compiles away.
+storage-metrics = ["vault_core/storage-metrics"]
+
+[dependencies]
+vault_core = { path = "../core" }
+# The tiny_http hub serves plain HTTP (Tailscale provides transport
+# security); notes-hub sits behind a TLS proxy.
+tiny_http = { version = "0.12", default-features = false }
+# rustls with ring and the bundled webpki roots, so `https://` hubs work the
+# same on Windows, Linux and Android. Exact pin: src/tls.rs builds the agent
+# from ureq's unversioned transport API (no semver guarantee) to verify with
+# pinned hub certificates; re-check that file before moving it.
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
+# The pinning certificate verifier (src/tls.rs): the same rustls, ring
+# provider and webpki roots ureq uses.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = "1"
+webpki-roots = "1"
+sha2 = "0.10"
+# Details of a hub certificate the user is asked to trust.
+x509-parser = "0.18"
+getrandom = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Compressed /sync and /push bodies (the zstd-v1 capability): libzstd, level 3.
+zstd = "0.13"
+tracing = "0.1"
+
+[dev-dependencies]
+# Test certificates (unit tests in src/tls.rs and tests/tls.rs).
+rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

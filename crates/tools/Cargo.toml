@@ -1,0 +1,40 @@
+[package]
+name = "vault_tools"
+description = "Transport-independent tools for notes-app vaults."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+name = "vault_tools"
+
+[[bin]]
+name = "import-replay"
+path = "src/bin/import-replay.rs"
+
+[[bin]]
+name = "notes"
+path = "src/bin/notes.rs"
+
+[dependencies]
+vault_core = { path = "../core" }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+anyhow = "1"
+toml = "0.8"
+serde_yaml = "0.9"
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+url = "2"
+base64 = "0.22"
+tar = "0.4"
+tempfile = "3"
+# Interim path dependency into the BubblePaw worktree (branch agent-integration),
+# as in crates/agent; the import CLI creates sessions through its Store.
+bubblepaw-core = { path = "../../../BubblePaw-base-agent/crates/bubblepaw-core" }
+
+[dev-dependencies]
+notes_hub = { path = "../hub" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time"] }

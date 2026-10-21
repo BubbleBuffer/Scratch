@@ -1,0 +1,16 @@
+{
+  "name": "notes-app",
+  "owner": {
+    "name": "BubbleBuffer"
+  },
+  "metadata": {
+    "description": "Plugins for the notes-app hub: Claude Code access to the vault and its memory."
+  },
+  "plugins": [
+    {
+      "name": "notes",
+      "source": "./claude-plugin",
+      "description": "Scratch hub for Claude Code: MCP tools, a memory index at session start, and the memory rules."
+    }
+  ]
+}

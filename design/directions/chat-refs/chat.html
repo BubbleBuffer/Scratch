@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat structure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@200..800&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=Fragment+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --desk:#ECE6DB; --sheet:#FFFAF1; --ink:#282A2F; --muted:#6E6A64; --line:#E2D9CA; --soft:#F5EDE0; --card:#FFFDF8;
+  --apricot:#DE945F; --moss:#6E9B5A; --sky:#5C8FB8; --sun:#D9A93B; --paw:#C8615A; --plum:#8C6BB1; --rail:#2F3138;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--desk);color:var(--ink);font:15px/1.55 "Atkinson Hyperlegible Next",system-ui,sans-serif}
+h1,h2,h3{font-family:"Bricolage Grotesque",sans-serif;margin:0}
+button{font:inherit;color:inherit}
+.app{max-width:760px;margin:0 auto;height:100%;display:flex;flex-direction:column;background:var(--sheet);box-shadow:0 0 0 1px #ddd3c3}
+
+/* top bar */
+.bar{flex:none;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--sheet)}
+.bar h1{font-size:18px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:none;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.icon:hover{background:var(--soft)}
+/* where-am-i strip */
+.where{flex:none;display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--line);background:#FBF5EA;cursor:pointer;font-size:13.5px;user-select:none}
+.where .dot{width:8px;height:8px;border-radius:50%;flex:none;transition:background .2s}
+.where .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.where .t b{font-weight:600}
+.where .t span{color:var(--muted)}
+.where .k{font:11px "Fragment Mono";color:var(--muted)}
+
+/* transcript */
+.scroll{flex:1;overflow-y:auto;padding:14px 14px 30px;scroll-behavior:smooth}
+.msg{max-width:88%;margin:8px 0;font-size:14.5px}
+.msg.user{margin-left:auto;background:#F1E7D7;border-radius:12px 12px 4px 12px;padding:8px 12px}
+.msg.agent{padding:2px 2px}
+.msg .work{font:12px "Fragment Mono";color:var(--muted);margin-bottom:3px}
+
+/* chapter + section markers */
+.chap{margin:26px 0 8px;display:flex;align-items:flex-end;gap:10px;position:relative}
+.chap .lab{font:11px "Fragment Mono";color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.chap h2{font-size:20px;line-height:1.25}
+.chap .txt{flex:1;min-width:0}
+.sec{display:flex;align-items:center;gap:8px;margin:20px 0 6px;color:var(--muted);font-size:13px;position:relative}
+.sec::after{content:"";flex:1;border-top:1px dashed var(--line)}
+.sec .bar2{width:4px;height:13px;border-radius:2px;flex:none}
+.sec b{color:var(--ink);font-weight:600;font-size:13.5px}
+.more-btn{flex:none;width:28px;height:28px;border-radius:7px;border:1px solid transparent;background:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1}
+.more-btn:hover{border-color:var(--line);background:var(--soft)}
+.refd{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:0 6px;margin-left:4px;cursor:pointer}
+.refd:hover{color:var(--ink)}
+.flash{animation:flash 1.6s ease}
+@keyframes flash{0%,40%{background:#F9DFC6}100%{background:transparent}}
+
+/* folded chapter card (same as notes) */
+.card{--c:var(--sun);position:relative;margin:14px 0 14px}
+.card .face{position:relative;z-index:2;border:1px solid var(--line);border-left:4px solid var(--c);border-radius:8px;background:var(--card);padding:10px 12px 10px 13px}
+.card::before,.card::after{content:"";position:absolute;border:1px solid var(--line);border-radius:8px;height:30px;z-index:0}
+.card::before{top:-5px;left:6px;right:6px;background:#F6EEE1}
+.card::after{top:-10px;left:13px;right:13px;background:#EFE6D6}
+.top{display:flex;gap:10px;align-items:flex-start;cursor:pointer;user-select:none}
+.top .txt{flex:1;min-width:0}
+.crumbs{font-size:12px;color:var(--muted);margin-bottom:1px}
+.card h3{font-size:16.5px;line-height:1.3}
+.peek{font-size:13.5px;color:var(--muted);margin-top:3px;display:flex;gap:6px}
+.peek i,.dec i{font-style:normal;color:var(--apricot)}
+.fold{flex:none;width:26px;height:26px;border-radius:6px;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);font-size:12px;transition:transform .18s;margin-top:2px}
+.card.open .fold{transform:rotate(180deg)}
+.more{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s ease}
+.card.open .more{grid-template-rows:1fr}
+.more>div{overflow:hidden}
+.in{padding-top:8px}
+.card.open .peek{display:none}
+.sum{font-size:14px;margin:0 0 8px}
+.dec{display:flex;gap:6px;font-size:13.5px;background:var(--soft);border-radius:6px;padding:5px 8px;margin-bottom:8px}
+.secs{list-style:none;margin:0 0 8px;padding:0}
+.secs li{display:flex;gap:8px;align-items:baseline;font-size:13.5px;padding:4px 0;border-top:1px dashed var(--line);cursor:pointer}
+.secs li:first-child{border-top:0}
+.secs li:hover{color:var(--apricot)}
+.secs .bar2{flex:none;width:4px;height:12px;border-radius:2px;transform:translateY(1px)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;font:12px "Fragment Mono";color:var(--muted)}
+.btn{font:600 13px "Atkinson Hyperlegible Next";background:none;border:1px solid var(--line);border-radius:6px;padding:3px 10px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--apricot)}
+.btn.main{background:var(--apricot);border-color:var(--apricot);color:#fff}
+
+/* composer */
+.composer{flex:none;border-top:1px solid var(--line);padding:10px 14px;display:flex;gap:8px;align-items:center}
+.composer .box{flex:1;border:1px solid var(--line);border-radius:10px;padding:8px 12px;color:var(--muted);font-size:14px;background:var(--card)}
+
+/* sheets (bottom on phone, centred on desktop) */
+.scrim{position:fixed;inset:0;background:rgba(40,30,20,.32);opacity:0;pointer-events:none;transition:opacity .18s;z-index:10}
+.scrim.on{opacity:1;pointer-events:auto}
+.panel{position:fixed;left:50%;bottom:0;transform:translate(-50%,105%);width:min(560px,100%);max-height:82vh;display:flex;flex-direction:column;background:var(--sheet);border-radius:16px 16px 0 0;box-shadow:0 -10px 40px -10px rgba(0,0,0,.35);transition:transform .22s ease;z-index:11}
+.panel.on{transform:translate(-50%,0)}
+@media (min-width:700px){.panel{bottom:auto;top:12vh;border-radius:14px;transform:translate(-50%,-20px);opacity:0;pointer-events:none;transition:transform .18s,opacity .18s}.panel.on{transform:translate(-50%,0);opacity:1;pointer-events:auto}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 2px}
+@media (min-width:700px){.grab{display:none}}
+.ph{padding:8px 16px 10px;border-bottom:1px solid var(--line)}
+.ph h3{font-size:17px}
+.ph .sub{font-size:13px;color:var(--muted)}
+.pb{overflow-y:auto;padding:8px 8px 14px}
+
+/* outline */
+.oc{padding:8px 8px 4px;border-radius:8px;cursor:pointer}
+.oc:hover{background:var(--soft)}
+.oc .row{display:flex;align-items:center;gap:8px}
+.oc .row .dot{width:9px;height:9px;border-radius:50%}
+.oc .row b{font-family:"Bricolage Grotesque";font-size:15.5px;flex:1}
+.state{font:11px "Fragment Mono";color:var(--muted)}
+.state.live{color:var(--moss)}
+.oc .d{font-size:13px;color:var(--muted);margin:2px 0 0 17px;display:flex;gap:5px}
+.os{display:flex;align-items:baseline;gap:8px;padding:5px 8px 5px 25px;border-radius:7px;cursor:pointer;font-size:14px}
+.os:hover{background:var(--soft)}
+.os .bar2{width:4px;height:12px;border-radius:2px;flex:none;transform:translateY(1px)}
+.os.here{font-weight:600}
+.os.here::after{content:"you're here";font:11px "Fragment Mono";color:var(--apricot);margin-left:auto;font-weight:400}
+
+/* search */
+.sinput{display:flex;align-items:center;gap:8px;margin:4px 8px 6px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--card)}
+.sinput input{flex:1;border:0;outline:0;background:none;font:15px "Atkinson Hyperlegible Next";color:var(--ink)}
+.filters{display:flex;gap:6px;padding:0 8px 6px;flex-wrap:wrap}
+.f{font-size:13px;border:1px solid var(--line);border-radius:999px;padding:1px 10px;cursor:pointer;background:none}
+.f.on{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+.grp{font:11px "Fragment Mono";color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:10px 10px 4px}
+.hit{display:flex;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer}
+.hit:hover,.hit.sel{background:var(--soft)}
+.hit .ic{flex:none;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;margin-top:1px}
+.hit .tx{flex:1;min-width:0}
+.hit .h{font-size:14.5px;font-weight:600;line-height:1.35}
+.hit .s{font-size:12.5px;color:var(--muted)}
+.hit .snip{font-size:13px;color:var(--muted);margin-top:2px}
+.hit mark{background:#F7DDBF;color:inherit;border-radius:3px;padding:0 1px}
+.empty{padding:20px;text-align:center;color:var(--muted);font-size:14px}
+
+/* add to note */
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:6px 8px}
+.opt{border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;background:var(--card)}
+.opt.on{border-color:var(--apricot);box-shadow:0 0 0 2px #F3D3B5}
+.opt .n{font-weight:600;font-size:14px;margin-bottom:6px}
+.mini-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:0 6px}
+.mini-card{border:1px solid var(--line);border-left:3px solid var(--plum);border-radius:6px;padding:4px 7px;font-size:11.5px;background:#fff}
+.mini-card b{font-family:"Bricolage Grotesque";font-size:12.5px;display:block}
+.notes{padding:4px 8px}
+.note{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:14.5px}
+.note:hover,.note.on{background:var(--soft)}
+.note .pg{width:22px;height:26px;border-radius:3px;background:#fff;border:1px solid var(--line);flex:none}
+.note small{color:var(--muted);margin-left:auto;font-size:12px}
+.pact{display:flex;justify-content:flex-end;gap:8px;padding:10px 16px 14px;border-top:1px solid var(--line)}
+
+/* menu */
+.menu{position:fixed;z-index:12;background:var(--sheet);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 30px -10px rgba(0,0,0,.35);padding:4px;min-width:200px;display:none}
+.menu.on{display:block}
+.menu button{display:flex;gap:10px;width:100%;text-align:left;background:none;border:0;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:14px}
+.menu button:hover{background:var(--soft)}
+.menu .sep{border-top:1px solid var(--line);margin:4px 0}
+
+.toast{position:fixed;left:50%;bottom:86px;transform:translate(-50%,20px);background:var(--rail);color:#F4EEE4;border-radius:10px;padding:8px 14px;font-size:14px;opacity:0;transition:.2s;z-index:20;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast a{color:#F2B98B;margin-left:8px}
+.kbd{font:11px "Fragment Mono";border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar">
+    <button class="icon" title="Back">‹</button>
+    <h1>BubblePlay cursor</h1>
+    <button class="icon" id="openSearch" title="Search (Ctrl+K)">⌕</button>
+    <button class="icon" id="openOutline" title="Contents">☰</button>
+  </div>
+  <div class="where" id="where">
+    <span class="dot" id="wdot" style="background:var(--sky)"></span>
+    <span class="t" id="wtext"><b>Release readiness</b> <span>› Large-drop fix</span></span>
+    <span class="k">contents ▾</span>
+  </div>
+
+  <div class="scroll" id="scroll">
+    <!-- chapter 1, closed: folded card -->
+    <div class="card" id="c1" data-name="Headless cursor" data-c="var(--moss)" style="--c:var(--moss)">
+      <div class="face">
+        <div class="top">
+          <div class="txt">
+            <div class="crumbs">Chapter · Sep 28 – 30 · closed</div>
+            <h3>Headless cursor</h3>
+            <div class="peek"><i>◆</i> Keep the Mouse Keys workaround; drop the virtual-mouse driver.</div>
+          </div>
+          <span class="fold">▾</span>
+        </div>
+        <div class="more"><div><div class="in">
+          <p class="sum">BubblePlay's headless cursor: Mouse Keys workaround hardened after the virtual-mouse driver route was dropped over driver signing.</p>
+          <div class="dec"><i>◆</i> Keep the Mouse Keys workaround; drop the virtual-mouse driver.</div>
+          <ul class="secs">
+            <li><span class="bar2" style="background:var(--sun)"></span>Mouse Keys fix and the alternatives</li>
+            <li><span class="bar2" style="background:var(--moss)"></span>Virtual mouse driver and the signing blocker</li>
+            <li><span class="bar2" style="background:var(--sky)"></span>Driver route dropped; Mouse Keys hardened</li>
+          </ul>
+          <div class="foot"><span>380 messages</span><span style="display:flex;gap:6px"><button class="btn" data-menu="c1">Add to note</button><button class="btn">Show messages</button></span></div>
+        </div></div></div>
+      </div>
+    </div>
+
+    <!-- chapter 2, closed -->
+    <div class="card" id="c2" data-name="Native drag-and-drop" data-c="var(--plum)" style="--c:var(--plum)">
+      <div class="face">
+        <div class="top">
+          <div class="txt">
+            <div class="crumbs">Chapter · Oct 2 – 5 · closed</div>
+            <h3>Native drag-and-drop</h3>
+            <div class="peek"><i>◆</i> Ship for Chrome first; Explorer stays behind a flag.</div>
+          </div>
+          <span class="fold">▾</span>
+        </div>
+        <div class="more"><div><div class="in">
+          <p class="sum">Virtual-file drag from the web to the PC: built, deployed, then extended with a host hover preview.</p>
+          <div class="dec"><i>◆</i> Ship for Chrome first; Explorer stays behind a flag.</div>
+          <ul class="secs">
+            <li><span class="bar2" style="background:var(--plum)"></span>Web→PC path and the Windows handoff stall</li>
+            <li><span class="bar2" style="background:var(--paw)"></span>Chrome live drops pass, Explorer still blocked</li>
+            <li><span class="bar2" style="background:var(--sun)"></span>Deployed; custom drag-preview overlay added</li>
+            <li><span class="bar2" style="background:var(--moss)"></span>Host hover preview shipped</li>
+          </ul>
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">Referenced in <span class="refd">↗ BubblePlay release plan</span></div>
+          <div class="foot"><span>580 messages</span><span style="display:flex;gap:6px"><button class="btn" data-menu="c2">Add to note</button><button class="btn">Show messages</button></span></div>
+        </div></div></div>
+      </div>
+    </div>
+
+    <!-- chapter 3, open: live messages -->
+    <div class="chap" id="c3" data-name="Release readiness" data-c="var(--sky)">
+      <div class="txt">
+        <div class="lab">Chapter · since Oct 6 · ongoing</div>
+        <h2>Release readiness</h2>
+      </div>
+      <button class="more-btn" data-menu="c3" title="More">⋯</button>
+    </div>
+
+    <div class="sec" id="s31" data-name="Release audit" data-c="var(--sun)"><span class="bar2" style="background:var(--sun)"></span><b>Release audit</b><button class="more-btn" data-menu="s31">⋯</button></div>
+    <div class="msg user">Can you do a release-readiness pass on BubblePlay? What's missing before I'd hand it to someone else?</div>
+    <div class="msg agent"><div class="work">read 14 files · ran 3 checks</div>Three blockers: no update channel, the TOTP login isn't finished, and large drops (over ~200 MB) time out. Everything else is polish.</div>
+
+    <div class="sec" id="s32" data-name="Go and TOTP plan" data-c="var(--moss)"><span class="bar2" style="background:var(--moss)"></span><b>Go and TOTP plan</b><button class="more-btn" data-menu="s32">⋯</button></div>
+    <div class="msg user">Let's do TOTP in the Go service, not the client.</div>
+    <div class="msg agent"><div class="work">wrote plan · 2 files</div>Agreed. The service issues and verifies codes; the client only shows the QR once and stores nothing. Plan is in <u>BubblePlay release plan</u>.</div>
+
+    <div class="sec" id="s33" data-name="Outage recovery" data-c="var(--paw)"><span class="bar2" style="background:var(--paw)"></span><b>Outage recovery</b><button class="more-btn" data-menu="s33">⋯</button></div>
+    <div class="msg user">The relay went down overnight, can you check what happened?</div>
+    <div class="msg agent"><div class="work">ssh vps · read logs</div>Caddy restarted after a cert renewal and the relay container didn't come back because of a missing restart policy. Added <code>restart: unless-stopped</code>; it's up.</div>
+
+    <div class="sec" id="s34" data-name="Large-drop fix" data-c="var(--sky)"><span class="bar2" style="background:var(--sky)"></span><b>Large-drop fix</b><button class="more-btn" data-menu="s34">⋯</button></div>
+    <div class="msg user">Now the large drops. 400 MB files time out.</div>
+    <div class="msg agent"><div class="work">edited 3 files · ran drop test</div>The stream was buffered whole before the handoff. It now streams in 4 MB chunks with backpressure; a 1.2 GB drop finished in 38 s.</div>
+    <div class="msg user">Nice. Ship it.</div>
+  </div>
+
+  <div class="composer"><div class="box">Message…</div><button class="btn main">Send</button></div>
+</div>
+
+<!-- section menu -->
+<div class="menu" id="menu">
+  <button data-act="add">＋ Add to note…</button>
+  <button data-act="link">⛓ Copy link</button>
+  <button data-act="fold">▾ Fold this chapter</button>
+  <div class="sep"></div>
+  <button data-act="rename">✎ Rename</button>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- outline -->
+<div class="panel" id="outline">
+  <div class="grab"></div>
+  <div class="ph"><h3>Contents</h3><div class="sub">BubblePlay cursor · 3 chapters · 1,595 messages</div></div>
+  <div class="pb" id="outlineBody"></div>
+</div>
+
+<!-- search -->
+<div class="panel" id="search">
+  <div class="grab"></div>
+  <div class="pb" style="padding-top:10px">
+    <div class="sinput">⌕ <input id="q" placeholder="Search pages and chats" autocomplete="off"><span class="kbd">Esc</span></div>
+    <div class="filters" id="filters">
+      <button class="f on" data-f="all">All</button><button class="f" data-f="page">Pages</button><button class="f" data-f="chat">Chats</button><button class="f" data-f="dec">Decisions</button>
+    </div>
+    <div id="results"></div>
+  </div>
+</div>
+
+<!-- add to note -->
+<div class="panel" id="add">
+  <div class="grab"></div>
+  <div class="ph"><h3 id="addTitle">Add to note</h3><div class="sub" id="addSub"></div></div>
+  <div class="pb">
+    <div class="grp">Show as</div>
+    <div class="choice">
+      <div class="opt on" data-o="card"><div class="n">Card</div><div class="mini-card" id="miniCard"><span style="color:var(--muted)">BubblePlay cursor</span><b>Native drag-and-drop</b>◆ Ship for Chrome first…</div></div>
+      <div class="opt" data-o="chip"><div class="n">Link in text</div><span class="mini-chip" id="miniChip">● BubblePlay cursor › Native drag-and-drop</span></div>
+    </div>
+    <div class="grp">Into</div>
+    <div class="notes">
+      <div class="note on"><span class="pg"></span>BubblePlay release plan<small>edited today</small></div>
+      <div class="note"><span class="pg"></span>BubblePlay decisions<small>Oct 4</small></div>
+      <div class="note"><span class="pg"></span>Today<small>daily note</small></div>
+      <div class="note"><span class="pg" style="border-style:dashed"></span>New note…</div>
+    </div>
+  </div>
+  <div class="pact"><button class="btn" id="addCancel">Cancel</button><button class="btn main" id="addGo">Add</button></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const scroll=$('#scroll');
+
+/* data for outline + search */
+const chapters=[
+  {id:'c1',name:'Headless cursor',c:'var(--moss)',state:'closed',when:'Sep 28 – 30',dec:'Keep the Mouse Keys workaround; drop the virtual-mouse driver.',
+   secs:[['Mouse Keys fix and the alternatives','var(--sun)'],['Virtual mouse driver and the signing blocker','var(--moss)'],['Driver route dropped; Mouse Keys hardened','var(--sky)']]},
+  {id:'c2',name:'Native drag-and-drop',c:'var(--plum)',state:'closed',when:'Oct 2 – 5',dec:'Ship for Chrome first; Explorer stays behind a flag.',
+   secs:[['Web→PC path and the Windows handoff stall','var(--plum)'],['Chrome live drops pass, Explorer still blocked','var(--paw)'],['Deployed; custom drag-preview overlay added','var(--sun)'],['Host hover preview shipped','var(--moss)']]},
+  {id:'c3',name:'Release readiness',c:'var(--sky)',state:'ongoing',when:'since Oct 6',dec:'TOTP lives in the Go service, not the client.',
+   secs:[['Release audit','var(--sun)','s31'],['Go and TOTP plan','var(--moss)','s32'],['Outage recovery','var(--paw)','s33'],['Large-drop fix','var(--sky)','s34']]},
+];
+const index=[
+  {k:'page',t:'BubblePlay release plan',s:'Page · edited today',snip:'Native drops ship for Chrome first…'},
+  {k:'chap',t:'Native drag-and-drop',s:'BubblePlay cursor · chapter · Oct 2 – 5',snip:'Virtual-file drag from the web to the PC: built, deployed, then extended with a host hover preview.',go:'c2',c:'var(--plum)'},
+  {k:'sec',t:'Chrome live drops pass, Explorer still blocked',s:'BubblePlay cursor › Native drag-and-drop',snip:'Explorer stalls during the Windows handoff; three workarounds tried.',go:'c2',c:'var(--paw)'},
+  {k:'sec',t:'Large-drop fix',s:'BubblePlay cursor › Release readiness',snip:'The stream was buffered whole before the handoff. It now streams in 4 MB chunks with backpressure.',go:'s34',c:'var(--sky)'},
+  {k:'sec',t:'Outage recovery',s:'BubblePlay cursor › Release readiness',snip:'Caddy restarted after a cert renewal and the relay container didn\'t come back.',go:'s33',c:'var(--paw)'},
+  {k:'dec',t:'Ship native drops for Chrome first; Explorer stays behind a flag',s:'BubblePlay cursor › Native drag-and-drop · Oct 4',go:'c2'},
+  {k:'dec',t:'Keep the Mouse Keys workaround; drop the virtual-mouse driver',s:'BubblePlay cursor › Headless cursor · Sep 30',go:'c1'},
+  {k:'dec',t:'TOTP lives in the Go service, not the client',s:'BubblePlay cursor › Release readiness · Oct 7',go:'s32'},
+  {k:'chap',t:'Headless cursor',s:'BubblePlay cursor · chapter · Sep 28 – 30',snip:'Mouse Keys workaround hardened after the virtual-mouse driver route was dropped over driver signing.',go:'c1',c:'var(--moss)'},
+  {k:'page',t:'BubblePlay decisions',s:'Page · Oct 4',snip:'A running list of what we settled…'},
+];
+
+/* cards fold */
+$$('.card .top').forEach(t=>t.addEventListener('click',()=>t.closest('.card').classList.toggle('open')));
+
+/* panels */
+function openPanel(id){closeAll();$('#scrim').classList.add('on');$('#'+id).classList.add('on');if(id==='search'){$('#q').value='';render();setTimeout(()=>$('#q').focus(),60)}}
+function closeAll(){$$('.panel').forEach(p=>p.classList.remove('on'));$('#scrim').classList.remove('on');$('#menu').classList.remove('on')}
+$('#scrim').onclick=closeAll;
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPanel('search')}if(e.key==='Escape')closeAll()});
+$('#openSearch').onclick=()=>openPanel('search');
+$('#openOutline').onclick=$('#where').onclick=()=>openPanel('outline');
+
+/* jump */
+function jump(id){
+  closeAll();
+  const el=document.getElementById(id);
+  if(el.classList.contains('card'))el.classList.add('open');
+  setTimeout(()=>{
+    scroll.scrollTo({top:el.offsetTop-scroll.offsetTop-10,behavior:'smooth'});
+    const tgt=el.querySelector('.face')||el;tgt.classList.remove('flash');void tgt.offsetWidth;tgt.classList.add('flash');
+  },120);
+}
+
+/* outline */
+$('#outlineBody').innerHTML=chapters.map(ch=>`
+  <div class="oc" data-go="${ch.id}"><div class="row"><span class="dot" style="background:${ch.c}"></span><b>${ch.name}</b><span class="state ${ch.state==='ongoing'?'live':''}">${ch.state==='ongoing'?'● ongoing':ch.when}</span></div>
+  <div class="d"><span style="color:var(--apricot)">◆</span>${ch.dec}</div></div>
+  ${ch.secs.map(s=>`<div class="os ${s[2]==='s34'?'here':''}" data-go="${s[2]||ch.id}"><span class="bar2" style="background:${s[1]}"></span>${s[0]}</div>`).join('')}
+`).join('');
+$('#outlineBody').addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g)jump(g.dataset.go)});
+
+/* search */
+let filt='all';
+const icons={page:['▤','#EFE6D6'],chap:['❐','#EAE1F2'],sec:['§','#E6EEF5'],dec:['◆','#F8E6D6']};
+function hl(t,q){if(!q)return t;const i=t.toLowerCase().indexOf(q);return i<0?t:t.slice(0,i)+'<mark>'+t.slice(i,i+q.length)+'</mark>'+t.slice(i+q.length)}
+function render(){
+  const q=$('#q').value.trim().toLowerCase();
+  let items=index.filter(x=>!q||(x.t+' '+(x.snip||'')+' '+x.s).toLowerCase().includes(q));
+  const groups=[['page','Pages',['page']],['chat','Chats',['chap','sec']],['dec','Decisions',['dec']]];
+  let html='';
+  groups.forEach(([key,label,kinds])=>{
+    if(filt!=='all'&&filt!==key)return;
+    const g=items.filter(x=>kinds.includes(x.k));if(!g.length)return;
+    html+=`<div class="grp">${label}</div>`+g.slice(0,filt==='all'?4:20).map(x=>{const ic=icons[x.k];return `
+      <div class="hit" data-go="${x.go||''}"><span class="ic" style="background:${ic[1]};color:${x.k==='dec'?'var(--apricot)':(x.c||'var(--muted)')}">${ic[0]}</span>
+      <div class="tx"><div class="h">${hl(x.t,q)}</div><div class="s">${x.s}</div>${x.snip?`<div class="snip">${hl(x.snip,q)}</div>`:''}</div></div>`}).join('');
+  });
+  $('#results').innerHTML=html||'<div class="empty">Nothing found</div>';
+}
+$('#q').addEventListener('input',render);
+$('#filters').addEventListener('click',e=>{const f=e.target.closest('.f');if(!f)return;filt=f.dataset.f;$$('.f').forEach(x=>x.classList.toggle('on',x===f));render()});
+$('#results').addEventListener('click',e=>{const h=e.target.closest('.hit');if(!h)return;if(h.dataset.go)jump(h.dataset.go);else{closeAll();toast('Would open the page')}});
+
+/* where-am-i follows scroll */
+const marks=()=>$$('.card,.chap,.sec');
+scroll.addEventListener('scroll',()=>{
+  let chap=null,sec=null;const y=scroll.scrollTop+scroll.offsetTop+40;
+  marks().forEach(m=>{if(m.offsetTop<=y){if(m.classList.contains('sec'))sec=m;else{chap=m;sec=null}}});
+  if(!chap)chap=$('#c1');
+  $('#wdot').style.background=(sec||chap).dataset.c;
+  $('#wtext').innerHTML=`<b>${chap.dataset.name}</b>`+(sec?` <span>› ${sec.dataset.name}</span>`:'');
+});
+
+/* menu + add to note */
+let target=null;
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-menu]');
+  if(b){
+    e.stopPropagation();target=document.getElementById(b.dataset.menu);
+    if(b.classList.contains('btn')){openAdd();return}
+    const r=b.getBoundingClientRect(),m=$('#menu');m.classList.add('on');
+    m.style.top=(r.bottom+4)+'px';m.style.left=Math.max(8,Math.min(r.right-210,innerWidth-218))+'px';return;
+  }
+  if(!e.target.closest('#menu'))$('#menu').classList.remove('on');
+});
+$('#menu').addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(!a)return;$('#menu').classList.remove('on');
+  if(a.dataset.act==='add')openAdd();else if(a.dataset.act==='link')toast('Link copied');else toast('Mockup only')});
+function openAdd(){
+  const chapEl=target.classList.contains('sec')?$('#c3'):target;
+  const isSec=target.classList.contains('sec');
+  const label=isSec?`BubblePlay cursor › ${chapEl.dataset.name}`:'BubblePlay cursor';
+  $('#addTitle').textContent='Add “'+target.dataset.name+'” to a note';
+  $('#addSub').textContent=isSec?'Section of '+chapEl.dataset.name:'Chapter';
+  $('#miniCard').style.borderLeftColor=target.dataset.c;
+  $('#miniCard').innerHTML=`<span style="color:var(--muted)">${label}</span><b>${target.dataset.name}</b>${isSec?'Summary of this section…':'◆ Key decision…'}`;
+  $('#miniChip').textContent='● '+label+' › '+target.dataset.name;
+  openPanel('add');
+}
+$$('.opt').forEach(o=>o.onclick=()=>$$('.opt').forEach(x=>x.classList.toggle('on',x===o)));
+$$('.note').forEach(o=>o.onclick=()=>$$('.note').forEach(x=>x.classList.toggle('on',x===o)));
+$('#addCancel').onclick=closeAll;
+$('#addGo').onclick=()=>{const n=$('.note.on').textContent.replace(/edited today|Oct 4|daily note/,'').trim();closeAll();toast(`Added to ${n} <a href="index.html">Open</a>`)};
+function toast(h){const t=$('#toast');t.innerHTML=h;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2600)}
+
+/* start at the bottom, like a chat */
+requestAnimationFrame(()=>{scroll.style.scrollBehavior='auto';scroll.scrollTop=scroll.scrollHeight;scroll.style.scrollBehavior='';scroll.dispatchEvent(new Event('scroll'))});
+</script>
+</body>
+</html>

@@ -1,0 +1,1233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Patchwork</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@200..800&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=Fragment+Mono&display=swap" rel="stylesheet">
+<style>
+/* ---------- Tokens ---------- */
+:root{
+  --cloth:#F3EFE7; --raised:#FFFAF1; --muted:#DCD4C8; --muted-2:#E8E2D8;
+  --ink:#282A2F; --ink-2:#625C55; --thread:#CFC5B8; --thread-strong:#6C645D;
+  --apricot:#DE945F; --apricot-text:#874016; --paw:#DDA39D; --moss:#697A6B;
+  --att:#F0D29C; --danger:#E5B1AA; --danger-text:#8A2F25; --cons:#CAD8CD; --info:#CBD5DF;
+  --focus:#7AB7FF; --seam-gap:#B8ADA1; --today:#FFFAF1; --stage:#E6E0D5;
+  --callout-bg:#CBD5DF; --callout-ink:#282A2F;
+  --sp-home:#DE945F; --sp-home-deep:#BF6F3C; --sp-home-ink:#282A2F;
+  --sp-work:#2F3138; --sp-work-deep:#4C505A; --sp-work-ink:#F3EFE7;
+  --sp-trips:#DDA39D; --sp-trips-deep:#BC7C75; --sp-trips-ink:#282A2F;
+  --sp-reading:#5F7062; --sp-reading-deep:#495A4C; --sp-reading-ink:#FFFAF1;
+  --sp-garden:#F0D29C; --sp-garden-deep:#CDA663; --sp-garden-ink:#282A2F;
+  --shadow:0 4px 12px rgba(40,42,47,.12); --shadow-h:0 8px 20px rgba(40,42,47,.18);
+  --r-control:7px 11px 6px 9px; --r-field:6px 10px 6px 8px; --r-panel:12px 18px 10px 16px;
+  --display:"Bricolage Grotesque", system-ui, sans-serif;
+  --ui:"Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --mono:"Fragment Mono", ui-monospace, monospace;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --cloth:#24262B; --raised:#30333A; --muted:#3B3E45; --muted-2:#34373E;
+    --ink:#F3EFE7; --ink-2:#C6BAAC; --thread:#4A4E57; --thread-strong:#999DA6;
+    --apricot:#F0A064; --apricot-text:#F0A064; --danger-text:#F2B8AE; --seam-gap:#17181B; --today:#30333A; --stage:#1B1C20;
+    --callout-bg:#3A4350; --callout-ink:#F3EFE7;
+    --sp-home:#DB8C56; --sp-home-deep:#B0673A; --sp-home-ink:#1E2024;
+    --sp-work:#DCD4C8; --sp-work-deep:#B5AA9C; --sp-work-ink:#282A2F;
+    --sp-trips:#D29891; --sp-trips-deep:#AC736D; --sp-trips-ink:#1E2024;
+    --sp-reading:#5F7062; --sp-reading-deep:#4A5A4D; --sp-reading-ink:#FFFAF1;
+    --sp-garden:#E3C48B; --sp-garden-deep:#BC9A58; --sp-garden-ink:#1E2024;
+    --shadow:0 4px 12px rgba(0,0,0,.35); --shadow-h:0 8px 20px rgba(0,0,0,.45);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --cloth:#24262B; --raised:#30333A; --muted:#3B3E45; --muted-2:#34373E;
+  --ink:#F3EFE7; --ink-2:#C6BAAC; --thread:#4A4E57; --thread-strong:#999DA6;
+  --apricot:#F0A064; --apricot-text:#F0A064; --danger-text:#F2B8AE; --seam-gap:#17181B; --today:#30333A; --stage:#1B1C20;
+  --callout-bg:#3A4350; --callout-ink:#F3EFE7;
+  --sp-home:#DB8C56; --sp-home-deep:#B0673A; --sp-home-ink:#1E2024;
+  --sp-work:#DCD4C8; --sp-work-deep:#B5AA9C; --sp-work-ink:#282A2F;
+  --sp-trips:#D29891; --sp-trips-deep:#AC736D; --sp-trips-ink:#1E2024;
+  --sp-reading:#5F7062; --sp-reading-deep:#4A5A4D; --sp-reading-ink:#FFFAF1;
+  --sp-garden:#E3C48B; --sp-garden-deep:#BC9A58; --sp-garden-ink:#1E2024;
+  --shadow:0 4px 12px rgba(0,0,0,.35); --shadow-h:0 8px 20px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+.sp-home{--patch:var(--sp-home);--patch-deep:var(--sp-home-deep);--patch-ink:var(--sp-home-ink)}
+.sp-work{--patch:var(--sp-work);--patch-deep:var(--sp-work-deep);--patch-ink:var(--sp-work-ink)}
+.sp-trips{--patch:var(--sp-trips);--patch-deep:var(--sp-trips-deep);--patch-ink:var(--sp-trips-ink)}
+.sp-reading{--patch:var(--sp-reading);--patch-deep:var(--sp-reading-deep);--patch-ink:var(--sp-reading-ink)}
+.sp-garden{--patch:var(--sp-garden);--patch-deep:var(--sp-garden-deep);--patch-ink:var(--sp-garden-ink)}
+.sp-none{--patch:var(--muted-2);--patch-deep:var(--muted);--patch-ink:var(--ink)}
+
+/* ---------- Base ---------- */
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{background:var(--stage);color:var(--ink);font:450 15px/1.5 var(--ui);-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+h1,h2,h3,h4{margin:0;font-family:var(--display);font-weight:640;letter-spacing:-.02em;line-height:1.1}
+ul,ol{margin:0;padding:0;list-style:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+svg.ui{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.mark{flex:none;display:block}
+.mark .m-base{fill:var(--patch)} .mark .m-cut{fill:var(--patch-deep)}
+.mark .m-g{fill:var(--patch-ink)} .mark .m-g2{fill:var(--patch-deep)}
+.on-patch .mark .m-base,.mark.on .m-base{fill:var(--patch-deep)}
+.on-patch .mark .m-cut,.mark.on .m-cut{fill:transparent}
+.on-patch .mark .m-g2,.mark.on .m-g2{fill:var(--patch)}
+
+/* proposed tag: quiet, never dominant */
+.prop{display:inline-flex;align-items:center;gap:3px;font:600 10.5px/1 var(--ui);letter-spacing:.01em;padding:3px 6px 3px 5px;border:1px dashed currentColor;border-radius:5px 7px 4px 6px;opacity:.62;vertical-align:middle;white-space:nowrap}
+.prop::before{content:"";width:5px;height:5px;border:1.25px solid currentColor;transform:rotate(45deg)}
+
+/* ---------- Stage / prototype chrome ---------- */
+.stage{height:100%;display:flex;flex-direction:column}
+.proto{flex:none;height:40px;display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--stage);font-size:12.5px;color:var(--ink-2);border-bottom:1px solid var(--thread)}
+.proto b{font-family:var(--display);font-size:14px;color:var(--ink);font-weight:650}
+.proto .sp{flex:1}
+.seg{display:inline-flex;border:1px solid var(--thread-strong);border-radius:var(--r-control);overflow:hidden}
+.seg button{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;font-weight:650;font-size:12.5px;color:var(--ink-2)}
+.seg button svg.ui{width:15px;height:15px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--cloth)}
+.seg button+button{border-left:1px solid var(--thread-strong)}
+.proto-btn{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--thread-strong);border-radius:var(--r-control);font-weight:650;font-size:12.5px}
+.proto-btn[aria-expanded="true"]{background:var(--apricot);color:#282A2F;border-color:var(--apricot)}
+.canvas{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+.device{width:100%;height:100%;container:dev / inline-size;position:relative;background:var(--cloth);overflow:hidden}
+.stage[data-mode="mobile"] .device{width:390px;height:min(844px,calc(100% - 28px));border-radius:44px;box-shadow:0 0 0 9px #101214,0 30px 60px rgba(0,0,0,.28)}
+@media (max-width:560px){
+  .statusbar{display:none!important}
+  .proto .seg.motion{display:none}
+  .stage[data-mode] .device{width:100%;height:100%;border-radius:0;box-shadow:none}
+  .proto{height:34px;gap:6px;padding:0 8px}
+  .proto .lbl,.proto b span{display:none}
+  .seg button{padding:3px 7px}
+  .seg button .t{display:none}
+}
+
+/* direction note */
+.note{position:absolute;right:16px;top:12px;width:380px;max-height:calc(100% - 24px);overflow:auto;background:var(--raised);color:var(--ink);border:1px solid var(--thread-strong);border-radius:var(--r-panel);box-shadow:var(--shadow-h);padding:20px 22px;z-index:90;font-size:14px;opacity:0;transform:translateY(-8px);visibility:hidden;transition:opacity .18s,transform .24s var(--ease),visibility 0s .24s}
+.note.open{opacity:1;transform:none;visibility:visible;transition:opacity .18s,transform .24s var(--ease)}
+.note h2{font-size:26px;margin:2px 0 8px}
+.note h3{font-size:16px;margin:16px 0 6px}
+.note p{margin:6px 0}
+.note table{width:100%;border-collapse:collapse;font-size:13px}
+.note td{padding:5px 0;border-top:1px solid var(--thread);vertical-align:top}
+.note td:last-child{text-align:right;font-weight:700;white-space:nowrap;padding-left:10px}
+.note ul{list-style:none;padding:0}
+.note li{padding:3px 0 3px 16px;position:relative}
+.note li::before{content:"";position:absolute;left:2px;top:10px;width:7px;height:7px;background:var(--apricot);border-radius:2px 3px 1px 2px}
+
+/* ---------- App shell ---------- */
+.app{position:absolute;inset:0;display:grid;grid-template-columns:260px 1fr;grid-template-rows:1fr;background:var(--cloth)}
+.statusbar{display:none}
+.side{display:flex;flex-direction:column;gap:6px;padding:14px 12px 12px;border-right:1px solid var(--thread);min-height:0;overflow:auto}
+.brand{display:flex;align-items:center;gap:9px;padding:4px 6px 8px}
+.brand b{font-family:var(--display);font-size:19px;font-weight:680;letter-spacing:-.02em}
+.side-search{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;border:1px solid var(--thread);border-radius:var(--r-field);color:var(--ink-2);background:var(--raised);transition:border-color .15s,transform .15s}
+.side-search:hover{border-color:var(--thread-strong)}
+.side-search kbd{margin-left:auto;font:11px var(--mono);color:var(--ink-2)}
+.navi{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:var(--r-control);font-weight:600;color:var(--ink-2);transition:background .15s,color .15s,transform .12s;width:100%;text-align:left}
+.navi:hover{background:var(--muted-2);color:var(--ink)}
+.navi:active{transform:translateY(1px)}
+.navi[aria-current="page"]{background:var(--ink);color:var(--cloth)}
+.navi .badge{margin-left:auto;font-size:12px;font-weight:700;padding:1px 7px;border-radius:999px;background:var(--danger);color:#282A2F}
+.navi[aria-current="page"] .badge{background:var(--apricot)}
+.side-label{display:flex;align-items:center;justify-content:space-between;margin:12px 4px 4px 8px;font-weight:700;font-size:13px;color:var(--ink-2)}
+.side-label button{width:26px;height:26px;display:grid;place-items:center;border-radius:var(--r-control)}
+.side-label button:hover{background:var(--muted-2)}
+.side-label svg.ui{width:16px;height:16px}
+
+/* spaces as fitted patches, unequal widths, seamed together */
+.spaces{display:flex;flex-direction:column}
+.spatch{position:relative;background:var(--patch);color:var(--patch-ink);padding:9px 10px 9px 11px;border-radius:0 9px 7px 0;transition:transform .18s var(--ease),box-shadow .18s}
+.spatch:first-child{border-radius:12px 14px 7px 0}
+.spatch:last-child{border-radius:0 9px 9px 14px}
+.spatch+.spatch::before{content:"";position:absolute;left:6px;right:6px;top:0;border-top:1.5px dashed color-mix(in srgb,var(--patch-ink) 40%,transparent)}
+.spatch:hover{transform:translateX(2px);z-index:2;box-shadow:var(--shadow)}
+.spatch-head{display:flex;align-items:center;gap:8px;width:100%;font-weight:700;font-size:14.5px;text-align:left}
+.spatch-head .n{margin-left:auto;font-size:12px;font-weight:600;opacity:.75}
+.spatch ul{margin:5px 0 0}
+.pg{display:flex;align-items:center;gap:8px;width:100%;padding:4px 6px;margin-left:-2px;border-radius:var(--r-control);font-size:13.5px;font-weight:550;text-align:left;transition:background .15s}
+.pg:hover{background:color-mix(in srgb,var(--patch-ink) 12%,transparent)}
+.pg.child{padding-left:24px}
+.pg[aria-current="page"]{background:var(--raised);color:var(--ink);font-weight:700}
+.pg[aria-current="page"] .mark .m-base{fill:var(--patch)}
+.pg[aria-current="page"] .mark .m-g2{fill:var(--patch-deep)}
+.pg .db{margin-left:auto;font-size:11px;opacity:.7}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:10px}
+
+.main{min-width:0;min-height:0;overflow:auto;display:grid;position:relative;scroll-behavior:smooth}
+.view{grid-area:1/1;min-width:0}
+.bottombar{display:none}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:var(--r-control);font-weight:720;font-size:13.5px;border:1px solid var(--thread-strong);background:var(--raised);transition:transform .14s var(--ease),box-shadow .14s,background .14s}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn.primary{background:var(--apricot);border-color:var(--apricot);color:#282A2F}
+.btn.icon{width:40px;padding:0;justify-content:center}
+.btn .plus-ic{transition:transform .25s var(--ease)}
+.btn[aria-expanded="true"] .plus-ic{transform:rotate(45deg)}
+.ibtn{width:34px;height:34px;display:grid;place-items:center;border-radius:var(--r-control);color:var(--ink-2);transition:background .14s,transform .12s}
+.ibtn:hover{background:var(--muted-2);color:var(--ink)}
+.ibtn:active{transform:scale(.94)}
+
+/* ---------- Home ---------- */
+.home{display:flex;flex-direction:column;padding:22px 30px 26px;min-height:100%}
+.home-head{display:flex;align-items:flex-end;gap:12px;margin-bottom:16px}
+.home-head .hello{color:var(--ink-2);font-weight:600;font-size:14px}
+.home-head h1{font-size:40px;font-weight:660;font-variation-settings:"wdth" 86;letter-spacing:-.035em;line-height:1}
+.home-head .acts{margin-left:auto;display:flex;gap:8px}
+
+.quilt{flex:1;min-height:640px;display:grid;grid-template-columns:repeat(24,minmax(0,1fr));grid-template-rows:repeat(12,minmax(0,1fr));gap:3px;background:var(--seam-gap);border-radius:var(--r-panel);padding:0;overflow:hidden;position:relative}
+.patch{position:relative;background:var(--patch);color:var(--patch-ink);padding:16px 18px;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;transition:transform .2s var(--ease),box-shadow .2s}
+.patch::after{content:"";position:absolute;inset:6px;border:1.5px dashed color-mix(in srgb,var(--patch-ink) 26%,transparent);pointer-events:none;border-radius:4px}
+.patch.lift:hover{transform:translateY(-2px);box-shadow:var(--shadow-h);z-index:3}
+.patch .ph{display:flex;align-items:center;gap:9px}
+.patch .ph h3{font-size:21px;font-weight:660}
+.patch .ph .meta{margin-left:auto;font-size:12px;font-weight:600;opacity:.75}
+.patch .soft{opacity:.78}
+.p-today{grid-area:1/1/13/14;--patch:var(--today);--patch-ink:var(--ink);--patch-deep:var(--muted);--stitch:var(--apricot);padding:20px 24px 18px}
+.p-trips{grid-area:1/14/6/21}
+.p-garden{grid-area:1/21/4/25}
+.p-reading{grid-area:4/21/8/25}
+.p-home{grid-area:6/14/13/19}
+.p-new{grid-area:6/19/8/21;--patch:var(--cloth);--patch-ink:var(--ink-2);align-items:center;justify-content:center;text-align:center;gap:4px;padding:10px;font-weight:700;font-size:12.5px;cursor:pointer}
+.p-new::after{border-style:dashed;border-width:1.5px;inset:7px}
+.p-new:hover{background:var(--raised);color:var(--ink)}
+.p-work{grid-area:8/19/13/25}
+
+/* sew-in on load */
+.quilt.play .patch{animation:sewIn .62s var(--ease) both;animation-delay:calc(var(--i,0) * 70ms)}
+.quilt.play .patch::after{animation:fadeIn .5s ease both;animation-delay:calc(var(--i,0) * 70ms + 380ms)}
+@keyframes sewIn{from{opacity:0;transform:translate(var(--dx,0),var(--dy,0)) scale(.985)}}
+@keyframes fadeIn{from{opacity:0}}
+
+/* pinned items inside patches */
+.pin{display:flex;align-items:center;gap:10px;width:100%;padding:7px 8px;margin:0 -8px;border-radius:var(--r-control);text-align:left;transition:background .15s,transform .12s;position:relative;z-index:1}
+.pin:hover{background:color-mix(in srgb,var(--patch-ink) 11%,transparent)}
+.pin:active{transform:translateY(1px)}
+.pin b{display:block;font-size:15px;font-weight:720;line-height:1.25}
+.pin span{display:block;font-size:12.5px;opacity:.8}
+.pin.big b{font-family:var(--display);font-size:24px;font-weight:660;letter-spacing:-.02em}
+.pin .go{margin-left:auto;opacity:.6}
+.stitchbar{display:flex;gap:3px;margin-top:2px}
+.stitchbar i{flex:1;height:6px;border-radius:2px 3px 1px 2px;background:color-mix(in srgb,var(--patch-ink) 22%,transparent)}
+.stitchbar i.on{background:var(--patch-ink)}
+.prog{position:relative;z-index:1}
+.prog .lab{display:flex;justify-content:space-between;font-size:12.5px;font-weight:650;margin-bottom:4px}
+.mini-task{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;position:relative;z-index:1}
+.mini-task .late{font-weight:700;text-decoration:underline;text-decoration-style:wavy;text-underline-offset:3px;text-decoration-thickness:1px}
+.mini-task svg.ui{width:15px;height:15px}
+.patch .spacer{flex:1}
+.show-m{display:none!important}
+
+/* Today patch */
+.today-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.today-head h2{font-size:34px;font-weight:680;font-variation-settings:"wdth" 82;letter-spacing:-.035em}
+.today-head .date{font-weight:600;color:var(--ink-2)}
+.today-head .daily{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;padding:6px 10px;border-radius:var(--r-control);border:1px solid var(--thread);transition:background .15s}
+.today-head .daily:hover{background:var(--cloth)}
+.today-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,.86fr) minmax(0,1.2fr);gap:26px;margin-top:6px}
+.col-h{display:flex;align-items:center;gap:8px;font:700 13.5px var(--ui);color:var(--ink-2);margin-bottom:8px}
+.col-h .count{margin-left:auto;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--apricot);color:#282A2F;font-weight:750}
+.agenda li{display:grid;grid-template-columns:46px 14px 1fr;gap:0 10px;align-items:start;position:relative;padding-bottom:16px}
+.agenda li::before{content:"";position:absolute;left:62px;top:14px;bottom:-2px;border-left:1.5px dashed var(--thread)}
+.agenda li:last-child::before{display:none}
+.agenda .tm{font-weight:700;font-size:13.5px;font-variant-numeric:tabular-nums;padding-top:1px}
+.agenda .node{width:12px;height:12px;margin-top:4px;background:var(--patch);border:1.5px solid var(--patch-ink);border-radius:3px 4px 2px 3px;position:relative;z-index:1}
+.agenda .ev b{display:block;font-weight:700;font-size:15px;line-height:1.3}
+.agenda .ev span{font-size:12.5px;color:var(--ink-2)}
+.agenda li.past{opacity:.55}
+.agenda li.past .ev b{text-decoration:line-through;text-decoration-thickness:1px}
+.agenda li.now{padding-bottom:12px}
+.agenda li.now .tm{color:var(--apricot-text)}
+.agenda li.now .node{background:var(--apricot);border-color:var(--apricot);border-radius:50%;width:12px;height:12px}
+.agenda li.now .node::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--apricot);animation:pulse 2.6s ease-out infinite}
+@keyframes pulse{0%{opacity:.7;transform:scale(.6)}80%,100%{opacity:0;transform:scale(1.4)}}
+.agenda li.now .ev b{color:var(--apricot-text);font-size:13.5px}
+.agenda li.now .ev span{font-weight:600}
+
+/* checkbox: a cross-stitch that sews itself */
+.tick{position:relative;display:grid;place-items:center;width:22px;height:22px;flex:none;cursor:pointer}
+.tick input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.tick .box{width:20px;height:20px;border:1.75px solid var(--thread-strong);border-radius:5px 7px 4px 6px;background:var(--raised);display:grid;place-items:center;transition:background .2s,border-color .2s,transform .15s var(--ease)}
+.tick:hover .box{border-color:var(--ink);transform:scale(1.06)}
+.tick input:active+.box{transform:scale(.9)}
+.tick input:focus-visible+.box{outline:2px solid var(--focus);outline-offset:2px}
+.tick .box svg{width:14px;height:14px;fill:none;stroke:var(--chk-ink,#282A2F);stroke-width:2.4;stroke-linecap:round}
+.tick .box path{stroke-dasharray:14;stroke-dashoffset:14;transition:stroke-dashoffset .22s ease}
+.tick .box path+path{transition-delay:.16s}
+.tick input:checked+.box{background:var(--chk,var(--apricot));border-color:var(--chk-edge,var(--chk,var(--apricot)))}
+.tick input:checked+.box path{stroke-dashoffset:0}
+
+.tasks li{display:flex;align-items:flex-start;gap:11px;padding:8px 6px 8px 4px;border-radius:var(--r-control);transition:background .15s,opacity .3s}
+.tasks li:hover{background:var(--cloth)}
+.tasks .tt{flex:1;min-width:0}
+.tasks .tt b{display:block;font-size:15px;font-weight:650;line-height:1.3;position:relative;width:fit-content}
+.tasks .tt b::after{content:"";position:absolute;left:0;top:55%;height:1.5px;width:100%;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .3s var(--ease) .1s}
+.tasks li.done .tt b::after{transform:scaleX(1)}
+.tasks li.done .tt{opacity:.55}
+.meta-row{display:flex;align-items:center;gap:8px;margin-top:2px;font-size:12.5px;color:var(--ink-2)}
+.chip-sp{display:inline-flex;align-items:center;gap:5px;font-weight:600}
+.chip-sp::before{content:"";width:9px;height:9px;background:var(--patch);border:1px solid color-mix(in srgb,var(--ink) 25%,transparent);border-radius:2px 3px 1px 2px}
+.due{display:inline-flex;align-items:center;gap:4px;font-weight:700}
+.due svg.ui{width:14px;height:14px}
+.due.late{color:var(--danger-text);background:color-mix(in srgb,var(--danger) 35%,transparent);padding:0 6px 0 4px;border-radius:4px 6px 3px 5px}
+.done-lab{font-weight:700;color:var(--ink-2)}
+.more-link{display:inline-flex;align-items:center;gap:4px;margin:6px 0 0 4px;font-weight:700;font-size:13px;color:var(--apricot-text)}
+.more-link:hover{text-decoration:underline;text-underline-offset:3px}
+.capture{display:flex;align-items:center;gap:8px;margin-top:8px;position:relative;z-index:1}
+.field{flex:1;display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;background:var(--cloth);border:1px solid var(--thread-strong);border-radius:var(--r-field);color:var(--ink-2)}
+.field:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+.field input{flex:1;min-width:0;border:0;background:none;outline:none;font-size:15px;color:var(--ink)}
+.field input::placeholder{color:var(--ink-2)}
+.today-done{display:none;align-items:center;gap:10px;padding:10px 12px;margin-top:6px;border-radius:var(--r-field);background:var(--cons);color:#282A2F;font-weight:700}
+.p-today.sewn .today-done{display:flex;animation:rise .4s var(--ease) both}
+
+.week{margin-top:4px}
+.week ol{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;background:var(--thread);border:1px solid var(--thread);border-radius:var(--r-field);overflow:hidden}
+.week li{background:var(--today);padding:7px 8px 8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.week li.past{background:var(--cloth)}
+.week li.is-today{background:var(--apricot);color:#282A2F}
+.week .d{font-size:12px;font-weight:650;color:inherit;opacity:.85}
+.week .d b{font-size:15px;font-weight:750;opacity:1}
+.week .dots{display:flex;gap:3px;height:6px}
+.week .dots i{width:6px;height:6px;border-radius:1px 2px 1px 2px;background:currentColor;opacity:.7}
+.week .x{font-size:11.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.8}
+/* row entry */
+.play .rise,.rise.play{animation:rise .42s var(--ease) both;animation-delay:calc(var(--i,0) * 45ms)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+.new-row{animation:rowIn .45s var(--ease) both}
+@keyframes rowIn{from{opacity:0;transform:translateY(-6px);max-height:0}to{max-height:80px}}
+
+/* ---------- Page ---------- */
+.topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;height:52px;padding:0 18px;background:var(--cloth)}
+.crumb{display:flex;align-items:center;gap:6px;font-weight:650;font-size:14px;min-width:0}
+.crumb .sep{opacity:.5}
+.crumb button{display:inline-flex;align-items:center;gap:6px;padding:4px 6px;border-radius:var(--r-control)}
+.crumb button:hover{background:var(--muted-2)}
+.topbar .edited{margin-left:auto;font-size:12.5px;color:var(--ink-2);margin-right:6px}
+.band{position:relative;height:210px;background:var(--patch);color:var(--patch-ink);overflow:hidden;transition:background .5s ease}
+.band::after{content:"";position:absolute;left:0;right:0;bottom:7px;border-bottom:2px dashed color-mix(in srgb,var(--patch-ink) 35%,transparent)}
+.band .cover{position:absolute;right:0;bottom:0;height:100%;width:auto;z-index:1}
+.band .rail{position:absolute;left:0;right:0;bottom:9.5%;height:1.9%;min-height:3px;background:#282A2F;opacity:.55}
+.p-trips .skyline{position:relative;flex:1;min-height:0;margin:0 -18px;overflow:hidden}
+.p-trips .skyline .cover{position:absolute;right:0;bottom:0;height:100%;width:auto}
+.p-trips .skyline .rail{position:absolute;left:0;right:0;bottom:9.5%;height:3px;background:#282A2F;opacity:.5}
+.band .tag{position:absolute;left:clamp(24px,7%,96px);top:18px;display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px;background:color-mix(in srgb,var(--patch-ink) 12%,transparent);padding:5px 10px 5px 7px;border-radius:var(--r-control)}
+.page-body{position:relative;max-width:780px;margin:0 auto;padding:0 40px 80px;font-size:16.5px;line-height:1.58}
+.page-icon{width:84px;height:84px;margin-top:-46px;position:relative;z-index:2;filter:drop-shadow(0 3px 0 color-mix(in srgb,var(--ink) 18%,transparent))}
+.page-title{font-size:48px;font-weight:680;font-variation-settings:"wdth" 86;letter-spacing:-.04em;margin:14px 0 14px;line-height:1}
+.props{display:grid;grid-template-columns:150px 1fr;gap:2px 12px;margin:0 0 22px;font-size:14.5px}
+.props dt{display:flex;align-items:center;gap:8px;color:var(--ink-2);font-weight:600;height:34px}
+.props dt svg.ui{width:17px;height:17px}
+.props dd{margin:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:34px;font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px 0 8px;border-radius:999px;font-size:13px;font-weight:700;color:#282A2F}
+.pill svg.ui{width:14px;height:14px}
+.pill.planning{background:var(--att)}
+.tagc{display:inline-flex;align-items:center;height:26px;padding:0 9px;border-radius:5px 7px 4px 6px;font-size:13px;font-weight:650;background:var(--muted-2);border:1px solid var(--thread)}
+.num{font-variant-numeric:tabular-nums}
+.callout{display:flex;gap:14px;padding:16px 18px;margin:8px 0 20px;background:var(--callout-bg);color:var(--callout-ink);border-radius:var(--r-panel);position:relative}
+.callout::after{content:"";position:absolute;inset:5px;border:1.5px dashed color-mix(in srgb,var(--callout-ink) 22%,transparent);border-radius:8px 13px 6px 11px;pointer-events:none}
+.callout svg.ui{width:24px;height:24px;margin-top:2px}
+.callout b{display:block;font-size:16px}
+.code{font:13.5px var(--mono);padding:1px 6px;background:color-mix(in srgb,var(--callout-ink) 10%,transparent);border-radius:4px}
+.mention{display:inline-flex;align-items:center;gap:5px;padding:0 7px 0 3px;border-radius:5px 7px 4px 6px;background:var(--patch);color:var(--patch-ink);font-weight:700;text-decoration:none;vertical-align:baseline;transition:transform .14s;line-height:1.5}
+.mention:hover{transform:translateY(-1px)}
+.page-body h3{font-size:21px;margin:26px 0 8px}
+.page-body p{margin:8px 0}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin:16px 0}
+.cols2 h3{margin-top:4px}
+.bul li{position:relative;padding:3px 0 3px 22px}
+.bul li::before{content:"";position:absolute;left:3px;top:13px;width:8px;height:8px;background:var(--patch);border:1.25px solid color-mix(in srgb,var(--ink) 35%,transparent);border-radius:2px 3px 1px 2px}
+
+.checklist{position:relative;margin:24px 0;padding:18px 20px 14px;background:var(--raised);border:1px solid var(--thread);border-radius:var(--r-panel);--chk:var(--patch);--chk-ink:var(--patch-ink);--chk-edge:var(--patch-deep);transition:background .4s}
+.checklist .ch-h{display:flex;align-items:center;gap:10px}
+.checklist .ch-h h3{margin:0;font-size:21px}
+.checklist .ch-h .cnt{margin-left:auto;font-weight:750;font-size:14px}
+.checklist .stitchbar{margin:10px 0 8px;--patch-ink:var(--ink)}
+.checklist .stitchbar i.on{background:var(--patch-deep)}
+.checklist li{display:flex;align-items:center;gap:12px;padding:6px 4px;border-radius:var(--r-control)}
+.checklist li:hover{background:var(--cloth)}
+.checklist li span{transition:opacity .2s}
+.checklist li.done span{opacity:.55;text-decoration:line-through;text-decoration-thickness:1.5px}
+.checklist .packed{display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;font-weight:750;background:var(--patch);color:var(--patch-ink);border-radius:var(--r-field)}
+.checklist.sewn .packed{display:flex;animation:rise .4s var(--ease) .55s both}
+.stitch-svg{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:3}
+.stitch-svg .s{fill:none;stroke:var(--stitch,var(--patch-deep));stroke-width:2.5;stroke-dasharray:7 5;stroke-linecap:round}
+.needle{position:absolute;left:0;top:0;width:26px;height:8px;offset-rotate:auto;pointer-events:none;z-index:4}
+
+.toggle{margin:16px 0}
+.toggle>button{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:640;font-size:21px;letter-spacing:-.02em;padding:4px 8px 4px 2px;border-radius:var(--r-control)}
+.toggle>button:hover{background:var(--muted-2)}
+.toggle>button svg.ui{transition:transform .25s var(--ease)}
+.toggle>button[aria-expanded="true"] svg.ui{transform:rotate(90deg)}
+.tg-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .32s var(--ease)}
+.tg-body>div{overflow:hidden}
+.toggle.open .tg-body{grid-template-rows:1fr}
+.days{padding:6px 0 4px 28px}
+.days li{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:5px 0;border-bottom:1px solid var(--thread)}
+.days li b{font-weight:700}
+.toggle.open .days li{animation:rise .35s var(--ease) both;animation-delay:calc(var(--i)*40ms + 80ms)}
+
+.board{margin:22px 0}
+.board .cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.lane{padding:10px;border-radius:var(--r-panel);background:var(--muted-2);border:1px solid var(--thread)}
+.lane.booked{background:color-mix(in srgb,var(--cons) 55%,var(--raised))}
+:root[data-theme="dark"] .lane.booked{background:color-mix(in srgb,var(--cons) 16%,var(--raised))}
+.lane h4{display:flex;align-items:center;gap:7px;font-family:var(--ui);font-weight:750;font-size:13.5px;letter-spacing:0;margin:0 0 8px 2px}
+.lane h4 .n{margin-left:auto;font-weight:600;color:var(--ink-2)}
+.card{display:flex;align-items:center;gap:9px;background:var(--raised);border:1px solid var(--thread);border-radius:var(--r-field);padding:9px 10px;margin-top:6px;font-size:14.5px;font-weight:650;transition:transform .15s var(--ease),box-shadow .15s}
+.card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.card small{display:block;font-weight:500;color:var(--ink-2);font-size:12.5px}
+.card svg.ui{width:17px;height:17px;color:var(--ink-2)}
+.imgph{margin:22px 0;border-radius:var(--r-panel);overflow:hidden;border:1px solid var(--thread);background:var(--raised)}
+.imgph>svg{display:block;width:100%;height:180px}
+.imgph figcaption{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13.5px;color:var(--ink-2);font-weight:600}
+.imgph figcaption .btn{margin-left:auto;height:32px;font-size:12.5px}
+.backlinks{margin-top:30px;padding-top:14px;border-top:2px dashed var(--thread)}
+.backlinks h4{font-family:var(--ui);font-size:13.5px;font-weight:750;color:var(--ink-2);letter-spacing:0;margin-bottom:8px}
+.backlinks .bl{display:flex;flex-wrap:wrap;gap:8px}
+.bl a{display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 6px;border-radius:var(--r-control);background:var(--raised);border:1px solid var(--thread);font-weight:650;font-size:14px;text-decoration:none;transition:transform .14s,box-shadow .14s}
+.bl a:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.bl small{font-weight:500;color:var(--ink-2)}
+
+/* page enter */
+.view.enter .page-body>*{animation:rise .45s var(--ease) both;animation-delay:calc(var(--i,0) * 40ms + 140ms)}
+.view.slide{animation:slideIn .38s var(--ease) both}
+@keyframes slideIn{from{opacity:0;transform:translateX(26px)}}
+
+/* morph ghost */
+.ghost{position:absolute;z-index:60;background:var(--patch);pointer-events:none;overflow:hidden}
+.ghost::after{content:"";position:absolute;inset:6px;border:1.5px dashed color-mix(in srgb,var(--patch-ink) 30%,transparent);border-radius:4px}
+.ghost .cover{position:absolute;right:0;bottom:0;height:100%;width:auto}
+.ghost .rail{position:absolute;left:0;right:0;bottom:9.5%;height:3px;background:#282A2F;opacity:.5}
+.ghost-icon{position:absolute;z-index:61;pointer-events:none}
+
+/* ---------- Empty page ---------- */
+.band.uncut{background:var(--cloth)}
+.band.uncut::before{content:"";position:absolute;inset:14px 18px 18px;border:2px dashed var(--thread-strong);border-radius:var(--r-panel)}
+.band.uncut::after{display:none}
+.band .scis{position:absolute;left:30px;top:4px;color:var(--ink-2);background:var(--cloth);padding:2px 4px;animation:snip 3.6s var(--ease) infinite}
+.band:not(.uncut) .scis{display:none}
+@keyframes snip{0%,100%{transform:translateX(0)}50%{transform:translateX(60px)}}
+.band .scis svg.ui{width:22px;height:22px}
+.empty-icon{width:84px;height:84px;margin-top:-46px;position:relative;z-index:2;display:grid;place-items:center;border:2px dashed var(--thread-strong);border-radius:var(--r-panel);background:var(--raised);color:var(--ink-2);font-weight:700;font-size:12px}
+.untitled{font-size:48px;font-weight:680;font-variation-settings:"wdth" 86;letter-spacing:-.04em;margin:14px 0 6px;color:color-mix(in srgb,var(--ink) 35%,transparent);display:flex;align-items:center}
+.caret{display:inline-block;width:3px;height:44px;background:var(--apricot);margin-right:4px;animation:blink 1.1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.pick{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:10px 0 24px;font-weight:650;font-size:14px;color:var(--ink-2)}
+.sw{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 11px 0 7px;border:1px solid var(--thread);border-radius:var(--r-control);background:var(--raised);color:var(--ink);font-weight:650;font-size:13.5px;transition:transform .14s var(--ease),border-color .14s}
+.sw::before{content:"";width:16px;height:16px;background:var(--patch);border-radius:3px 5px 2px 4px;border:1px solid color-mix(in srgb,var(--ink) 20%,transparent)}
+.sw:hover{transform:translateY(-1px);border-color:var(--thread-strong)}
+.sw[aria-pressed="true"]{border:2px solid var(--ink)}
+.blank{display:grid;grid-template-columns:200px 1fr;gap:26px;align-items:center;padding:22px 24px;border:1.5px dashed var(--thread-strong);border-radius:var(--r-panel)}
+.blank h3{font-size:26px;margin-bottom:4px}
+.blank p{margin:0 0 12px;color:var(--ink-2)}
+.patterns{display:flex;flex-wrap:wrap;gap:8px}
+.zz{font-family:var(--display);font-weight:700;fill:var(--ink-2);animation:zz 3s ease-in-out infinite}
+.zz2{animation-delay:1s}
+@keyframes zz{0%{opacity:0;transform:translate(0,6px)}40%{opacity:1}100%{opacity:0;transform:translate(8px,-10px)}}
+
+/* ---------- + menu ---------- */
+.menu{position:absolute;z-index:80;width:290px;padding:6px;background:var(--raised);color:var(--ink);border:1px solid var(--thread-strong);border-radius:var(--r-panel);box-shadow:var(--shadow-h);opacity:0;visibility:hidden;transform:translateY(-8px) scale(.97);transform-origin:top right;transition:opacity .16s ease,transform .22s var(--ease),visibility 0s .22s}
+.menu.open{opacity:1;visibility:visible;transform:none;transition:opacity .16s ease,transform .22s var(--ease)}
+.menu .mh{padding:8px 10px 6px;font-weight:700;font-size:12.5px;color:var(--ink-2)}
+.menu button{display:flex;align-items:center;gap:11px;width:100%;padding:8px 10px;border-radius:var(--r-control);text-align:left;transition:background .12s}
+.menu button:hover,.menu button:focus-visible{background:var(--cloth)}
+.menu button b{display:block;font-weight:700;font-size:14.5px;line-height:1.25}
+.menu button small{display:block;color:var(--ink-2);font-size:12.5px}
+.menu button .prop{margin-left:auto}
+.menu.open button{animation:rise .3s var(--ease) both;animation-delay:calc(var(--i)*35ms)}
+.toast{position:absolute;left:50%;bottom:26px;z-index:85;transform:translate(-50%,20px);opacity:0;padding:11px 16px;background:#2F3138;color:#F3EFE7;border-radius:var(--r-control);font-weight:650;font-size:14px;box-shadow:var(--shadow-h);transition:opacity .2s,transform .3s var(--ease);pointer-events:none;max-width:calc(100% - 32px)}
+:root[data-theme="dark"] .toast{background:#F3EFE7;color:#282A2F}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- Mobile (container) ---------- */
+@container dev (max-width: 720px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
+  .side{display:none}
+  .stage[data-mode="mobile"] .statusbar{display:flex}
+  .statusbar{align-items:center;justify-content:space-between;height:38px;padding:8px 28px 0;font-weight:750;font-size:14px;font-variant-numeric:tabular-nums}
+  .statusbar .dots{display:flex;gap:4px;align-items:center}
+  .statusbar .dots i{display:block;width:16px;height:9px;border:1.5px solid currentColor;border-radius:3px}
+  .main{grid-row:2}
+  .home{padding:12px 16px 18px}
+  .home-head{margin-bottom:12px}
+  .home-head h1{font-size:30px}
+  .home-head .acts{display:none}
+  .quilt{min-height:0;flex:none;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:auto repeat(5,82px)}
+  .p-today{grid-area:1/1/2/7;padding:16px 16px 12px}
+  .p-trips{grid-area:2/1/4/5}
+  .p-garden{grid-area:2/5/3/7}
+  .p-reading{grid-area:3/5/5/7}
+  .p-home{grid-area:4/1/7/4}
+  .p-new{grid-area:4/4/5/5;font-size:11px;padding:6px}
+  .p-new .t2{display:none}
+  .p-work{grid-area:5/4/7/7}
+  .patch{padding:12px 12px;gap:6px}
+  .patch .ph h3{font-size:17px}
+  .patch .ph .meta,.hide-m{display:none!important}
+  .show-m{display:flex!important}
+  .p-garden .spacer{display:none}
+  .pin.big b{font-size:18px}
+  .pin.big .mark{width:34px;height:34px}
+  .pin .mark{width:26px;height:26px}
+  .pin span,.p-garden .pin,.p-reading .pin span,.pin .go{display:none}
+  .pin.big span{display:block}
+  .pin.big span .hide-m,.pin.big .go{display:none}
+  .mini-task .hide-m{display:none}
+  .tasks .tt b{font-size:15px}
+  .meta-row{font-size:12px}
+  .pin{padding:4px 6px;margin:0 -6px}
+  .today-head h2{font-size:28px}
+  .today-head .daily{display:none}
+  .today-body{grid-template-columns:1fr;gap:10px}
+  .agenda ol{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+  .agenda li{display:flex;flex-direction:column;gap:0;padding:7px 10px;min-width:max-content;border:1px solid var(--thread);border-radius:var(--r-field);background:var(--cloth)}
+  .agenda li::before,.agenda .node{display:none}
+  .agenda li.now{background:var(--apricot);border-color:var(--apricot);color:#282A2F}
+  .agenda li.now .tm,.agenda li.now .ev b{color:#282A2F}
+  .agenda .ev b{font-size:13.5px}
+  .agenda .ev span{display:none}
+  .agenda li.now .ev span{display:block;color:#282A2F}
+  .agenda .col-h,.p-today .capture,.week{display:none}
+  .p-trips .skyline{display:none}
+  .tasks li{padding:7px 2px;align-items:center}
+  .tasks .tt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tasks .meta-row{margin:0}
+  .chip-sp{font-size:0;gap:0}
+  .chip-sp::before{width:10px;height:10px}
+  .bottombar{display:block;grid-row:3;background:var(--raised);border-top:1px solid var(--thread);padding:8px 10px 10px}
+  .bb-cap{display:flex;gap:8px;margin-bottom:8px}
+  .bb-cap .field{height:46px;background:var(--cloth)}
+  .bb-row{display:grid;grid-template-columns:repeat(5,1fr);align-items:center}
+  .bb{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11.5px;font-weight:700;color:var(--ink-2);border-radius:var(--r-control);transition:transform .12s,color .12s}
+  .bb:active{transform:scale(.92)}
+  .bb[aria-current="page"]{color:var(--ink)}
+  .bb[aria-current="page"] svg.ui{color:var(--apricot-text)}
+  .bb.fab{justify-self:center;width:56px;height:56px;justify-content:center;background:var(--apricot);color:#282A2F;border-radius:16px 20px 14px 18px;box-shadow:var(--shadow);margin-top:-22px}
+  .bb.fab svg.ui{width:26px;height:26px;transition:transform .25s var(--ease)}
+  .bb.fab[aria-expanded="true"] svg.ui{transform:rotate(45deg)}
+  .app[data-view="home"] .bb-page,.app[data-view="home"] ~ * .bb-page{display:none}
+  .app[data-view="page"] .bb-pickp,.app[data-view="empty"] .bb-jump{display:none}
+  .app:not([data-view="home"]) .bb-home,.app:not([data-view="home"]) .bb-cap{display:none}
+  .topbar{height:46px;padding:0 10px}
+  .topbar .back,.topbar .edited,.topbar .tb-plus,.topbar .tb-star{display:none}
+  .topbar .crumb{font-size:13.5px}
+  .band{height:150px}
+  .band .tag{display:none}
+  .band.uncut::before{inset:10px 12px 14px}
+  .page-body{padding:0 18px 40px;font-size:16px}
+  .page-icon,.empty-icon{width:68px;height:68px;margin-top:-38px}
+  .page-title,.untitled{font-size:36px}
+  .caret{height:32px}
+  .props{grid-template-columns:110px 1fr;font-size:14px}
+  .cols2{grid-template-columns:1fr;gap:4px}
+  .board .cols{grid-template-columns:1fr 1fr;gap:6px}
+  .card{font-size:13.5px;padding:8px}
+  .card svg.ui{display:none}
+  .blank{grid-template-columns:1fr;justify-items:start;gap:8px;padding:16px}
+  .blank svg{width:150px;height:auto}
+  .menu{left:10px!important;right:10px!important;top:auto!important;bottom:96px;width:auto;transform-origin:bottom center;transform:translateY(14px) scale(.98)}
+  .menu.open{transform:none}
+  .toast{bottom:150px}
+  .note{left:10px;right:10px;width:auto}
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:1ms!important;animation-delay:0ms!important;animation-iteration-count:1!important;transition-duration:1ms!important;transition-delay:0ms!important;scroll-behavior:auto!important}
+}
+:root.rm *,:root.rm *::before,:root.rm *::after{animation-duration:1ms!important;animation-delay:0ms!important;animation-iteration-count:1!important;transition-duration:1ms!important;transition-delay:0ms!important;scroll-behavior:auto!important}
+</style>
+</head>
+<body>
+<div class="stage" id="stage" data-mode="desktop">
+  <div class="proto" role="toolbar" aria-label="Prototype controls">
+    <b>A · Patchwork<span> prototype</span></b>
+    <span class="sp"></span>
+    <span class="lbl">Frame</span>
+    <div class="seg" role="group" aria-label="Frame">
+      <button data-act="mode" data-v="desktop" aria-pressed="true"><svg class="ui" viewBox="0 0 20 20"><rect x="2.5" y="4" width="15" height="10" rx="1.5"/><path d="M7 17h6M10 14v3"/></svg><span class="t">Desktop</span></button>
+      <button data-act="mode" data-v="mobile" aria-pressed="false"><svg class="ui" viewBox="0 0 20 20"><rect x="6" y="2.5" width="8" height="15" rx="2"/><path d="M9 15h2"/></svg><span class="t">Phone</span></button>
+    </div>
+    <span class="lbl">Theme</span>
+    <div class="seg" role="group" aria-label="Theme">
+      <button data-act="theme" data-v="light" aria-pressed="true"><svg class="ui" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.5"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M4.3 15.7l1.4-1.4M14.3 5.7l1.4-1.4"/></svg><span class="t">Light</span></button>
+      <button data-act="theme" data-v="dark" aria-pressed="false"><svg class="ui" viewBox="0 0 20 20"><path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8z"/></svg><span class="t">Dark</span></button>
+    </div>
+    <div class="seg motion" role="group" aria-label="Motion">
+      <button data-act="motion" aria-pressed="false" title="Simulate reduced motion"><span class="t">Reduce motion</span><span class="sr">Reduce motion</span></button>
+    </div>
+    <button class="proto-btn" data-act="note" aria-expanded="false" aria-controls="note">About<span class="lbl"> this direction</span></button>
+  </div>
+
+  <div class="canvas" id="canvas">
+    <div class="device" id="device">
+      <div class="app" id="app" data-view="home">
+        <div class="statusbar" aria-hidden="true"><span>10:40</span><span class="dots"><i></i></span></div>
+        <aside class="side" id="side" aria-label="Sidebar"></aside>
+        <main class="main" id="main">
+          <div class="view" id="vHome"></div>
+          <div class="view" id="vPage" hidden></div>
+          <div class="view" id="vEmpty" hidden></div>
+        </main>
+        <nav class="bottombar" id="bottombar" aria-label="Main"></nav>
+        <div class="menu" id="menu" role="menu" aria-label="Add"></div>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <aside class="note" id="note" aria-label="About this direction">
+      <span class="prop">design note</span>
+      <h2>A · Patchwork</h2>
+      <p><b>Signature idea:</b> colour is the structure. Like the calico's unequal patches, every space owns one patch colour, and that patch follows its pages everywhere: sidebar tab, home patch, page header, icon and checkbox.</p>
+      <p>Today is the big milk-white patch of the cat; the spaces are smaller patches sewn around it, never a uniform card grid. Seams mark real ownership changes, and finishing something sews it shut.</p>
+      <h3>Proposed features shown</h3>
+      <ul>
+        <li>Space colours (patch per space), with a patch picker on new pages</li>
+        <li>Patchwork home: Today agenda from calendar plus due and overdue tasks</li>
+        <li>Quick capture into Today (bottom bar on phone)</li>
+        <li>Pinned page per space with progress and trip countdown</li>
+        <li>Daily note link</li>
+        <li>Sew-shut completion for checklists and for Today</li>
+      </ul>
+      <h3>Flutter cost (rough)</h3>
+      <table>
+        <tr><td>Space patch colours as theme tokens (light and dark)</td><td>Small</td></tr>
+        <tr><td>Two-tone patch icons (authored SVG set, tinted per space)</td><td>Medium</td></tr>
+        <tr><td>Patch sidebar (stepped, seamed tabs)</td><td>Medium</td></tr>
+        <tr><td>Home quilt: irregular tiling that reflows to phone (custom MultiChildLayoutDelegate)</td><td>Medium</td></tr>
+        <tr><td>Today agenda (needs calendar + task queries)</td><td>Large</td></tr>
+        <tr><td>Quick capture</td><td>Medium</td></tr>
+        <tr><td>Patch-to-header morph (Hero with a custom rect + colour tween)</td><td>Medium</td></tr>
+        <tr><td>Stitch seam completion (CustomPainter with PathMetrics dashes)</td><td>Small</td></tr>
+        <tr><td>Cross-stitch checkbox, row entry, menu motion</td><td>Small</td></tr>
+        <tr><td>Phone bottom bar with capture and + sheet</td><td>Medium</td></tr>
+      </table>
+    </aside>
+  </div>
+</div>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const root=document.documentElement;
+const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches||root.classList.contains('rm');
+
+/* ---------- Icons ---------- */
+const BASE='M7 1.5H24.5C28 1.5 30.5 4 30.5 7.5V24C30.5 28 28 30.5 24 30.5H6.5C3.5 30.5 1.5 28.5 1.5 25.5V7C1.5 3.8 3.8 1.5 7 1.5Z';
+const CUT='M30.5 13V24C30.5 28 28 30.5 24 30.5H11Z';
+const G={
+  house:'<path class="m-g" d="M16 7.5 25 15v9.5h-6.2v-6h-5.6v6H7V15z"/>',
+  briefcase:'<path class="m-g" fill-rule="evenodd" d="M12.5 8.5h7c1 0 1.8.8 1.8 1.8V12H25v11.5H7V12h3.7v-1.7c0-1 .8-1.8 1.8-1.8zm.6 2.2V12h5.8v-1.3z"/><path class="m-g2" d="M7 16.3h18v1.8H7z"/>',
+  suitcase:'<path class="m-g" d="M10 11h12c1.4 0 2.5 1.1 2.5 2.5v8c0 1.4-1.1 2.5-2.5 2.5H10c-1.4 0-2.5-1.1-2.5-2.5v-8C7.5 12.1 8.6 11 10 11zM13 7.5h6V11h-2V9.5h-2V11h-2z"/><path class="m-g2" d="M11.5 11h2v13h-2zM18.5 11h2v13h-2z"/>',
+  book:'<path class="m-g" d="M6.5 9c3.5-.6 6.5 0 9 1.6V24c-2.5-1.4-5.5-2-9-1.4zM25.5 9c-3.5-.6-6.5 0-9 1.6V24c2.5-1.4 5.5-2 9-1.4z"/>',
+  sprout:'<path class="m-g" d="M15 15.5h2V25h-2zM16 17c-5.5 0-8.5-3.5-8.5-8.5 5.5 0 8.5 3 8.5 8.5zM16.6 15c0-4.6 2.8-7.5 8-7.5 0 4.7-2.9 7.5-8 7.5z"/>',
+  tram:'<path class="m-g" d="M15.2 4.5h1.6v5h-1.6zM9.5 9.5h13c1.7 0 3 1.3 3 3V21c0 1.7-1.3 3-3 3h-13c-1.7 0-3-1.3-3-3v-8.5c0-1.7 1.3-3 3-3zM10 24h3.5v2.5H10zM18.5 24H22v2.5h-3.5z"/><path class="m-g2" d="M9.5 12.5h5.3v4H9.5zM17.2 12.5h5.3v4h-5.3zM9.5 19h13v1.5h-13z"/>',
+  calcheck:'<path class="m-g" d="M8 9h16c.8 0 1.5.7 1.5 1.5v13c0 .8-.7 1.5-1.5 1.5H8c-.8 0-1.5-.7-1.5-1.5v-13C6.5 9.7 7.2 9 8 9zM10.5 6.5h2V10h-2zM19.5 6.5h2V10h-2z"/><path class="m-g2" d="M11.5 17.5l2-2 2 2 4.5-4.5 2 2-6.5 6.5z"/>',
+  flag:'<path class="m-g" d="M9 6.5h2.2V26H9zM11.2 7.5H24l-3 4.5 3 4.5H11.2z"/>',
+  bowl:'<path class="m-g" d="M6.5 15h19c0 5-4.2 9-9.5 9s-9.5-4-9.5-9zM11.5 8h1.8v4.5h-1.8zM15.1 6.5h1.8v6h-1.8zM18.7 8h1.8v4.5h-1.8z"/>',
+  loaf:'<path class="m-g" d="M7 23.5V16c0-4.6 4-7.5 9-7.5s9 2.9 9 7.5v7.5z"/><path class="m-g2" d="M10.5 14.5l2.4-1.8 1.4 1.9-2.4 1.8zM15.3 13.4l2.4-1.8 1.4 1.9-2.4 1.8zM20 14.5l1.8-1.4 1.2 1.6-1.8 1.4z"/>',
+  books:'<path class="m-g" d="M7 8h4v16H7zM12.5 10h4v14h-4zM18 9.2l3.8-1 3.7 15.3-3.8 1z"/>',
+  rows:'<path class="m-g" d="M7 8h18v4H7zM7 14h18v4H7zM7 20h18v4H7z"/><path class="m-g2" d="M10 9.2h2v1.6h-2zM15 9.2h2v1.6h-2zM20 9.2h2v1.6h-2zM12.5 15.2h2v1.6h-2zM17.5 15.2h2v1.6h-2zM10 21.2h2v1.6h-2zM15 21.2h2v1.6h-2zM20 21.2h2v1.6h-2z"/>',
+};
+const mark=(g,s=24,cls='')=>`<svg class="mark ${cls}" width="${s}" height="${s}" viewBox="0 0 32 32" aria-hidden="true"><path class="m-base" d="${BASE}"/><path class="m-cut" d="${CUT}"/>${G[g]}</svg>`;
+const U={
+  search:'<circle cx="9" cy="9" r="5.5"/><path d="M13 13l4 4"/>',
+  back:'<path d="M12 4 6 10l6 6"/>',
+  chev:'<path d="M7.5 5l5 5-5 5"/>',
+  more:'<circle cx="4.5" cy="10" r="1.2" fill="currentColor"/><circle cx="10" cy="10" r="1.2" fill="currentColor"/><circle cx="15.5" cy="10" r="1.2" fill="currentColor"/>',
+  star:'<path d="M10 3l2.1 4.4 4.8.6-3.5 3.3.9 4.8L10 13.8 5.7 16.1l.9-4.8L3.1 8l4.8-.6z"/>',
+  plus:'<path d="M10 4v12M4 10h12"/>',
+  home:'<path d="M3.5 9 10 3.5 16.5 9v7.5h-4.5v-4h-4v4H3.5z"/>',
+  tasks:'<rect x="3.5" y="3.5" width="13" height="13" rx="2.5"/><path d="M7 10l2 2 4-4"/>',
+  trash:'<path d="M4 6h12M8 6V4h4v2M5.5 6l.8 10h7.4l.8-10"/>',
+  gear:'<circle cx="10" cy="10" r="2.5"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"/>',
+  clock:'<circle cx="10" cy="10" r="6.5"/><path d="M10 6.5V10l2.5 1.5"/>',
+  mic:'<rect x="7.5" y="3" width="5" height="9" rx="2.5"/><path d="M5 10a5 5 0 0 0 10 0M10 15v2.5"/>',
+  quilt:'<rect x="3" y="3" width="8" height="6" rx="1"/><rect x="12.5" y="3" width="4.5" height="9" rx="1"/><rect x="3" y="10.5" width="8" height="6.5" rx="1"/><rect x="12.5" y="13.5" width="4.5" height="3.5" rx="1"/>',
+  cal:'<rect x="3" y="4.5" width="14" height="12" rx="2"/><path d="M3 8.5h14M7 2.5v3M13 2.5v3"/>',
+  tag:'<path d="M3.5 3.5h6l7 7-6 6-7-7z"/><circle cx="7" cy="7" r="1"/>',
+  euro:'<circle cx="10" cy="10" r="6.5"/><path d="M12.5 7.5c-.6-.6-1.5-1-2.5-1-1.7 0-3 1.6-3 3.5s1.3 3.5 3 3.5c1 0 1.9-.4 2.5-1M6 9h4.5M6 11h4.5"/>',
+  status:'<circle cx="10" cy="10" r="6.5" stroke-dasharray="2.5 2.6"/>',
+  image:'<rect x="3" y="4" width="14" height="12" rx="2"/><circle cx="7.5" cy="8.5" r="1.5"/><path d="M3.5 14.5l4.5-4 3.5 3 2-1.5 3 2.5"/>',
+  scissors:'<circle cx="5.5" cy="6" r="2.5"/><circle cx="5.5" cy="14" r="2.5"/><path d="M7.5 7.5 17 15M7.5 12.5 17 5"/>',
+  plane:'<path d="M2.5 11.5 17.5 4l-4 13-3.2-4.6z M10.3 12.4 17.5 4"/>',
+  check:'<path d="M5 10.5l3 3 7-7"/>',
+  list:'<path d="M4 5h12M4 10h9M4 15h11"/>',
+  page:'<path d="M5.5 2.5h6l3.5 3.5v11.5h-9.5z"/><path d="M11.5 2.5V6H15"/>',
+  db:'<rect x="3" y="3.5" width="14" height="13" rx="2"/><path d="M3 8h14M8 8v8.5"/>',
+  link:'<path d="M8.5 11.5l3-3M7 9.5 5.5 11a2.5 2.5 0 0 0 3.5 3.5l1.5-1.5M13 10.5l1.5-1.5A2.5 2.5 0 0 0 11 5.5L9.5 7"/>',
+  share:'<path d="M10 3v9M6.5 6.5 10 3l3.5 3.5M4.5 10.5v5.5h11v-5.5"/>',
+  note:'<path d="M5 3h10v14H5z"/><path d="M8 7h4M8 10h4M8 13h2"/>',
+  pin:'<path d="M7 3h6l-1 5 3 3H5l3-3z"/><path d="M10 11v6"/>',
+};
+const ui=(n,extra='')=>`<svg class="ui" viewBox="0 0 20 20" aria-hidden="true" ${extra}>${U[n]}</svg>`;
+const X='<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8"/><path d="M11 3l-8 8"/></svg>';
+const tick=(attrs,label)=>`<label class="tick"><input type="checkbox" ${attrs} aria-label="${label}"><span class="box">${X}</span></label>`;
+
+/* ---------- Data ---------- */
+const SPACES=[
+  {id:'home',name:'Home life',g:'house',pages:[{id:'recipes',name:'Recipes',g:'bowl',db:1},{id:'sourdough',name:'Sourdough',g:'loaf',child:1}]},
+  {id:'work',name:'Work',g:'briefcase',pages:[{id:'weekly',name:'Weekly review',g:'calcheck'},{id:'q4',name:'Q4 roadmap',g:'flag',db:1}]},
+  {id:'trips',name:'Trips',g:'suitcase',pages:[{id:'lisbon',name:'Lisbon in May',g:'tram'}]},
+  {id:'reading',name:'Reading',g:'book',pages:[{id:'books',name:'Book list',g:'books',db:1}]},
+  {id:'garden',name:'Garden',g:'sprout',pages:[{id:'gplan',name:'Garden plan',g:'rows'}]},
+];
+const SPN=Object.fromEntries(SPACES.map(s=>[s.id,s.name]));
+const TASKS=[
+  {id:6,t:'Call plumber',sp:'home',due:'4 days late',late:1},
+  {id:5,t:'Return library books',sp:'reading',due:'3 days late',late:1},
+  {id:3,t:'Draft Q4 goals',sp:'work',due:'1 day late',late:1},
+  {id:2,t:'Feed sourdough starter',sp:'home',due:'Today'},
+  {id:4,t:'Plant garlic',sp:'garden',due:'Today'},
+  {id:1,t:'Book Lisbon flights',sp:'trips',due:'Today',done:1},
+  // later this week, not shown in Today: Send weekly review (Fri 9), Buy rye flour (Wed 7),
+  // Order tulip bulbs (Thu 8), Finish Piranesi (Sun 11), Renew travel insurance (Thu 15), Prep 1:1 notes (done)
+];
+const PACK=[['Passport',1],['Travel adapter',1],['Sunscreen',1],['Walking shoes',1],['Light jacket',1],['Camera and charger',1],['Phrasebook',0],['Tote for market finds',0]];
+
+/* ---------- Sidebar ---------- */
+function renderSide(){
+  const insets=['0px','14px','4px','22px','9px'];
+  $('#side').innerHTML=`
+    <div class="brand">${calicoMark()}<b>Notes</b></div>
+    <button class="side-search" data-act="toast" data-msg="Search is not part of this mock.">${ui('search')}<span>Search</span><kbd>Ctrl K</kbd></button>
+    <nav aria-label="Primary" style="margin-top:4px">
+      <button class="navi" data-act="home" id="navToday" aria-current="page">${ui('home')}Today</button>
+      <button class="navi" data-act="toast" data-msg="The Tasks database is not mocked here.">${ui('tasks')}Tasks<span class="badge" aria-label="3 overdue">3 late</span></button>
+    </nav>
+    <div class="side-label"><span>Spaces</span><button aria-label="New space" data-act="empty">${ui('plus')}</button></div>
+    <div class="spaces">
+      ${SPACES.map((s,i)=>`
+      <div class="spatch sp-${s.id} on-patch" style="margin-right:${insets[i]}" data-space="${s.id}">
+        <button class="spatch-head" data-act="toast" data-msg="${s.name}: space overview is not mocked.">${mark(s.g,22)}<span>${s.name}</span><span class="n">${s.pages.length}</span></button>
+        <ul>${s.pages.map(p=>`<li><button class="pg${p.child?' child':''}" data-page="${p.id}" ${p.id==='lisbon'?'data-act="open"':`data-act="toast" data-msg="Only Lisbon in May is mocked as a full page."`}>${mark(p.g,18)}<span>${p.name}</span>${p.db?`<span class="db">${ui('db','style="width:14px;height:14px"')}</span>`:''}</button></li>`).join('')}</ul>
+      </div>`).join('')}
+    </div>
+    <div class="side-foot">
+      <button class="navi" data-act="toast" data-msg="Trash is not part of this mock.">${ui('trash')}Trash</button>
+      <button class="navi" data-act="toast" data-msg="Settings are not part of this mock.">${ui('gear')}Settings</button>
+    </div>`;
+}
+function calicoMark(){
+  return `<svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><path d="${BASE}" fill="var(--raised)" stroke="var(--ink)" stroke-width="1.5"/><path d="M1.5 7C1.5 3.8 3.8 1.5 7 1.5H17L14 13 1.5 16Z" fill="#DE945F"/><path d="M30.5 18V24C30.5 28 28 30.5 24 30.5H17L19 21Z" fill="#282A2F"/><path d="M20 1.5h4.5C28 1.5 30.5 4 30.5 7.5V10L23 8Z" fill="#DDA39D"/></svg>`;
+}
+
+/* ---------- Home ---------- */
+function renderHome(){
+  const todo=TASKS.filter(t=>!t.done).length;
+  $('#vHome').innerHTML=`
+  <div class="home">
+    <div class="home-head">
+      <div><div class="hello">Good morning</div><h1>Tuesday 6 October</h1></div>
+      <div class="acts">
+        <button class="btn" data-act="toast" data-msg="Search is not part of this mock.">${ui('search')}Search</button>
+        <button class="btn primary" data-act="plus" aria-haspopup="menu" aria-expanded="false" aria-controls="menu"><span class="plus-ic">${ui('plus')}</span>New</button>
+      </div>
+    </div>
+    <div class="quilt play" id="quilt">
+      <section class="patch p-today" id="today" style="--i:0;--dx:-14px;--dy:0" aria-labelledby="todayH">
+        <div class="today-head"><h2 id="todayH">Today</h2><span class="date" id="todaySum">5 to do · 3 events</span>
+          <button class="daily" data-act="toast" data-msg="Daily notes are proposed, not mocked.">${ui('note')}Daily note <span class="prop">proposed</span></button></div>
+        <div class="today-body">
+          <div class="agenda">
+            <div class="col-h">${ui('cal')}Agenda <span class="prop">proposed</span></div>
+            <ol>
+              <li class="past rise" style="--i:1"><span class="tm">09:30</span><span class="node sp-work"></span><div class="ev"><b>Standup</b><span>Work · 15 min</span></div></li>
+              <li class="now rise" style="--i:2"><span class="tm">10:40</span><span class="node"></span><div class="ev"><b>Now</b><span>3 h 20 min free until the dentist</span></div></li>
+              <li class="rise" style="--i:3"><span class="tm">14:00</span><span class="node sp-home"></span><div class="ev"><b>Dentist</b><span>Home life · 40 min</span></div></li>
+              <li class="rise" style="--i:4"><span class="tm">19:00</span><span class="node sp-home"></span><div class="ev"><b>Pottery class</b><span>Home life · bring the apron</span></div></li>
+            </ol>
+          </div>
+          <div class="due-col">
+            <div class="col-h">${ui('tasks')}Due and overdue <span class="count" id="todoCount">${todo} to do</span></div>
+            <ul class="tasks" id="taskList">${TASKS.map((t,i)=>taskRow(t,i)).join('')}</ul>
+            <button class="more-link" data-act="toast" data-msg="The Tasks database is not mocked here.">5 more this week ${ui('chev','style="width:15px;height:15px"')}</button>
+            <div class="today-done" role="status">${ui('check')}Today is sewn up. Nothing left due.</div>
+          </div>
+        </div>
+        <div class="week" aria-label="This week">
+          <div class="col-h">${ui('cal')}This week <span class="prop">proposed</span></div>
+          <ol>${[['Mon',5,2,'1 late'],['Tue',6,6,''],['Wed',7,1,''],['Thu',8,2,''],['Fri',9,2,''],['Sat',10,0,''],['Sun',11,1,'']].map(([d,n,c,x])=>`<li class="${n===6?'is-today':''}${n<6?' past':''}"><span class="d">${d} <b>${n}</b></span><span class="dots" aria-label="${c} items">${'<i></i>'.repeat(c)}</span><span class="x">${n===6?'Today':x||(c?c+' items':'Free')}</span></li>`).join('')}</ol>
+        </div>
+        <form class="capture" id="capForm" autocomplete="off">
+          <label class="field">${ui('plus')}<span class="sr">Quick capture</span><input id="capIn" placeholder="Catch a thought, task or link" /></label>
+          <button class="btn primary" type="submit">Add to Today</button>
+          <span class="prop">proposed</span>
+        </form>
+      </section>
+
+      <section class="patch p-trips sp-trips on-patch lift" style="--i:1;--dx:12px;--dy:-10px" data-space="trips">
+        <div class="ph">${mark('suitcase',26)}<h3>Trips</h3><span class="meta">1 page</span></div>
+        <button class="pin big" data-act="open" data-page="lisbon">${mark('tram',46,'on')}<div><b>Lisbon in May</b><span>12–19 May<span class="hide-m"> · 7 months away</span></span></div><span class="go">${ui('chev')}</span></button>
+        <div class="skyline" aria-hidden="true"><span class="rail"></span>${coverArt()}</div>
+        <div class="prog"><div class="lab"><span>Packing</span><span>6 of 8</span></div><div class="stitchbar" aria-hidden="true">${'<i class="on"></i>'.repeat(6)}<i></i><i></i></div></div>
+        <div class="mini-task hide-m">${ui('check')}<span>Book Lisbon flights · done today</span></div>
+      </section>
+
+      <section class="patch p-garden sp-garden on-patch lift" style="--i:2;--dx:14px;--dy:-12px">
+        <div class="ph">${mark('sprout',24)}<h3>Garden</h3></div>
+        <button class="pin" data-act="toast" data-msg="Only Lisbon in May is mocked as a full page."><div><b>Garden plan</b><span class="hide-m">Plant garlic · today</span></div></button>
+        <div class="spacer"></div>
+        <div class="mini-task hide-m">${ui('cal')}<span>Order tulip bulbs · Thu</span></div>
+        <div class="mini-task show-m"><span>Garlic today</span></div>
+      </section>
+
+      <section class="patch p-reading sp-reading on-patch lift" style="--i:3;--dx:14px;--dy:0">
+        <div class="ph">${mark('book',24)}<h3>Reading</h3></div>
+        <button class="pin" data-act="toast" data-msg="Only Lisbon in May is mocked as a full page."><div><b>Book list</b><span class="hide-m">Database · 31 books</span></div></button>
+        <div class="spacer"></div>
+        <div class="prog hide-m"><div class="lab"><span>Read this year</span><span>14 of 20</span></div><div class="stitchbar" aria-hidden="true">${'<i class="on"></i>'.repeat(7)}<i></i><i></i><i></i></div></div>
+        <div class="mini-task">${ui('clock')}<span class="late">Library<span class="hide-m"> books</span> · 3 days late</span></div>
+      </section>
+
+      <section class="patch p-home sp-home on-patch lift" style="--i:4;--dx:0;--dy:14px">
+        <div class="ph">${mark('house',26)}<h3>Home life</h3><span class="meta">2 pages</span></div>
+        <button class="pin" data-act="toast" data-msg="Only Lisbon in May is mocked as a full page.">${mark('bowl',32,'on')}<div><b>Recipes</b><span>Database · 23 recipes</span></div></button>
+        <button class="pin" data-act="toast" data-msg="Only Lisbon in May is mocked as a full page.">${mark('loaf',32,'on')}<div><b>Sourdough</b><span>Starter fed 2 days ago</span></div></button>
+        <div class="spacer"></div>
+        <div class="mini-task hide-m">${ui('cal')}<span>Feed sourdough starter · today</span></div>
+        <div class="mini-task hide-m">${ui('cal')}<span>Buy rye flour · Wed</span></div>
+        <div class="prog"><div class="lab"><span>Chores<span class="hide-m"> this week</span></span><span>3 of 7</span></div><div class="stitchbar" aria-hidden="true">${'<i class="on"></i>'.repeat(3)}${'<i></i>'.repeat(4)}</div></div>
+        <div class="mini-task">${ui('clock')}<span class="late">Plumber<span class="hide-m"> call</span> · 4 days late</span></div>
+      </section>
+
+      <button class="patch p-new" style="--i:5" data-act="empty">${ui('plus')}<span>New<span class="t2"> space</span></span></button>
+
+      <section class="patch p-work sp-work on-patch lift" style="--i:6;--dx:12px;--dy:12px">
+        <div class="ph">${mark('briefcase',26)}<h3>Work</h3><span class="meta">2 pages</span></div>
+        <button class="pin" data-act="toast" data-msg="Weekly review is mentioned on the Lisbon page; it is not mocked as a full page.">${mark('calcheck',32,'on')}<div><b>Weekly review</b><span class="hide-m">Every Friday</span></div></button>
+        <button class="pin hide-m" data-act="toast" data-msg="Only Lisbon in May is mocked as a full page.">${mark('flag',32,'on')}<div><b>Q4 roadmap</b><span>Database · goals 2 of 5 drafted</span></div></button>
+        <div class="spacer"></div>
+        <div class="mini-task">${ui('clock')}<span class="late">Q4 goals · 1 day late</span></div>
+      </section>
+    </div>
+  </div>`;
+}
+function taskRow(t,i){
+  return `<li class="rise${t.done?' done':''} sp-${t.sp}" style="--i:${i+2}" data-id="${t.id}">
+    ${tick(`data-task="${t.id}" ${t.done?'checked':''}`,t.t)}
+    <div class="tt"><b>${t.t}</b><div class="meta-row"><span class="chip-sp">${SPN[t.sp]}</span>${t.done?'<span class="done-lab">Done</span>':`<span class="due${t.late?' late':''}">${t.late?ui('clock'):''}${t.due}</span>`}</div></div></li>`;
+}
+
+/* ---------- Lisbon page ---------- */
+function coverArt(){
+  return `<svg class="cover" viewBox="0 0 640 210" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
+    <circle cx="214" cy="62" r="24" fill="#FFFAF1" opacity=".85"/>
+    <path d="M0 210C90 204 170 170 250 148S320 124 380 138S540 108 640 122V210Z" fill="var(--patch-deep)"/>
+    <g>
+      <rect x="250" y="104" width="44" height="64" fill="#FFFAF1"/><path d="M246 106 272 84 298 106Z" fill="#BF6F3C"/>
+      <rect x="296" y="88" width="38" height="80" fill="#F0D29C"/><path d="M292 90 315 70 338 90Z" fill="#BF6F3C"/>
+      <rect x="336" y="112" width="48" height="56" fill="#DE945F"/><path d="M332 114 360 94 388 114Z" fill="#874016"/>
+      <rect x="386" y="96" width="36" height="72" fill="#CBD5DF"/><path d="M382 98 404 80 426 98Z" fill="#BF6F3C"/>
+      <rect x="424" y="118" width="50" height="50" fill="#FFFAF1"/><path d="M420 120 449 100 478 120Z" fill="#874016"/>
+      <rect x="476" y="80" width="30" height="88" fill="#FFFAF1"/><rect x="484" y="58" width="14" height="24" fill="#FFFAF1"/><path d="M482 60 491 46 500 60Z" fill="#BF6F3C"/>
+      <g fill="#282A2F" opacity=".78">
+        <rect x="260" y="118" width="8" height="12"/><rect x="276" y="118" width="8" height="12"/><rect x="260" y="140" width="8" height="12"/>
+        <rect x="306" y="104" width="7" height="12"/><rect x="319" y="104" width="7" height="12"/><rect x="306" y="128" width="7" height="12"/><rect x="319" y="128" width="7" height="12"/>
+        <rect x="348" y="126" width="9" height="12"/><rect x="364" y="126" width="9" height="12"/>
+        <rect x="396" y="110" width="7" height="11"/><rect x="408" y="110" width="7" height="11"/><rect x="396" y="132" width="7" height="11"/>
+        <rect x="436" y="132" width="9" height="12"/><rect x="452" y="132" width="9" height="12"/>
+        <rect x="486" y="96" width="10" height="14"/><rect x="487" y="64" width="8" height="10"/>
+      </g>
+    </g>
+    
+    <g class="tram-g" transform="translate(372 0)">
+      <path d="M200 140h2v10h-2z M172 150h70c5 0 8 3 8 8v22c0 4-3 7-7 7h-71c-4 0-7-3-7-7v-22c0-5 3-8 7-8z" fill="#F0D29C"/>
+      <path d="M186 140 216 132" stroke="#282A2F" stroke-width="1.5"/>
+      <rect x="172" y="156" width="20" height="14" fill="#282A2F"/><rect x="196" y="156" width="20" height="14" fill="#282A2F"/><rect x="220" y="156" width="22" height="14" fill="#282A2F"/>
+      <rect x="165" y="175" width="85" height="4" fill="#BF6F3C"/>
+      <circle cx="182" cy="188" r="5" fill="#282A2F"/><circle cx="234" cy="188" r="5" fill="#282A2F"/>
+    </g>
+  </svg>`;
+}
+function renderPage(){
+  let i=0; const n=()=>`style="--i:${i++}"`;
+  $('#vPage').className='view sp-trips';
+  $('#vPage').innerHTML=`
+  <div class="topbar">
+    <button class="ibtn back" data-act="home" aria-label="Back to Today">${ui('back')}</button>
+    <nav class="crumb" aria-label="Breadcrumb"><button class="sp-trips on-patch" data-act="toast" data-msg="Trips overview is not mocked.">${mark('suitcase',18)}Trips</button><span class="sep">/</span><span style="display:inline-flex;align-items:center;gap:6px">${mark('tram',18)}Lisbon in May</span></nav>
+    <span class="edited">Edited 2 min ago</span>
+    <button class="btn tb-plus" data-act="plus" aria-haspopup="menu" aria-expanded="false" aria-controls="menu" style="height:34px"><span class="plus-ic">${ui('plus')}</span>Add</button>
+    <button class="ibtn tb-star" aria-label="Pinned" data-act="toast" data-msg="Pinned to the Trips patch on Today.">${ui('star','style="fill:var(--apricot);stroke:var(--apricot-text)"')}</button>
+    <button class="ibtn" aria-label="More" data-act="toast" data-msg="Page menu is not mocked.">${ui('more')}</button>
+  </div>
+  <header class="band" id="band">
+    <span class="tag">${ui('pin','style="width:15px;height:15px"')}Pinned to Trips</span>
+    <span class="rail"></span>${coverArt()}
+  </header>
+  <article class="page-body">
+    <div class="page-icon" ${n()}>${mark('tram',84)}</div>
+    <h1 class="page-title" ${n()}>Lisbon in May</h1>
+    <dl class="props" ${n()}>
+      <dt>${ui('cal')}Dates</dt><dd class="num">12–19 May</dd>
+      <dt>${ui('status')}Status</dt><dd><span class="pill planning">${ui('status')}Planning</span></dd>
+      <dt>${ui('euro')}Budget</dt><dd class="num">€1,400</dd>
+      <dt>${ui('tag')}Tags</dt><dd><span class="tagc">City break</span><span class="tagc">Food</span><span class="tagc">Spring</span></dd>
+    </dl>
+    <div class="callout" ${n()}>${ui('plane')}<div><b>Flights confirmed</b>TP 1351, Tue 12 May 07:40, London to Lisbon. Booking reference <span class="code">K7QX2M</span>, two seats.</div></div>
+    <p ${n()}>Keep the budget lines in <a class="mention sp-work on-patch" href="#" data-act="toast" data-msg="Weekly review is not mocked as a full page.">${mark('calcheck',18)}Weekly review</a> so the trip total stays honest. Go slow: one neighbourhood a day.</p>
+    <div class="cols2" ${n()}>
+      <div><h3>Must see</h3><ul class="bul"><li>Alfama at dawn, before the trams</li><li>Belém tower and the monastery</li><li>LX Factory on Sunday</li><li>A day in Sintra</li></ul></div>
+      <div><h3>Must eat</h3><ul class="bul"><li>Pastéis de nata at Manteigaria</li><li>A bifana standing at the counter</li><li>Grilled sardines in Graça</li><li>Ginjinha in a chocolate cup</li></ul></div>
+    </div>
+    <section class="checklist" id="packing" ${n()} aria-labelledby="packH">
+      <div class="ch-h"><h3 id="packH">Packing</h3><span class="cnt" id="packCnt">6 of 8 packed</span></div>
+      <div class="stitchbar" id="packBar" aria-hidden="true"></div>
+      <ul id="packList">${PACK.map(([t,d],k)=>`<li class="${d?'done':''}">${tick(`data-pack="${k}" ${d?'checked':''}`,t)}<span>${t}</span></li>`).join('')}</ul>
+      <div class="packed" role="status">${ui('check')}All packed. The bag is sewn shut.</div>
+    </section>
+    <div class="toggle" id="dayToggle" ${n()}>
+      <button aria-expanded="false" aria-controls="days" data-act="toggle">${ui('chev')}Day by day</button>
+      <div class="tg-body" id="days"><div><ol class="days">
+        <li style="--i:0"><b>Tue 12</b><span>Land 10:20, Alfama, sunset at Senhora do Monte</span></li>
+        <li style="--i:1"><b>Wed 13</b><span>Belém in the morning, LX Factory</span></li>
+        <li style="--i:2"><b>Thu 14</b><span>Sintra day trip, back for fado</span></li>
+        <li style="--i:3"><b>Fri 15</b><span>Tile museum, Graça, sardines</span></li>
+        <li style="--i:4"><b>Sat 16</b><span>Cascais by train, beach</span></li>
+        <li style="--i:5"><b>Sun 17–18</b><span>No plans on purpose</span></li>
+        <li style="--i:6"><b>Tue 19</b><span>Market breakfast, fly home 16:05</span></li>
+      </ol></div></div>
+    </div>
+    <section class="board" ${n()} aria-labelledby="bookH">
+      <h3 id="bookH">Bookings</h3>
+      <div class="cols">
+        <div class="lane"><h4>${ui('status','style="width:15px;height:15px"')}To book<span class="n">2</span></h4>
+          <div class="card">${ui('cal')}<div>Sintra day trip<small>Thu 14 May</small></div></div>
+          <div class="card">${ui('cal')}<div>Fado dinner<small>Thu 14 May, 21:00</small></div></div></div>
+        <div class="lane booked"><h4>${ui('check','style="width:15px;height:15px"')}Booked<span class="n">2</span></h4>
+          <div class="card">${ui('plane')}<div>Flights TP 1351<small>12 and 19 May</small></div></div>
+          <div class="card">${ui('home')}<div>Flat in Alfama<small>7 nights</small></div></div></div>
+      </div>
+    </section>
+    <figure class="imgph" ${n()}>
+      <svg viewBox="0 0 700 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs><pattern id="az" width="44" height="44" patternUnits="userSpaceOnUse">
+          <rect width="44" height="44" fill="#E7ECF1"/><path d="M22 4 40 22 22 40 4 22Z" fill="none" stroke="#2F3138" stroke-width="2"/>
+          <rect x="17" y="17" width="10" height="10" fill="#2F3138" transform="rotate(45 22 22)"/>
+          <path d="M0 0h7L0 7zM44 0h-7l7 7zM0 44h7l-7-7zM44 44h-7l7-7z" fill="#DE945F"/></pattern></defs>
+        <rect width="700" height="180" fill="url(#az)"/>
+      </svg>
+      <figcaption>${ui('image')}Photo of the tiles in Alfama goes here<button class="btn" data-act="toast" data-msg="Image upload is not part of this mock.">Add image</button></figcaption>
+    </figure>
+    <section class="backlinks" ${n()}>
+      <h4>Linked from 3 pages</h4>
+      <div class="bl">
+        <a href="#" class="sp-work" data-act="toast" data-msg="Not mocked.">${mark('calcheck',22)}Weekly review<small>Work</small></a>
+        <a href="#" class="sp-trips" data-act="toast" data-msg="Not mocked.">${mark('suitcase',22)}Trips<small>space</small></a>
+        <a href="#" class="sp-home" data-act="toast" data-msg="Not mocked.">${mark('bowl',22)}Recipes<small>Home life, "pastéis de nata"</small></a>
+      </div>
+    </section>
+  </article>`;
+  updatePack(false);
+}
+
+/* ---------- Empty page ---------- */
+function renderEmpty(){
+  $('#vEmpty').className='view sp-none';
+  $('#vEmpty').innerHTML=`
+  <div class="topbar">
+    <button class="ibtn back" data-act="home" aria-label="Back to Today">${ui('back')}</button>
+    <nav class="crumb" aria-label="Breadcrumb"><span id="emptyCrumb">Not in a space yet</span><span class="sep">/</span><span>Untitled</span></nav>
+    <span class="edited">Just now</span>
+    <button class="btn tb-plus" data-act="plus" aria-haspopup="menu" aria-expanded="false" aria-controls="menu" style="height:34px"><span class="plus-ic">${ui('plus')}</span>Add</button>
+  </div>
+  <header class="band uncut" id="emptyBand"><span class="scis">${ui('scissors')}</span></header>
+  <article class="page-body">
+    <div class="empty-icon" style="--i:0">Icon</div>
+    <h1 class="untitled" style="--i:1"><span class="caret"></span>Untitled</h1>
+    <div class="pick" style="--i:2"><span>Cut it from a patch:</span>
+      ${SPACES.map(s=>`<button class="sw sp-${s.id}" data-act="swatch" data-sp="${s.id}" aria-pressed="false">${s.name}</button>`).join('')}
+      <span class="prop">proposed</span></div>
+    <div class="blank" style="--i:3">
+      ${catLoaf()}
+      <div><h3>Blank cloth. Nothing cut yet.</h3>
+      <p>Start from a pattern, or just type. Press <span class="code" style="color:var(--ink)">/</span> for blocks.</p>
+      <div class="patterns">
+        <button class="btn" data-act="toast" data-msg="Patterns are not mocked.">${ui('tasks')}Checklist</button>
+        <button class="btn" data-act="toast" data-msg="Patterns are not mocked.">${ui('plane')}Trip plan</button>
+        <button class="btn" data-act="toast" data-msg="Patterns are not mocked.">${ui('note')}Journal</button>
+        <button class="btn" data-act="toast" data-msg="Patterns are not mocked.">${ui('db')}Table</button>
+      </div></div>
+    </div>
+  </article>`;
+}
+function catLoaf(){
+  return `<svg width="200" height="140" viewBox="0 0 200 140" role="img" aria-label="A calico cat loaf, asleep">
+    <defs><clipPath id="loafClip"><path d="M30 122C30 74 58 50 104 50C148 50 172 76 172 122Z"/></clipPath>
+    <clipPath id="headClip"><circle cx="70" cy="86" r="30"/></clipPath></defs>
+    <rect x="16" y="121" width="172" height="3" rx="1.5" fill="var(--thread-strong)"/>
+    <path d="M30 122C30 74 58 50 104 50C148 50 172 76 172 122Z" fill="#FFFAF1" stroke="#282A2F" stroke-width="3"/>
+    <g clip-path="url(#loafClip)"><path d="M112 46C146 48 172 76 176 112L136 116C130 92 120 72 112 46Z" fill="#DE945F"/><path d="M150 96C160 100 170 110 176 124H144Z" fill="#282A2F"/></g>
+    <path d="M48 66 50 42 66 56Z" fill="#282A2F" stroke="#282A2F" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M76 56 90 42 94 64Z" fill="#FFFAF1" stroke="#282A2F" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="70" cy="86" r="30" fill="#FFFAF1" stroke="#282A2F" stroke-width="3"/>
+    <g clip-path="url(#headClip)"><path d="M38 56H66C64 70 56 80 40 84Z" fill="#282A2F"/><path d="M84 52C96 60 102 72 101 84L88 78C88 68 86 60 84 52Z" fill="#DE945F"/></g>
+    <circle cx="70" cy="86" r="30" fill="none" stroke="#282A2F" stroke-width="3"/>
+    <path d="M55 86q5 4 10 0M76 86q5 4 10 0" fill="none" stroke="#282A2F" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M67.5 95h5l-2.5 3z" fill="#DDA39D" stroke="#282A2F" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M40 94l14 2M40 100l14 0M100 94l-14 2M100 100l-14 0" stroke="#282A2F" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M168 118c18-2 20 12 0 12h-56" fill="none" stroke="#282A2F" stroke-width="3" stroke-linecap="round"/>
+    <text class="zz" x="104" y="44" font-size="16">z</text><text class="zz zz2" x="116" y="30" font-size="12">z</text>
+  </svg>`;
+}
+
+/* ---------- Bottom bar (phone) ---------- */
+function renderBottom(){
+  $('#bottombar').innerHTML=`
+    <form class="bb-cap" id="capForm2" autocomplete="off"><label class="field">${ui('plus')}<span class="sr">Quick capture</span><input id="capIn2" placeholder="Catch a thought into Today"/></label><button class="btn icon" type="button" aria-label="Dictate" data-act="toast" data-msg="Voice capture is proposed, not mocked.">${ui('mic')}</button></form>
+    <div class="bb-row bb-home">
+      <button class="bb" data-act="home" aria-current="page">${ui('home')}Today</button>
+      <button class="bb" data-act="toast" data-msg="Search is not part of this mock.">${ui('search')}Search</button>
+      <button class="bb fab" data-act="plus" aria-label="Add" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">${ui('plus')}</button>
+      <button class="bb" data-act="spaces">${ui('quilt')}Spaces</button>
+      <button class="bb" data-act="toast" data-msg="The Tasks database is not mocked here.">${ui('tasks')}Tasks</button>
+    </div>
+    <div class="bb-row bb-page">
+      <button class="bb" data-act="home">${ui('back')}Back</button>
+      <button class="bb bb-jump" data-act="jump">${ui('tasks')}Packing</button>
+      <button class="bb bb-pickp" data-act="pickjump">${ui('quilt')}Patch</button>
+      <button class="bb fab" data-act="plus" aria-label="Add block" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">${ui('plus')}</button>
+      <button class="bb" data-act="toast" data-msg="Sharing is not part of this mock.">${ui('share')}Share</button>
+      <button class="bb" data-act="toast" data-msg="Page menu is not mocked.">${ui('more')}More</button>
+    </div>`;
+}
+function renderMenu(){
+  const items=[
+    ['page','Page','A blank piece of cloth','empty',''],
+    ['tasks','Task','Lands in Today','task',''],
+    ['list','Checklist','With a stitched progress bar','toast',''],
+    ['db','Database','Table, board or calendar','toast',''],
+    ['quilt','Space','A new patch colour','empty','<span class="prop">proposed</span>'],
+  ];
+  $('#menu').innerHTML=`<div class="mh">Add to Today</div>`+items.map(([ic,b,s,act,extra],i)=>`<button role="menuitem" style="--i:${i}" data-act="${act}" data-msg="${b} is not wired in this mock." data-close>${ui(ic)}<span><b>${b}</b><small>${s}</small></span>${extra}</button>`).join('');
+}
+
+/* ---------- Behaviour ---------- */
+const state={view:'home'};
+const app=$('#app'), main=$('#main');
+
+function setView(v){
+  state.view=v; app.dataset.view=v;
+  $('#navToday')?.setAttribute('aria-current',v==='home'?'page':'false');
+  $$('.pg').forEach(p=>p.toggleAttribute('aria-current',v==='page'&&p.dataset.page==='lisbon'));
+  $$('.pg[aria-current]').forEach(p=>p.setAttribute('aria-current','page'));
+}
+function rel(r){const a=app.getBoundingClientRect();return{left:r.left-a.left,top:r.top-a.top,width:r.width,height:r.height}}
+function px(o){return{left:o.left+'px',top:o.top+'px',width:o.width+'px',height:o.height+'px'}}
+
+let busy=false;
+async function openLisbon(src){
+  if(busy||state.view==='page') return; busy=true; closeMenu();
+  const home=$('#vHome'), page=$('#vPage'), empty=$('#vEmpty');
+  const patch=src?.closest('.patch,.spatch')||$('.p-trips');
+  const fromR=rel(patch.getBoundingClientRect());
+  const fromIcon=(src?.querySelector('.mark')||patch.querySelector('.mark')).getBoundingClientRect();
+  const fromView=state.view==='empty'?empty:home;
+  page.hidden=false; page.classList.remove('enter'); void page.offsetWidth;
+  main.scrollTop=0;
+  setView('page');
+  if(reduced()){fromView.hidden=true; page.classList.add('enter'); busy=false; return}
+  const band=$('#band'), toR=rel(band.getBoundingClientRect());
+  const pIcon=$('.page-icon',page), toIcon=rel(pIcon.getBoundingClientRect());
+  band.style.visibility='hidden'; pIcon.style.visibility='hidden';
+  page.style.opacity='0';
+  const g=document.createElement('div'); g.className='ghost sp-trips'; g.innerHTML='<span class="rail"></span>'+coverArt(); Object.assign(g.style,px(fromR)); app.appendChild(g);
+  const gi=document.createElement('div'); gi.className='ghost-icon sp-trips'; gi.innerHTML=mark('tram',84);
+  const fi=rel(fromIcon); Object.assign(gi.style,px(fi)); gi.firstChild.setAttribute('width','100%'); gi.firstChild.setAttribute('height','100%'); app.appendChild(gi);
+  fromView.animate([{opacity:1,transform:'none'},{opacity:0,transform:'scale(.985)'}],{duration:240,easing:'ease',fill:'forwards'});
+  const dur=560, ease='cubic-bezier(.2,.8,.2,1)';
+  const a1=g.animate([{...px(fromR),borderRadius:'12px'},{...px(toR),borderRadius:'0px'}],{duration:dur,easing:ease,fill:'forwards'});
+  gi.animate([px(fi),px(toIcon)],{duration:dur+60,easing:ease,fill:'forwards'});
+  setTimeout(()=>{page.style.opacity='';page.classList.add('enter')},dur-180);
+  await a1.finished.catch(()=>{});
+  await new Promise(r=>setTimeout(r,60));
+  band.style.visibility=''; pIcon.style.visibility='';
+  g.remove(); gi.remove();
+  fromView.getAnimations().forEach(a=>a.cancel()); fromView.hidden=true;
+  busy=false;
+}
+async function goHome(){
+  if(busy||state.view==='home') return; busy=true; closeMenu();
+  const home=$('#vHome'), page=$('#vPage'), empty=$('#vEmpty');
+  const fromView=state.view==='page'?page:empty;
+  if(state.view==='empty'||reduced()){
+    fromView.hidden=true; home.hidden=false; setView('home'); main.scrollTop=0;
+    if(!reduced()){home.classList.remove('slide');void home.offsetWidth;home.classList.add('slide')}
+    busy=false; return;
+  }
+  const band=$('#band'), fromR=rel(band.getBoundingClientRect());
+  const pIcon=$('.page-icon',page), fi=rel(pIcon.getBoundingClientRect());
+  home.hidden=false; home.style.opacity='0'; setView('home');
+  const prevScroll=main.scrollTop; main.style.scrollBehavior='auto'; main.scrollTop=0;
+  const target=document.querySelector('#quilt .p-trips'), toR=rel(target.getBoundingClientRect());
+  const ti=rel(target.querySelector('.pin .mark').getBoundingClientRect());
+  // keep the page visually in place while it fades
+  page.style.transform=`translateY(${-prevScroll}px)`; band.style.visibility='hidden'; pIcon.style.visibility='hidden';
+  const g=document.createElement('div'); g.className='ghost sp-trips'; g.innerHTML='<span class="rail"></span>'+coverArt(); app.appendChild(g);
+  const gi=document.createElement('div'); gi.className='ghost-icon sp-trips'; gi.innerHTML=mark('tram',84,'on'); gi.firstChild.setAttribute('width','100%'); gi.firstChild.setAttribute('height','100%'); app.appendChild(gi);
+  const dur=520, ease='cubic-bezier(.2,.8,.2,1)';
+  page.animate([{opacity:1},{opacity:0}],{duration:200,fill:'forwards'});
+  const a1=g.animate([{...px(fromR),borderRadius:'0px'},{...px(toR),borderRadius:'0px'}],{duration:dur,easing:ease,fill:'forwards'});
+  gi.animate([px(fi),px(ti)],{duration:dur,easing:ease,fill:'forwards'});
+  home.animate([{opacity:0},{opacity:1}],{duration:300,delay:220,easing:'ease',fill:'forwards'});
+  await a1.finished.catch(()=>{});
+  home.style.opacity=''; home.getAnimations().forEach(a=>a.cancel());
+  page.getAnimations().forEach(a=>a.cancel()); page.hidden=true; page.style.transform='';
+  band.style.visibility=''; pIcon.style.visibility='';
+  g.remove(); gi.remove(); main.style.scrollBehavior='';
+  replay($('#quilt'),false);
+  busy=false;
+}
+function openEmpty(){
+  if(busy) return; closeMenu();
+  const cur=state.view==='home'?$('#vHome'):state.view==='page'?$('#vPage'):null;
+  renderEmpty();
+  if(cur) cur.hidden=true;
+  const e=$('#vEmpty'); e.hidden=false; main.scrollTop=0; setView('empty');
+  if(!reduced()){e.classList.remove('slide','enter');void e.offsetWidth;e.classList.add('slide')}
+}
+function replay(el,quilt=true){ if(!el) return; el.classList.remove('play'); void el.offsetWidth; if(quilt) el.classList.add('play'); else $$('.rise',el).forEach(r=>{r.classList.remove('play');void r.offsetWidth;r.classList.add('play')}); }
+
+/* + menu */
+let menuBtn=null;
+function openMenu(btn){
+  const m=$('#menu'); menuBtn=btn;
+  const a=app.getBoundingClientRect(), r=btn.getBoundingClientRect();
+  m.style.top=(r.bottom-a.top+8)+'px'; m.style.right=(a.right-r.right)+'px'; m.style.left='auto';
+  $('.mh',m).textContent=state.view==='page'?'Add to Lisbon in May':state.view==='empty'?'Add to this page':'Add to Today';
+  m.classList.add('open'); btn.setAttribute('aria-expanded','true');
+  setTimeout(()=>$('button',m)?.focus({preventScroll:true}),30);
+}
+function closeMenu(){
+  const m=$('#menu'); if(!m.classList.contains('open')) return;
+  m.classList.remove('open'); $$('[aria-expanded="true"][data-act="plus"]').forEach(b=>b.setAttribute('aria-expanded','false'));
+}
+
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200)}
+
+/* stitch-closed completion: a running stitch sews round the element */
+function roundRectPath(w,h,r,i){const x=i,y=i,W=w-2*i,H=h-2*i;return `M${x+r} ${y}H${x+W-r}Q${x+W} ${y} ${x+W} ${y+r}V${y+H-r}Q${x+W} ${y+H} ${x+W-r} ${y+H}H${x+r}Q${x} ${y+H} ${x} ${y+H-r}V${y+r}Q${x} ${y} ${x+r} ${y}Z`}
+function sew(el){
+  unsew(el);
+  const w=el.offsetWidth,h=el.offsetHeight,d=roundRectPath(w,h,10,6);
+  const id='m'+Math.random().toString(36).slice(2,8);
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('class','stitch-svg'); svg.setAttribute('width',w); svg.setAttribute('height',h); svg.setAttribute('viewBox',`0 0 ${w} ${h}`); svg.setAttribute('aria-hidden','true');
+  svg.innerHTML=`<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-10" y="-10" width="${w+20}" height="${h+20}"><path class="mk" d="${d}" fill="none" stroke="#fff" stroke-width="8" pathLength="1000" stroke-dasharray="1000 1000" stroke-dashoffset="1000"/></mask></defs><path class="s" d="${d}" mask="url(#${id})"/>`;
+  el.appendChild(svg);
+  const mk=svg.querySelector('.mk');
+  if(reduced()){mk.setAttribute('stroke-dashoffset','0');return}
+  const dur=1100;
+  mk.animate([{strokeDashoffset:1000},{strokeDashoffset:0}],{duration:dur,easing:'cubic-bezier(.45,.05,.35,1)',fill:'forwards'});
+  const nd=document.createElement('div'); nd.className='needle';
+  nd.innerHTML='<svg width="26" height="8" viewBox="0 0 26 8"><path d="M1 4h20" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/><ellipse cx="22" cy="4" rx="3" ry="1.8" fill="none" stroke="var(--ink)" stroke-width="1.4"/></svg>';
+  nd.style.offsetPath=`path("${d}")`; el.appendChild(nd);
+  nd.animate([{offsetDistance:'0%'},{offsetDistance:'100%'}],{duration:dur,easing:'cubic-bezier(.45,.05,.35,1)',fill:'forwards'}).finished.then(()=>nd.animate([{opacity:1},{opacity:0}],{duration:200,fill:'forwards'}).finished.then(()=>nd.remove()));
+  el.animate([{transform:'none'},{transform:'scale(1.008)'},{transform:'none'}],{duration:400,delay:dur-100,easing:'ease-out'});
+}
+function unsew(el){ $$('.stitch-svg,.needle',el).forEach(n=>n.remove()) }
+
+function updatePack(celebrate=true){
+  const boxes=$$('[data-pack]'), done=boxes.filter(b=>b.checked).length, all=done===boxes.length;
+  $('#packCnt').textContent=all?'All 8 packed':`${done} of ${boxes.length} packed`;
+  $('#packBar').innerHTML=boxes.map(b=>`<i class="${b.checked?'on':''}"></i>`).join('');
+  const c=$('#packing'); const was=c.classList.contains('sewn');
+  c.classList.toggle('sewn',all);
+  if(all&&!was&&celebrate) sew(c); if(!all) unsew(c);
+}
+function updateToday(){
+  const boxes=$$('[data-task]'), left=boxes.filter(b=>!b.checked).length;
+  $('#todoCount').textContent=left?`${left} to do`:'all done';
+  $('#todaySum').textContent=(left?`${left} to do`:'all done')+' · 3 events';
+  const t=$('#today'), was=t.classList.contains('sewn');
+  t.classList.toggle('sewn',left===0);
+  if(left===0&&!was) sew(t); if(left) unsew(t);
+}
+
+document.addEventListener('change',e=>{
+  const i=e.target;
+  if(i.matches('[data-pack]')){i.closest('li').classList.toggle('done',i.checked);updatePack()}
+  if(i.matches('[data-task]')){
+    const li=i.closest('li'); li.classList.toggle('done',i.checked);
+    const lab=li.querySelector('.meta-row>:last-child'); const t=TASKS.find(x=>x.id==i.dataset.task)||{due:'Today'};
+    lab.outerHTML=i.checked?'<span class="done-lab">Done</span>':`<span class="due${t.late?' late':''}">${t.late?ui('clock'):''}${t.due||'Today'}</span>`;
+    updateToday();
+  }
+});
+function addTask(text){
+  if(state.view!=='home'){ goHome(); }
+  const id='n'+Date.now(), ul=$('#taskList');
+  const li=document.createElement('div'); li.innerHTML=taskRow({id,t:text,sp:'home',due:'Today'},0);
+  const row=li.firstElementChild; row.classList.remove('rise'); row.classList.add('new-row');
+  row.querySelector('.chip-sp').textContent='Inbox'; row.classList.remove('sp-home'); row.classList.add('sp-none');
+  ul.insertBefore(row,ul.firstChild); updateToday();
+  toast(`Added to Today: ${text}`);
+}
+document.addEventListener('submit',e=>{
+  e.preventDefault(); const inp=e.target.querySelector('input'); const v=inp.value.trim()||'New task'; inp.value=''; addTask(v);
+});
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]');
+  if(!t){ if(!e.target.closest('#menu')) closeMenu(); return }
+  const act=t.dataset.act;
+  if(t.tagName==='A') e.preventDefault();
+  if(act!=='plus'&&!t.closest('#menu')) closeMenu();
+  switch(act){
+    case 'open': openLisbon(t); break;
+    case 'home': goHome(); break;
+    case 'empty': openEmpty(); break;
+    case 'plus': $('#menu').classList.contains('open')&&menuBtn===t?closeMenu():(closeMenu(),openMenu(t)); break;
+    case 'task': closeMenu(); addTask('New task'); break;
+    case 'toast': closeMenu(); toast(t.dataset.msg); break;
+    case 'toggle': {const w=t.closest('.toggle'),o=!w.classList.contains('open');w.classList.toggle('open',o);t.setAttribute('aria-expanded',o);break}
+    case 'pickjump': $('.pick').scrollIntoView({block:'center'}); $('.sw')?.focus({preventScroll:true}); break;
+    case 'jump': $('#packing').scrollIntoView({block:'center'}); break;
+    case 'spaces': $('#quilt .p-trips').scrollIntoView({block:'start'}); break;
+    case 'swatch': {
+      const sp=t.dataset.sp, band=$('#emptyBand'), v=$('#vEmpty');
+      $$('.sw').forEach(s=>s.setAttribute('aria-pressed',s===t));
+      v.className='view sp-'+sp; band.className='band sp-'+sp; band.innerHTML='';
+      $('#emptyCrumb').textContent=SPN[sp];
+      $('.empty-icon').innerHTML=mark(SPACES.find(s=>s.id===sp).g,64);
+      $('.empty-icon').style.borderStyle='solid';
+      if(!reduced()) band.animate([{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0 0 0 0)'}],{duration:520,easing:'cubic-bezier(.2,.8,.2,1)'});
+      break;
+    }
+    case 'mode': setMode(t.dataset.v); break;
+    case 'theme': setTheme(t.dataset.v); break;
+    case 'motion': {const on=!root.classList.contains('rm');root.classList.toggle('rm',on);t.setAttribute('aria-pressed',on);break}
+    case 'note': {const n=$('#note'),o=!n.classList.contains('open');n.classList.toggle('open',o);t.setAttribute('aria-expanded',o);break}
+  }
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const was=$('#menu').classList.contains('open'); closeMenu(); if(was) menuBtn?.focus(); $('#note').classList.remove('open'); } });
+
+function setMode(m){ $('#stage').dataset.mode=m; $$('[data-act="mode"]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===m)); closeMenu(); }
+function setTheme(th){ root.dataset.theme=th; $$('[data-act="theme"]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===th)); }
+
+/* init */
+renderSide(); renderHome(); renderPage(); renderBottom(); renderMenu();
+setTheme(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+if(innerWidth<560) setMode('mobile');
+window.proto={openLisbon:()=>openLisbon($('#quilt .p-trips .pin')),goHome,openEmpty,setMode,setTheme,toggleDays:()=>$('#dayToggle>button').click(),
+  openMenu:()=>openMenu($$('[data-act="plus"]').find(b=>b.offsetParent)),
+  packAll:()=>$$('[data-pack]').forEach(b=>{if(!b.checked){b.checked=true;b.dispatchEvent(new Event('change',{bubbles:true}))}}),
+  tickTask:id=>{const b=$(`[data-task="${id}"]`);b.checked=!b.checked;b.dispatchEvent(new Event('change',{bubbles:true}))},
+  swatch:sp=>$(`.sw[data-sp="${sp}"]`).click(), note:()=>$('[data-act="note"]').click()};
+</script>
+</body>
+</html>

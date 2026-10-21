@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "tabs/1440px: equal tiles, no horizontal sheet overflow, rail tile22px, mention3px, top band6px passed",
+    "tabs/900px: equal tiles, no horizontal sheet overflow, rail tile22px, mention3px, top band6px passed",
+    "tabs/390px: equal tiles, no horizontal sheet overflow, rail tile22px, mention3px, top band6px passed",
+    "patches/1440px: equal tiles, no horizontal sheet overflow, rail tile22px, mention3px, cover104px and icon56px passed",
+    "patches/900px: equal tiles, no horizontal sheet overflow, rail tile22px, mention3px, cover104px and icon56px passed",
+    "patches/390px: equal tiles, no horizontal sheet overflow, rail tile22px, mention3px, cover72px and icon56px passed",
+    "quiet/Fun On/manual reduced: blank checklist All done, no confetti, undo restores progress passed",
+    "tabs/Fun On/manual reduced: blank checklist All done, no confetti, undo restores progress passed",
+    "patches/Fun On/manual reduced: blank checklist All done, no confetti, undo restores progress passed",
+    "Home Today/Fun On: All done and 14 coloured confetti pieces passed"
+  ],
+  "errors": []
+}

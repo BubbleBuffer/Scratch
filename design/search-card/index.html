@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Search card mockup</title>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    if (q.has('clean')) document.documentElement.classList.add('clean');
+    var t = q.get('theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@200..800&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,200..800&family=Fragment+Mono&display=swap" rel="stylesheet">
+<style>
+/* Bundled fallback: the same font files the app ships (app/assets/fonts). */
+@font-face{font-family:"Atkinson Hyperlegible Next";src:url("../../app/assets/fonts/AtkinsonHyperlegibleNext%5Bwght%5D.ttf") format("truetype");font-weight:200 800;font-style:normal;font-display:swap}
+@font-face{font-family:"Bricolage Grotesque";src:url("../../app/assets/fonts/BricolageGrotesque%5Bopsz%2Cwdth%2Cwght%5D.ttf") format("truetype");font-weight:200 800;font-stretch:75% 100%;font-style:normal;font-display:swap}
+@font-face{font-family:"Fragment Mono";src:url("../../app/assets/fonts/FragmentMono-Regular.ttf") format("truetype");font-weight:400;font-style:normal;font-display:swap}
+
+/* ---------- tokens: values from app/lib/ui/tokens.dart (light and dark), as in design/merge ---------- */
+:root{
+  --bgPrimary:#FFFAF1; --bgSecondary:#F3EFE7; --desk:#ECE6DB; --bgHover:rgba(40,42,47,.05);
+  --textPrimary:#282A2F; --textSecondary:#625C55; --textTertiary:#6C645D;
+  --border:#E4DCCF; --borderSubtle:#EDE6DA; --borderStrong:#B8ADA1; --threadStrong:#8C8279;
+  --accent:#DE945F; --accentText:#874016; --onAccent:#282A2F; --focus:#7AB7FF;
+  --rail:#2F3138; --rail2:#3B3E45; --railInk:#F3EFE7; --railMuted:#C6BAAC; --railLine:#41444C;
+  --okBg:#CAD8CD; --infoBg:#CBD5DF; --attnBg:#F0D29C; --dangerBg:#E5B1AA;
+  --toast:#2F3138; --toastAccent:#F0A064; --scrim:rgba(20,22,24,.38);
+  --p-apricot:#DE945F; --p-paw:#DDA39D; --p-sun:#F0D29C; --p-moss:#5F7062;
+  --tileInk:#282A2F; --tileInkMoss:#FFFAF1;
+  --stack:-16px 0 30px -12px rgba(40,42,47,.32);
+  --seamHover:0 8px 20px rgba(40,42,47,.14);
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bgPrimary:#30333A; --bgSecondary:#2A2D33; --desk:#222428; --bgHover:rgba(255,255,255,.06);
+  --textPrimary:#F3EFE7; --textSecondary:#C6BAAC; --textTertiary:#999DA6;
+  --border:#41444C; --borderSubtle:#363940; --borderStrong:#575B64; --threadStrong:#999DA6;
+  --accent:#F0A064; --accentText:#F0A064; --onAccent:#282A2F;
+  --rail:#141618; --rail2:#24262B; --railInk:#F3EFE7; --railMuted:#C6BAAC; --railLine:#2B2E33;
+  --okBg:#2A6F39; --infoBg:rgba(203,213,223,.20); --attnBg:rgba(240,210,156,.20); --dangerBg:rgba(229,177,170,.26);
+  --toast:#141618; --scrim:rgba(0,0,0,.5);
+  --p-apricot:#DB8C56; --p-paw:#D29891; --p-sun:#E3C48B; --p-moss:#5F7062;
+  --tileInk:#1E2024; --tileInkMoss:#FFFAF1;
+  --stack:-16px 0 30px -12px rgba(0,0,0,.6);
+  --seamHover:0 8px 20px rgba(0,0,0,.42);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bgPrimary:#30333A; --bgSecondary:#2A2D33; --desk:#222428; --bgHover:rgba(255,255,255,.06);
+    --textPrimary:#F3EFE7; --textSecondary:#C6BAAC; --textTertiary:#999DA6;
+    --border:#41444C; --borderSubtle:#363940; --borderStrong:#575B64; --threadStrong:#999DA6;
+    --accent:#F0A064; --accentText:#F0A064; --onAccent:#282A2F;
+    --rail:#141618; --rail2:#24262B; --railInk:#F3EFE7; --railMuted:#C6BAAC; --railLine:#2B2E33;
+    --okBg:#2A6F39; --infoBg:rgba(203,213,223,.20); --attnBg:rgba(240,210,156,.20); --dangerBg:rgba(229,177,170,.26);
+    --toast:#141618; --scrim:rgba(0,0,0,.5);
+    --p-apricot:#DB8C56; --p-paw:#D29891; --p-sun:#E3C48B; --p-moss:#5F7062;
+    --tileInk:#1E2024; --tileInkMoss:#FFFAF1;
+    --stack:-16px 0 30px -12px rgba(0,0,0,.6);
+    --seamHover:0 8px 20px rgba(0,0,0,.42);
+    color-scheme:dark;
+  }
+}
+
+/* ---------- base (from design/merge) ---------- */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--desk);color:var(--textPrimary);font:400 16px/22px "Atkinson Hyperlegible Next",system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit}
+button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+p,h1,h2,h3{margin:0}
+.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+.disp{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-stretch:90%;letter-spacing:-.03em;font-weight:700}
+.sp-apricot{background:var(--p-apricot)}
+.sp-paw{background:var(--p-paw)}
+.sp-sun{background:var(--p-sun)}
+.sp-moss{background:var(--p-moss)}
+.tile{display:grid;place-items:center;width:30px;height:30px;border-radius:7px;color:var(--tileInk);flex:none}
+.tile.sm{width:22px;height:22px;border-radius:7px}
+.tile.sm .i{width:14px;height:14px}
+.tile.sp-moss{color:var(--tileInkMoss)}
+.cal{display:block;flex:none}
+.mono{font-family:"Fragment Mono",ui-monospace,monospace;font-size:.92em;letter-spacing:0}
+.cnt{display:inline-block;font:600 12px/16px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--tileInk);background:var(--p-apricot);border-radius:999px;padding:0 7px;min-width:20px;text-align:center;flex:none}
+.cnt.zero{background:var(--off,rgba(40,42,47,.12));color:var(--textSecondary)}
+:root[data-theme="dark"] .cnt.zero{background:rgba(255,255,255,.12)}
+
+/* ---------- preview bar (review tooling, hidden with ?clean) ---------- */
+.bar{position:sticky;top:0;z-index:99;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 10px;background:#1E2024;color:#EDE8DE;font:12.5px/16px system-ui,sans-serif}
+.bar .lbl{opacity:.6;margin-right:2px}
+.bar button{color:#EDE8DE;padding:4px 8px;border-radius:6px;background:#33363D;font:12.5px/16px system-ui,sans-serif}
+.bar button[aria-pressed="true"]{background:#DE945F;color:#282A2F}
+.bar button[hidden]{display:none}
+.bar .sp{flex:1}
+html.clean .bar{display:none}
+
+/* ---------- screen: desktop (rail + sheet) or phone, by the app's 768 px breakpoint ---------- */
+.screen{position:relative}
+.screen.desk{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
+.screen.phone{background:var(--bgPrimary);min-height:100vh;max-width:430px;margin:0 auto}
+.phone .rail,.phone .dbar{display:none}
+.desk .pbar,.desk .pband{display:none}
+.phone .main{padding:0}
+.phone .sheet{border-radius:0;box-shadow:none;min-height:0}
+.phone .sheet > .band{display:none}
+
+/* phone bar */
+.pbar{height:44px;display:flex;align-items:center;padding:0 4px}
+.pb{width:44px;height:44px;display:grid;place-items:center;flex:none;border-radius:7px;color:var(--textPrimary)}
+.pt{flex:1;min-width:0;display:flex;align-items:center;gap:8px;font:500 15px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;white-space:nowrap}
+.pt .name{overflow:hidden;text-overflow:ellipsis}
+.band{height:6px;flex:none}
+
+/* rail */
+.rail{background:var(--rail);color:var(--railInk);padding:16px 10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0;min-height:100vh}
+.rhead{display:flex;align-items:center;gap:8px;padding:0 8px 12px}
+.rhead .disp{font-size:18px;line-height:24px;color:var(--railInk)}
+.rrow{display:flex;align-items:center;gap:10px;width:100%;min-height:30px;padding:4px 8px;border-radius:7px;color:var(--railMuted);font:400 14px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;text-align:left}
+.rrow.top{color:var(--railInk)}
+.rrow.sel{background:color-mix(in srgb,var(--railInk) 10%,var(--rail2));color:var(--railInk)}
+.rrow.lvl1{padding-left:30px}
+.rrow .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rrow .i{width:18px;height:18px}
+.rlabel{font:700 12px/16px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--railMuted);padding:14px 8px 6px}
+.rnew{display:flex;align-items:center;gap:8px;height:40px;padding:0 10px;border-radius:7px;background:var(--rail2);color:var(--railInk);margin:10px 0 2px;font:500 14px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif}
+.rfoot{margin-top:auto;border-top:1px solid var(--railLine);padding-top:6px}
+
+/* desktop main and sheet */
+.main{position:relative;min-width:0;padding:12px}
+.sheet{position:relative;min-height:calc(100vh - 24px);background:var(--bgPrimary);border-radius:16px;box-shadow:var(--stack);display:flex;flex-direction:column}
+.sheet .band{border-radius:16px 16px 0 0}
+.dbar{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;flex:none}
+.dbar .crumb{font:500 14px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--textSecondary);display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.dbar .crumb .cur{color:var(--textPrimary)}
+.dbar .crumb .i{width:14px;height:14px;color:var(--textTertiary)}
+.dbar .edited{margin-left:auto;font:500 14px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--textTertiary);white-space:nowrap}
+.dbar .db{width:32px;height:32px;display:grid;place-items:center;border-radius:7px;color:var(--textSecondary);flex:none}
+.dbar .db .i{width:18px;height:18px}
+
+/* ---------- note type (from design/merge) ---------- */
+.page{flex:1;padding-bottom:96px}
+.phone .page{padding:0 18px 96px}
+.col{position:relative;margin:0 auto;width:100%}
+.desk .col{max-width:720px;padding:0 12px}
+.title{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-stretch:90%;letter-spacing:-.03em;font-weight:700}
+.phone .title{font-size:28px;line-height:33.6px;margin:22px 0 12px}
+.desk .title{font-size:40px;line-height:48px;margin:56px 0 16px}
+.h2{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-stretch:90%;letter-spacing:-.03em;font-weight:600}
+.phone .h2{font-size:20px;line-height:26px;margin:16px 0 4px}
+.desk .h2{font-size:24px;line-height:31.2px;margin:22px 0 6px}
+.blk{padding:3px 0}
+.desk .blk{line-height:24px}
+.blk.prose{line-height:30px}
+.desk .blk.prose{line-height:31px}
+.todo{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;padding:3px 0;align-items:start}
+.desk .todo{line-height:24px}
+.cb{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--threadStrong);display:grid;place-items:center;flex:none}
+.cb.on{background:var(--p-apricot);border-color:transparent;color:var(--tileInk)}
+.cb .i{width:15px;height:15px;stroke-width:2}
+.cb:hover{border-color:var(--accent)}
+
+/* ---------- A: query block ---------- */
+/* Radii.panel (12/18/10/16) for the block, Radii.field for the editor, Radii.ctl for the chip. */
+.qcard{margin:8px 0 12px;border:1px solid var(--border);border-radius:12px 18px 10px 16px;background:var(--bgPrimary);overflow:hidden}
+.qhead{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 10px;min-height:44px;background:var(--bgSecondary)}
+.qcard:not(.collapsed) .qhead,.qpop .qhead,.qsheet .qhead{border-bottom:1px solid var(--borderSubtle)}
+.qhead > .i{width:16px;height:16px;color:var(--textTertiary)}
+.qstr{flex:1;min-width:0;font:400 13.5px/20px "Fragment Mono",ui-monospace,monospace;color:var(--textPrimary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 6px;border-radius:6px 10px 6px 8px;text-align:left}
+.qstr:hover{background:var(--bgHover)}
+.qstr .k{color:var(--textTertiary)}
+.qstr .t{color:var(--accentText)}
+.qedit{flex:1;min-width:0;display:flex}
+.qedit input{width:100%;font:400 13.5px/20px "Fragment Mono",ui-monospace,monospace;color:var(--textPrimary);background:var(--bgPrimary);border:1px solid var(--borderStrong);border-radius:6px 10px 6px 8px;padding:5px 7px;outline:2px solid var(--focus);outline-offset:1px}
+.qhint{display:flex;gap:14px;padding:6px 12px;font:400 12.5px/17px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--textTertiary);border-bottom:1px solid var(--borderSubtle);background:var(--bgSecondary)}
+.qhint b{font-weight:600;color:var(--textSecondary)}
+.phone .qhint .keys{display:none}
+.qtog{width:32px;height:32px;display:grid;place-items:center;border-radius:7px;color:var(--textSecondary);flex:none}
+.qtog:hover{background:var(--bgHover)}
+.qtog .i{width:18px;height:18px}
+.collapsed .qtog .i{transform:rotate(-90deg)}
+.collapsed .qbody,.collapsed .qhint{display:none}
+.qbody{padding:2px 0}
+.qrow{display:grid;grid-template-columns:22px minmax(0,1fr) auto;column-gap:10px;align-items:center;padding:7px 12px;min-height:40px}
+.qrow + .qrow{border-top:1px solid var(--borderSubtle)}
+.qrow:hover{background:var(--bgHover)}
+.qrow .rt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:400 15px/22px "Atkinson Hyperlegible Next",system-ui,sans-serif}
+.qrow .rm{display:flex;align-items:center;gap:8px;font:400 13px/18px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--textTertiary);white-space:nowrap}
+.qrow .tile.sm{width:22px;height:22px}
+.pill{font:600 12px/16px "Atkinson Hyperlegible Next",system-ui,sans-serif;padding:2px 8px;border-radius:999px;color:var(--textPrimary);background:var(--attnBg)}
+.phone .qrow{grid-template-columns:22px minmax(0,1fr);row-gap:1px;min-height:52px;padding:8px 12px}
+.phone .qrow .rm{grid-column:2}
+.qempty{display:flex;align-items:center;gap:10px;padding:14px 12px;font:400 14px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--textTertiary)}
+.qempty .i{width:18px;height:18px}
+.qmore{display:block;width:100%;padding:8px 12px 9px 44px;border-top:1px solid var(--borderSubtle);font:600 14px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--accentText);text-align:left}
+
+/* ---------- B: inline chip ---------- */
+.qchip{display:inline-flex;align-items:center;gap:5px;padding:1px 8px 1px 6px;margin:0 1px;vertical-align:baseline;line-height:22px;border-radius:7px 11px 6px 9px;background:var(--bgSecondary);border:1px solid var(--border);font:500 15px/22px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--textPrimary);white-space:nowrap}
+.qchip:hover{border-color:var(--borderStrong)}
+.qchip .i{width:15px;height:15px;color:var(--textTertiary)}
+.qchip .n{font-weight:700;color:var(--accentText)}
+.qchip[aria-expanded="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--bgPrimary))}
+.qchip.zero,.qchip.zero .n{color:var(--textTertiary);font-weight:500}
+.qpop{position:absolute;z-index:10;width:420px;max-width:100%;background:var(--bgPrimary);border:1px solid var(--border);border-radius:12px 18px 10px 16px;box-shadow:var(--seamHover);overflow:hidden}
+.qfoot{display:flex;gap:18px;padding:8px 12px 10px;border-top:1px solid var(--borderSubtle)}
+.qfoot button{font:600 14px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;color:var(--accentText);padding:4px 0}
+.scrim{position:absolute;inset:0;background:var(--scrim);z-index:9}
+.qsheet{position:absolute;left:0;right:0;bottom:0;z-index:10;background:var(--bgPrimary);border-radius:16px 18px 0 0;box-shadow:0 -8px 24px rgba(20,22,24,.22);padding-bottom:20px;overflow:hidden}
+.qsheet .grab{width:36px;height:4px;border-radius:999px;background:var(--borderStrong);margin:8px auto 6px}
+.qsheet .qhead{background:var(--bgPrimary);padding-left:14px;padding-right:14px}
+.qpop .qhead{padding-right:12px}
+.qsheet .qfoot{padding:10px 14px}
+.qsheet .qrow{padding-left:14px;padding-right:14px}
+
+/* ---------- toast (from design/merge) ---------- */
+.toast{position:fixed;left:16px;right:16px;bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:10px;background:var(--toast);color:var(--railInk);font:400 14px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;box-shadow:0 8px 20px rgba(20,22,24,.28);z-index:20}
+.toast button{color:var(--toastAccent);font:700 14px/20px "Atkinson Hyperlegible Next",system-ui,sans-serif;padding:6px 2px;flex:none}
+.desk .toast{left:calc(50% + 120px);right:auto;transform:translateX(-50%);width:min(440px,calc(100% - 288px))}
+.phone .toast{left:50%;transform:translateX(-50%);width:min(398px,calc(100% - 32px));right:auto}
+</style>
+</head>
+<body>
+
+<div class="bar" role="navigation" aria-label="Mockup preview">
+  <span class="lbl">Variant</span>
+  <button type="button" data-v="a">A · Block</button>
+  <button type="button" data-v="b">B · Inline chip</button>
+  <span class="lbl">State</span>
+  <button type="button" data-s="live">Live</button>
+  <button type="button" data-s="open">Popover open</button>
+  <button type="button" data-s="edit">Editing query</button>
+  <button type="button" data-s="ticked">After a tick</button>
+  <button type="button" data-s="empty">Empty</button>
+  <span class="sp"></span>
+  <span class="lbl">Resize below 768 px for the phone layout</span>
+  <button type="button" data-theme-set="light">Light</button>
+  <button type="button" data-theme-set="dark">Dark</button>
+</div>
+
+<!-- icon sprites (ported from app/lib/ui/icons.dart and calico_art.dart, as in design/merge) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="cal" viewBox="0 0 32 32">
+      <path d="M7 1.5H24.5C28 1.5 30.5 4 30.5 7.5V24C30.5 28 28 30.5 24 30.5H6.5C3.5 30.5 1.5 28.5 1.5 25.5V7C1.5 3.8 3.8 1.5 7 1.5Z" fill="#FFFAF1" stroke="#282A2F" stroke-width="1.5"/>
+      <path d="M1.5 7C1.5 3.8 3.8 1.5 7 1.5H17L14 13L1.5 16Z" fill="#DE945F"/>
+      <path d="M30.5 18V24C30.5 28 28 30.5 24 30.5H17L19 21Z" fill="#282A2F"/>
+      <path d="M20 1.5H24.5C28 1.5 30.5 4 30.5 7.5V10L23 8Z" fill="#DDA39D"/>
+      <path d="M7 1.5H24.5C28 1.5 30.5 4 30.5 7.5V24C30.5 28 28 30.5 24 30.5H6.5C3.5 30.5 1.5 28.5 1.5 25.5V7C1.5 3.8 3.8 1.5 7 1.5Z" fill="none" stroke="#282A2F" stroke-width="1.5"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></symbol>
+    <symbol id="i-left" viewBox="0 0 20 20"><path d="M12.5 4.5 7 10l5.5 5.5"/></symbol>
+    <symbol id="i-right" viewBox="0 0 20 20"><path d="M7.5 4.5 13 10l-5.5 5.5"/></symbol>
+    <symbol id="i-down" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.75" cy="8.75" r="5.25"/><path d="M12.6 12.6l3.9 3.9"/></symbol>
+    <symbol id="i-page" viewBox="0 0 20 20"><path d="M5.5 3h6l3.5 3.5V16q0 1-1 1H6q-1 0-1-1V4q0-1 .5-1z"/><path d="M11.5 3v3.5H15M7.5 10h5M7.5 13h5"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 20 20"><rect x="3.5" y="4" width="13" height="12" rx="1.5"/><path d="M3.5 8h13M8 8v8"/></symbol>
+    <symbol id="i-task" viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13" rx="3"/><path d="M7 10.2 9 12.2l4-4.4"/></symbol>
+    <symbol id="i-home" viewBox="0 0 20 20"><path d="M3.5 9 10 3.5 16.5 9M5 8v8h10V8M8.5 16v-4.5h3V16"/></symbol>
+    <symbol id="i-more" viewBox="0 0 20 20"><circle cx="4.5" cy="10" r="1.4" fill="currentColor" stroke="none"/><circle cx="10" cy="10" r="1.4" fill="currentColor" stroke="none"/><circle cx="15.5" cy="10" r="1.4" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 20 20"><path d="M3.5 5.5h13M8 5.5v-2h4v2M5 5.5l1 11h8l1-11M8.5 8.5v5M11.5 8.5v5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 20 20"><path d="M4.5 10.5 8 14l7.5-7.5"/></symbol>
+    <symbol id="i-star" viewBox="0 0 20 20"><polygon points="10,3.6 11.82,8.09 16.66,8.44 12.95,11.56 14.11,16.26 10,13.7 5.89,16.26 7.05,11.56 3.34,8.44 8.18,8.09"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.5"/><circle cx="10" cy="10" r="6.2"/></symbol>
+    <symbol id="i-close" viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></symbol>
+  </defs>
+</svg>
+
+<section class="screen" id="screen">
+  <aside class="rail">
+    <div class="rhead"><svg class="cal" width="26" height="26" viewBox="0 0 32 32"><use href="#cal"/></svg><span class="disp">Notes</span></div>
+    <button class="rrow top"><svg class="i"><use href="#i-home"/></svg><span class="ttl">Home</span></button>
+    <button class="rrow top"><svg class="i"><use href="#i-search"/></svg><span class="ttl">Search</span></button>
+    <button class="rnew"><svg class="i"><use href="#i-plus"/></svg>New page</button>
+    <div class="rlabel">Pages</div>
+    <div class="rrow top"><span class="tile sm sp-apricot"><svg class="i"><use href="#i-page"/></svg></span><span class="ttl">Work</span></div>
+    <button class="rrow lvl1 sel"><span class="ttl">Week 42</span></button>
+    <button class="rrow lvl1"><span class="ttl">Sync rewrite</span></button>
+    <button class="rrow lvl1"><span class="ttl">Sprint board</span></button>
+    <button class="rrow lvl1"><span class="ttl">Tasks</span></button>
+    <div class="rrow top"><span class="tile sm sp-sun"><svg class="i"><use href="#i-page"/></svg></span><span class="ttl">Travel</span></div>
+    <button class="rrow lvl1"><span class="ttl">Lisbon trip</span></button>
+    <div class="rrow top"><span class="tile sm sp-moss"><svg class="i"><use href="#i-page"/></svg></span><span class="ttl">Money</span></div>
+    <button class="rrow lvl1"><span class="ttl">Groceries</span></button>
+    <div class="rfoot">
+      <button class="rrow"><svg class="i"><use href="#i-trash"/></svg><span class="ttl">Trash</span></button>
+      <button class="rrow"><svg class="i"><use href="#i-settings"/></svg><span class="ttl">Settings</span></button>
+    </div>
+  </aside>
+
+  <div class="main-wrap">
+    <header class="pbar">
+      <button class="pb" aria-label="Back"><svg class="i"><use href="#i-left"/></svg></button>
+      <div class="pt"><span class="tile sm sp-apricot"><svg class="i"><use href="#i-page"/></svg></span><span class="name">Week 42</span></div>
+      <button class="pb" aria-label="Favourite"><svg class="i"><use href="#i-star"/></svg></button>
+      <button class="pb" aria-label="More"><svg class="i"><use href="#i-more"/></svg></button>
+    </header>
+    <div class="band pband sp-apricot"></div>
+
+    <div class="main">
+      <div class="sheet">
+        <div class="band sp-apricot"></div>
+        <div class="dbar">
+          <span class="crumb"><span class="tile sm sp-apricot"><svg class="i"><use href="#i-page"/></svg></span>Work<svg class="i"><use href="#i-right"/></svg><span class="cur">Week 42</span></span>
+          <span class="edited">Edited <span class="mono">4 min</span> ago</span>
+          <button class="db" aria-label="Favourite"><svg class="i"><use href="#i-star"/></svg></button>
+          <button class="db" aria-label="More"><svg class="i"><use href="#i-more"/></svg></button>
+          <button class="db" aria-label="Close"><svg class="i"><use href="#i-close"/></svg></button>
+        </div>
+        <div class="page"><div class="col" id="col"></div></div>
+      </div>
+    </div>
+  </div>
+  <div id="overlay"></div>
+</section>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var screen = document.getElementById('screen');
+  var main = screen.querySelector('.main');
+  var col = document.getElementById('col');
+  var overlay = document.getElementById('overlay');
+  var params = new URLSearchParams(location.search);
+
+  // ---------- sample notes (queries use crates/core/src/search_query.rs syntax) ----------
+  // "Tasks" is a database whose rows have a `done` checkbox; ticking one sets done:yes,
+  // so it stops matching `done:no` and leaves the result list.
+  var Q = {
+    tasks: '#work done:no sort:"Due date"',
+    board: 'in:[[Sprint board]] status:doing',
+    week:  'updated:week sort:updated'
+  };
+  var TASKS = [
+    { id: 't1', title: 'Draft the migration note', src: 'Sync rewrite', due: 'Wed' },
+    { id: 't2', title: "Review Mia's index patch", src: 'Sync rewrite', due: 'Thu' },
+    { id: 't3', title: 'Book a room for the retro', src: 'Tasks', due: 'Fri' },
+    { id: 't4', title: 'Renew the code-signing cert', src: 'Release', due: 'Oct 24' }
+  ];
+  var BOARD = [
+    { title: 'Index generation counter', who: 'Mia', due: 'Thu' },
+    { title: 'Feed event on commit', who: 'You', due: 'Fri' },
+    { title: 'Result stream over the bridge', who: 'Sam', due: 'Oct 22' }
+  ];
+  var WEEK = [
+    { title: 'Sync rewrite', sp: 'apricot', where: 'Work', when: '2 h ago' },
+    { title: 'Sprint board', sp: 'apricot', where: 'Work', when: '3 h ago', db: true },
+    { title: 'Lisbon trip', sp: 'sun', where: 'Travel', when: 'yesterday' },
+    { title: 'Groceries', sp: 'moss', where: 'Money', when: 'Tue' },
+    { title: 'Week 41', sp: 'apricot', where: 'Work', when: 'Mon' },
+    { title: 'Release checklist', sp: 'apricot', where: 'Work', when: 'Mon' },
+    { title: 'Reading list', sp: 'paw', where: 'Home', when: 'Mon' }
+  ];
+
+  var st = {
+    v: params.get('v') === 'b' ? 'b' : 'a',
+    s: params.get('s') || 'live',
+    done: {}, editing: null, open: null, toast: null,
+    collapsed: { week: true }, showAll: {}
+  };
+
+  function applyState() {
+    st.done = {}; st.editing = null; st.open = null; st.toast = null;
+    st.collapsed = { week: true }; st.showAll = {};
+    if (st.v === 'a' && st.s === 'open') st.s = 'live';
+    if (st.s === 'ticked') { st.done.t1 = true; st.toast = 't1'; }
+    if (st.s === 'empty') TASKS.forEach(function (t) { st.done[t.id] = true; });
+    if (st.s === 'edit') st.editing = 'tasks';
+    if (st.v === 'b' && st.s !== 'live') st.open = 'tasks';
+  }
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function icon(id) { return '<svg class="i"><use href="#' + id + '"/></svg>'; }
+  // Light highlighting: keys are muted, tags take the accent text colour.
+  function hl(q) {
+    return q.split(/(\s+)/).map(function (tok) {
+      if (/^#/.test(tok)) return '<span class="t">' + esc(tok) + '</span>';
+      var m = tok.match(/^(-?[a-z]+:)(.*)$/i);
+      if (m) return '<span class="k">' + esc(m[1]) + '</span>' + esc(m[2]);
+      return esc(tok);
+    }).join('');
+  }
+
+  function results(id) {
+    if (id === 'tasks') return TASKS.filter(function (t) { return !st.done[t.id]; });
+    if (id === 'board') return BOARD;
+    return WEEK;
+  }
+
+  function rowHtml(id, r) {
+    if (id === 'tasks') {
+      return '<div class="qrow"><button class="cb" data-act="tick" data-id="' + r.id + '" aria-label="Mark done"></button>' +
+        '<span class="rt">' + esc(r.title) + '</span><span class="rm">' + esc(r.src) + ' · Due ' + esc(r.due) + '</span></div>';
+    }
+    if (id === 'board') {
+      return '<div class="qrow"><span class="tile sm sp-apricot">' + icon('i-grid') + '</span>' +
+        '<span class="rt">' + esc(r.title) + '</span><span class="rm"><span class="pill">Doing</span>' + esc(r.who) + ' · ' + esc(r.due) + '</span></div>';
+    }
+    return '<div class="qrow"><span class="tile sm sp-' + r.sp + '">' + icon(r.db ? 'i-grid' : 'i-page') + '</span>' +
+      '<span class="rt">' + esc(r.title) + '</span><span class="rm">' + esc(r.where) + ' · ' + esc(r.when) + '</span></div>';
+  }
+
+  var EMPTY = { tasks: 'No open #work tasks.', board: 'Nothing in Doing.', week: 'Nothing edited this week.' };
+
+  function headHtml(id, withToggle) {
+    var n = results(id).length;
+    var q = st.editing === id
+      ? '<span class="qedit"><input id="qin" value="' + esc(Q[id]) + '" spellcheck="false" aria-label="Query"></span>'
+      : '<button class="qstr" data-act="edit" data-q="' + id + '" title="Edit query">' + hl(Q[id]) + '</button>';
+    return '<div class="qhead">' + icon('i-search') + q +
+      '<span class="cnt' + (n ? '' : ' zero') + '">' + n + '</span>' +
+      (withToggle ? '<button class="qtog" data-act="toggle" data-q="' + id + '" aria-label="Collapse">' + icon('i-down') + '</button>' : '') +
+      '</div>' +
+      (st.editing === id ? '<div class="qhint"><span>Updates as notes change</span><span class="keys"><b>Enter</b> apply · <b>Esc</b> cancel</span></div>' : '');
+  }
+
+  function bodyHtml(id, limit) {
+    var rs = results(id);
+    if (!rs.length) return '<div class="qbody"><div class="qempty">' + icon(id === 'tasks' ? 'i-task' : 'i-search') + '<span>' + esc(EMPTY[id]) + '</span></div></div>';
+    var shown = (limit && !st.showAll[id]) ? rs.slice(0, limit) : rs;
+    var more = rs.length - shown.length;
+    return '<div class="qbody">' + shown.map(function (r) { return rowHtml(id, r); }).join('') +
+      (more ? '<button class="qmore" data-act="more" data-q="' + id + '">Show ' + more + ' more</button>' : '') + '</div>';
+  }
+
+  function cardHtml(id) {
+    return '<div class="qcard' + (st.collapsed[id] ? ' collapsed' : '') + '" data-card="' + id + '">' +
+      headHtml(id, true) + bodyHtml(id, 5) + '</div>';
+  }
+
+  var CHIP = {
+    tasks: { ic: 'i-task', label: function (n) { return n ? [n, n === 1 ? 'open #work task' : 'open #work tasks'] : ['', 'no open #work tasks']; } },
+    board: { ic: 'i-grid', label: function (n) { return [n, 'in Doing']; } },
+    week:  { ic: 'i-page', label: function (n) { return [n, n === 1 ? 'page this week' : 'pages this week']; } }
+  };
+  function chipHtml(id) {
+    var n = results(id).length, l = CHIP[id].label(n);
+    return '<button class="qchip' + (n ? '' : ' zero') + '" data-act="chip" data-q="' + id + '" aria-expanded="' + (st.open === id) + '">' +
+      icon(CHIP[id].ic) + (l[0] !== '' ? '<span class="n">' + l[0] + '</span>' : '') + '<span>' + l[1] + '</span></button>';
+  }
+
+  function render() {
+    var phone = window.innerWidth < 768;
+    screen.className = 'screen ' + (phone ? 'phone' : 'desk');
+    var h = '<h1 class="title">Week 42</h1>';
+    if (st.v === 'a') {
+      h += '<p class="blk">Ship the sync rewrite to beta by Friday. The lists below are searches, so they stay current as tasks and the board change.</p>' +
+        '<h2 class="h2">Open work</h2>' + cardHtml('tasks') +
+        '<h2 class="h2">On the board</h2>' + cardHtml('board') +
+        '<h2 class="h2">Touched this week</h2>' + cardHtml('week') +
+        '<p class="blk">Retro is Friday at 16:00. Notes go in Week 42 retro.</p>';
+    } else {
+      h += '<p class="blk prose">Ship the sync rewrite to beta by Friday. Still on my plate: ' + chipHtml('tasks') +
+        '. On the board, ' + chipHtml('board') + ' are moving, and I touched ' + chipHtml('week') + '.</p>' +
+        '<h2 class="h2">Before Friday</h2>' +
+        '<div class="todo"><span class="cb on">' + icon('i-check') + '</span><span style="color:var(--textTertiary);text-decoration:line-through">Cut the beta branch</span></div>' +
+        '<div class="todo"><span class="cb"></span><span>Write the beta notes</span></div>' +
+        '<p class="blk">Retro is Friday at 16:00. Notes go in Week 42 retro.</p>';
+    }
+    col.innerHTML = h;
+
+    // Popover (desktop) or bottom sheet (phone) for the open chip.
+    var o = '';
+    if (st.v === 'b' && st.open) {
+      var panel = headHtml(st.open, false) + bodyHtml(st.open, 6) +
+        '<div class="qfoot"><button data-act="none">Open in Search</button><button data-act="none">Show as a block</button></div>';
+      if (phone) {
+        o = '<div class="scrim" data-act="close"></div><div class="qsheet" role="dialog" aria-label="Query results"><div class="grab"></div>' + panel + '</div>';
+        overlay.innerHTML = o; col.querySelectorAll('.qpop').forEach(function (x) { x.remove(); });
+      } else {
+        overlay.innerHTML = '';
+        var pop = document.createElement('div');
+        pop.className = 'qpop'; pop.setAttribute('role', 'dialog'); pop.innerHTML = panel;
+        col.appendChild(pop);
+        var chip = col.querySelector('.qchip[aria-expanded="true"]');
+        var cr = col.getBoundingClientRect(), r = chip.getBoundingClientRect();
+        var left = Math.max(12, Math.min(r.left - cr.left, cr.width - pop.offsetWidth - 12));
+        pop.style.left = left + 'px';
+        pop.style.top = (r.bottom - cr.top + 6) + 'px';
+      }
+    } else overlay.innerHTML = '';
+
+    if (st.toast) {
+      overlay.insertAdjacentHTML('beforeend', '<div class="toast"><span>Marked done, so it left this list.</span><button data-act="undo">Undo</button></div>');
+    }
+
+    var inp = document.getElementById('qin');
+    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+
+    document.querySelectorAll('[data-v]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === st.v); });
+    document.querySelectorAll('[data-s]').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.s === st.s);
+      if (b.dataset.s === 'open') b.hidden = st.v !== 'b';
+    });
+  }
+
+  function setUrl() {
+    var p = new URLSearchParams(location.search);
+    p.set('v', st.v); p.set('s', st.s);
+    history.replaceState(null, '', '?' + p.toString());
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-v],[data-s],[data-theme-set]');
+    if (b) {
+      if (b.dataset.v) { st.v = b.dataset.v; applyState(); setUrl(); render(); }
+      else if (b.dataset.s) { st.s = b.dataset.s; applyState(); setUrl(); render(); }
+      else {
+        root.setAttribute('data-theme', b.dataset.themeSet);
+        document.querySelectorAll('[data-theme-set]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+      }
+      return;
+    }
+    var el = e.target.closest('[data-act]');
+    if (!el) {
+      if (st.open && !e.target.closest('.qpop,.qsheet')) { st.open = null; render(); }
+      return;
+    }
+    var id = el.dataset.q;
+    switch (el.dataset.act) {
+      case 'tick': st.done[el.dataset.id] = true; st.toast = el.dataset.id; break;
+      case 'undo': if (st.toast) delete st.done[st.toast]; st.toast = null; break;
+      case 'edit': st.editing = id; break;
+      case 'toggle': st.collapsed[id] = !st.collapsed[id]; break;
+      case 'more': st.showAll[id] = true; break;
+      case 'chip': st.open = st.open === id ? null : id; st.editing = null; break;
+      case 'close': st.open = null; break;
+      default: return;
+    }
+    render();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target.id !== 'qin') { if (e.key === 'Escape' && st.open) { st.open = null; render(); } return; }
+    if (e.key === 'Enter') { Q[st.editing] = e.target.value.trim() || Q[st.editing]; st.editing = null; render(); }
+    if (e.key === 'Escape') { st.editing = null; render(); }
+  });
+
+  window.addEventListener('resize', render);
+  applyState();
+  render();
+})();
+</script>
+</body>
+</html>

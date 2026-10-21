@@ -1,0 +1,26 @@
+# One workspace, one target/ directory for every Rust crate in the repo
+# (the core and the prototypes' Rust parts), so dependencies build once.
+[workspace]
+resolver = "2"
+members = ["crates/*", "prototypes/tauri/src-tauri", "app/rust"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+publish = false
+license = "AGPL-3.0-or-later"
+
+# Disk use: dependencies carry no debug info in dev builds (most of the
+# size of target/), and our own crates keep line tables for backtraces.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 2
+
+[profile.release]
+debug = false
+strip = true
+lto = "thin"
+codegen-units = 4

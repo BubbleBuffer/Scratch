@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notes directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
+<style>
+  :root { --cloth:#F3EFE7; --raised:#FFFAF1; --ink:#282A2F; --muted:#625C55; --thread:#B8ADA1; --apricot:#DE945F; --paw:#DDA39D; --moss:#697A6B; --duvet:#2F3138; }
+  @media (prefers-color-scheme: dark) { :root { --cloth:#2F3138; --raised:#30333A; --ink:#F3EFE7; --muted:#C6BAAC; --thread:#575B64; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--cloth); color:var(--ink); font:450 15px/1.5 "Atkinson Hyperlegible Next", sans-serif; padding:48px 16px; }
+  main { max-width:1040px; margin:0 auto; }
+  h1 { font:640 clamp(40px,6vw,72px)/0.95 "Bricolage Grotesque", sans-serif; letter-spacing:-0.04em; margin:0 0 12px; font-variation-settings:"wdth" 86; }
+  p.lead { color:var(--muted); max-width:60ch; margin:0 0 40px; }
+  .cuts { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:0; border:1px solid var(--thread); border-radius:12px 18px 10px 16px; overflow:hidden; }
+  a.cut { display:block; padding:28px 24px 32px; color:inherit; text-decoration:none; background:var(--raised); border-right:1px solid var(--thread); transition:transform .18s cubic-bezier(.22,1,.36,1), background .18s; }
+  a.cut:last-child { border-right:0; }
+  a.cut:hover { transform:translateY(-2px); }
+  a.cut:focus-visible { outline:2px solid #7AB7FF; outline-offset:-4px; }
+  .swatch { height:10px; width:72px; border-radius:7px 11px 6px 9px; margin-bottom:20px; }
+  .cut h2 { font:640 30px/1 "Bricolage Grotesque", sans-serif; letter-spacing:-0.03em; margin:0 0 10px; }
+  .cut p { margin:0; color:var(--muted); }
+  .go { margin-top:18px; font-weight:700; color:var(--ink); }
+  @media (prefers-reduced-motion: reduce) { a.cut { transition:none; } a.cut:hover { transform:none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Three directions</h1>
+  <p class="lead">Each one is a clickable prototype of home, the Lisbon page, mobile, an empty state and a completion moment, in light and dark. They share the same content, so only the design differs. Pick one, or mix parts.</p>
+  <div class="cuts">
+    <a class="cut" href="a-patchwork/"><div class="swatch" style="background:linear-gradient(90deg,#DE945F 0 45%,#2F3138 45% 62%,#DDA39D 62% 82%,#697A6B 82%)"></div><h2>A · Patchwork</h2><p>Colour as structure. Every space owns a patch of the calico, and pages wear their space's colour.</p><div class="go">Open →</div></a>
+    <a class="cut" href="b-sticker-desk/"><div class="swatch" style="background:#DDA39D"></div><h2>B · Sticker desk</h2><p>Personality through objects. Page icons are die-cut stickers, home is a desk, and motion is springy.</p><div class="go">Open →</div></a>
+    <a class="cut" href="c-stacks/"><div class="swatch" style="background:#2F3138"></div><h2>C · Stacks</h2><p>Depth and physical motion. Pages are sheets on a stack, and the breadcrumb is the stack's edge.</p><div class="go">Open →</div></a>
+    <a class="cut" href="d-stacks-calico/#calico=tabs&amp;fun=off&amp;theme=light&amp;frame=d"><div class="swatch" style="background:#DE945F"></div><h2>D · Stacks calico</h2><p>Stacks with calico at three strengths: Quiet, Tabs or Patches, plus an optional layer of fun.</p><div class="go">Open →</div></a>
+  </div>
+</main>
+</body>
+</html>

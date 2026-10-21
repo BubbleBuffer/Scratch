@@ -1,0 +1,112 @@
+# Relative search acceptance runs only on build01, with a same-binary control.
+name: search-ab
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: Baseline revision
+        type: string
+        required: true
+        default: '4f978b9'
+      candidate:
+        description: Candidate revision (empty uses the dispatched ref's HEAD)
+        type: string
+        required: false
+        default: ''
+      pairs:
+        description: Interleaved real and control pairs (minimum 5)
+        type: number
+        required: true
+        default: 5
+
+permissions:
+  contents: read
+
+concurrency:
+  group: search-ab-build01
+  cancel-in-progress: false
+
+jobs:
+  search-ab:
+    runs-on: [self-hosted, build01]
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+        working-directory: notes-app
+    env:
+      CARGO_INCREMENTAL: '0'
+      RUSTC_WRAPPER: sccache
+      BASELINE: ${{ inputs.baseline || '4f978b9' }}
+      CANDIDATE: ${{ inputs.candidate || github.sha }}
+      PAIRS: ${{ inputs.pairs || 5 }}
+    steps:
+      - name: Set evidence and temporary worktree paths
+        working-directory: .
+        run: |
+          printf 'AB_OUTPUT=%s/search-ab-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+          printf 'AB_WORK=%s/search-ab-worktrees-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          path: notes-app
+          fetch-depth: 0
+          clean: false
+      # Cargo resolves the workspace's agent path even for this targeted core build.
+      - uses: actions/checkout@v4
+        with:
+          repository: BubbleBuffer/BubblePaw-base
+          ref: release
+          path: BubblePaw-base-agent
+          ssh-key: ${{ secrets.BUBBLEPAW_DEPLOY_KEY }}
+          persist-credentials: false
+          clean: false
+      - name: Check build01 tools and record available CPUs
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          python3 --version
+          sccache --version
+          mkdir -p "$AB_OUTPUT" "$AB_WORK"
+          ln -s "$GITHUB_WORKSPACE/BubblePaw-base-agent" "$AB_WORK/BubblePaw-base-agent"
+          { hostname; lscpu; printf '\nAvailable CPUs: '; nproc; } | tee "$AB_OUTPUT/machine.txt"
+      - name: Harness selftests
+        # build01's persistent toolchain and target cache match ci.yml's master path.
+        run: python3 crates/core/benches/ab_search_gate.py selftest
+      - name: Interleaved search A/B and same-binary control
+        run: |
+          set -euo pipefail
+          ulimit -n 65536
+          python3 crates/core/benches/ab_search_gate.py run \
+            --baseline "$BASELINE" --candidate "$CANDIDATE" --pairs "$PAIRS" --jobs 2 \
+            --work-dir "$AB_WORK" \
+            --target-dir "$GITHUB_WORKSPACE/notes-app/target/search-ab-cargo" \
+            --out-dir "$AB_OUTPUT" 2>&1 | tee "$AB_OUTPUT/harness.log"
+      - name: Publish job summary
+        if: always()
+        run: |
+          if [[ -f "$AB_OUTPUT/summary.md" ]]; then
+            cat "$AB_OUTPUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf 'Search A/B did not produce a verdict; inspect the job logs.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -f "$AB_OUTPUT/machine.txt" ]]; then
+            printf '\n<details><summary>Runner CPU details</summary>\n\n```text\n' >> "$GITHUB_STEP_SUMMARY"
+            cat "$AB_OUTPUT/machine.txt" >> "$GITHUB_STEP_SUMMARY"
+            printf '\n```\n</details>\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload raw search gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: search-ab-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            ${{ env.AB_OUTPUT }}/raw/
+            ${{ env.AB_OUTPUT }}/build/
+            ${{ env.AB_OUTPUT }}/result.json
+            ${{ env.AB_OUTPUT }}/summary.md
+            ${{ env.AB_OUTPUT }}/harness.log
+            ${{ env.AB_OUTPUT }}/machine.txt
