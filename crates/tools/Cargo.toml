@@ -33,7 +33,7 @@ tar = "0.4"
 tempfile = "3"
 # Interim path dependency into the BubblePaw worktree (branch agent-integration),
 # as in crates/agent; the import CLI creates sessions through its Store.
-bubblepaw-core = { path = "../../../BubblePaw-base-agent/crates/bubblepaw-core" }
+bubblepaw-core = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
 
 [dev-dependencies]
 notes_hub = { path = "../hub" }

@@ -15,10 +15,12 @@ vault_tools = { path = "../tools" }
 vault_mcp = { path = "../mcp" }
 notes_agent_wire = { path = "../agent_wire" }
 # Interim: path dependencies into the BubblePaw worktree (branch
-# agent-integration) until that branch lands; then a git dependency.
+# agent-integration, merged into release) until it becomes a git dependency.
+# scripts/publish-public.sh rewrites these to BubbleBuffer/BubblePaw-Core
+# for the public Scratch copy.
 # The runner's `web` feature stays off.
-bubblepaw-core = { path = "../../../BubblePaw-base-agent/crates/bubblepaw-core" }
-bubblepaw-runner = { path = "../../../BubblePaw-base-agent/crates/bubblepaw-runner" }
+bubblepaw-core = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
+bubblepaw-runner = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
 anyhow = "1"
 async-trait = "0.1"
 futures-core = "0.3"

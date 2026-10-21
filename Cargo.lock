@@ -492,6 +492,7 @@ dependencies = [
 [[package]]
 name = "bubblepaw-core"
 version = "0.1.0"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?rev=2cddf0cd165043d2984a975b2e94932b5a9d325f#2cddf0cd165043d2984a975b2e94932b5a9d325f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -511,6 +512,7 @@ dependencies = [
 [[package]]
 name = "bubblepaw-mcp"
 version = "0.1.0"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?rev=2cddf0cd165043d2984a975b2e94932b5a9d325f#2cddf0cd165043d2984a975b2e94932b5a9d325f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -527,6 +529,7 @@ dependencies = [
 [[package]]
 name = "bubblepaw-runner"
 version = "0.1.0"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?rev=2cddf0cd165043d2984a975b2e94932b5a9d325f#2cddf0cd165043d2984a975b2e94932b5a9d325f"
 dependencies = [
  "anyhow",
  "async-trait",
