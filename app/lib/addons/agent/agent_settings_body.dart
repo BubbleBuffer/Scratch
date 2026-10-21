@@ -1,10 +1,12 @@
 import '../../services/addon_services.dart';
 // Settings > AI > Agent (desktop): whether the in-app agent runs, where
 // it runs (this computer, or the hub this vault syncs with when that is an
-// https:// hub with a device token), and for this computer its default
-// model, the Claude Code extension and projects. Saved in ai_settings.json.
+// https:// hub with a device token), its default model (listed from the
+// default host, even while the tab is on the other one), and for this
+// computer the Claude Code extension and projects. Saved in ai_settings.json.
 // Permission preferences remain dormant while the app always uses Bypass.
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../ui/ui.dart';
@@ -44,12 +46,37 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
   @override
   void initState() {
     super.initState();
-    // The model list comes from the open agent.
+    // The tab's model list comes from the open agent; Default model lists
+    // the default host's, read here when the tab is on the other host.
+    widget.store.retryDefaultHostModels();
+    widget.store.addListener(_onStore);
     if (widget.store.enabled) widget.store.ensureOpen();
   }
 
   @override
+  void didUpdateWidget(AgentSettingsSection old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.store, widget.store)) {
+      old.store.removeListener(_onStore);
+      widget.store.addListener(_onStore);
+    }
+  }
+
+  void _onStore() {
+    if (!mounted) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
+    widget.store.removeListener(_onStore);
     for (final c in [
       _customModel,
       _bun,
@@ -95,10 +122,14 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
     );
     final hub = store.hubLink;
     final onHub = store.host == AgentHost.hub;
-    final models = store.shownModels();
-    final current = s.agentModel.trim().isEmpty
+    // Default model: the default host's list, not the tab's.
+    final defaultOnHub = store.defaultHost == AgentHost.hub;
+    final (:ids, :unavailable) = store.defaultHostModels();
+    final models = ids ?? const <String>[];
+    final stored = s.agentModel.trim();
+    final current = stored.isEmpty
         ? (models.isEmpty ? '' : models.first)
-        : s.agentModel.trim();
+        : stored;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -144,20 +175,34 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
           ),
         if (s.agentEnabled) ...[
           _models(context),
-          if (models.isNotEmpty)
+          if (models.isNotEmpty || unavailable)
             SettingsRow(
               label: 'Default model',
-              description: onHub
+              description: defaultOnHub
                   ? "New chats on the hub use it, or the hub's first model if it doesn't offer it. Each chat can pick another."
-                  : "New chats and AI tasks use it, or the first model if this computer doesn't offer it. Each chat can pick another.",
-              trailing: SelectButton<String>(
-                key: const ValueKey('agent-default-model'),
-                title: 'Default model',
-                value: models.contains(current) ? current : models.first,
-                options: models,
-                labelOf: store.modelLabel,
-                onChanged: (m) => _set((s) => s.agentModel = m),
-              ),
+                  : "New chats on this computer and AI tasks use it, or this computer's first model if it doesn't offer it. Each chat can pick another.",
+              trailing: models.isNotEmpty
+                  ? SelectButton<String>(
+                      key: const ValueKey('agent-default-model'),
+                      title: 'Default model',
+                      value: models.contains(current) ? current : models.first,
+                      options: models,
+                      labelOf: store.modelLabel,
+                      onChanged: (m) => _set((s) => s.agentModel = m),
+                    )
+                  : Text(
+                      stored.isEmpty ? 'Not set' : store.modelLabel(stored),
+                      key: const ValueKey('agent-default-model-stored'),
+                      style: tsRaw(13, 18, 400, c.textSecondary),
+                    ),
+            ),
+          if (models.isEmpty && unavailable)
+            Text(
+              defaultOnHub
+                  ? "Can't list the hub's models right now."
+                  : "Can't list this computer's models right now.",
+              key: const ValueKey('agent-default-model-unavailable'),
+              style: tsRaw(12, 16, 400, c.textSecondary),
             ),
         ],
         if (s.agentEnabled && !onHub) ...[

@@ -294,7 +294,7 @@ Uri _hubUri(String value) {
       uri.hasFragment ||
       (uri.path.isNotEmpty && uri.path != '/')) {
     throw const HubAuthException(
-      'Enter a hub URL such as https://notes.breadcat.cc.',
+      'Enter a hub URL such as https://notes.example.com.',
     );
   }
   return uri.replace(path: '');

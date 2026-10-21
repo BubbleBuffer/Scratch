@@ -9,7 +9,7 @@ status: current
 
 Implemented on `mobile-agent` on 2026-10-11. Android always uses the Hub agent; the local engine remains Windows/Linux only. Desktop host selection and local-agent settings are unchanged. iOS and the desktop relay (stage 4d) are outside this change.
 
-The default Hub address is `https://notes.breadcat.cc`. Settings > AI > Agent exposes the editable address, browser sign-in/sign-out, the returned account (or the device label for an older Hub), sync status, agent opening status and the Hub's model list. The signed-out chat offers Sign in. New chat becomes available after sign-in. The existing chat, outline and note-reference cards remain in place, along with the merged mobile dock and swipe panels.
+The default Hub address is `https://notes.example.com`. Settings > AI > Agent exposes the editable address, browser sign-in/sign-out, the returned account (or the device label for an older Hub), sync status, agent opening status and the Hub's model list. The signed-out chat offers Sign in. New chat becomes available after sign-in. The existing chat, outline and note-reference cards remain in place, along with the merged mobile dock and swipe panels.
 
 ## Login and notes
 
@@ -50,7 +50,7 @@ All Flutter runs used one test worker. No existing assertion or timeout was chan
 
 1. Install an update built from `mobile-agent` through the normal release-signing/update path, preserving the existing app's data. This change does not publish an APK or update the deployed Hub.
 2. Open Pages from the bottom dock, then the settings gear, AI and Agent. The Agent panel's signed-out Sign in action also opens this section.
-3. Keep `https://notes.breadcat.cc` (or enter the intended Hub address) and tap Sign in. In the browser, sign in to Authentik with an account in the `notes-users` group. Return to Scratch via `notes://auth`.
+3. Keep `https://notes.example.com` (or enter the intended Hub address) and tap Sign in. In the browser, sign in to Authentik with an account in the `notes-users` group. Return to Scratch via `notes://auth`.
 4. Wait for the sync status to show a successful sync. Check any displayed error before proceeding; Sync now retries the existing connection. If the agent did not open, use Retry connection. Select a model if the Hub lists them.
 5. Open the Agent panel, tap New chat and ask it to find/read a known note. Then ask for a small edit. Once the turn completes and sync succeeds, open the note and verify the edit. This is the outstanding production acceptance check.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Paired cold-history A/B runner and aggregate report. Run on linux01 (Linux only).
+"""Paired cold-history A/B runner and aggregate report. Run on the Linux machine (Linux only).
 
 Runs the pinned default (non-instrumented) release binaries one at a time, each on a
 fresh copy of an aged fixture, then aggregates completed pairs into JSON and Markdown.

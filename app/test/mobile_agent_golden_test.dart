@@ -65,7 +65,7 @@ void main() {
         s.clientUrl = 'https://hub.test';
         s.clientToken = 'test-device-token';
         s.clientDeviceLabel = 'Android';
-        s.clientAccount = 'breadcat';
+        s.clientAccount = 'alice';
       });
       store.models = _stubModels;
       await _openAiSettings(tester);

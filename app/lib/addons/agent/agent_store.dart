@@ -355,10 +355,131 @@ class AgentStore extends ChangeNotifier {
         'claude-opus-5-5' => 'Opus 5.5',
         'claude-sonnet-5-5' => 'Sonnet 5.5',
         'claude-haiku-5-5' => 'Haiku 5.5',
-        _ => models.where((m) => m.id == id).firstOrNull?.name ?? id,
+        _ => _nameOf(id),
       };
     }
-    return models.where((m) => m.id == id).firstOrNull?.name ?? id;
+    return _nameOf(id);
+  }
+
+  String _nameOf(String id) {
+    for (final list in [models, for (final c in _hostModels.values) c.models]) {
+      final name = list.where((m) => m.id == id).firstOrNull?.name;
+      if (name != null) return name;
+    }
+    return id;
+  }
+
+  // ------------------------------------------- Settings > Default model
+
+  /// The model lists last read from each host, keyed by what they depend
+  /// on ([_modelsKey]), so Settings can list [defaultHost]'s models while
+  /// the tab is on the other host.
+  final Map<AgentHost, _HostModels> _hostModels = {};
+  final Set<AgentHost> _hostModelsLoading = {};
+  Future<void>? _localModelsRead;
+  bool _modelsFailed = false;
+
+  /// Tests: reads a host's models instead of opening an agent there.
+  @visibleForTesting
+  static Future<List<AgentModel>> Function(AgentHost host)? debugHostModels;
+
+  String _modelsKey(AgentHost h) => h == AgentHost.hub
+      ? _hubConnectionKey()
+      : '${settings.agentBunPath.trim()}\u0000'
+            '${settings.agentClaudeCodeDir.trim()}';
+
+  List<String> _visibleIds(List<AgentModel> ms) => [
+    for (final id in {for (final m in ms) m.id, ...settings.agentCustomModels})
+      if (!settings.agentHiddenModels.contains(id)) id,
+  ];
+
+  /// What Settings > Default model lists: [defaultHost]'s models (hidden
+  /// ones left out), read from that host even when the tab is on the other
+  /// one. `ids` is null while they load, or when the host can't list them
+  /// (`unavailable`): the setting is then shown as stored, never rewritten.
+  ({List<String>? ids, bool unavailable}) defaultHostModels() {
+    final def = defaultHost;
+    if (def == host) {
+      final ids = shownModels();
+      if (ids.isNotEmpty) return (ids: ids, unavailable: false);
+      return (ids: null, unavailable: openError != null || _modelsFailed);
+    }
+    if (def == AgentHost.hub && hubLink == null) {
+      return (ids: null, unavailable: true);
+    }
+    final cached = _hostModels[def];
+    if (cached != null && cached.key == _modelsKey(def)) {
+      if (cached.failed) return (ids: null, unavailable: true);
+      return (ids: _visibleIds(cached.models), unavailable: false);
+    }
+    _readHostModels(def);
+    return (ids: null, unavailable: false);
+  }
+
+  /// Lets Settings try a host that couldn't list its models again.
+  void retryDefaultHostModels() {
+    _hostModels.removeWhere((_, c) => c.failed);
+  }
+
+  void _readHostModels(AgentHost h) {
+    if (_disposed || !_hostModelsLoading.add(h)) return;
+    final key = _modelsKey(h);
+    final read = () async {
+      // Called from build: start the bridge calls after it.
+      await Future<void>.value();
+      var list = const <AgentModel>[];
+      var failed = false;
+      try {
+        final debug = debugHostModels;
+        list = debug != null ? await debug(h) : await _listModelsOn(h);
+      } catch (e) {
+        failed = true;
+        AppLog.info('agent models on ${h.name}: $e');
+      }
+      _hostModelsLoading.remove(h);
+      if (_disposed) return;
+      if (_modelsKey(h) == key) {
+        _hostModels[h] = _HostModels(key, list, failed: failed);
+      }
+      _notify();
+    }();
+    if (h == AgentHost.local) {
+      _localModelsRead = read.whenComplete(() => _localModelsRead = null);
+    }
+  }
+
+  /// Opens a short-lived agent on [h] for its model list.
+  Future<List<AgentModel>> _listModelsOn(AgentHost h) async {
+    final hub = h == AgentHost.hub ? hubLink : null;
+    if (h == AgentHost.hub && hub == null) throw StateError('no hub');
+    final agent = await _count(() => _connect(hub));
+    try {
+      final info = await _count(agent.hostInfo);
+      return _withExtras(await _count(agent.models), info);
+    } finally {
+      await agent.closeEvents();
+      agent.dispose();
+    }
+  }
+
+  /// Adds the Claude Code models a host with that provider always offers.
+  static List<AgentModel> _withExtras(
+    List<AgentModel> models,
+    AgentHostInfo? info,
+  ) {
+    if (!(info?.providers.contains('claude-code') ?? false)) return models;
+    const extras = {
+      'claude-code/claude-fable-5-1': 'Fable 5.1',
+      'claude-code/claude-opus-5-5': 'Opus 5.5',
+      'claude-code/claude-sonnet-5-5': 'Sonnet 5.5',
+      'claude-code/claude-haiku-5-5': 'Haiku 5.5',
+    };
+    return [
+      ...models,
+      for (final entry in extras.entries)
+        if (!models.any((m) => m.id == entry.key))
+          AgentModel(id: entry.key, name: entry.value),
+    ];
   }
 
   /// Capabilities reported by the connected host; unknown until it opens.
@@ -863,35 +984,41 @@ class AgentStore extends ChangeNotifier {
     return _opening ??= _open().whenComplete(() => _opening = null);
   }
 
+  /// An agent on [hub], or on this computer when it is null.
+  Future<NotesAgent> _connect(HubLink? hub) {
+    final s = settings;
+    String? opt(String v) => v.trim().isEmpty ? null : v.trim();
+    return hub != null
+        ? NotesAgent.connect(
+            url: hub.url,
+            device: vault.deviceId,
+            token: hub.token,
+          )
+        : NotesAgent.open(
+            vault: vault.raw,
+            dataDir: _folder(),
+            settings: AgentSettings(
+              defaultModel: s.agentModel.trim(),
+              bunPath: opt(s.agentBunPath),
+              claudeCodeDir: opt(s.agentClaudeCodeDir),
+              permissionMode: bridge.AgentPermissionMode.bypass,
+              testTools: testTools,
+              desktopTools: s.desktopTools,
+              desktopRoot: s.desktopRoot.trim(),
+            ),
+          );
+  }
+
   Future<NotesAgent?> _open() async {
     // Android never attempts the desktop engine, even with stale preferences.
     if (requiresHubSignIn) return null;
     final openingKey = _configKey();
-    final s = settings;
-    String? opt(String v) => v.trim().isEmpty ? null : v.trim();
     final hub = host == AgentHost.hub ? hubLink : null;
     try {
-      final agent = await _count(
-        () => hub != null
-            ? NotesAgent.connect(
-                url: hub.url,
-                device: vault.deviceId,
-                token: hub.token,
-              )
-            : NotesAgent.open(
-                vault: vault.raw,
-                dataDir: _folder(),
-                settings: AgentSettings(
-                  defaultModel: s.agentModel.trim(),
-                  bunPath: opt(s.agentBunPath),
-                  claudeCodeDir: opt(s.agentClaudeCodeDir),
-                  permissionMode: bridge.AgentPermissionMode.bypass,
-                  testTools: testTools,
-                  desktopTools: s.desktopTools,
-                  desktopRoot: s.desktopRoot.trim(),
-                ),
-              ),
-      );
+      // Settings may be reading this computer's models with a short-lived
+      // engine: let it close before this one opens.
+      if (hub == null) await _localModelsRead;
+      final agent = await _count(() => _connect(hub));
       if (_disposed || openingKey != _configKey()) {
         await agent.closeEvents();
         agent.dispose();
@@ -941,26 +1068,20 @@ class AgentStore extends ChangeNotifier {
   Future<void> _loadModels() async {
     final a = _agent;
     if (a == null) return;
+    final on = _agentOnHub ? AgentHost.hub : AgentHost.local;
     try {
-      models = await _count(a.models);
-      if (hostInfo?.providers.contains('claude-code') ?? false) {
-        const extras = {
-          'claude-code/claude-fable-5-1': 'Fable 5.1',
-          'claude-code/claude-opus-5-5': 'Opus 5.5',
-          'claude-code/claude-sonnet-5-5': 'Sonnet 5.5',
-          'claude-code/claude-haiku-5-5': 'Haiku 5.5',
-        };
-        models = [
-          ...models,
-          for (final entry in extras.entries)
-            if (!models.any((m) => m.id == entry.key))
-              AgentModel(id: entry.key, name: entry.value),
-        ];
-      }
+      models = _withExtras(await _count(a.models), hostInfo);
+      _modelsFailed = false;
     } catch (e) {
       models = const [];
+      _modelsFailed = true;
       AppLog.info('agent models: $e');
     }
+    _hostModels[on] = _HostModels(
+      _modelsKey(on),
+      models,
+      failed: _modelsFailed,
+    );
     _notify();
   }
 
@@ -1748,4 +1869,12 @@ class _AgentSearchReader implements AgentSearchReader {
   @override
   Future<ChatOutline> outline(String sessionId) =>
       _agent.sessionOutline(sessionId: sessionId);
+}
+
+/// A host's model list as Settings last read it.
+class _HostModels {
+  const _HostModels(this.key, this.models, {required this.failed});
+  final String key;
+  final List<AgentModel> models;
+  final bool failed;
 }

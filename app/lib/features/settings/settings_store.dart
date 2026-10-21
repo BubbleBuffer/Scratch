@@ -33,8 +33,6 @@ enum ThemePref {
 /// The default hub address: every interface, port 47100.
 const defaultHubAddress = '0.0.0.0:47100';
 
-const defaultHubUrl = 'https://notes.breadcat.cc';
-
 class AppSettings extends ChangeNotifier {
   AppSettings({this.file});
 
@@ -74,8 +72,9 @@ class AppSettings extends ChangeNotifier {
   /// return only the device label, so this can be absent while signed in.
   String? clientAccount;
 
-  /// Browser sign-in destination, retained after sign-out.
-  String hubSignInUrl = defaultHubUrl;
+  /// Browser sign-in destination, retained after sign-out. Empty until the
+  /// user enters their hub's URL: there is no built-in hub.
+  String hubSignInUrl = '';
 
   /// Download every attachment in the background, not only those opened.
   bool prefetchAttachments = false;
@@ -127,7 +126,7 @@ class AppSettings extends ChangeNotifier {
     hubSignInUrl =
         (j['hubSignInUrl'] as String?) ??
         (clientDeviceLabel != null ? clientUrl : null) ??
-        defaultHubUrl;
+        '';
     prefetchAttachments = (j['prefetchAttachments'] as bool?) ?? false;
     trustedCertificates = TrustedCertificates.fromJson(j['trustedCertificates']);
     if (j['reminders'] case final Map r) {

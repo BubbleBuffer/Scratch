@@ -25,7 +25,7 @@ Existing database tests and golden assertions stay in place. `app/test/addons/ad
 
 Opening an empty database page keeps the editor's first paragraph local until the first block edit (2026-10-12). It therefore does not write to the vault, wake the change feed or restart the document scan. The insert is persisted together with the first edit, using the existing editor row and undo behavior. The 200-row regression in `app/test/empty_page_open_test.dart` checks desktop and mobile opening, first-line persistence and undo/redo. The `prepareTasks` workaround is removed from `db_perf_test.dart`.
 
-The 10k-row gate (`app/test/db_perf_test.dart`, debug mode, p95 of 480 frames < 60 ms) is timed on linux01 (Intel i5-1135G7, 4 cores, 8 GB, Flutter 3.47.7), not on the shared Windows PC. At 7b9c19c it passes 3 of 3 runs (2026-10-13):
+The 10k-row gate (`app/test/db_perf_test.dart`, debug mode, p95 of 480 frames < 60 ms) is timed on the Linux machine (Intel i5-1135G7, 4 cores, 8 GB, Flutter 3.47.7), not on the shared Windows PC. At 7b9c19c it passes 3 of 3 runs (2026-10-13):
 
 | Run | Table p50 / p95 / max (ms) | Board p50 / p95 / max (ms) |
 |---|---|---|
@@ -33,13 +33,13 @@ The 10k-row gate (`app/test/db_perf_test.dart`, debug mode, p95 of 480 frames < 
 | 2 | 14.8 / 28.0 / 34.9 | 6.5 / 10.5 / 21.1 |
 | 3 | 23.6 / 31.9 / 65.4 | 7.9 / 11.5 / 18.4 |
 
-No table-renderer change was needed to pass. linux01 had other users logged in, so the spread is noisy. Windows PC timings under heavy load (p95 382 ms on 2026-10-12) are not meaningful for this gate.
+No table-renderer change was needed to pass. The Linux machine had other users logged in, so the spread is noisy. Windows PC timings under heavy load (p95 382 ms on 2026-10-12) are not meaningful for this gate.
 
 The previous open-time insert caused `PagesStore` to reload and scan `listPages` in 200-row chunks, filtering out database rows until it found enough documents. In the 10k-row investigation that scan rebuilt 5,512 widgets per opening frame; native list calls took 9–23 ms. This was the page-list scan, not the search indexer. Real edits used to trigger the same `PagesStore` reload and scan. Content edits now patch the store in place (see below).
 
 ### Edit cost on the 10k-row vault
 
-A content edit patches `PagesStore` in place instead of reloading and re-scanning the vault; structural changes still reload (see [app state](../architecture/app-state.md)). `app/test/edit_perf_test.dart` types one character into an ordinary page with the 10k-row Tasks collection present, 20 times, and waits until idle. Command: `flutter test --concurrency=1 test/edit_perf_test.dart`, debug build with the release bridge, on linux01 (2026-10-13). Each cell is the median of three runs; each run's p50 and p95 are over the 20 edits.
+A content edit patches `PagesStore` in place instead of reloading and re-scanning the vault; structural changes still reload (see [app state](../architecture/app-state.md)). `app/test/edit_perf_test.dart` types one character into an ordinary page with the 10k-row Tasks collection present, 20 times, and waits until idle. Command: `flutter test --concurrency=1 test/edit_perf_test.dart`, debug build with the release bridge, on the Linux machine (2026-10-13). Each cell is the median of three runs; each run's p50 and p95 are over the 20 edits.
 
 | Metric | Before (7cb34fb) p50 / p95 | After (b0e309b) p50 / p95 |
 |---|---|---|

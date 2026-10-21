@@ -36,7 +36,7 @@ Steps for this Windows PC, once the production hub serves `/mcp`.
 
    Claude Code then asks for two values:
 
-   - **Hub URL:** defaults to `https://notes.breadcat.cc`. Keep the default.
+   - **Hub URL:** your hub's URL, for example `https://notes.example.com`.
    - **Agent token:** paste the token from step 1.
 
 3. **Put `notes.exe` on PATH.** It is built at `F:\build\notes-cli\notes.exe`, so add `F:\build\notes-cli` to the user PATH and open a new terminal. Without it, the session-start hook prints only the memory rules, not the index. Outside Claude Code, the CLI reads `NOTES_HUB_URL` and `NOTES_TOKEN`, or `notes/config.toml`.
@@ -62,10 +62,10 @@ After each successful index fetch, the hook saves the global index text, so it s
 
 ## Where the token is stored
 
-`hub_token` is marked sensitive, so Claude Code keeps it in the OS credential store, not in a settings file. The session-start hook uses `CLAUDE_PLUGIN_OPTION_HUB_TOKEN` when supplied and never prints it. Otherwise it leaves token resolution to the CLI's existing environment or `notes/config.toml`. If `CLAUDE_PLUGIN_OPTION_HUB_URL` is absent or empty, the hook uses `https://notes.breadcat.cc`, matching the manifest's default.
+`hub_token` is marked sensitive, so Claude Code keeps it in the OS credential store, not in a settings file. The session-start hook uses `CLAUDE_PLUGIN_OPTION_HUB_TOKEN` when supplied and never prints it. Otherwise it leaves token resolution to the CLI's existing environment or `notes/config.toml`. If `CLAUDE_PLUGIN_OPTION_HUB_URL` is absent or empty, the hook uses `https://notes.example.com`, matching the manifest's default.
 
 The staging test explicitly exports both hook options: `--plugin-dir` did not export `userConfig` to the hook in the verified session. The installed-plugin option export path remains unverified.
 
 ## Staging test
 
-`integrations/claude-plugin/test/e2e-docker01.sh` runs this flow end to end against a staging hub on docker01, not production. Run it from Git Bash in the repo root.
+The private staging end-to-end script runs this flow end to end against a staging hub on a Docker host, not production. Run it from Git Bash in the repo root.

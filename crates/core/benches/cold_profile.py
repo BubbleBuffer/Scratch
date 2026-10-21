@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run feature-instrumented first-sync phases on fresh, disposable fixture copies.
 
-Run on linux01; no builds, installations, or changes to the source fixtures.
+Run on the Linux machine; no builds, installations, or changes to the source fixtures.
 The uninstrumented A/B pairs use cold_ab.py instead.
 """
 import argparse

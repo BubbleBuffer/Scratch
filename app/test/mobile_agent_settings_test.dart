@@ -86,7 +86,7 @@ void main() {
     await openAiSettings(tester);
 
     expect(find.text('Agent'), findsOneWidget);
-    expect(find.text('https://notes.breadcat.cc'), findsOneWidget);
+    expect(key('hub-sign-in-url'), findsOneWidget);
     expect(key('hub-sign-in'), findsOneWidget);
     expect(
       find.text('Not connected. Sign in to the Hub to use the agent.'),
@@ -171,7 +171,7 @@ void main() {
       expect(key('hub-sync-now'), findsNothing);
       expect(key('agent-retry-connection'), findsNothing);
 
-      signInFixture(tv, account: 'breadcat');
+      signInFixture(tv, account: 'alice');
       await settle(tester);
       // Signed in but the sync loop is not running in this fixture.
       expect(key('hub-sync-now'), findsOneWidget);
@@ -209,7 +209,7 @@ void main() {
 
   // A Hub that reports an account, and one that does not (older Hubs): the
   // older one shows the device name it registered, never a made-up account.
-  for (final account in <String?>[null, 'breadcat']) {
+  for (final account in <String?>[null, 'alice']) {
     final label = account ?? 'older Hub';
     appTest('Hub sign in and sign out on Android ($label)', (tester) async {
       final tv = await pumpApp(tester, mobile: true);
@@ -222,8 +222,16 @@ void main() {
       );
       await settle(tester);
 
+      await tester.enterText(
+        find.descendant(
+          of: key('hub-sign-in-url'),
+          matching: find.byType(EditableText),
+        ),
+        'https://notes.example.com',
+      );
+      await settle(tester);
       await tapAndSettle(tester, key('hub-sign-in'));
-      expect(auth.requestedUrl, 'https://notes.breadcat.cc');
+      expect(auth.requestedUrl, 'https://notes.example.com');
       expect(find.text('Waiting for the browser…'), findsOneWidget);
       auth.pending!.complete(
         HubAuthResult(
@@ -261,11 +269,11 @@ void main() {
   ) async {
     final tv = await pumpApp(tester, mobile: true);
     final store = AgentStore.of(tv.app);
-    signInFixture(tv, account: 'breadcat');
+    signInFixture(tv, account: 'alice');
     store.models = _stubModels;
     await openAiSettings(tester);
 
-    expect(find.text('Signed in to hub.test as breadcat'), findsOneWidget);
+    expect(find.text('Signed in to hub.test as alice'), findsOneWidget);
     expect(key('hub-sign-out'), findsOneWidget);
     expect(key('hub-sign-in'), findsNothing);
     // The fake state never connects: the status says so.

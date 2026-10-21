@@ -247,7 +247,7 @@ button{font:inherit;color:inherit}
 
     <div class="sec" id="s33" data-name="Outage recovery" data-c="var(--paw)"><span class="bar2" style="background:var(--paw)"></span><b>Outage recovery</b><button class="more-btn" data-menu="s33">⋯</button></div>
     <div class="msg user">The relay went down overnight, can you check what happened?</div>
-    <div class="msg agent"><div class="work">ssh vps · read logs</div>Caddy restarted after a cert renewal and the relay container didn't come back because of a missing restart policy. Added <code>restart: unless-stopped</code>; it's up.</div>
+    <div class="msg agent"><div class="work">ssh &lt;server&gt; · read logs</div>Caddy restarted after a cert renewal and the relay container didn't come back because of a missing restart policy. Added <code>restart: unless-stopped</code>; it's up.</div>
 
     <div class="sec" id="s34" data-name="Large-drop fix" data-c="var(--sky)"><span class="bar2" style="background:var(--sky)"></span><b>Large-drop fix</b><button class="more-btn" data-menu="s34">⋯</button></div>
     <div class="msg user">Now the large drops. 400 MB files time out.</div>

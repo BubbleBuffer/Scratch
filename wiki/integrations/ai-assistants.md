@@ -34,8 +34,8 @@ Claude on the web and phone reaches the vault through a custom connector. The hu
 - Discovery and keys are cached for 10 minutes, as app login is. A signing-key rotation in Authentik is picked up within 10 minutes.
 - The allow-list is the same as app login: `oidc.allowed_users` by email or `sub`, and `oidc.allowed_groups`, in practice `notes-users`. If the token lacks the `groups` claim (or the email, when users are listed), the hub asks Authentik's userinfo endpoint once per token and caches the answer until the token expires.
 - Allowed callers get the same tools as a full-access agent token. Their edits are recorded with actor `oauth:<email>`, or `oauth:<sub>` without an email.
-- Without a valid token, `/mcp` answers 401 with `WWW-Authenticate: Bearer resource_metadata="https://notes.breadcat.cc/.well-known/oauth-protected-resource/mcp"`. A valid token from an account not on the allow-list gets 403.
-- `GET /.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp` serve the protected-resource metadata (RFC 9728). It names resource `https://notes.breadcat.cc/mcp`, the claude-mcp issuer as authorization server, the scopes `openid email profile offline_access`, and bearer tokens in the header only.
+- Without a valid token, `/mcp` answers 401 with `WWW-Authenticate: Bearer resource_metadata="https://notes.example.com/.well-known/oauth-protected-resource/mcp"`. A valid token from an account not on the allow-list gets 403.
+- `GET /.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp` serve the protected-resource metadata (RFC 9728). It names resource `https://notes.example.com/mcp`, the claude-mcp issuer as authorization server, the scopes `openid email profile offline_access`, and bearer tokens in the header only.
 - Origin: a request without `Origin` passes. With the feature on, a single `Origin` of `https://claude.ai`, `https://claude.com` or `https://chatgpt.com` passes; other or multiple Origin values get 403. Origin logging is bounded and uses debug level.
 - With both variables unset, the hub behaves as before: no metadata routes, a bare `Bearer` 401, and every Origin refused.
 
@@ -52,14 +52,14 @@ Created over root SSH with `ak shell`. Change Authentik infrastructure the same 
   - Scopes `openid`, `email`, `profile`, `offline_access`.
 - Application `claude-mcp`, bound to the group `notes-users`.
 - Client ID: `d1QDPw9lEM6jOT2WFfcJkggcMqLuA6BrEIvvWF4b` (public, not a secret).
-- Issuer: `https://auth.breadcat.cc/application/o/claude-mcp/`. JWKS: `https://auth.breadcat.cc/application/o/claude-mcp/jwks/`. Discovery is public and advertises S256.
+- Issuer: `https://auth.example.com/application/o/claude-mcp/`. JWKS: `https://auth.example.com/application/o/claude-mcp/jwks/`. Discovery is public and advertises S256.
 
 ### Connector settings in Claude
 
 In Claude, go to **Settings → Connectors → Add custom connector**:
 
 - Name: `Notes` (any name).
-- URL: `https://notes.breadcat.cc/mcp`.
+- URL: `https://notes.example.com/mcp`.
 - Advanced settings: OAuth Client ID is the `claude-mcp` Client ID. Leave the OAuth Client Secret blank; the client is public.
 
 Then choose **Connect**. Claude opens Authentik's login. After sign-in, the vault tools appear in chats.
@@ -74,15 +74,15 @@ Then choose **Connect**. Claude opens Authentik's login. After sign-in, the vaul
 
 ## Agent gateway connector
 
-**Implemented, off by default; deployment and real connector sign-in are not established here.** Add a separate connector for `https://notes.breadcat.cc/mcp/agent` to use the agent runtime. It offers all `/mcp` vault tools, the host's advertised tools and `hosts`. Host tools accept optional `host`; JS and `js_help` appear only when enabled. A connector URL can select a host, for example `https://notes.breadcat.cc/mcp/agent?host=hub`. Only the hub host is available; desktop outbound relay is not implemented, and the hub has no desktop tool pack or shell.
+**Implemented, off by default; deployment and real connector sign-in are not established here.** Add a separate connector for `https://notes.example.com/mcp/agent` to use the agent runtime. It offers all `/mcp` vault tools, the host's advertised tools and `hosts`. Host tools accept optional `host`; JS and `js_help` appear only when enabled. A connector URL can select a host, for example `https://notes.example.com/mcp/agent?host=hub`. Only the hub host is available; desktop outbound relay is not implemented, and the hub has no desktop tool pack or shell.
 
-Use the same public Authentik `claude-mcp` client as the `/mcp` connector: OAuth Client ID `d1QDPw9lEM6jOT2WFfcJkggcMqLuA6BrEIvvWF4b`, with the client secret blank. The issuer is `https://auth.breadcat.cc/application/o/claude-mcp/`. The existing registered callbacks above still apply; allowing the ChatGPT Origin does not register a ChatGPT OAuth callback or establish a successful ChatGPT connection.
+Use the same public Authentik `claude-mcp` client as the `/mcp` connector: OAuth Client ID `d1QDPw9lEM6jOT2WFfcJkggcMqLuA6BrEIvvWF4b`, with the client secret blank. The issuer is `https://auth.example.com/application/o/claude-mcp/`. The existing registered callbacks above still apply; allowing the ChatGPT Origin does not register a ChatGPT OAuth callback or establish a successful ChatGPT connection.
 
 Enable `NOTES_HUB_MCP_AGENT_ENABLED=true` alongside `NOTES_HUB_MCP_OAUTH_ISSUER` and `NOTES_HUB_MCP_OAUTH_CLIENT_ID`; enabling the gateway without both OAuth settings is a configuration error. `NOTES_HUB_MCP_AGENT_DEFAULT_HOST` defaults to `hub`. These also have TOML keys `mcp_agent_enabled`, `mcp_agent_default_host` and `[mcp_oauth]` `issuer`/`client_id`.
 
 Host selection is per call: tool argument `host` wins, followed by the request URL's `?host=name`, the global `NOTES_HUB_MCP_AGENT_DEFAULT_HOST`, then `hub`. Unknown hosts from URL or configuration cause a call error listing available hosts; they do not fall back silently.
 
-The gateway accepts OAuth bearer tokens only. It shares `/mcp`'s issuer, RS256/expiry/audience validation and app-login allow-list (`oidc.allowed_users` or `oidc.allowed_groups`, in practice `notes-users`). The JWT `aud` must contain the configured client ID. Additional resource audiences `<public_url>/mcp`, `<public_url>/mcp/agent` and `<public_url>/mcp/agent?<query>` are accepted on both endpoints; a resource audience alone is refused. Requests without Origin pass; single Origins `https://claude.ai`, `https://claude.com` and `https://chatgpt.com` pass, while other or multiple Origins are refused. Missing/invalid credentials return 401 with metadata at `https://notes.breadcat.cc/.well-known/oauth-protected-resource/mcp/agent`; an account outside the allow-list gets 403. That metadata advertises resource `https://notes.breadcat.cc/mcp/agent` and the same issuer and scopes.
+The gateway accepts OAuth bearer tokens only. It shares `/mcp`'s issuer, RS256/expiry/audience validation and app-login allow-list (`oidc.allowed_users` or `oidc.allowed_groups`, in practice `notes-users`). The JWT `aud` must contain the configured client ID. Additional resource audiences `<public_url>/mcp`, `<public_url>/mcp/agent` and `<public_url>/mcp/agent?<query>` are accepted on both endpoints; a resource audience alone is refused. Requests without Origin pass; single Origins `https://claude.ai`, `https://claude.com` and `https://chatgpt.com` pass, while other or multiple Origins are refused. Missing/invalid credentials return 401 with metadata at `https://notes.example.com/.well-known/oauth-protected-resource/mcp/agent`; an account outside the allow-list gets 403. That metadata advertises resource `https://notes.example.com/mcp/agent` and the same issuer and scopes.
 
 Discovery preserves URL host selection: a connector at `/mcp/agent?host=hub` receives a 401 challenge pointing to `/.well-known/oauth-protected-resource/mcp/agent?host=hub`, whose resource includes `/mcp/agent?host=hub`. The query selects a host; the shared verifier accepts the query-bearing resource audience on either endpoint, while still requiring the configured client ID in `aud`.
 
@@ -96,7 +96,7 @@ HTTP initialize returns an OAuth-subject-bound `Mcp-Session-Id`. Send it with su
 
 ### Switch an existing connector
 
-Edit the connector URL from `https://notes.breadcat.cc/mcp` to `https://notes.breadcat.cc/mcp/agent?host=hub`, or back. Keep the same OAuth Client ID and login. Both routes use the same issuer, accepted audiences, allow-list, scopes (`openid email profile offline_access`) and registered redirect URIs. The server accepts the same valid OAuth token on either route, without binding it to the resource URL advertised in metadata. Static agent tokens remain specific to `/mcp`.
+Edit the connector URL from `https://notes.example.com/mcp` to `https://notes.example.com/mcp/agent?host=hub`, or back. Keep the same OAuth Client ID and login. Both routes use the same issuer, accepted audiences, allow-list, scopes (`openid email profile offline_access`) and registered redirect URIs. The server accepts the same valid OAuth token on either route, without binding it to the resource URL advertised in metadata. Static agent tokens remain specific to `/mcp`.
 
 ## Current state (2026-10-01)
 
@@ -145,7 +145,7 @@ For an agent with HTTP support, create a hub token with `notes-hub --config <fil
 
 The `notes` binary in `vault_tools` calls the same hub `/mcp` endpoint. It provides `search`, `read`, `query`, `write` and `append`, plus nine `memory` commands (`list`, `search`, `read`, `write`, `update`, `delete`, `index`, `import` and `rules`; `rules` is answered locally, without hub access) and `wiki import`. Write and append bodies come from stdin; `--json` returns the raw tool result. It does not open a local vault.
 
-`NOTES_HUB_URL` overrides the config's `hub`, then defaults to `https://notes.breadcat.cc`. `NOTES_TOKEN` overrides the config's `token`. The config is `%APPDATA%\notes\config.toml` on Windows, or `$XDG_CONFIG_HOME/notes/config.toml` (otherwise `~/.config/notes/config.toml`) on Unix. Tokens are never command-line arguments or printed in diagnostics. See [Agent memory](agent-memory.md) for the index and import rules.
+`NOTES_HUB_URL` overrides the config's `hub`, then defaults to `https://notes.example.com`. `NOTES_TOKEN` overrides the config's `token`. The config is `%APPDATA%\notes\config.toml` on Windows, or `$XDG_CONFIG_HOME/notes/config.toml` (otherwise `~/.config/notes/config.toml`) on Unix. Tokens are never command-line arguments or printed in diagnostics. See [Agent memory](agent-memory.md) for the index and import rules.
 
 ### Desktop connection examples
 
@@ -198,7 +198,7 @@ args = []
 - Runners: **Claude Code** (`claude -p --mcp-config <file> --strict-mcp-config --allowedTools mcp__notes --output-format text`) and **Codex** (`codex exec --skip-git-repo-check -c mcp_servers.notes.url=… -c mcp_servers.notes.bearer_token_env_var=NOTES_MCP_TOKEN --output-last-message <file> -`). Each runs from an argument list with the prompt on stdin (never a shell line), without a console window, with a 10-minute timeout, and the MCP config file is deleted afterwards. They get the app's MCP endpoint (started on a free local port when "Serve the vault" is off). **DeepSeek** is called over HTTPS from Dart (`/chat/completions`; the key stays in `ai_settings.json` on the device) and sees only the page's text.
 - The prompt holds the task, the page's markdown (up to 20,000 characters) and its id.
 - **Agent runner (built 2026-10-08):** Settings > AI > Runner has "Agent", the in-app BubblePaw agent ([Agent](agent.md)). It is the default when the agent is on and no runner was chosen before; a runner chosen earlier is kept (`runner` is written to `ai_settings.json` only once chosen). Its tasks run through `ai_run_task_with_agent` in their own agent session, which writes the answer or error into the task. When the agent cannot open, the task fails with the reason. Claude Code, Codex and DeepSeek are unchanged.
-- **Agent settings** (Settings > AI > Agent, Windows and Linux, in `ai_settings.json`): "Use the agent" (`agentEnabled`, default on), the default model (`agentModel`; a select from the agent's models, a text field when none are listed, empty for the built-in default), Claude Code's bun program and extension folder (`agentBunPath`, `agentClaudeCodeDir`, empty by default; the folder is BubblePaw's `extensions/claude-code`), and approvals Ask or Allow (`agentApprovals`). A change reopens the agent after 600 ms. On Android the Agent section is the Hub's ([mobile_agent_settings.dart](../../app/lib/addons/agent/mobile_agent_settings.dart)): the Hub address (kept through sign-out), Sign in or Sign out, the account (an older Hub that reports none shows the device name it registered), the connection line and the default model when the Hub lists models. Signed out, the Agent chat shows a Sign in action and no composer; New chat is in its top bar and is off while signed out.
+- **Agent settings** (Settings > AI > Agent, Windows and Linux, in `ai_settings.json`): "Use the agent" (`agentEnabled`, default on), the default model (`agentModel`; a select from the models of the default host, "Agent runs on", read from that host even while the AI tab is on the other one; when that host can't list them, the stored value and a short hint, and the setting is left as it is; empty for the built-in default), Claude Code's bun program and extension folder (`agentBunPath`, `agentClaudeCodeDir`, empty by default; the folder is BubblePaw's `extensions/claude-code`), and approvals Ask or Allow (`agentApprovals`). A change reopens the agent after 600 ms. On Android the Agent section is the Hub's ([mobile_agent_settings.dart](../../app/lib/addons/agent/mobile_agent_settings.dart)): the Hub address (kept through sign-out), Sign in or Sign out, the account (an older Hub that reports none shows the device name it registered), the connection line and the default model when the Hub lists models. Signed out, the Agent chat shows a Sign in action and no composer; New chat is in its top bar and is off while signed out.
 
 ### Agent merge helper and interim block review
 

@@ -2,7 +2,7 @@
   "mcpServers": {
     "notes": {
       "type": "http",
-      "url": "https://notes.breadcat.cc/mcp",
+      "url": "${user_config.hub_url}/mcp",
       "headers": {
         "Authorization": "Bearer ${user_config.hub_token}"
       }

@@ -33,7 +33,7 @@ try {
     $createdVolume = $true
     docker run -d --name $container --mount "type=volume,src=$volume,dst=/data" `
         -p '127.0.0.1::8080' --memory 1g --pids-limit 512 --security-opt no-new-privileges:true `
-        -e NOTES_HUB_PUBLIC_URL=https://notes.breadcat.cc `
+        -e NOTES_HUB_PUBLIC_URL=https://notes.example.com `
         -e NOTES_HUB_OIDC_ISSUER=https://fake-issuer.invalid/application/o/notes-hub/ `
         -e NOTES_HUB_OIDC_CLIENT_ID=local-smoke -e NOTES_HUB_OIDC_CLIENT_SECRET=synthetic-secret `
         -e NOTES_HUB_OIDC_ALLOWED_GROUPS=notes-users $Image | Out-Null

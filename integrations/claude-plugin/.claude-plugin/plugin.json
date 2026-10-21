@@ -9,8 +9,8 @@
     "hub_url": {
       "type": "string",
       "title": "Hub URL",
-      "description": "Base URL of the notes hub, without a trailing slash.",
-      "default": "https://notes.breadcat.cc"
+      "description": "Your hub's URL, e.g. https://notes.example.com",
+      "required": true
     },
     "hub_token": {
       "type": "string",

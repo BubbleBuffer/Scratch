@@ -48,16 +48,6 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="notes" android:host="page" />
             </intent-filter>
-            <!-- Verified App Link: https://notes.breadcat.cc/open/<page id> opens
-                 the page in the app. The hub serves the matching statement at
-                 /.well-known/assetlinks.json (its android_package and
-                 android_sha256_certs settings). -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="notes.breadcat.cc" android:pathPrefix="/open/" />
-            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

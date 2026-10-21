@@ -47,11 +47,11 @@ void main() {
 
   test('parses the web form of a page link, from any host', () {
     expect(
-      PageLink.parse('https://notes.breadcat.cc/open/$page'),
+      PageLink.parse('https://notes.example.com/open/$page'),
       const PageLink(page),
     );
     expect(
-      PageLink.parse('https://notes.breadcat.cc/open/$page?block=$block'),
+      PageLink.parse('https://notes.example.com/open/$page?block=$block'),
       const PageLink(page, blockId: block),
     );
     expect(
@@ -63,14 +63,14 @@ void main() {
       const PageLink(page),
     );
     expect(
-      PageLink.fromUri(Uri.parse('HTTPS://NOTES.BREADCAT.CC/open/$page')),
+      PageLink.fromUri(Uri.parse('HTTPS://NOTES.EXAMPLE.COM/open/$page')),
       const PageLink(page),
     );
   });
 
   test('the web form still builds the notes link the app opens', () {
     expect(
-      PageLink.parse('https://notes.breadcat.cc/open/$page?block=$block')?.url,
+      PageLink.parse('https://notes.example.com/open/$page?block=$block')?.url,
       'notes://page/$page?block=$block',
     );
   });
@@ -80,16 +80,16 @@ void main() {
     'notes://pair?hub=http://100.101.102.103:47100&token=abc',
     'https://example.com/notes://page/$page',
     'http://127.0.0.1:47100/open/$page',
-    'https://notes.breadcat.cc/open/$page/',
-    'https://notes.breadcat.cc/open/$page/extra',
-    'https://notes.breadcat.cc/open/',
-    'https://notes.breadcat.cc/open',
-    'https://notes.breadcat.cc/$page',
-    'https://notes.breadcat.cc/view/$page',
-    'https://notes.breadcat.cc:8443/open/$page',
-    'https://user@notes.breadcat.cc/open/$page',
-    'https://notes.breadcat.cc/open/$page?block=$block&block=$block',
-    'ftp://notes.breadcat.cc/open/$page',
+    'https://notes.example.com/open/$page/',
+    'https://notes.example.com/open/$page/extra',
+    'https://notes.example.com/open/',
+    'https://notes.example.com/open',
+    'https://notes.example.com/$page',
+    'https://notes.example.com/view/$page',
+    'https://notes.example.com:8443/open/$page',
+    'https://user@notes.example.com/open/$page',
+    'https://notes.example.com/open/$page?block=$block&block=$block',
+    'ftp://notes.example.com/open/$page',
     'notes://open/$page',
     'notes://page',
     'notes://page/',

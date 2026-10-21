@@ -14,9 +14,15 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 
 $repo    = 'V:\projects\notes-app'
 $cliDir   = 'F:\build\notes-cli'
-$hubUrl   = 'https://notes.breadcat.cc'
 $settings = Join-Path $HOME '.claude\settings.json'
 $cliCfg   = Join-Path $env:APPDATA 'notes\config.toml'
+
+# The hub URL comes from the notes CLI config (there is no built-in hub).
+$cfg = Get-Content -LiteralPath $cliCfg -Raw -ErrorAction SilentlyContinue
+$hubUrl = $null
+if ($cfg -and $cfg -match '(?m)^\s*hub\s*=\s*"([^"]+)"') { $hubUrl = $Matches[1].TrimEnd('/') }
+if (-not $hubUrl) { $hubUrl = (Read-Host "Hub URL (for example https://notes.example.com)").Trim().TrimEnd('/') }
+if (-not $hubUrl) { throw 'No hub URL given' }
 
 # 1. notes CLI on the user PATH
 if (-not (Test-Path "$cliDir\notes.exe")) { throw "notes.exe not found in $cliDir" }
@@ -43,7 +49,6 @@ if ($plugins -notmatch 'notes@notes-app') {
 
 # 3. Plugin options: hub URL and the agent token from the CLI config
 $token = $null
-$cfg = Get-Content -LiteralPath $cliCfg -Raw -ErrorAction SilentlyContinue
 if ($cfg -and $cfg -match '(?m)^\s*token\s*=\s*"([^"]+)"') { $token = $Matches[1] }
 if (-not $token) {
     Write-Host "No token readable in $cliCfg."

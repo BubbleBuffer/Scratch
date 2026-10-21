@@ -12,10 +12,10 @@ to its temporary copy only; no git revision is changed.
 
 ## Acceptance and diagnostics
 
-- **Acceptance is the build01 workflow.** The `search-ab` GitHub workflow runs
-  this harness on build01 with `baseline`, `candidate` and `pairs` inputs. Its
+- **Acceptance is the self-hosted CI runner workflow.** The `search-ab` GitHub workflow runs
+  this harness on the self-hosted CI runner with `baseline`, `candidate` and `pairs` inputs. Its
   verdict is the one that counts.
-- **linux01 and local runs are diagnostic only.** They are for development and
+- **The Linux machine and local runs are diagnostic only.** They are for development and
   investigation. A result from them does not accept or reject a candidate, and
   it does not qualify hosted absolute latency or UI latency.
 
@@ -29,7 +29,7 @@ python crates/core/benches/ab_search_gate.py selftest      # no Cargo, no benchm
 python crates/core/benches/ab_search_gate.py run --help
 ```
 
-- `run` is heavy. Run it on build01 (acceptance) or linux01 (diagnostic), not on the PC.
+- `run` is heavy. Run it on the self-hosted CI runner (acceptance) or the Linux machine (diagnostic), not on the PC.
 - The same-binary control is always on. There is no flag to turn it off.
 - `--jobs` is passed to cargo as `-j`. Default `max(1, min(2, CPUs))`.
 - `--cargo` names the cargo executable (default `cargo` on PATH).
@@ -125,16 +125,16 @@ or `verdict: INVALID`.
 `--out-dir` inside the repository must be under `target/`, which git ignores.
 Raw outputs must not be committed. `out-dir` and `target` are never deleted.
 
-## Running on linux01 (diagnostic)
+## Running on the Linux machine (diagnostic)
 
-The steps below run from Git Bash on the PC, or in a shell on linux01. Both
+The steps below run from Git Bash on the PC, or in a shell on the Linux machine. Both
 revisions must resolve in the clone, so use a full clone (not `--depth`). The
 candidate must also be on origin, so push the candidate branch first.
 
 ```
-/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes linux01 'git clone https://github.com/BubbleBuffer/notes-app.git /home/dev/work/search-ab'
-/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes linux01 'cd /home/dev/work/search-ab && git fetch origin <candidate-branch> && git checkout --detach origin/<candidate-branch> && python3 crates/core/benches/ab_search_gate.py selftest'
-/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes linux01 'mkdir -p /home/dev/work/search-ab-worktrees && ln -sfn /home/dev/work/BubblePaw-base-agent /home/dev/work/search-ab-worktrees/BubblePaw-base-agent && test -d /home/dev/work/BubblePaw-base-agent && ulimit -n 65536 && cd /home/dev/work/search-ab && . /home/dev/.cargo/env && python3 crates/core/benches/ab_search_gate.py run --baseline <baseline-rev> --candidate <candidate-rev> --pairs 5 --jobs 2 --work-dir /home/dev/work/search-ab-worktrees --target-dir /home/dev/work/.target/search-ab --out-dir /home/dev/work/search-ab-results/<name>'
+/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes <linux-host> 'git clone https://github.com/BubbleBuffer/notes-app.git /home/dev/work/search-ab'
+/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes <linux-host> 'cd /home/dev/work/search-ab && git fetch origin <candidate-branch> && git checkout --detach origin/<candidate-branch> && python3 crates/core/benches/ab_search_gate.py selftest'
+/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes <linux-host> 'mkdir -p /home/dev/work/search-ab-worktrees && ln -sfn /home/dev/work/BubblePaw-base-agent /home/dev/work/search-ab-worktrees/BubblePaw-base-agent && test -d /home/dev/work/BubblePaw-base-agent && ulimit -n 65536 && cd /home/dev/work/search-ab && . /home/dev/.cargo/env && python3 crates/core/benches/ab_search_gate.py run --baseline <baseline-rev> --candidate <candidate-rev> --pairs 5 --jobs 2 --work-dir /home/dev/work/search-ab-worktrees --target-dir /home/dev/work/.target/search-ab --out-dir /home/dev/work/search-ab-results/<name>'
 ```
 
 Worktree root and sibling dependencies. The clone must sit directly under
@@ -157,8 +157,8 @@ missing sibling fails the build even with `-p vault_core`.
   failed during its untimed corpus setup with "Too many open files" under the
   default limit. This changes the environment, not the workload.
 - The private clone needs GitHub authentication; a transient credential helper
-  can supply credentials for clone/fetch without saving them on linux01.
-- `linux01-run` ships only the working tree (tracked and untracked files, no
+  can supply credentials for clone/fetch without saving them on the Linux machine.
+- The remote Linux build helper ships only the working tree (tracked and untracked files, no
   `.git`). It can run the selftest, but the gate resolves revisions from git
   history, so use the full clone above for a real run.
 
@@ -190,7 +190,7 @@ Without git history they fail, and the selftest reports that check as FAIL.
 - A run takes `4 x pairs` rounds, about twice the rounds of the earlier gate
   (which had `2 x pairs`).
 - Earlier record, before the control band (rule: both median p50 and median p95
-  ratios at most 1.05, no control): on linux01, `4f978b9` versus `333d1ea` with
+  ratios at most 1.05, no control): on the Linux machine, `4f978b9` versus `333d1ea` with
   five AB/BA pairs gave **FAIL**, with fourteen warm cases over 1.05 in median
   p50. See the [superseded diagnostic record](../../../wiki/architecture/search-queries.md#interleaved-ab-acceptance-2026-10-13).
   That result does not apply to the current rule.

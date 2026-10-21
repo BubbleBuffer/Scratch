@@ -42,7 +42,7 @@ Machine: Windows 11 Home 10.0.26200, Ryzen 7 5800X (8 cores / 16 threads), appro
 
 **Complete: same hotspots at the agreed bridge-versus-Flutter split.** Xvfb software rendering on a loaded 4-core host does not measure UI frame time meaningfully: these UI numbers are a relative baseline only. The absolute 20 ms UI target needs real hardware to judge. Five Linux desktop profile runs exited 0 with 100 measured keystrokes per route, following one warm-up round on each fresh 10,000-page vault. The extra runs cover the wide spread. See [every run, stage timings, load and command](../architecture/core-state.md#linux-profile-search-measurement-2026-10-13).
 
-Every result below uses **Flutter 3.47.7 / Dart 3.13.5** (the accepted SDK difference from 3.47.5), on linux01: Debian 13, i5-1135G7, four available CPUs, 8 GiB RAM, Xvfb/Mesa llvmpipe software rendering with two worker threads. Logical fixture 1440×900, native surface 1280×720, DPR 1. These are medians of the five run percentiles, with min–max spread in brackets; timings are milliseconds.
+Every result below uses **Flutter 3.47.7 / Dart 3.13.5** (the accepted SDK difference from 3.47.5), on the Linux machine: Debian 13, i5-1135G7, four available CPUs, 8 GiB RAM, Xvfb/Mesa llvmpipe software rendering with two worker threads. Logical fixture 1440×900, native surface 1280×720, DPR 1. These are medians of the five run percentiles, with min–max spread in brackets; timings are milliseconds.
 
 | Route / endpoint | Flutter | Median p50 [min–max] | Median p95 [min–max] |
 | --- | --- | --- | --- |

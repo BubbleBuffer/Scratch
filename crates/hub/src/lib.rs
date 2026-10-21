@@ -36,9 +36,7 @@ use vault_core::Vault;
 use vault_sync::{Hub, HubRequest};
 
 pub use agent::AgentTestHooks;
-pub use config::{
-    AgentSection, ApprovalsSetting, Config, McpOAuthConfig, OidcConfig, SchedulesSection,
-};
+pub use config::{AgentSection, Config, McpOAuthConfig, OidcConfig, SchedulesSection};
 
 /// Shared by every handler.
 pub(crate) struct AppState {

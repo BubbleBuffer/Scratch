@@ -167,7 +167,7 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
           SettingsField(
             fieldKey: const ValueKey('hub-sign-in-url'),
             controller: _url,
-            placeholder: 'https://notes.breadcat.cc',
+            placeholder: 'https://notes.example.com',
             onChanged: (v) => AppSettings.read(context).update(
               (s) => s.hubSignInUrl = v.trim(),
             ),

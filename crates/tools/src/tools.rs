@@ -281,9 +281,8 @@ static TOOLS: LazyLock<Vec<ToolDef>> = LazyLock::new(|| vec![
 
 /// Tools that are callable over MCP but never listed. `memory_list` is the
 /// memory index the CLI reads (it was an alias of the old memory_search
-/// listing). `feedback_list` left
-/// the tool list; its code stays for the user (`notes feedback` and direct
-/// calls). `import_markdown` is the repo import the `notes wiki` CLI sends;
+/// listing). `feedback_list` left the tool list; it stays callable over MCP
+/// and by direct calls. `import_markdown` is the repo import the `notes wiki` CLI sends;
 /// models never see it.
 static HIDDEN: &[ToolDef] = &[
     ToolDef {

@@ -3,7 +3,7 @@
 // sidebar collapsed and the mobile Pages screen open the sheet, Send writes one report page under the hidden Feedback page,
 // Cancel writes nothing, and the report stays out of the sidebar and search.
 //
-// The package facts are faked here. Tests run on linux01, so the device facts
+// The package facts are faked here. Tests run on the Linux machine, so the device facts
 // come from the real Linux plugin, registered as the app does at startup: the
 // method-channel default cannot describe a Linux device (its data is typed as
 // the base class, which the collector casts to LinuxDeviceInfo).

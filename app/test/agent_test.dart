@@ -512,7 +512,7 @@ void main() {
     // Render the selected Hub state without opening an external connection.
     store.settings.agentHost = AgentHost.hub;
     tv.app.settings
-      ..clientUrl = 'https://notes.breadcat.cc'
+      ..clientUrl = 'https://notes.example.com'
       ..clientToken = 'test-token';
     store.debugSetHostInfo(
       const AgentHostInfo(
@@ -533,7 +533,7 @@ void main() {
     expect(key('agent-projects'), findsNothing);
     expect(
       textOf(tester, 'agent-host-info'),
-      'Runs on: notes.breadcat.cc · tools: vault',
+      'Runs on: notes.example.com · tools: vault',
     );
     await closeAi(tester, ai);
   });

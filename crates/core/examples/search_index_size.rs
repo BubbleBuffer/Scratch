@@ -1,4 +1,4 @@
-//! Reproducible storage-option probe; run on a quiet linux01 in release mode.
+//! Reproducible storage-option probe; run on a quiet Linux machine in release mode.
 //! cargo run --release -p vault_core --example search_index_size -- /tmp/notes-index-size
 //! Keeps the seeded vault and each option database for dbstat inspection.
 use std::{fs, path::Path, time::Instant};

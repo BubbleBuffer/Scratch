@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pull via a dedicated root key forced to rrsync -ro on the VPS. No push or
-# arbitrary remote command is needed. Run as dev on linux01, never on the VPS.
+# arbitrary remote command is needed. Run as dev on the Linux machine, never on the VPS.
 set -Eeuo pipefail
 umask 077
 export LC_ALL=C

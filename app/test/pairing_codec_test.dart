@@ -4,7 +4,7 @@ import 'package:notes_app/features/sync/pairing_codec.dart';
 void main() {
   const token = '0123456789abcdef0123456789abcdef';
   for (final url in [
-    'https://notes.breadcat.cc',
+    'https://notes.example.com',
     'https://host:8443',
     'http://192.168.0.5:47100',
   ]) {

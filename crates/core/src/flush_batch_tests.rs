@@ -193,7 +193,7 @@ fn cache_write_failure_keeps_the_durable_unindexed_snapshot() {
 /// FLUSH_LOCK_FIXTURE=<copy> cargo test -p vault_core --lib
 ///     large_aged_fixture_batch_hold -- --ignored --nocapture
 #[test]
-#[ignore = "requires an owned copy of the 10,001-page aged fixture on linux01"]
+#[ignore = "requires an owned copy of the 10,001-page aged fixture on the Linux machine"]
 fn large_aged_fixture_batch_hold() {
     let path = PathBuf::from(std::env::var("FLUSH_LOCK_FIXTURE").expect("owned fixture copy"));
     let source = stopped(&path);

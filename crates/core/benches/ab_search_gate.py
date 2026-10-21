@@ -42,7 +42,7 @@ SWITCH = "SEARCH_PERF_REPORT_ONLY"
 BAND_FLOOR = 0.05  # minimum noise band on the median p50 ratio; the control spread can widen it
 DEFAULT_PAIRS = 5
 MIN_PAIRS = 5
-JOBS_CAP = 2  # default cargo -j cap, so the default build stays modest on linux01
+JOBS_CAP = 2  # default cargo -j cap, so the default build stays modest on the Linux machine
 RUN_TIMEOUT_S = 900
 EXPECTED_CASE_COUNT = 47
 EXIT_PASS, EXIT_FAIL, EXIT_INVALID = 0, 1, 2
@@ -995,7 +995,7 @@ def cmd_selftest(args) -> int:
         len({c["label"] for c in two_ids["cases"]}) == 1,
     )
 
-    # libtest inline prefix (seen on linux01): the first output line starts with "test <name> ... ".
+    # libtest inline prefix (seen on the Linux machine): the first output line starts with "test <name> ... ".
     prefixed_text = SYNTHETIC_SAMPLE.replace(
         "word index,", f"test {TEST_NAME} ... word index,", 1
     )

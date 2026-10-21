@@ -15,8 +15,6 @@ pub mod import;
 #[path = "notes_cli/wiki.rs"]
 pub mod wiki;
 
-pub const DEFAULT_HUB: &str = "https://notes.breadcat.cc";
-
 /// Deliberately has no Debug implementation: the token is a secret.
 pub struct Config {
     pub hub: String,
@@ -55,10 +53,14 @@ impl Config {
             .ok_or_else(|| {
                 anyhow!("missing token; set NOTES_TOKEN or token in notes/config.toml")
             })?;
-        Ok(Self {
-            hub: hub.or(file.hub).unwrap_or_else(|| DEFAULT_HUB.into()),
-            token,
-        })
+        // There is no built-in hub: the URL is whatever the user configured.
+        let hub = hub
+            .or(file.hub)
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| {
+                anyhow!("no hub configured; set NOTES_HUB_URL or hub in notes/config.toml")
+            })?;
+        Ok(Self { hub, token })
     }
 }
 

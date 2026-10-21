@@ -10,14 +10,14 @@ status: current
 
 **Build step 4c, locally verified 2026-10-08.** The linux/amd64 image, archive and deploy kit are built and tested locally. These are instructions for the lead. No VPS connection or deployment was performed. See [Hub server](hub.md) for config and routes, and [the agent plan](../integrations/agent.md) for 4b and the later desktop relay.
 
-The target is **linux/amd64** at **https://notes.breadcat.cc**. Build on this Windows PC: the x86_64 VPS has about 9 GB free. The hub joins the external `notes-ingress` Docker network; Caddy terminates TLS and forwards HTTP to `notes-hub:8080`. The hub publishes no host port.
+The target is **linux/amd64** at **https://notes.example.com**. Build on this Windows PC: the x86_64 VPS has about 9 GB free. The hub joins the external `notes-ingress` Docker network; Caddy terminates TLS and forwards HTTP to `notes-hub:8080`. The hub publishes no host port.
 
 ## Authentik
 
 The existing installation is Authentik 2026.5 in `/home/networking/authentik`, container `authentik-server-1`. In its admin UI:
 
 1. Create the group `notes-users` and add the intended users.
-2. Create an OAuth2/OpenID provider with **Confidential** client type. Record its client ID and secret. Set the redirect URI to **strict** `https://notes.breadcat.cc/auth/callback`.
+2. Create an OAuth2/OpenID provider with **Confidential** client type. Record its client ID and secret. Set the redirect URI to **strict** `https://notes.example.com/auth/callback`.
 3. Select an RSA **Signing Key** so ID tokens use **RS256**; leave token encryption unset. Use the provider's existing authorization flow and select the `openid`, `email` and `profile` scope mappings.
 4. Keep issuer mode **Each provider has a different issuer, based on the application slug**. Create an application with slug **notes-hub** and associate this provider. Its issuer is `https://<authentik host>/application/o/notes-hub/`, including the trailing slash.
 
@@ -62,7 +62,7 @@ Pins: Rust **1.97.1** (`rust:1.97.1-bookworm`), Node **22.18.0** (`node:22.18.0-
 The following transfer commands are for the lead to run; the build script does not deploy. For example, first create `/home/networking/notes-hub` on the VPS using the lead's normal access, then send the archive and text kit using **Windows OpenSSH**:
 
 ```powershell
-$hubDestination = 'vps:/home/networking/notes-hub/'
+$hubDestination = '<server>:/home/networking/notes-hub/'
 & C:\Windows\System32\OpenSSH\scp.exe .\target\notes-hub.tar.gz $hubDestination
 & C:\Windows\System32\OpenSSH\scp.exe .\deploy\hub\compose.yaml .\deploy\hub\.env.example .\deploy\hub\Caddyfile.snippet $hubDestination
 ```
@@ -78,7 +78,7 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Edit `.env`: set the real issuer, client ID and client secret, and `NOTES_HUB_OIDC_ALLOWED_GROUPS=notes-users`. Keep `NOTES_HUB_PUBLIC_URL=https://notes.breadcat.cc`. Comma-separated or space-separated lists work. Environment variables override `/data/hub.toml`; keep secrets in `.env` rather than in the wiki or shell command history.
+Edit `.env`: set the real issuer, client ID and client secret, and `NOTES_HUB_OIDC_ALLOWED_GROUPS=notes-users`. Keep `NOTES_HUB_PUBLIC_URL=https://notes.example.com`. Comma-separated or space-separated lists work. Environment variables override `/data/hub.toml`; keep secrets in `.env` rather than in the wiki or shell command history.
 
 ### Claude connector
 
@@ -86,7 +86,7 @@ The Claude connector is off by default. Set both variables, or neither:
 
 | Variable | TOML key | Value |
 |---|---|---|
-| `NOTES_HUB_MCP_OAUTH_ISSUER` | `[mcp_oauth] issuer` | `https://auth.breadcat.cc/application/o/claude-mcp/` |
+| `NOTES_HUB_MCP_OAUTH_ISSUER` | `[mcp_oauth] issuer` | `https://auth.example.com/application/o/claude-mcp/` |
 | `NOTES_HUB_MCP_OAUTH_CLIENT_ID` | `[mcp_oauth] client_id` | `d1QDPw9lEM6jOT2WFfcJkggcMqLuA6BrEIvvWF4b` (the public `claude-mcp` client) |
 
 - Setting only one of them is a startup error. Both need `NOTES_HUB_PUBLIC_URL`.
@@ -116,7 +116,7 @@ This initializes only those paths; it does not recursively change ownership of a
 Add [Caddyfile.snippet](../../deploy/hub/Caddyfile.snippet) to `/home/networking/caddy/templates/Caddyfile.template`, not to the generated `configs/Caddyfile`:
 
 ```caddyfile
-notes.breadcat.cc {
+notes.example.com {
     import cloudflare
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -142,7 +142,7 @@ networks:
     external: true
 ```
 
-Use the same DNS setup as the existing sites for `notes.breadcat.cc`. WebSockets pass through `reverse_proxy` by default; `flush_interval -1` is unnecessary.
+Use the same DNS setup as the existing sites for `notes.example.com`. WebSockets pass through `reverse_proxy` by default; `flush_interval -1` is unnecessary.
 
 Start the hub, render the Caddy template, and recreate Caddy with the added service network:
 
@@ -172,21 +172,21 @@ Follow the CLI's browser/device instructions from the lead's browser. Codex devi
 docker compose ps
 docker compose logs --tail 100 hub
 docker compose exec hub curl --fail --silent http://127.0.0.1:8080/health
-curl --fail --silent https://notes.breadcat.cc/health
+curl --fail --silent https://notes.example.com/health
 docker compose exec hub notes-hub --config /data/hub.toml --devices
 ```
 
-Both health requests should return HTTP 200 with body `notes-hub`. Then point the app's hub setting at `https://notes.breadcat.cc`, sign in as a `notes-users` member and check one sync round; check a user outside the allowed group is refused. `/health` alone does not prove Authentik login, app callbacks or agent provider access. Once 4b is available, check the remote Agent section and streamed responses too.
+Both health requests should return HTTP 200 with body `notes-hub`. Then point the app's hub setting at `https://notes.example.com`, sign in as a `notes-users` member and check one sync round; check a user outside the allowed group is refused. `/health` alone does not prove Authentik login, app callbacks or agent provider access. Once 4b is available, check the remote Agent section and streamed responses too.
 
 For emergency pairing only, `docker compose exec hub notes-hub --config /data/hub.toml --pair <label>` prints a bearer token. The running hub reloads token file changes before authentication checks and reloads under a lock before every save, so `--pair` and `--unpair` take effect without a restart. Revoke the token after recovery with the matching `--unpair <label>` command. A restart cancels logins and agent connections in progress.
 
 ## Updates, backups and rollback
 
-The [backup kit](../../deploy/hub/backup/install-vps.md) runs the same stopped-volume backup at **02:30 UTC daily** through `notes-hub-backup.service` and its timer on the VPS, installed 2026-10-14. The first run, `notes-hub-data-20261014T024635Z.tar.gz`, succeeded. The root oneshot stops the compose `hub` service, streams a root-owned tar of the complete volume through the installed hub image, and restarts the hub. An exit trap retries the restart on failure. A shared `.deploy.lock` excludes deployments during the backup.
+The [backup kit](../../deploy/hub/backup/install-server.md) runs the same stopped-volume backup at **02:30 UTC daily** through `notes-hub-backup.service` and its timer on the VPS, installed 2026-10-14. The first run, `notes-hub-data-20261014T024635Z.tar.gz`, succeeded. The root oneshot stops the compose `hub` service, streams a root-owned tar of the complete volume through the installed hub image, and restarts the hub. An exit trap retries the restart on failure. A shared `.deploy.lock` excludes deployments during the backup.
 
 Archives live in `/opt/notes-hub/backups/notes-hub-data-<UTC timestamp>.tar.gz`, with a sibling `.tar.gz.sha256`. The directory is `0700`; archives and checksums are `0600`. The script keeps the newest seven archives and refuses to stop the hub when free disk is below twice the last archive size. A first backup has no previous size to compare.
 
-The [linux01 pull kit](../../deploy/hub/backup/install-home.md) runs as `dev` through a systemd user timer at **04:00 UTC daily** (since 2026-10-14) and pulls into `/home/dev/backups/notes-hub/`. Its key is restricted to `rrsync -ro /opt/notes-hub/backups`. It checks every SHA-256 and gzip/tar structure before publishing, and keeps 30 days by archive timestamp. Its private key stays on linux01. The VPS public-key entry uses `restrict,command="/usr/bin/rrsync -ro /opt/notes-hub/backups"`; it grants read-only backup-directory access. Both timers use `Persistent=true`.
+The [Linux machine pull kit](../../deploy/hub/backup/install-home.md) runs as `dev` through a systemd user timer at **04:00 UTC daily** (since 2026-10-14) and pulls into `/home/dev/backups/notes-hub/`. Its key is restricted to `rrsync -ro /opt/notes-hub/backups`. It checks every SHA-256 and gzip/tar structure before publishing, and keeps 30 days by archive timestamp. Its private key stays on the Linux machine. The VPS public-key entry uses `restrict,command="/usr/bin/rrsync -ro /opt/notes-hub/backups"`; it grants read-only backup-directory access. Both timers use `Persistent=true`.
 Before loading a replacement image, retain the current image and take a backup. After the approved kit installation, run from `/opt/notes-hub`:
 
 ```sh
@@ -223,9 +223,9 @@ docker run --rm --user 0 --entrypoint tar -v notes-hub-data-restore:/data -v "$P
 docker compose up -d --force-recreate hub
 ```
 
-The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Docker host against a private archive and checksum. It creates a fresh `notes-hub-bk-test-restore-*` volume, extracts as root, and compares archive contents and ownership. Before the hub starts, it compares the SHA-256 of every file under `vault/.vault/docs`, `vault/.vault/logs`, `vault/pages` and `vault/.vault/hub`, and of `hub.toml`, between the archive and the restored volume. The documents in `.vault/docs` are the content of record, so an archive with none fails unless `--allow-empty-vault` is given. The 2026-10-14 production archive has an empty vault and needs that flag. The verifier then starts an isolated hub on a free localhost port with an empty test config, a fake issuer and the agent disabled, checks `/health` and `notes-hub --devices`, and removes its own resources. The [docker01 harness](../../deploy/hub/backup/test-docker01.sh) seeds two synthetic pages through the hub's own agent MCP, so the archive holds real Loro documents. It then exercises backup failure recovery and retention.
+The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Docker host against a private archive and checksum. It creates a fresh `notes-hub-bk-test-restore-*` volume, extracts as root, and compares archive contents and ownership. Before the hub starts, it compares the SHA-256 of every file under `vault/.vault/docs`, `vault/.vault/logs`, `vault/pages` and `vault/.vault/hub`, and of `hub.toml`, between the archive and the restored volume. The documents in `.vault/docs` are the content of record, so an archive with none fails unless `--allow-empty-vault` is given. The 2026-10-14 production archive has an empty vault and needs that flag. The verifier then starts an isolated hub on a free localhost port with an empty test config, a fake issuer and the agent disabled, checks `/health` and `notes-hub --devices`, and removes its own resources. The private backup test script seeds two synthetic pages through the hub's own agent MCP, so the archive holds real Loro documents. It then exercises backup failure recovery and retention.
 
-**Restore test: 2026-10-14.** The docker01 harness seeds two pages through the hub's agent MCP, so the archive holds two Loro documents, two update logs and two Markdown pages. The restore check compares every hashed file before startup, then passes health and `--devices`. Tar failure, SIGTERM, disk-space refusal and retention checks pass. The production archive of 2026-10-14 has an empty vault: it fails without `--allow-empty-vault` and passes with it. These are filesystem restore checks, not authenticated sync or real provider sign-in tests. [Earlier recorded output and verification limits](../../deploy/hub/backup/TEST-REPORT.md).
+**Restore test: 2026-10-14.** The Docker host harness seeds two pages through the hub's agent MCP, so the archive holds two Loro documents, two update logs and two Markdown pages. The restore check compares every hashed file before startup, then passes health and `--devices`. Tar failure, SIGTERM, disk-space refusal and retention checks pass. The production archive of 2026-10-14 has an empty vault: it fails without `--allow-empty-vault` and passes with it. These are filesystem restore checks, not authenticated sync or real provider sign-in tests. [Earlier recorded output and verification limits](../../deploy/hub/backup/TEST-REPORT.md).
 
 ## Verification record and unverified points
 
@@ -242,17 +242,17 @@ The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Dock
 
 ## Live deployment
 
-- Running at `https://notes.breadcat.cc` on the VPS (`vps`), from `/opt/notes-hub` (compose file plus a `0600` `.env`). The data volume is `notes-hub-data`.
+- Running at `https://notes.example.com` on the VPS (`<server>`), from `/opt/notes-hub` (compose file plus a `0600` `.env`). The data volume is `notes-hub-data`.
 - Running image: commit `d45af66`, deployed 2026-10-14 by CI (hub image run 38544539596) after the first push to notes-app's `release` branch. It serves `/mcp` with agent tokens. `notes-hub:previous` is the 2026-10-08 hand-loaded image (`0caec07`). Both providers are signed in inside the container.
-- Authentik (`auth.breadcat.cc`):
+- Authentik (`auth.example.com`):
   - The provider and the application are both called `notes-hub`, created through `ak shell`.
-  - It is a confidential client: strict redirect `https://notes.breadcat.cc/auth/callback`, signed with the self-signed key, scopes openid, email and profile.
+  - It is a confidential client: strict redirect `https://notes.example.com/auth/callback`, signed with the self-signed key, scopes openid, email and profile.
   - Allowed grant types: authorization code and refresh token. Authentik 2026.5 checks this list per provider; a provider created through `ak shell` had it empty, and every login failed with "Invalid grant_type for provider" until it was set by hand (2026-10-15). The first real login, from the PC (`RobinPC`), succeeded right after.
   - The group is `notes-users`, with `akadmin` in it.
   - The hub asks for `openid email profile` (`NOTES_HUB_OIDC_SCOPES`); Authentik's profile scope carries `groups`.
 - Caddy:
   - Backups `*.before-notes-hub-20261008T*` were taken first.
-  - The template gained the `notes.breadcat.cc` block; the compose file gained `notes-ingress`.
+  - The template gained the `notes.example.com` block; the compose file gained `notes-ingress`.
   - Caddy was attached live with `docker network connect` and reloaded, with no recreate.
 - Checked live:
   - `/health` returns 200 (2026-10-08 and 2026-10-14).

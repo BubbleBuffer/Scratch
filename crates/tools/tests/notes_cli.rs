@@ -630,6 +630,20 @@ fn combined(output: &Output) -> String {
 }
 
 #[test]
+fn missing_hub_is_clear_and_has_no_built_in_default() {
+    let temp = TempDir::new();
+    let output = isolated_bin(&temp.0.join("home"))
+        .env("NOTES_TOKEN", "synthetic-token")
+        .args(["search", "something"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let text = combined(&output);
+    assert!(text.contains("no hub configured"), "{text}");
+    assert!(!text.contains("synthetic-token"), "token leaked: {text}");
+}
+
+#[test]
 fn missing_token_is_clear_and_offline_dry_run_needs_no_credentials() {
     let temp = TempDir::new();
     let output = isolated_bin(&temp.0.join("home"))

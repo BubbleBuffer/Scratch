@@ -74,17 +74,21 @@ pub struct AgentSection {
     pub bun: String,
     /// The Claude Code extension folder, holding `src/main.ts` (empty: none).
     pub claude_code_extension: String,
-    /// `ask` (default) or `allow` for tools that declare `Confirm`.
-    pub approvals: ApprovalsSetting,
+    /// Set when a config still has the removed `approvals` key (or
+    /// `NOTES_HUB_AGENT_APPROVALS`). It is ignored: hub agent runs use
+    /// Bypass. [`Config::load`] prints a deprecation line.
+    #[doc(hidden)]
+    #[serde(rename = "approvals", deserialize_with = "present")]
+    pub legacy_approvals: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ApprovalsSetting {
-    #[default]
-    Ask,
-    Allow,
+/// Accepts any value: the key is there.
+fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
+    serde::de::IgnoredAny::deserialize(d).map(|_| true)
 }
+
+const LEGACY_APPROVALS: &str = "notes-hub: [agent] approvals and NOTES_HUB_AGENT_APPROVALS \
+     are deprecated and ignored (hub agent runs use Bypass); remove them.";
 
 impl Default for AgentSection {
     fn default() -> AgentSection {
@@ -95,7 +99,7 @@ impl Default for AgentSection {
             default_model: String::new(),
             bun: String::new(),
             claude_code_extension: String::new(),
-            approvals: ApprovalsSetting::Ask,
+            legacy_approvals: false,
         }
     }
 }
@@ -222,6 +226,9 @@ impl Config {
         };
         c.apply_env(|k| std::env::var(k).ok())?;
         c.validate()?;
+        if c.agent.legacy_approvals {
+            eprintln!("{LEGACY_APPROVALS}");
+        }
         Ok(c)
     }
 
@@ -316,16 +323,8 @@ impl Config {
         if let Some(v) = var("AGENT_CLAUDE_CODE_EXTENSION") {
             a.claude_code_extension = v;
         }
-        if let Some(v) = var("AGENT_APPROVALS") {
-            a.approvals = match v.trim().to_ascii_lowercase().as_str() {
-                "ask" => ApprovalsSetting::Ask,
-                "allow" => ApprovalsSetting::Allow,
-                _ => {
-                    return Err(format!(
-                        "NOTES_HUB_AGENT_APPROVALS: ask or allow, not {v:?}"
-                    ))
-                }
-            };
+        if var("AGENT_APPROVALS").is_some() {
+            a.legacy_approvals = true;
         }
         Ok(())
     }
@@ -632,7 +631,6 @@ mod tests {
             data_dir = "/data"
             [agent]
             default_model = "claude-code/haiku"
-            approvals = "allow"
             "#,
         )
         .unwrap();
@@ -642,11 +640,10 @@ mod tests {
             vault_agent::bubblepaw_core::ExecutionMode::Native
         );
         assert!(!c.agent.enable_js);
-        assert_eq!(c.agent.approvals, ApprovalsSetting::Allow);
+        assert!(!c.agent.legacy_approvals);
         c.apply_env(|k| match k {
             "NOTES_HUB_AGENT_ENABLED" => Some("off".into()),
             "NOTES_HUB_AGENT_BUN" => Some("/usr/local/bin/bun".into()),
-            "NOTES_HUB_AGENT_APPROVALS" => Some("ask".into()),
             "NOTES_HUB_AGENT_EXECUTION_MODE" => Some("js".into()),
             "NOTES_HUB_AGENT_ENABLE_JS" => Some("true".into()),
             _ => None,
@@ -655,7 +652,6 @@ mod tests {
         assert!(!c.agent.enabled);
         assert_eq!(c.agent.bun, "/usr/local/bin/bun");
         assert_eq!(c.agent.default_model, "claude-code/haiku");
-        assert_eq!(c.agent.approvals, ApprovalsSetting::Ask);
         assert_eq!(
             c.agent.execution_mode,
             vault_agent::bubblepaw_core::ExecutionMode::Js
@@ -668,9 +664,20 @@ mod tests {
         assert!(c
             .apply_env(|k| (k == "NOTES_HUB_AGENT_ENABLE_JS").then(|| "invalid".into()))
             .is_err());
-        assert!(Config::from_toml("[agent]\napprovals = \"maybe\"").is_err());
-        assert!(c
-            .apply_env(|k| (k == "NOTES_HUB_AGENT_APPROVALS").then(|| "x".into()))
-            .is_err());
+        assert!(!c.agent.legacy_approvals);
+    }
+
+    #[test]
+    fn the_removed_approvals_setting_is_accepted_and_ignored() {
+        for value in ["\"ask\"", "\"allow\"", "\"maybe\"", "1"] {
+            let c = Config::from_toml(&format!("[agent]\napprovals = {value}")).unwrap();
+            assert!(c.agent.legacy_approvals, "{value}");
+            assert!(c.agent.enabled);
+        }
+        let mut c = Config::default();
+        c.apply_env(|k| (k == "NOTES_HUB_AGENT_APPROVALS").then(|| "x".into()))
+            .unwrap();
+        assert!(c.agent.legacy_approvals);
+        assert!(Config::from_toml("[agent]\napprovalz = \"ask\"").is_err());
     }
 }

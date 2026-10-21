@@ -14,7 +14,7 @@ These pages describe how the app works now. Plans, proposals and decisions are i
 - [Add-on reference](../addons/index.md): Board and database registrations, files and dependencies.
 - [Android agent through the Hub](mobile-agent.md): Hub-only mobile agent, authenticated vault sync, local acceptance tests and the phone sign-in steps.
 - [Android release](android-release.md): How Android release builds are signed, numbered and published to the owner's private F-Droid repo.
-- [The Flutter app (state)](app-state.md): The built Flutter app: bridge, layers, change feed, stores, registries, UI kit, shells, sync and settings, databases, tests on the real core, CI on build01 (all branches, 2 jobs in parallel, no hosted runners since 2026-10-13), known gaps. (partial)
+- [The Flutter app (state)](app-state.md): The built Flutter app: bridge, layers, change feed, stores, registries, UI kit, shells, sync and settings, databases, tests on the real core, CI on the self-hosted CI runner (all branches, 2 jobs in parallel, no hosted runners since 2026-10-13), known gaps. (partial)
 - [Conflict format v2](conflict-format.md): Approved Block, Subtree and Page conflicts, edit-beats-delete, synced resolutions and undo, journal repair log and vault-wide auto-resolve.
 - [Core (state)](core-state.md): The built Rust core (vault_core): Loro page documents, properties, collections and queries, trash, links, attachments, history, import, index, bench.
 - [Data model](data-model.md): Everything is a page with blocks and properties; collections group pages; views are queries plus renderers; markdown is the file format.

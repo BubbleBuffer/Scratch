@@ -1,7 +1,7 @@
 # Home backup pull installation — prepared, not installed
 
-This kit is for **linux01**, using `dev`'s systemd **user** service and timer.
-The timer runs at **04:00 UTC** (linux01's timezone) and catches missed
+This kit is for **The Linux machine**, using `dev`'s systemd **user** service and timer.
+The timer runs at **04:00 UTC** (the Linux machine's timezone) and catches missed
 runs with `Persistent=true`. Check `timedatectl` before enabling it. The pull
 retains archives from the last 30 days based on their UTC filename timestamp,
 so a repeated pull does not extend an archive's life. Files are `0600` in a
@@ -9,11 +9,11 @@ so a repeated pull does not extend an archive's life. Files are `0600` in a
 
 No timer has been installed or enabled by preparing this kit. VPS installation
 and key authorization remain pending owner approval; see
-[install-vps.md](install-vps.md).
+[the server install guide](install-server.md).
 
 ## Dependencies and dedicated key
 
-As root on linux01, install missing dependencies:
+As root on the Linux machine, install missing dependencies:
 
 ```sh
 apt-get update
@@ -23,7 +23,7 @@ install -d -o dev -g dev -m 700 /home/dev/backups
 install -d -o dev -g dev -m 700 /home/dev/backups/notes-hub
 ```
 
-As **dev on linux01**, create the key if that exact pathname is not already in
+As **dev on the Linux machine**, create the key if that exact pathname is not already in
 use. Preserve an existing key; never overwrite it without investigating:
 
 ```sh
@@ -38,7 +38,7 @@ chmod 644 /home/dev/.ssh/notes-hub-backup_ed25519.pub
 
 The empty passphrase permits this bounded unattended rsync pull. Its public
 key is authorized on the VPS only with the forced read-only directory
-restriction shown in `install-vps.md`. The private key stays on linux01. No
+restriction shown in [the server install guide](install-server.md). The private key stays on the Linux machine. No
 home-server credential or home-side authorized key is installed on the VPS.
 
 ## Pin the VPS host key out of band
@@ -53,7 +53,7 @@ cat /etc/ssh/ssh_host_ed25519_key.pub
 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
 ```
 
-As dev on linux01, write a dedicated known_hosts entry using the verified
+As dev on the Linux machine, write a dedicated known_hosts entry using the verified
 public key, with the same host token that `BACKUP_HOST` will use. For the
 deployment IP:
 
@@ -72,8 +72,8 @@ configuration and does not accept a new key automatically.
 
 ## Copy and install the exact files
 
-From this checkout, copy these files using the owner's ordinary linux01
-access into a private staging directory owned by dev:
+From this checkout, copy these files using the owner's ordinary SSH access to the Linux machine
+into a private staging directory owned by dev:
 
 ```text
 deploy/hub/backup/pull-notes-hub-backup.sh
@@ -85,11 +85,11 @@ deploy/hub/backup/install-home.md
 Example PowerShell commands (when installation is requested):
 
 ```powershell
-& C:\Windows\System32\OpenSSH\ssh.exe -o BatchMode=yes linux01 'install -d -m 700 /home/dev/notes-hub-backup-kit'
-& C:\Windows\System32\OpenSSH\scp.exe -o BatchMode=yes deploy/hub/backup/pull-notes-hub-backup.sh deploy/hub/backup/pull-notes-hub-backup.service deploy/hub/backup/pull-notes-hub-backup.timer deploy/hub/backup/install-home.md linux01:/home/dev/notes-hub-backup-kit/
+& C:\Windows\System32\OpenSSH\ssh.exe -o BatchMode=yes <linux-host> 'install -d -m 700 /home/dev/notes-hub-backup-kit'
+& C:\Windows\System32\OpenSSH\scp.exe -o BatchMode=yes deploy/hub/backup/pull-notes-hub-backup.sh deploy/hub/backup/pull-notes-hub-backup.service deploy/hub/backup/pull-notes-hub-backup.timer deploy/hub/backup/install-home.md <linux-host>:/home/dev/notes-hub-backup-kit/
 ```
 
-As **dev** on linux01:
+As **dev** on the Linux machine:
 
 ```sh
 install -d -m 700 /home/dev/.local/libexec/notes-hub
@@ -133,7 +133,7 @@ preparation.
 ## Verify before enabling
 
 After the approved VPS key installation and a successful VPS backup, run as
-**dev** on linux01:
+**dev** on the Linux machine:
 
 ```sh
 bash -n /home/dev/.local/libexec/notes-hub/pull-notes-hub-backup.sh

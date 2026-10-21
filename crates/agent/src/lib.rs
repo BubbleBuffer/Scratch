@@ -1,7 +1,7 @@
 //! A BubblePaw agent over the open vault, shared by the desktop and hub hosts.
 //!
-//! - Sessions live in a per-device SQLite store, `<data_dir>/agent/agent.sqlite`,
-//!   outside the vault.
+//! - Sessions live in a per-device BubblePaw store, `<data_dir>/agent/agent.data/`,
+//!   outside the vault (`agent/agent.sqlite` is the legacy store file).
 //! - The default model surface is BubblePaw's `js` tool. Hosts can opt into
 //!   native entrypoints; vault and history tools remain composable inside JS.
 //! - Providers: `codex` (Codex sign-in), `claude-code` (the Bun extension, when

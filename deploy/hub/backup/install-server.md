@@ -24,14 +24,14 @@ using the owner's existing administrative access:
 deploy/hub/backup/notes-hub-backup.sh
 deploy/hub/backup/notes-hub-backup.service
 deploy/hub/backup/notes-hub-backup.timer
-deploy/hub/backup/install-vps.md
+deploy/hub/backup/install-server.md
 ```
 
 For example, from PowerShell in this checkout, **after approval**:
 
 ```powershell
-& C:\Windows\System32\OpenSSH\ssh.exe -o BatchMode=yes vps 'install -d -m 700 /root/notes-hub-backup-kit'
-& C:\Windows\System32\OpenSSH\scp.exe -o BatchMode=yes deploy/hub/backup/notes-hub-backup.sh deploy/hub/backup/notes-hub-backup.service deploy/hub/backup/notes-hub-backup.timer deploy/hub/backup/install-vps.md vps:/root/notes-hub-backup-kit/
+& C:\Windows\System32\OpenSSH\ssh.exe -o BatchMode=yes <server> 'install -d -m 700 /root/notes-hub-backup-kit'
+& C:\Windows\System32\OpenSSH\scp.exe -o BatchMode=yes deploy/hub/backup/notes-hub-backup.sh deploy/hub/backup/notes-hub-backup.service deploy/hub/backup/notes-hub-backup.timer deploy/hub/backup/install-server.md <server>:/root/notes-hub-backup-kit/
 ```
 
 As root on the VPS, install dependencies and the exact files:
@@ -70,14 +70,14 @@ environment does not change systemd's filesystem boundary.
 
 ## Authorize only read-only backup pulls
 
-Generate the dedicated key **on linux01 as dev**, following
+Generate the dedicated key **on the Linux machine as dev**, following
 [install-home.md](install-home.md). Bring only that key's public `.pub` line to
-the VPS. The private key stays on linux01 and is never copied to the VPS or this
+the VPS. The private key stays on the Linux machine and is never copied to the VPS or this
 PC.
 
 Preserve all existing root SSH keys. Add exactly one line to
 `/root/.ssh/authorized_keys`, replacing the public-key placeholder with the
-public line generated on linux01:
+public line generated on the Linux machine:
 
 ```text
 restrict,command="/usr/bin/rrsync -ro /opt/notes-hub/backups" ssh-ed25519 PUBLIC_KEY_FROM_LINUX01 notes-hub-backup-pull
@@ -118,9 +118,9 @@ credentials. The deployment `.env` is not part of the volume archive; retain
 it separately through the owner's private credential backup procedure.
 
 The separate `restore-test.sh` is a disposable restore verifier, not a
-production restore automation unit. Run it **on the Docker host**, docker01,
+production restore automation unit. Run it **on the Docker host**,
 with a private test archive and a Docker context that points to its local
-daemon (for example the named `docker01` context). Its health check uses the
+daemon (for example the named `<docker-host>` context). Its health check uses the
 host's localhost port, so running it on another machine requires separate
 port forwarding and is not covered by these instructions. It is not
 installed on the VPS by these commands.

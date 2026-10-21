@@ -40,9 +40,15 @@ check() {
 run_hook() { bash "$hook" > "$scratch/output" 2> "$scratch/stderr"; }
 cache="$LOCALAPPDATA/notes/memory-index/global.txt"
 
-# Default hub qualifies without an explicit config; LOCALAPPDATA wins over XDG.
+# Without a configured hub nothing identifies the cache: the index is shown live only.
 run_hook
-check 'default hub index not cached in LOCALAPPDATA' grep -qx production-index "$cache"
+check 'unconfigured hub wrote a cache' test ! -e "$cache"
+check 'unconfigured hub live index missing' grep -qx production-index "$scratch/output"
+
+# The configured hub qualifies without a plugin option; LOCALAPPDATA wins over XDG.
+printf 'hub = "https://notes.example.com"\n' >"$XDG_CONFIG_HOME/notes/config.toml"
+run_hook
+check 'configured hub index not cached in LOCALAPPDATA' grep -qx production-index "$cache"
 check 'LOCALAPPDATA branch wrote to XDG cache' test ! -e "$XDG_CACHE_HOME/notes"
 # The rules text comes from `notes memory rules`; a failing CLI gets the one-line fallback.
 check 'rules not printed from notes memory rules' grep -qx fake-memory-rules "$scratch/output"
@@ -78,9 +84,9 @@ export TEST_INDEX=double-quoted-index TEST_INDEX_EXIT=0
 run_hook
 check 'double-quoted configured hub was not cached' grep -qx double-quoted-index "$cache"
 
-# Unsupported TOML forms fail closed instead of qualifying the default hub.
+# Unsupported TOML forms fail closed instead of qualifying the configured hub.
 printf '"hub" = "https://custom.invalid"\n' > "$XDG_CONFIG_HOME/notes/config.toml"
-export CLAUDE_PLUGIN_OPTION_HUB_URL=https://notes.breadcat.cc TEST_INDEX=unsupported-index
+export CLAUDE_PLUGIN_OPTION_HUB_URL=https://notes.example.com TEST_INDEX=unsupported-index
 run_hook
 check 'unsupported config enabled the default cache' grep -qx double-quoted-index "$cache"
 printf "hub = 'https://custom.invalid'\n" > "$XDG_CONFIG_HOME/notes/config.toml"
@@ -97,4 +103,4 @@ export CLAUDE_PLUGIN_OPTION_HUB_URL=https://custom.invalid TEST_INDEX=xdg-index
 run_hook
 check 'XDG fallback index not cached' grep -qx xdg-index "$XDG_CACHE_HOME/notes/memory-index/global.txt"
 check 'cache hook wrote stderr' test ! -s "$scratch/stderr"
-printf 'session cache: passed (configured/default hub, staging guard, LOCALAPPDATA and XDG roots, offline fallback)\n'
+printf 'session cache: passed (configured/unconfigured hub, staging guard, LOCALAPPDATA and XDG roots, offline fallback)\n'

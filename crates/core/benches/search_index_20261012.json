@@ -1,5 +1,5 @@
 {
-  "machine": "linux01",
+  "machine": "linux-host",
   "cpu": "Intel Core i5-1135G7 @ 2.40GHz",
   "available_cpus": 4,
   "starting_commit": "e46d35063b0c84a6bcffe65542ccc7b2ff783a79",

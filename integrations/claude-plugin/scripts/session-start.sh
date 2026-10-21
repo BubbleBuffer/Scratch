@@ -49,7 +49,9 @@ notes_config_path() {
   fi
 }
 
-configured_hub=https://notes.breadcat.cc
+# The hub the CLI config names. There is no built-in hub, so without one the
+# config identifies nothing and the cache stays off.
+configured_hub=
 config=
 notes_config_path
 if [ -e "$config" ]; then
@@ -83,7 +85,7 @@ if [ -e "$config" ]; then
     done < "$config"
   fi
 fi
-effective_hub=${CLAUDE_PLUGIN_OPTION_HUB_URL:-https://notes.breadcat.cc}
+effective_hub=${CLAUDE_PLUGIN_OPTION_HUB_URL:-$configured_hub}
 hook_token=${CLAUDE_PLUGIN_OPTION_HUB_TOKEN:-${NOTES_TOKEN:-}}
 cache_allowed=0
 if [ -n "$configured_hub" ] && [ "${effective_hub%/}" = "${configured_hub%/}" ]; then
@@ -91,7 +93,6 @@ if [ -n "$configured_hub" ] && [ "${effective_hub%/}" = "${configured_hub%/}" ];
 fi
 
 index=$(
-  # Keep this fallback in sync with userConfig.hub_url.default in plugin.json.
   # An empty token environment value leaves config token resolution to the CLI.
   # Global only. Cap the hub call at 3 s so an unreachable hub cannot hold up
   # session start (a healthy hub answers in 0.6-1.1 s). Git Bash's GNU timeout is

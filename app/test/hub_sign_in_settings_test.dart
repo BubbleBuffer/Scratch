@@ -69,11 +69,28 @@ void main() {
         tester.element(find.byType(HomeScreen)),
       ).push(PageRouteBuilder<void>(pageBuilder: (_, _, _) => _HubPage(auth)));
       await settle(tester);
-      expect(find.text('https://notes.breadcat.cc'), findsOneWidget);
+      // No built-in hub: the field starts empty and the user enters theirs.
+      expect(
+        tester.widget<EditableText>(
+          find.descendant(
+            of: key('hub-sign-in-url'),
+            matching: find.byType(EditableText),
+          ),
+        ).controller.text,
+        isEmpty,
+      );
+      await tester.enterText(
+        find.descendant(
+          of: key('hub-sign-in-url'),
+          matching: find.byType(EditableText),
+        ),
+        'https://notes.example.com',
+      );
+      await settle(tester);
       expect(key('hub-sign-in'), findsOneWidget);
 
       await tapAndSettle(tester, key('hub-sign-in'));
-      expect(auth.requestedUrl, 'https://notes.breadcat.cc');
+      expect(auth.requestedUrl, 'https://notes.example.com');
       expect(auth.requestedDevice, tv.vault.deviceId);
       expect(find.text('Waiting for the browser…'), findsOneWidget);
       expect(key('hub-sign-in-cancel'), findsOneWidget);
