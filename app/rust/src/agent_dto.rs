@@ -48,6 +48,7 @@ impl From<w::HostInfo> for AgentHostInfo {
             version: h.version,
             permission_mode: h.permission_mode.into(),
             projects: h.projects,
+            default_model: h.default_model,
         }
     }
 }

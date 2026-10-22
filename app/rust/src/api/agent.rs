@@ -57,6 +57,9 @@ pub struct AgentHostInfo {
     pub version: String,
     pub permission_mode: AgentPermissionMode,
     pub projects: bool,
+    /// The host's own default model (a hub's `[agent] default_model`); None
+    /// from hosts too old to report it.
+    pub default_model: Option<String>,
 }
 
 /// One configured MCP server of a desktop engine ([`NotesAgent::mcp_status`]).

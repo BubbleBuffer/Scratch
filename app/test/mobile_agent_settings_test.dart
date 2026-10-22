@@ -92,7 +92,10 @@ void main() {
       find.text('Not connected. Sign in to the Hub to use the agent.'),
       findsOneWidget,
     );
-    expect(key('agent-default-model'), findsNothing);
+    // Run AI on is the vault's choice, also on the phone; the hub's model
+    // and tool set need a signed-in Hub.
+    expect(key('agent-host'), findsOneWidget);
+    expect(key('agent-hub-model'), findsNothing);
     expect(key('agent-host-info'), findsNothing);
     // Desktop-only controls stay off the phone.
     expect(key('ai-runner'), findsNothing);
@@ -271,6 +274,13 @@ void main() {
     final store = AgentStore.of(tv.app);
     signInFixture(tv, account: 'alice');
     store.models = _stubModels;
+    // The hub's list and default come from this fake, not from a connection.
+    AgentStore.debugHostModels = (h) async => _stubModels;
+    AgentStore.debugHostDefaultModel = 'hub/fable';
+    addTearDown(() {
+      AgentStore.debugHostModels = null;
+      AgentStore.debugHostDefaultModel = null;
+    });
     await openAiSettings(tester);
 
     expect(find.text('Signed in to hub.test as alice'), findsOneWidget);
@@ -278,8 +288,13 @@ void main() {
     expect(key('hub-sign-in'), findsNothing);
     // The fake state never connects: the status says so.
     expect(find.text('Not connected to the Hub right now.'), findsOneWidget);
-    expect(key('agent-default-model'), findsOneWidget);
-    expect(find.text('Fable 5.1'), findsOneWidget);
+    expect(key('agent-hub-model'), findsOneWidget);
+    await settleUntil(
+      tester,
+      () => find.text('Hub default (Fable 5.1)').evaluate().isNotEmpty,
+    );
+    expect(key('agent-hub-unreachable'), findsNothing);
+    expect(key('agent-tool-set-hub'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -288,10 +303,18 @@ void main() {
   ) async {
     final tv = await pumpApp(tester, mobile: true);
     signInFixture(tv);
+    // No Hub list and none cached: the model row says the Hub can't be reached.
+    AgentStore.debugHostModels = (h) async => throw StateError('no hub here');
+    addTearDown(() => AgentStore.debugHostModels = null);
     await openAiSettings(tester);
 
     expect(find.text('Signed in to hub.test as Android'), findsOneWidget);
-    expect(key('agent-default-model'), findsNothing);
+    expect(key('agent-hub-model'), findsOneWidget);
+    await settleUntil(
+      tester,
+      () => key('agent-hub-unreachable').evaluate().isNotEmpty,
+    );
+    expect(find.text("Can't reach the hub."), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

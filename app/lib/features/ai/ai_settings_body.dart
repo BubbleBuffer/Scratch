@@ -1,7 +1,8 @@
-// Settings > AI: who answers AI tasks on this device (Claude Code, Codex,
-// DeepSeek), the vault's MCP endpoint for AI apps, the hub's agent tokens,
-// and the recent tasks with their status. Phones only list tasks: desktops
-// answer them.
+// Settings > AI: the agent first (an add-on section placed 'top', with "Run
+// AI on" and what that runner uses), then what answers Ask AI on this
+// computer (the agent, Claude Code, Codex or DeepSeek), the vault's MCP
+// endpoint for AI apps, the hub's agent tokens, and the recent tasks with
+// their status. Phones only list tasks: computers answer them.
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -38,18 +39,19 @@ class AiSettingsBody extends StatelessWidget {
           children: [
             const SettingsHeading('AI', primary: true),
             Text(
-              'Ask AI from the / menu on any device. A desktop with a runner set up answers and writes into the page.',
+              'Chat with the agent, or ask AI from the / menu on any device. A computer set up to answer writes into the page.',
               style: m
                   ? tsRaw(15, 21, 400, c.textSecondary)
                   : tsRaw(14, 20, 400, c.textSecondary),
             ),
             const SizedBox(height: 16),
             if (AiStore.canRun) ...[
-              _RunnerSection(store: store),
               for (final section in sections.where(
-                (s) => s.placement == 'afterRunner',
+                (s) => s.placement == 'top',
               ))
                 section.build(context),
+              const SettingsHeading('Ask AI', top: 24),
+              _RunnerSection(store: store),
               const SettingsHeading('MCP endpoint', top: 24),
               _McpSection(store: store),
             ],
@@ -114,11 +116,11 @@ class _RunnerSectionState extends State<_RunnerSection> {
         );
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SettingsRow(
-        label: 'Runner',
-        description: 'Who answers AI tasks on this device. The agent, Claude Code and Codex run here and can read and edit the vault; DeepSeek only sees the page.',
+        label: 'Answered by',
+        description: 'What answers Ask AI on this computer. DeepSeek only sees the page; the others can edit the vault.',
         trailing: SelectButton<AiRunner>(
           key: const ValueKey('ai-runner'),
-          title: 'Runner',
+          title: 'Answered by',
           value: s.runner,
           options: [
             for (final r in AiRunner.values)
@@ -176,7 +178,7 @@ class _RunnerSectionState extends State<_RunnerSection> {
         ),
       ],
       if (s.runner != AiRunner.none && !s.ready(s.runner))
-        Text(s.runner == AiRunner.agent ? 'Turn on the agent below to run tasks.' : 'Add the API key to run tasks.',
+        Text(s.runner == AiRunner.agent ? 'Turn on the agent above to answer Ask AI.' : 'Add the API key to answer Ask AI.',
             style: tsRaw(12, 16, 400, c.inlineCodeText)),
     ]);
   }

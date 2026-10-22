@@ -149,7 +149,8 @@ Future<void> signInToHub(
 }
 
 /// Revokes the hub token and always removes the local connection, including
-/// when the hub is unreachable. Attached AI settings also fall back locally.
+/// when the hub is unreachable. "Run AI on: Hub" then falls back to this
+/// computer by itself.
 Future<void> signOutFromHub(
   SyncStore sync,
   AppSettings s,
@@ -167,15 +168,6 @@ Future<void> signOutFromHub(
       s.clientDeviceLabel = null;
       s.clientAccount = null;
     });
-    final ai =
-        AgentStore.existing(sync.vault)?.settings ??
-        AiStore.settingsOf(sync.vault) ??
-        AiSettings.beside(s.file);
-    // A Hub override can't apply without a hub: this device follows the
-    // vault again (which falls back to this computer while no hub is set).
-    if (ai.agentHostOverride == AgentHost.hub) {
-      ai.update((s) => s.agentHostOverride = null);
-    }
     await sync.disconnect();
   }
 }

@@ -626,6 +626,8 @@ async fn host_info_reports_the_hubs_base_pack() {
         .await
         .unwrap());
     assert_eq!(info.kind, "hub");
+    // Settings label the hub's own default with it ("Hub default (...)").
+    assert_eq!(info.default_model.as_deref(), Some("scripted/scripted"));
     assert_eq!(info.permission_mode, w::PermissionMode::Bypass);
     assert_eq!(
         fs::read_to_string(e.data.0.join("agent/permission-mode.json")).unwrap(),

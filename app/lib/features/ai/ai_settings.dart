@@ -66,6 +66,45 @@ enum AgentHost {
       values.where((h) => h.runner == runner).firstOrNull;
 }
 
+/// The hub's models as last read on this device, for when it can't be
+/// reached (Settings > AI with Run AI on: Hub).
+class HubModelList {
+  const HubModelList({required this.models, this.defaultModel});
+
+  final List<({String id, String name})> models;
+
+  /// The hub's own default (`[agent] default_model`), when it reported it.
+  final String? defaultModel;
+
+  static HubModelList? fromJson(Object? j) {
+    if (j is! Map) return null;
+    final models = [
+      for (final m in (j['models'] as List?) ?? const [])
+        if (m is Map && m['id'] is String)
+          (id: m['id'] as String, name: (m['name'] as String?) ?? m['id'] as String),
+    ];
+    if (models.isEmpty) return null;
+    final d = j['default'];
+    return HubModelList(models: models, defaultModel: d is String ? d : null);
+  }
+
+  Map<String, dynamic> toJson() => {
+    'models': [
+      for (final m in models) {'id': m.id, 'name': m.name},
+    ],
+    if (defaultModel != null) 'default': defaultModel,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is HubModelList &&
+      other.defaultModel == defaultModel &&
+      listEquals(other.models, models);
+
+  @override
+  int get hashCode => Object.hash(defaultModel, Object.hashAll(models));
+}
+
 /// Where an effective agent default came from.
 enum AgentDefaultSource { device, vault, builtIn }
 
@@ -219,9 +258,13 @@ class AiSettings extends ChangeNotifier {
   /// on Android, including installs whose old settings saved it as off).
   bool agentEnabled = agentPlatform;
 
-  /// This device's override of the vault's default model, per runner
-  /// (missing: follow the vault).
+  /// This device's override of the vault's default model, per runner, as
+  /// saved by older builds. No longer applied or shown (2026-10-22): the
+  /// vault's setting decides.
   Map<AgentHost, String> agentModelOverrides = {};
+
+  /// The hub's models as last read here ([HubModelList]).
+  HubModelList? hubModels;
 
   /// Values saved by builds before the synced defaults (`agentHost`,
   /// `agentModel`). Kept until [AgentStore] copies them into the vault once
@@ -231,7 +274,9 @@ class AiSettings extends ChangeNotifier {
   bool get hasLegacyAgentDefaults =>
       legacyAgentHost != null || legacyAgentModel != null;
 
-  /// Model visibility and extra provider/model ids, on this device for either host.
+  /// Model visibility and extra provider/model ids, saved by older builds.
+  /// No longer applied or shown (2026-10-22): pickers list what the runner
+  /// reports.
   Set<String> agentHiddenModels = {};
   List<String> agentCustomModels = [];
 
@@ -247,11 +292,6 @@ class AiSettings extends ChangeNotifier {
   bool desktopTools = true;
   String desktopRoot =
       Platform.environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'] ?? '';
-
-  /// This device's override of the vault's default runner ("Agent runs
-  /// on"; null: follow the vault). A chat can switch before its first
-  /// message and then keeps its host. Android always runs on the Hub.
-  AgentHost? agentHostOverride;
 
   /// MCP servers of the desktop agent (in-app chats and the host relay), by
   /// name: each is BubblePaw's `McpServerSettings` as JSON (snake_case keys,
@@ -306,6 +346,7 @@ class AiSettings extends ChangeNotifier {
     legacyAgentModel = legacyModel is String && legacyModel.trim().isNotEmpty
         ? legacyModel.trim()
         : null;
+    hubModels = HubModelList.fromJson(j['hubModels']);
     agentHiddenModels =
         (j['agentHiddenModels'] as List?)?.whereType<String>().toSet() ?? {};
     agentCustomModels =
@@ -324,9 +365,6 @@ class AiSettings extends ChangeNotifier {
         _ => AgentPermissionMode.auto,
       },
     );
-    agentHostOverride = AgentHost.values
-        .where((h) => h.name == j['agentHostOverride'])
-        .firstOrNull;
     legacyAgentHost = AgentHost.values
         .where((h) => h.name == j['agentHost'])
         .firstOrNull;
@@ -355,13 +393,13 @@ class AiSettings extends ChangeNotifier {
       'agentModelOverrides': {
         for (final e in agentModelOverrides.entries) e.key.runner: e.value,
       },
+    if (hubModels != null) 'hubModels': hubModels!.toJson(),
     'agentHiddenModels': agentHiddenModels.toList(),
     'agentCustomModels': agentCustomModels,
     'agentBunPath': agentBunPath,
     'agentClaudeCodeDir': agentClaudeCodeDir,
     'agentPermissionMode': agentPermissionMode.name,
     if (legacyAgentHost != null) 'agentHost': legacyAgentHost!.name,
-    if (agentHostOverride != null) 'agentHostOverride': agentHostOverride!.name,
     'desktopTools': desktopTools,
     'desktopRoot': desktopRoot,
     if (agentMcpServers.isNotEmpty) 'agentMcpServers': agentMcpServers,

@@ -206,6 +206,7 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
         if (signedIn && localAgentPlatform && s.hubUsesThisComputer)
           HostRelayDetails(
             link: AgentStore.of(context.app).relay,
+            store: AgentStore.of(context.app),
             hubUrl: s.clientUrl!,
             name: s.clientDeviceLabel!.trim(),
           ),

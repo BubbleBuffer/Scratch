@@ -661,6 +661,7 @@ impl Agent {
             providers: providers.ids(),
             can_run_tasks: config.host_kind == HostKind::Desktop,
             version: env!("CARGO_PKG_VERSION").into(),
+            default_model: Some(default_model.clone()),
         };
 
         let notes = Arc::new(RuntimeNotes::without_processes(repl.clone()));

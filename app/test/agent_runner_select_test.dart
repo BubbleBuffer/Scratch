@@ -41,9 +41,13 @@ AgentStore storeWith(
   return store;
 }
 
-AiSettings closedSettings({AgentHost host = AgentHost.local}) => AiSettings()
-  ..agentEnabled = false
-  ..agentHostOverride = host;
+/// Settings with the agent off, so no agent opens. The runner comes from the
+/// vault ([chooseRunner]); a device override is no longer applied.
+AiSettings closedSettings() => AiSettings()..agentEnabled = false;
+
+/// Makes [h] the vault's runner, as Settings > AI > Run AI on does (synced).
+Future<void> chooseRunner(WidgetTester t, AgentStore store, AgentHost h) =>
+    real(t, () => store.setVaultDefaultHost(h));
 
 /// A chat [id] with no messages, or with one user message.
 AgentSessionState chatState(
@@ -158,30 +162,20 @@ void main() {
   appTest('a new chat runs on the default runner when it is usable', (t) async {
     final tv = await pumpApp(t, mobile: false);
 
-    final hub = storeWith(
-      tv,
-      settings: closedSettings(host: AgentHost.hub),
-      app: hubSettings(),
-    );
-    expect(hub.usableHosts, AgentHost.values);
-    expect(hub.canPickHost, isTrue);
-    expect(hub.defaultHost, AgentHost.hub);
-    expect(hub.host, AgentHost.hub);
+    final store = storeWith(tv, settings: closedSettings(), app: hubSettings());
+    await chooseRunner(t, store, AgentHost.hub);
+    expect(store.usableHosts, AgentHost.values);
+    expect(store.canPickHost, isTrue);
+    expect(store.defaultHost, AgentHost.hub);
+    expect(store.host, AgentHost.hub);
 
-    final local = storeWith(
-      tv,
-      settings: closedSettings(),
-      app: hubSettings(),
-    );
-    expect(local.defaultHost, AgentHost.local);
-    expect(local.host, AgentHost.local);
-    expect(local.canPickHost, isTrue, reason: 'a usable hub can be picked');
+    await chooseRunner(t, store, AgentHost.local);
+    expect(store.defaultHost, AgentHost.local);
+    expect(store.host, AgentHost.local);
+    expect(store.canPickHost, isTrue, reason: 'a usable hub can be picked');
 
-    final unusable = storeWith(
-      tv,
-      settings: closedSettings(host: AgentHost.hub),
-      app: AppSettings(),
-    );
+    final unusable = storeWith(tv, settings: closedSettings(), app: AppSettings());
+    await chooseRunner(t, unusable, AgentHost.hub);
     expect(unusable.usableHosts, [AgentHost.local]);
     expect(unusable.canPickHost, isFalse);
     expect(unusable.defaultHost, AgentHost.local, reason: 'no hub: this computer');
@@ -205,11 +199,8 @@ void main() {
 
   appTest('a chat with messages keeps its runner', (t) async {
     final tv = await pumpApp(t, mobile: false);
-    final store = storeWith(
-      tv,
-      settings: closedSettings(host: AgentHost.hub),
-      app: hubSettings(),
-    );
+    final store = storeWith(tv, settings: closedSettings(), app: hubSettings());
+    await chooseRunner(t, store, AgentHost.hub);
     expect(store.host, AgentHost.hub);
 
     store.debugSetSnapshot(chatState('chat-locked', withMessage: true));
@@ -233,11 +224,8 @@ void main() {
 
   appTest('opening a chat switches the tab to the host it was made on', (t) async {
     final tv = await pumpApp(t, mobile: false);
-    final store = storeWith(
-      tv,
-      settings: closedSettings(host: AgentHost.hub),
-      app: hubSettings(),
-    );
+    final store = storeWith(tv, settings: closedSettings(), app: hubSettings());
+    await chooseRunner(t, store, AgentHost.hub);
     store.pickModel('chat-on-hub', 'codex/hub-model');
     expect(store.hostOf('chat-on-hub'), AgentHost.hub);
 
@@ -248,26 +236,26 @@ void main() {
     expect(store.host, AgentHost.hub);
   });
 
-  appTest('the default model follows the connected runner\'s list', (t) async {
+  appTest('the default model is the chosen runner\'s setting, or its first model',
+      (t) async {
     final tv = await pumpApp(t, mobile: false);
-    final settings = closedSettings()
-      ..agentModelOverrides[AgentHost.local] = 'codex/b';
-    final store = storeWith(tv, settings: settings, app: AppSettings());
+    final store = storeWith(tv, settings: closedSettings(), app: AppSettings());
     store.models = const [
       AgentModel(id: 'codex/a', name: 'A'),
       AgentModel(id: 'codex/b', name: 'B'),
     ];
+    await real(t, () => store.setVaultDefaultModel(AgentHost.local, 'codex/b'));
     expect(store.defaultModel, 'codex/b', reason: 'the setting is listed');
     expect(store.modelOf(null), 'codex/b');
 
-    settings.agentModelOverrides[AgentHost.local] = 'codex/gone';
+    await real(t, () => store.setVaultDefaultModel(AgentHost.local, 'codex/gone'));
     expect(store.defaultModel, 'codex/a', reason: 'not listed: the first model');
     expect(store.modelOf(null), 'codex/a');
 
     store.models = const [];
     expect(store.defaultModel, 'codex/gone', reason: 'no list yet: the setting');
 
-    settings.agentModelOverrides.clear();
+    await real(t, () => store.setVaultDefaultModel(AgentHost.local, null));
     expect(store.defaultModel, isNull);
 
     store.models = const [
@@ -276,9 +264,13 @@ void main() {
     ];
     expect(store.defaultModel, 'codex/a', reason: 'no setting: the first model');
 
-    settings.agentCustomModels = ['claude-code/custom'];
-    settings.agentModelOverrides[AgentHost.local] = 'claude-code/custom';
-    expect(store.defaultModel, 'claude-code/custom', reason: 'custom models count');
+    // Custom ids are not offered any more, so a setting naming one is not listed.
+    await real(
+      t,
+      () => store.setVaultDefaultModel(AgentHost.local, 'claude-code/custom'),
+    );
+    expect(store.defaultModel, 'codex/a',
+        reason: 'custom ids are not listed');
 
     store.pickModel(null, 'codex/b');
     expect(store.modelOf(null), 'codex/b', reason: 'the next new chat');

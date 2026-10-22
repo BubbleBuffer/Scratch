@@ -137,6 +137,10 @@ Map<String, dynamic> mcpServerJson(
   return out;
 }
 
+/// Marks the MCP servers in Settings > AI, so Settings > Sync can scroll to
+/// them ([showMcpServers]).
+final mcpServersAnchor = GlobalKey(debugLabel: 'mcp-servers');
+
 class McpServersSettings extends StatefulWidget {
   const McpServersSettings({super.key, required this.store});
   final AgentStore store;

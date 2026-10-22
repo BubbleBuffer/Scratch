@@ -299,37 +299,17 @@ class AgentStore extends ChangeNotifier {
     await refreshVaultDefaults();
   }
 
-  /// Sets or clears (null) this device's override of the default runner.
-  void setHostOverride(AgentHost? h) =>
-      settings.update((s) => s.agentHostOverride = h);
-
-  /// Sets or clears (null) this device's override of [runner]'s model.
-  void setModelOverride(AgentHost runner, String? model) =>
-      settings.update((s) {
-        final m = model?.trim() ?? '';
-        if (m.isEmpty) {
-          s.agentModelOverrides.remove(runner);
-        } else {
-          s.agentModelOverrides[runner] = m;
-        }
-      });
-
-  /// The default runner here: device override, vault value, built-in
+  /// The default runner here: the vault's "Run AI on", else the built-in
   /// default, then a reachable fallback ([ResolvedAgentHost.fellBack]).
-  ResolvedAgentHost get resolvedHost => resolveAgentHost(
-    device: hubAgentPlatform ? null : settings.agentHostOverride,
-    vault: _vaultDefaults.host,
-    usable: usableHosts,
-  );
+  /// Settings no longer offer a per-device choice (2026-10-22), so a device
+  /// override saved by older builds is not applied.
+  ResolvedAgentHost get resolvedHost =>
+      resolveAgentHost(vault: _vaultDefaults.host, usable: usableHosts);
 
-  /// [runner]'s default model: device override, then the vault's value.
+  /// [runner]'s default model: the vault's value (null: the host's own).
   ({String? model, AgentDefaultSource? source}) resolvedModel(
     AgentHost runner,
-  ) => resolveAgentModel(
-    runner,
-    device: settings.agentModelOverrides,
-    vault: _vaultDefaults.models,
-  );
+  ) => resolveAgentModel(runner, vault: _vaultDefaults.models);
 
   /// Follows the app settings (the hub connection) from now on. Until
   /// then they are read from `settings.json` in the data folder.
@@ -477,16 +457,14 @@ class AgentStore extends ChangeNotifier {
   /// The available models, the default first.
   List<AgentModel> models = const [];
 
-  /// Reported and custom models, with device visibility applied. A chat keeps
-  /// its current model available even if the user hides it.
+  /// The models the open host reports. A chat keeps its current model
+  /// available even when the host no longer lists it.
   List<String> shownModels({String? current}) => [
-    for (final id in allModelIds)
-      if (!settings.agentHiddenModels.contains(id) || id == current) id,
+    ...allModelIds,
     if (current != null && !allModelIds.contains(current)) current,
   ];
 
-  List<String> get allModelIds =>
-      {for (final m in models) m.id, ...settings.agentCustomModels}.toList();
+  List<String> get allModelIds => {for (final m in models) m.id}.toList();
 
   String modelLabel(String id) {
     if (id.startsWith('claude-code/')) {
@@ -526,37 +504,81 @@ class AgentStore extends ChangeNotifier {
   @visibleForTesting
   static Future<List<AgentModel>> Function(AgentHost host)? debugHostModels;
 
+  /// Tests: the host default reported with [debugHostModels]' lists.
+  @visibleForTesting
+  static String? debugHostDefaultModel;
+
   String _modelsKey(AgentHost h) => h == AgentHost.hub
       ? _hubConnectionKey()
       : '${settings.agentBunPath.trim()}\u0000'
             '${settings.agentClaudeCodeDir.trim()}';
 
-  List<String> _visibleIds(List<AgentModel> ms) => [
-    for (final id in {for (final m in ms) m.id, ...settings.agentCustomModels})
-      if (!settings.agentHiddenModels.contains(id)) id,
-  ];
-
-  /// What Settings > Default model lists: [defaultHost]'s models (hidden
-  /// ones left out), read from that host even when the tab is on the other
-  /// one. `ids` is null while they load, or when the host can't list them
-  /// (`unavailable`): the setting is then shown as stored, never rewritten.
+  /// What Settings > Default model lists: [defaultHost]'s models, read from
+  /// that host even when the tab is on the other one. `ids` is null while
+  /// they load, or when the host can't list them (`unavailable`): the
+  /// setting is then shown as stored, never rewritten.
   ({List<String>? ids, bool unavailable}) defaultHostModels() {
-    final def = defaultHost;
-    if (def == host) {
-      final ids = shownModels();
-      if (ids.isNotEmpty) return (ids: ids, unavailable: false);
-      return (ids: null, unavailable: openError != null || _modelsFailed);
+    final r = runnerModels(defaultHost);
+    if (r.live) {
+      return (ids: {for (final m in r.models) m.id}.toList(), unavailable: false);
     }
-    if (def == AgentHost.hub && hubLink == null) {
-      return (ids: null, unavailable: true);
+    return (ids: null, unavailable: r.unreachable);
+  }
+
+  /// Settings > Run AI on: [runner]'s models and its own default model.
+  /// `live` when read from that runner now. Otherwise, for the hub, the last
+  /// list it reported on this device ([AiSettings.hubModels]), with
+  /// `unreachable` once it can't be reached; neither while a read runs.
+  RunnerModels runnerModels(AgentHost runner) {
+    RunnerModels known({required bool unreachable}) {
+      final cache = runner == AgentHost.hub ? settings.hubModels : null;
+      return RunnerModels(
+        models: [
+          for (final m in cache?.models ?? const <({String id, String name})>[])
+            AgentModel(id: m.id, name: m.name),
+        ],
+        hostDefault: cache?.defaultModel,
+        unreachable: unreachable,
+      );
     }
-    final cached = _hostModels[def];
-    if (cached != null && cached.key == _modelsKey(def)) {
-      if (cached.failed) return (ids: null, unavailable: true);
-      return (ids: _visibleIds(cached.models), unavailable: false);
+
+    if (runner == AgentHost.hub && hubLink == null) {
+      return known(unreachable: true);
     }
-    _readHostModels(def);
-    return (ids: null, unavailable: false);
+    if (runner == host) {
+      if (isOpen && models.isNotEmpty) {
+        return RunnerModels(
+          models: models,
+          hostDefault: hostInfo?.defaultModel,
+          live: true,
+        );
+      }
+      // An open tab that couldn't list them. A failed open says nothing
+      // about the list: read it on its own connection below.
+      if (isOpen && _modelsFailed) return known(unreachable: true);
+    }
+    final cached = _hostModels[runner];
+    if (cached != null && cached.key == _modelsKey(runner)) {
+      if (cached.failed) return known(unreachable: true);
+      return RunnerModels(
+        models: cached.models,
+        hostDefault: cached.hostDefault,
+        live: true,
+      );
+    }
+    _readHostModels(runner);
+    return known(unreachable: false);
+  }
+
+  /// Keeps the hub's list for when it can't be reached.
+  void _rememberHubModels(List<AgentModel> list, String? hostDefault) {
+    if (list.isEmpty) return;
+    final next = HubModelList(
+      models: [for (final m in list) (id: m.id, name: m.name)],
+      defaultModel: hostDefault,
+    );
+    if (next == settings.hubModels) return;
+    settings.update((s) => s.hubModels = next);
   }
 
   /// Lets Settings try a host that couldn't list its models again.
@@ -571,10 +593,16 @@ class AgentStore extends ChangeNotifier {
       // Called from build: start the bridge calls after it.
       await Future<void>.value();
       var list = const <AgentModel>[];
+      String? hostDefault;
       var failed = false;
       try {
         final debug = debugHostModels;
-        list = debug != null ? await debug(h) : await _listModelsOn(h);
+        if (debug != null) {
+          list = await debug(h);
+          hostDefault = debugHostDefaultModel;
+        } else {
+          (list, hostDefault) = await _listModelsOn(h);
+        }
       } catch (e) {
         failed = true;
         AppLog.info('agent models on ${h.name}: $e');
@@ -582,7 +610,15 @@ class AgentStore extends ChangeNotifier {
       _hostModelsLoading.remove(h);
       if (_disposed) return;
       if (_modelsKey(h) == key) {
-        _hostModels[h] = _HostModels(key, list, failed: failed);
+        _hostModels[h] = _HostModels(
+          key,
+          list,
+          failed: failed,
+          hostDefault: hostDefault,
+        );
+        if (h == AgentHost.hub && !failed) {
+          _rememberHubModels(list, hostDefault);
+        }
       }
       _notify();
     }();
@@ -591,14 +627,17 @@ class AgentStore extends ChangeNotifier {
     }
   }
 
-  /// Opens a short-lived agent on [h] for its model list.
-  Future<List<AgentModel>> _listModelsOn(AgentHost h) async {
+  /// Opens a short-lived agent on [h] for its model list and default.
+  Future<(List<AgentModel>, String?)> _listModelsOn(AgentHost h) async {
     final hub = h == AgentHost.hub ? hubLink : null;
     if (h == AgentHost.hub && hub == null) throw StateError('no hub');
     final agent = await _count(() => _connect(hub));
     try {
       final info = await _count(agent.hostInfo);
-      return _withExtras(await _count(agent.models), info);
+      return (
+        _withExtras(await _count(agent.models), info),
+        info.defaultModel,
+      );
     } finally {
       await agent.closeEvents();
       agent.dispose();
@@ -1058,6 +1097,11 @@ class AgentStore extends ChangeNotifier {
   late final _relay = HostRelayLink(onChanged: _notify);
   HostRelayLink get relay => _relay;
 
+  /// Whether "Let the hub use this computer" is on and can run: it then
+  /// shares this computer's tools and MCP servers, whichever runner the
+  /// vault uses.
+  bool get sharesThisComputer => _relayConfig() != null;
+
   /// The relay's settings while it should run: desktop, the toggle on and
   /// signed in to an https hub.
   HostRelayConfig? _relayConfig() {
@@ -1385,7 +1429,11 @@ class AgentStore extends ChangeNotifier {
       _modelsKey(on),
       models,
       failed: _modelsFailed,
+      hostDefault: hostInfo?.defaultModel,
     );
+    if (on == AgentHost.hub && !_modelsFailed) {
+      _rememberHubModels(models, hostInfo?.defaultModel);
+    }
     _notify();
   }
 
@@ -2178,8 +2226,37 @@ class _AgentSearchReader implements AgentSearchReader {
 
 /// A host's model list as Settings last read it.
 class _HostModels {
-  const _HostModels(this.key, this.models, {required this.failed});
+  const _HostModels(
+    this.key,
+    this.models, {
+    required this.failed,
+    this.hostDefault,
+  });
   final String key;
   final List<AgentModel> models;
   final bool failed;
+
+  /// The host's own default model, when it reports one.
+  final String? hostDefault;
+}
+
+/// A runner's models for Settings ([AgentStore.runnerModels]).
+class RunnerModels {
+  const RunnerModels({
+    this.models = const [],
+    this.hostDefault,
+    this.live = false,
+    this.unreachable = false,
+  });
+
+  final List<AgentModel> models;
+
+  /// The runner's own default model (the hub's `[agent] default_model`).
+  final String? hostDefault;
+
+  /// Read from the runner now (else the last known list, or none yet).
+  final bool live;
+
+  /// The runner can't be reached; [models] is the last known list.
+  final bool unreachable;
 }

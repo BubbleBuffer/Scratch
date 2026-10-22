@@ -12898,6 +12898,7 @@ impl SseDecode for crate::api::agent::AgentHostInfo {
         let mut var_permissionMode =
             <crate::api::agent::AgentPermissionMode>::sse_decode(deserializer);
         let mut var_projects = <bool>::sse_decode(deserializer);
+        let mut var_defaultModel = <Option<String>>::sse_decode(deserializer);
         return crate::api::agent::AgentHostInfo {
             kind: var_kind,
             packs: var_packs,
@@ -12907,6 +12908,7 @@ impl SseDecode for crate::api::agent::AgentHostInfo {
             version: var_version,
             permission_mode: var_permissionMode,
             projects: var_projects,
+            default_model: var_defaultModel,
         };
     }
 }
@@ -17341,6 +17343,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::agent::AgentHostInfo {
             self.version.into_into_dart().into_dart(),
             self.permission_mode.into_into_dart().into_dart(),
             self.projects.into_into_dart().into_dart(),
+            self.default_model.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -20190,6 +20193,7 @@ impl SseEncode for crate::api::agent::AgentHostInfo {
         <String>::sse_encode(self.version, serializer);
         <crate::api::agent::AgentPermissionMode>::sse_encode(self.permission_mode, serializer);
         <bool>::sse_encode(self.projects, serializer);
+        <Option<String>>::sse_encode(self.default_model, serializer);
     }
 }
 

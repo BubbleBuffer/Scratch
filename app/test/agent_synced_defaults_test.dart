@@ -1,8 +1,8 @@
 // Integration spec phase 3: the default runner and default model are vault
-// settings (synced on the hidden settings page). A device override wins on
-// that device; clearing it falls back to the vault value; an unreachable
-// runner falls back to a reachable one. Old per-device values go into the
-// vault once, only when it has none, and are not kept as overrides.
+// settings (synced on the hidden settings page). An unreachable runner falls
+// back to a reachable one. Old per-device values go into the vault once, only
+// when it has none, and are not kept as overrides. Per-device overrides are
+// no longer applied: one left in ai_settings.json by an older build is ignored.
 
 import 'dart:convert';
 import 'dart:io';
@@ -86,24 +86,21 @@ void main() {
     final s = AiSettings.load(file);
     expect(s.legacyAgentHost, AgentHost.hub);
     expect(s.legacyAgentModel, 'codex/old');
-    expect(s.agentHostOverride, isNull, reason: 'old values are not overrides');
     expect(s.agentModelOverrides, isEmpty);
     s.update((s) {
       s.legacyAgentHost = null;
       s.legacyAgentModel = null;
-      s.agentHostOverride = AgentHost.local;
       s.agentModelOverrides[AgentHost.hub] = 'codex/mine';
     });
     final saved = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
     expect(saved.containsKey('agentHost'), isFalse);
     expect(saved.containsKey('agentModel'), isFalse);
     final back = AiSettings.load(file);
-    expect(back.agentHostOverride, AgentHost.local);
     expect(back.agentModelOverrides, {AgentHost.hub: 'codex/mine'});
     expect(back.hasLegacyAgentDefaults, isFalse);
   });
 
-  appTest('the vault default syncs; a device override wins here and clearing it falls back', (tester) async {
+  appTest('the vault default syncs; a device override from an older build is ignored', (tester) async {
     final tv = await pumpApp(tester, mobile: false);
     final other = await openOtherDevice(tester);
     try {
@@ -123,17 +120,13 @@ void main() {
       expect(store.vaultDefaults.models[AgentHost.local], 'codex/vault-pick');
       expect(store.resolvedModel(AgentHost.local).model, 'codex/vault-pick');
 
-      // This device overrides it, only here.
-      store.setModelOverride(AgentHost.local, 'codex/mine');
-      expect(store.resolvedModel(AgentHost.local).model, 'codex/mine');
-      expect(store.resolvedModel(AgentHost.local).source, AgentDefaultSource.device);
-      final d = await real(tester, () => tv.vault.run((v) => v.agentDefaults()));
-      expect(d.models.single.model, 'codex/vault-pick', reason: 'the override stays on the device');
-
-      // Clearing the override falls back to the vault value.
-      store.setModelOverride(AgentHost.local, null);
+      // A device override left in ai_settings.json is not applied: the
+      // vault value wins, and the vault is not changed.
+      store.settings.update((s) => s.agentModelOverrides[AgentHost.local] = 'codex/mine');
       expect(store.resolvedModel(AgentHost.local).model, 'codex/vault-pick');
-      expect(AiSettings.load(file).agentModelOverrides, isEmpty);
+      expect(store.resolvedModel(AgentHost.local).source, AgentDefaultSource.vault);
+      final d = await real(tester, () => tv.vault.run((v) => v.agentDefaults()));
+      expect(d.models.single.model, 'codex/vault-pick');
 
       // This device writes the vault value; the other device gets it.
       await real(tester, () => store.setVaultDefaultHost(AgentHost.hub));
@@ -147,12 +140,16 @@ void main() {
       expect(there.runner, 'hub');
       expect({for (final m in there.models) m.runner: m.model}, {'this_device': 'codex/vault-pick', 'hub': 'codex/hub-pick'});
 
-      // A host override wins here; clearing it follows the vault again.
-      store.setHostOverride(AgentHost.local);
-      expect(store.resolvedHost.source, AgentDefaultSource.device);
-      expect(store.resolvedHost.fellBack, isFalse);
-      store.setHostOverride(null);
-      expect(store.resolvedHost.source, AgentDefaultSource.vault);
+      // An agentHostOverride left in an old ai_settings.json loads without
+      // error and is not applied: the vault's runner (the hub, unreachable
+      // here) still decides.
+      final old = File('${tv.dir.path}/old-override-settings.json')
+        ..writeAsStringSync('{"agentHostOverride": "local"}');
+      final oldStore = AgentStore.attach(tv.vault, AiSettings.load(old));
+      await real(tester, oldStore.refreshVaultDefaults);
+      expect(oldStore.resolvedHost.source, AgentDefaultSource.vault);
+      expect(oldStore.resolvedHost.wanted, AgentHost.hub);
+      expect(oldStore.resolvedHost.fellBack, isTrue);
     } finally {
       await other.close(tester);
     }

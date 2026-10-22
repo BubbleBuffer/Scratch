@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/models.dart';
 import 'package:notes_app/core/vault.dart';
-import 'package:notes_app/features/ai/ai_settings.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
 import 'package:notes_app/features/sync/hub_auth.dart';
 import 'package:notes_app/features/sync/sync_control.dart';
@@ -195,7 +194,7 @@ void main() {
 
   for (final status in [HttpStatus.noContent, HttpStatus.serviceUnavailable]) {
     test(
-      'sign out calls the hub and clears sync and Hub agent choice after HTTP $status',
+      'sign out calls the hub and clears sync after HTTP $status',
       () async {
         final dir = Directory.systemTemp.createTempSync('notes-hub-signout-');
         final settings = AppSettings(file: File('${dir.path}/settings.json'));
@@ -224,8 +223,6 @@ void main() {
             'test-device-token',
             deviceLabel: 'Desktop',
           );
-          AiSettings.beside(settings.file)
-              .update((s) => s.agentHostOverride = AgentHost.hub);
           final signout = signOutFromHub(sync, settings, auth);
           if (status == HttpStatus.noContent) {
             await signout;
@@ -237,7 +234,6 @@ void main() {
           expect(restored.clientUrl, isNull);
           expect(restored.clientToken, isNull);
           expect(restored.clientDeviceLabel, isNull);
-          expect(AiSettings.beside(settings.file).agentHostOverride, isNull);
           expect(sync.connected, isFalse);
           expect(sync.disconnected, isTrue);
         } finally {

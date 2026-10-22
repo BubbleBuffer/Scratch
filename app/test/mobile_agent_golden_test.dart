@@ -69,7 +69,7 @@ void main() {
       });
       store.models = _stubModels;
       await _openAiSettings(tester);
-      await tester.ensureVisible(key('agent-default-model'));
+      await tester.ensureVisible(key('agent-hub-model'));
       await settle(tester);
       await shot('mobile-agent-settings-signed-in-$tag');
     });

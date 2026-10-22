@@ -25,7 +25,7 @@ export '../features/settings/controls.dart'
         OutlineButton,
         CopyableText;
 export '../features/settings/settings_screen.dart'
-    show showSettings, SettingsSection;
+    show showSettings, openSettingsSection, SettingsSection;
 export '../features/sync/hub_auth.dart' show HubAuthService;
 export '../features/sync/sync_settings.dart' show HubSignInSettings;
 export '../features/sync/sync_indicator.dart' show SyncIndicator;

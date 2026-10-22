@@ -58,7 +58,6 @@ AiSettings fakeAgentSettings() {
   )..createSync(recursive: true);
   return AiSettings()
     ..agentEnabled = true
-    ..agentModelOverrides[AgentHost.local] = 'claude-code/code-model'
     ..agentBunPath = fakeExtension()
     ..agentClaudeCodeDir = dir.path;
 }
@@ -71,6 +70,11 @@ Future<AgentStore> openAgentStore(
   final store = AgentStore.attach(
     current.vault,
     settings ?? fakeAgentSettings(),
+  );
+  // The chat default is a vault setting (a device override is not applied).
+  await real(
+    tester,
+    () => store.setVaultDefaultModel(AgentHost.local, 'claude-code/code-model'),
   );
   await real(tester, store.ensureOpen);
   expect(store.openError, isNull);
@@ -449,7 +453,8 @@ void main() {
     await tapAndSettle(tester, key('agent-enabled-toggle'));
     await settleUntil(tester, () => !store.isOpen);
     expect(store.settings.agentEnabled, isFalse);
-    expect(key('agent-default-model'), findsNothing);
+    expect(key('agent-host'), findsNothing);
+    expect(key('agent-computer-model'), findsNothing);
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await settle(tester);
     expect(key('sidebar-agent'), findsNothing);
@@ -470,10 +475,10 @@ void main() {
     expect(key('agent-permissions'), findsNothing);
     expect(key('agent-projects'), findsOneWidget);
     expect(key('agent-desktop-root'), findsNothing);
-    expect(
-      textOf(tester, 'agent-host-info'),
-      'Runs on: This computer · tools: vault, files & shell',
-    );
+    expect(key('agent-tool-set-this_device'), findsOneWidget);
+    expect(key('agent-hub-model'), findsNothing);
+    expect(key('agent-host-info'), findsNothing,
+        reason: 'the runner summary line is gone');
 
     final first = await real(tester, store.ensureOpen);
     store.settings.update((s) => s.desktopTools = false);
@@ -509,8 +514,11 @@ void main() {
       reason: 'changing just the root reopens too',
     );
 
-    // Render the selected Hub state without opening an external connection.
-    store.settings.agentHostOverride = AgentHost.hub;
+    // Render the selected Hub state without opening an external connection:
+    // the hub's models are not read (they fail here), and no agent opens.
+    AgentStore.debugHostModels = (h) async => throw StateError('no hub here');
+    addTearDown(() => AgentStore.debugHostModels = null);
+    await real(tester, () => store.setVaultDefaultHost(AgentHost.hub));
     tv.app.settings
       ..clientUrl = 'https://notes.example.com'
       ..clientToken = 'test-token';
@@ -531,10 +539,12 @@ void main() {
     expect(key('agent-desktop-root'), findsNothing);
     expect(key('agent-permissions'), findsNothing);
     expect(key('agent-projects'), findsNothing);
-    expect(
-      textOf(tester, 'agent-host-info'),
-      'Runs on: notes.example.com · tools: vault',
-    );
+    expect(key('agent-computer-model'), findsNothing);
+    expect(key('agent-computer-model-stored'), findsNothing);
+    expect(key('agent-hub-model'), findsOneWidget);
+    expect(key('agent-tool-set-hub'), findsOneWidget);
+    expect(key('agent-tool-set-this_device'), findsNothing);
+    expect(key('agent-host-info'), findsNothing);
     await closeAi(tester, ai);
   });
 

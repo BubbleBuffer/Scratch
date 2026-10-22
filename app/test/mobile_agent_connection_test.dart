@@ -237,8 +237,6 @@ void main() {
       },
     );
     try {
-      // Even a saved local-host preference must not reach the desktop engine.
-      store.settings.agentHostOverride = AgentHost.local;
       await real(
         tester,
         () => _localHttp(

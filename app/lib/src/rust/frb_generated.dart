@@ -10873,8 +10873,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AgentHostInfo dco_decode_agent_host_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return AgentHostInfo(
       kind: dco_decode_String(arr[0]),
       packs: dco_decode_list_String(arr[1]),
@@ -10884,6 +10884,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       version: dco_decode_String(arr[5]),
       permissionMode: dco_decode_agent_permission_mode(arr[6]),
       projects: dco_decode_bool(arr[7]),
+      defaultModel: dco_decode_opt_String(arr[8]),
     );
   }
 
@@ -13662,6 +13663,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_version = sse_decode_String(deserializer);
     var var_permissionMode = sse_decode_agent_permission_mode(deserializer);
     var var_projects = sse_decode_bool(deserializer);
+    var var_defaultModel = sse_decode_opt_String(deserializer);
     return AgentHostInfo(
       kind: var_kind,
       packs: var_packs,
@@ -13671,6 +13673,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       version: var_version,
       permissionMode: var_permissionMode,
       projects: var_projects,
+      defaultModel: var_defaultModel,
     );
   }
 
@@ -17113,6 +17116,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.version, serializer);
     sse_encode_agent_permission_mode(self.permissionMode, serializer);
     sse_encode_bool(self.projects, serializer);
+    sse_encode_opt_String(self.defaultModel, serializer);
   }
 
   @protected

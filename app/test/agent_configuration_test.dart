@@ -41,7 +41,7 @@ void main() {
   );
 
   appTest(
-    'picker hides models, retains the current model and adds custom ids',
+    'the chat picker lists the models the host reports, not stored hidden or custom ids',
     (t) async {
       await pumpApp(t, mobile: false);
       final store = await openAgentStore(t);
@@ -57,11 +57,7 @@ void main() {
       store.pickModel(null, 'codex/current');
       await openAgentScreen(t);
       final picker = t.widget<SelectButton<String>>(key('agent-model'));
-      expect(picker.options, [
-        'codex/shown',
-        'codex/current',
-        'claude-code/custom',
-      ]);
+      expect(picker.options, ['codex/shown', 'codex/hidden', 'codex/current']);
       expect(picker.value, 'codex/current');
       expect(store.modelLabel('claude-code/opus'), 'Opus (latest)');
       expect(store.modelLabel('claude-code/claude-fable-5-1'), 'Fable 5.1');
@@ -69,29 +65,7 @@ void main() {
     },
   );
 
-  appTest('hiding the implicit current model keeps it selected and shown', (
-    t,
-  ) async {
-    await pumpApp(t, mobile: false);
-    final store = await openAgentStore(
-      t,
-      settings: fakeAgentSettings()..agentModelOverrides.clear(),
-    );
-    store.models = const [
-      AgentModel(id: 'codex/implicit', name: 'Implicit'),
-      AgentModel(id: 'codex/other', name: 'Other'),
-    ];
-    store.settings.update((s) => s.agentHiddenModels.add('codex/implicit'));
-    expect(store.modelOf(null), 'codex/implicit');
-    await openAgentScreen(t);
-    final picker = t.widget<SelectButton<String>>(key('agent-model'));
-    expect(picker.value, 'codex/implicit');
-    expect(picker.options, ['codex/implicit', 'codex/other']);
-  });
-
-  appTest('Models switches and custom Add/Remove save on this device', (
-    t,
-  ) async {
+  appTest('the settings page has no model switches or custom ids', (t) async {
     final tv = await pumpApp(t, mobile: false);
     final file = File('${tv.dir.path}/model-settings.json');
     final settings = AiSettings.load(file);
@@ -100,39 +74,27 @@ void main() {
       ..agentEnabled = fake.agentEnabled
       ..agentModelOverrides.addAll(fake.agentModelOverrides)
       ..agentBunPath = fake.agentBunPath
-      ..agentClaudeCodeDir = fake.agentClaudeCodeDir;
+      ..agentClaudeCodeDir = fake.agentClaudeCodeDir
+      // Left by an older build: not applied any more.
+      ..agentHiddenModels = {'claude-code/claude-opus-5-5'}
+      ..agentCustomModels = ['claude-code/claude-opus-4-7'];
     final store = await openAgentStore(t, settings: settings);
     final ai = await aiStore(t, settings: settings);
     try {
+      store.models = const [
+        AgentModel(id: 'codex/shown', name: 'Shown'),
+        AgentModel(id: 'codex/hidden', name: 'Hidden'),
+      ];
+      expect(store.shownModels(), ['codex/shown', 'codex/hidden']);
       await tapAndSettle(t, key('sidebar-settings'));
       await tapAndSettle(t, key('settings-nav-ai'));
-      final visible = key('agent-model-visible-claude-code/claude-opus-5-5');
-      await t.ensureVisible(visible);
-      await tapAndSettle(t, visible);
-      expect(
-        AiSettings.load(file).agentHiddenModels,
-        contains('claude-code/claude-opus-5-5'),
-      );
-      await t.ensureVisible(key('agent-model-add-field'));
-      await enterField(
-        t,
-        'agent-model-add-field',
-        'claude-code/claude-opus-4-7',
-      );
-      await tapAndSettle(t, key('agent-model-add'));
-      expect(AiSettings.load(file).agentCustomModels, [
-        'claude-code/claude-opus-4-7',
-      ]);
-      expect(store.shownModels(), contains('claude-code/claude-opus-4-7'));
-      final defaults = t.widget<SelectButton<String>>(
-        key('agent-default-model'),
-      );
-      expect(defaults.options, isNot(contains('claude-code/claude-opus-5-5')));
-      expect(defaults.options, contains('claude-code/claude-opus-4-7'));
-      final remove = key('agent-model-remove-claude-code/claude-opus-4-7');
-      await t.ensureVisible(remove);
-      await tapAndSettle(t, remove);
-      expect(AiSettings.load(file).agentCustomModels, isEmpty);
+      expect(key('agent-model-visible-claude-code/claude-opus-5-5'), findsNothing);
+      expect(key('agent-model-add-field'), findsNothing);
+      expect(key('agent-model-add'), findsNothing);
+      expect(key('agent-model-remove-claude-code/claude-opus-4-7'), findsNothing);
+      // The host's own list shows; a hidden or custom id from an older build is not applied.
+      expect(store.shownModels(), contains('claude-code/claude-opus-5-5'));
+      expect(store.shownModels(), isNot(contains('claude-code/claude-opus-4-7')));
     } finally {
       await closeAi(t, ai);
     }

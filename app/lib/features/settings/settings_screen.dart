@@ -84,6 +84,24 @@ Future<void> showSettings(BuildContext context, {SettingsSection section = Setti
   return showPanel(context, (_) => SettingsModal(initial: section), width: 1150, height: 715);
 }
 
+/// Opens [section]: in the settings already open on a desktop, else as
+/// [showSettings] does.
+Future<void> openSettingsSection(BuildContext context, SettingsSection section) {
+  final jump = context.dependOnInheritedWidgetOfExactType<_SettingsJump>();
+  if (jump == null) return showSettings(context, section: section);
+  jump.go(section);
+  return Future.value();
+}
+
+/// Lets a section of the desktop modal open another ([openSettingsSection]).
+class _SettingsJump extends InheritedWidget {
+  const _SettingsJump({required this.go, required super.child});
+  final ValueChanged<SettingsSection> go;
+
+  @override
+  bool updateShouldNotify(_SettingsJump old) => false;
+}
+
 // ---------------------------------------------------------------------------
 // Frames
 
@@ -228,7 +246,10 @@ class _SettingsModalState extends State<SettingsModal> {
           child: SingleChildScrollView(
             key: ValueKey('settings-body-${_section.name}'),
             padding: const EdgeInsets.fromLTRB(60, 36, 60, 48),
-            child: sectionBody(_section),
+            child: _SettingsJump(
+              go: (s) => setState(() => _section = s),
+              child: sectionBody(_section),
+            ),
           ),
         ),
       ),

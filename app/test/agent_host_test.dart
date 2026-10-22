@@ -2,6 +2,7 @@
 // settings' hub (an https:// hub with a device token), and the setting's
 // round trip through ai_settings.json. No bridge needed.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -49,17 +50,17 @@ void main() {
     expect(none.fellBack, isTrue);
   });
 
-  test('the device override is saved in ai_settings.json', () {
+  test('an old agentHostOverride in ai_settings.json loads and is not saved', () {
     final dir = Directory.systemTemp.createTempSync('agent_host_test');
     addTearDown(() => dir.deleteSync(recursive: true));
     final file = File('${dir.path}${Platform.pathSeparator}ai_settings.json');
-    AiSettings.load(file).update((s) => s.agentHostOverride = AgentHost.hub);
-    expect(AiSettings.load(file).agentHostOverride, AgentHost.hub);
-    file.writeAsStringSync('{"agentHostOverride": "moon"}');
-    expect(AiSettings.load(file).agentHostOverride, isNull,
-        reason: 'an unknown runner is no override');
-    file.writeAsStringSync('{"agentHost": "moon"}');
-    expect(AiSettings.load(file).legacyAgentHost, isNull);
+    file.writeAsStringSync('{"agentHostOverride": "hub", "agentHost": "moon"}');
+    expect(() => AiSettings.load(file), returnsNormally);
+    expect(AiSettings.load(file).legacyAgentHost, isNull,
+        reason: 'an unknown runner is no default');
+    AiSettings.load(file).update((s) => s.agentEnabled = true);
+    final saved = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+    expect(saved.containsKey('agentHostOverride'), isFalse);
   });
 
   test('computer access defaults to home and round-trips with its root', () {

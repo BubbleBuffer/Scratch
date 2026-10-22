@@ -1,17 +1,49 @@
 // Under "Let the hub use this computer" (Settings > Sync, desktop) while it
 // is on: the name this computer has on the hub, the relay's connection state
 // (read every [HostRelayLink.statusInterval] while shown) and the connector
-// address for ChatGPT or claude.ai, with Copy.
+// address for ChatGPT or claude.ai, with Copy, and what it shares: this
+// computer's tools and MCP servers, with a link to the MCP servers (shown in
+// Settings > AI whichever runner the vault uses while this is on).
 //
 // The name is the hub's label for this device, from sign-in
 // (`clientDeviceLabel`); the hub matches `?host=` against it exactly.
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../core/tool_sets.dart';
 import '../../services/addon_services.dart';
 import '../../ui/ui.dart';
+import 'agent_mcp_settings.dart';
 import 'agent_store.dart';
 import 'host_relay_link.dart';
+
+/// What the hub may use on this computer, in one line.
+String hostRelayToolsLine(AgentStore store) {
+  final set = store.vaultDefaults.toolSetFor(AgentHost.local);
+  if (set != 'everything') {
+    return "Shares this computer's vault tools (${toolSetLabel(set)}).";
+  }
+  final n = store.settings.agentMcpServers.values
+      .where((v) => v['enabled'] != false)
+      .length;
+  final servers = switch (n) {
+    0 => 'no MCP servers',
+    1 => '1 MCP server',
+    _ => '$n MCP servers',
+  };
+  final files = store.settings.desktopTools ? ', files, commands' : '';
+  return "Shares this computer's tools: the vault$files and $servers.";
+}
+
+/// Opens Settings > AI at the MCP servers.
+Future<void> showMcpServers(BuildContext context) async {
+  await openSettingsSection(context, SettingsSection.ai);
+  SchedulerBinding.instance.addPostFrameCallback((_) {
+    final target = mcpServersAnchor.currentContext;
+    if (target != null && target.mounted) Scrollable.ensureVisible(target);
+  });
+}
 
 /// `<hub>/mcp/agent?host=<name>`: the connector address that runs this
 /// computer's tools through [hubUrl].
@@ -29,9 +61,13 @@ class HostRelayDetails extends StatefulWidget {
     required this.link,
     required this.hubUrl,
     required this.name,
+    this.store,
   });
 
   final HostRelayLink link;
+
+  /// For the line of what it shares (null: not shown).
+  final AgentStore? store;
 
   /// The signed-in hub's address and this computer's name on it.
   final String hubUrl, name;
@@ -116,6 +152,20 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
             );
           },
         ),
+        if (widget.store case final store?)
+          ListenableBuilder(
+            listenable: store,
+            builder: (context, _) => SettingsRow(
+              key: const ValueKey('host-relay-tools'),
+              label: 'What it shares',
+              description: hostRelayToolsLine(store),
+              trailing: TextBtn(
+                'MCP servers',
+                key: const ValueKey('host-relay-mcp-link'),
+                onTap: () => showMcpServers(context),
+              ),
+            ),
+          ),
         SettingsRow(
           label: 'Connector address',
           description:

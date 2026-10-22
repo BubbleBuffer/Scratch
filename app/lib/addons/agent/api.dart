@@ -96,12 +96,12 @@ class AgentAddon extends Addon {
         id: 'agent.desktop',
         label: 'Agent',
         location: 'ai',
-        placement: 'afterRunner',
+        placement: 'top',
         isVisible: (_) => AgentStore.canRun && !hubAgentPlatform,
         build: (context) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SettingsHeading('Agent', top: 24),
+            const SettingsHeading('Agent'),
             AgentSettingsSection(
               store: AgentStore.of(context.app),
               onChanged: () => ctx.services.pumpAi(context),

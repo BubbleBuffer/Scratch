@@ -725,6 +725,10 @@ class AgentHostInfo {
   final AgentPermissionMode permissionMode;
   final bool projects;
 
+  /// The host's own default model (a hub's `[agent] default_model`); None
+  /// from hosts too old to report it.
+  final String? defaultModel;
+
   const AgentHostInfo({
     required this.kind,
     required this.packs,
@@ -734,6 +738,7 @@ class AgentHostInfo {
     required this.version,
     required this.permissionMode,
     required this.projects,
+    this.defaultModel,
   });
 
   @override
@@ -745,7 +750,8 @@ class AgentHostInfo {
       canRunTasks.hashCode ^
       version.hashCode ^
       permissionMode.hashCode ^
-      projects.hashCode;
+      projects.hashCode ^
+      defaultModel.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -759,7 +765,8 @@ class AgentHostInfo {
           canRunTasks == other.canRunTasks &&
           version == other.version &&
           permissionMode == other.permissionMode &&
-          projects == other.projects;
+          projects == other.projects &&
+          defaultModel == other.defaultModel;
 }
 
 /// The PC host relay's connection ([`NotesAgent::host_relay_status`]).

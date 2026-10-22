@@ -127,6 +127,11 @@ pub struct HostInfo {
     pub providers: Vec<String>,
     pub can_run_tasks: bool,
     pub version: String,
+    /// The model of runs that name none and of a vault that sets none: the
+    /// host's configured default (a hub's `[agent] default_model`). Older
+    /// hosts don't send it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_model: Option<String>,
 }
 
 /// A model as `provider/model`.
@@ -743,6 +748,23 @@ impl RpcError {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn host_info_from_an_older_host_has_no_default_model() {
+        let old: HostInfo = serde_json::from_value(json!({
+            "kind": "hub", "packs": [], "tools": [], "providers": ["codex"],
+            "can_run_tasks": false, "version": "0.1.0"
+        }))
+        .unwrap();
+        assert_eq!(old.default_model, None);
+        let new = HostInfo {
+            default_model: Some("codex/gpt-6-luna".into()),
+            ..old
+        };
+        let json = serde_json::to_value(&new).unwrap();
+        assert_eq!(json["default_model"], "codex/gpt-6-luna");
+        assert_eq!(serde_json::from_value::<HostInfo>(json).unwrap(), new);
+    }
 
     #[test]
     fn chat_context_round_trips_and_old_context_defaults_to_no_chats() {

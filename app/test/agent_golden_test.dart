@@ -77,7 +77,7 @@ void main() {
         alignment: 0.13,
       );
       await settle(tester);
-      expect(key('agent-host-info').hitTestable(), findsOneWidget);
+      expect(key('agent-host').hitTestable(), findsOneWidget);
       expect(key('agent-projects'), findsOneWidget);
       await shot('$tag-settings-agent');
       await closeAi(tester, ai);
