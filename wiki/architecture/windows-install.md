@@ -13,7 +13,7 @@ Built 2026-10-21 on `lane/win-installer`. The script is [app/windows/installer/s
 
 - **Per-user, no admin.** `PrivilegesRequired=lowest`. It installs the `flutter build windows` Release folder to `%LOCALAPPDATA%\Programs\Scratch`. The exe stays `notes.exe`.
 - **Shortcuts.** A Start menu shortcut named Scratch with the app icon, so Windows Search finds it. A desktop shortcut is an option on the tasks page, unchecked by default.
-- **Apps & features.** An uninstall entry under HKCU: name Scratch, the pubspec version, publisher BubbleBuffer, and the exe's icon.
+- **Apps & features.** An uninstall entry under HKCU: name Scratch, the displayed version (`VersionText`, see below), publisher BubbleBuffer, and the exe's icon.
 - **Upgrade in place.** The AppId GUID is fixed (`1B472506-0E7C-46CD-B530-F256FB709BB5`), so a newer installer replaces the same install. Never change it.
 - **Running app.** If Scratch is open, the installer closes it through the Restart Manager (`CloseApplications=yes`) before replacing files. It does not restart it; the finish page has a "Launch Scratch" box.
 - **Uninstall.** Removes the program files, the shortcuts and `HKCU\Software\Classes\notes` (the `notes://` scheme). The installer writes that key at install time, pointing at the installed `notes.exe`, so links work before the first start; the app also rewrites it on every start ([app state, page links](app-state.md#page-links)). User data in `%LOCALAPPDATA%\Notes` is never touched.
@@ -23,7 +23,14 @@ Built 2026-10-21 on `lane/win-installer`. The script is [app/windows/installer/s
 
 CI builds it in the `app` job of [.github/workflows/windows-build.yml](../../.github/workflows/windows-build.yml), right after `flutter build windows --release`. Inno Setup 6 ships on the windows-latest image; the step installs it with choco if it is missing. The version is the `version:` in `app/pubspec.yaml` without the build number. The artifact is `scratch-setup-<sha7>`, holding `Scratch-Setup-<version>-<sha7>.exe`, kept 7 days beside `notes-windows-<sha7>` (the plain folder).
 
-The workflow is manual: `gh workflow run windows-build.yml --ref <branch>`.
+`windows-build` runs on pushes to `main`, on pull requests and on demand: `gh workflow run windows-build.yml --ref <branch>`.
+
+The release workflow ([.github/workflows/release.yml](../../.github/workflows/release.yml)) builds the installer again for each `v*` tag, or for a tag named by hand, and attaches it to the GitHub release as `Scratch-Setup-<version>.exe`. It passes both defines:
+
+- `/DAppVersion` is the numeric version (`0.1.0`, the tag without the pre-release part). It sets the file version and the output file name.
+- `/DVersionText` is the full version (`0.1.0-prealpha.1`, the tag without `v`). It is what the installer displays and what Apps & features shows.
+
+`VersionText` is optional. Without it the installer shows `AppVersion`. `windows-build` passes only `AppVersion`, so its artifacts show the numeric version.
 
 To build locally after a Release build, from `app/`:
 

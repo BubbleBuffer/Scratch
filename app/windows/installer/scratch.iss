@@ -3,6 +3,8 @@
 ; Built in CI by .github/workflows/windows-build.yml after `flutter build windows`:
 ;   iscc /DAppVersion=0.2.0 /DSha7=abc1234 /DSourceDir=<Release folder> /DOutputDir=<dir> scratch.iss
 ; Output: Scratch-Setup-<AppVersion>-<Sha7>.exe
+; Optional /DVersionText=<text> (e.g. 0.1.0-prealpha.1) is the displayed version;
+; AppVersion stays numeric for the file version.
 ;
 ; Installs to %LOCALAPPDATA%\Programs\Scratch. The exe stays notes.exe; the
 ; Start menu shortcut, desktop shortcut and Apps & features entry say Scratch.
@@ -10,6 +12,9 @@
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
+#endif
+#ifndef VersionText
+  #define VersionText AppVersion
 #endif
 #ifndef Sha7
   #define Sha7 "local"
@@ -28,8 +33,8 @@
 ; Fixed AppId: every later installer with this id upgrades the same install in place.
 AppId={{1B472506-0E7C-46CD-B530-F256FB709BB5}
 AppName={#AppName}
-AppVersion={#AppVersion}
-AppVerName={#AppName} {#AppVersion}
+AppVersion={#VersionText}
+AppVerName={#AppName} {#VersionText}
 AppPublisher=BubbleBuffer
 VersionInfoVersion={#AppVersion}
 VersionInfoProductName={#AppName}

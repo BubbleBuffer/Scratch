@@ -35,4 +35,4 @@ The Windows installer is described in [Windows installer](wiki/architecture/wind
 
 `AGPL-3.0-or-later`; see [LICENSE](LICENSE). Bundled third-party components and their licences are listed in [THIRD_PARTY.md](THIRD_PARTY.md).
 
-Scratch is made by [BubbleBuffer](https://github.com/BubbleBuffer).
+Scratch is made by [BubbleBuffer](https://0xbubbuff.de).

@@ -1,0 +1,38 @@
+# Fails when private strings reach this public repository: private host names
+# and addresses, local paths, personal accounts, secret formats, personal tool
+# folders such as .claude/, or a job on a non-hosted runner.
+# See scripts/check-private-strings.sh.
+#
+# The private patterns come from the PRIVATE_STRINGS secret, which GitHub does
+# not pass to pull requests from forks. A fork's content is public already, so
+# fork pull requests run only the public checks; every push to this repository
+# (any branch) runs the full check and requires the patterns.
+name: private strings
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: private strings
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check tracked files
+        env:
+          PRIVATE_STRINGS: ${{ secrets.PRIVATE_STRINGS }}
+          FROM_FORK: ${{ github.event.pull_request.head.repo.fork == true }}
+        run: |
+          if [ "$FROM_FORK" = true ]; then
+            bash scripts/check-private-strings.sh
+          else
+            bash scripts/check-private-strings.sh --require-patterns
+          fi

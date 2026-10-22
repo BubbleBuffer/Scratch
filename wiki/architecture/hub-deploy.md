@@ -35,7 +35,7 @@ Assign it to the provider's scopes and enable **Include claims in id_token**. Th
 
 ## Build and send the kit
 
-Run from the notes-app repository in **PowerShell 7.4 or newer**, with `gzip.exe` on PATH and Docker Desktop's Linux engine running. PowerShell 7.4 preserves the binary pipe from `docker save` into gzip:
+Run from the Scratch repository root in **PowerShell 7.4 or newer**, with `gzip.exe` on PATH and Docker Desktop's Linux engine running. PowerShell 7.4 preserves the binary pipe from `docker save` into gzip:
 
 ```powershell
 pwsh -File .\deploy\hub\build.ps1
@@ -225,7 +225,7 @@ docker compose up -d --force-recreate hub
 
 The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Docker host against a private archive and checksum. It creates a fresh `notes-hub-bk-test-restore-*` volume, extracts as root, and compares archive contents and ownership. Before the hub starts, it compares the SHA-256 of every file under `vault/.vault/docs`, `vault/.vault/logs`, `vault/pages` and `vault/.vault/hub`, and of `hub.toml`, between the archive and the restored volume. The documents in `.vault/docs` are the content of record, so an archive with none fails unless `--allow-empty-vault` is given. The 2026-10-14 production archive has an empty vault and needs that flag. The verifier then starts an isolated hub on a free localhost port with an empty test config, a fake issuer and the agent disabled, checks `/health` and `notes-hub --devices`, and removes its own resources. The private backup test script seeds two synthetic pages through the hub's own agent MCP, so the archive holds real Loro documents. It then exercises backup failure recovery and retention.
 
-**Restore test: 2026-10-14.** The Docker host harness seeds two pages through the hub's agent MCP, so the archive holds two Loro documents, two update logs and two Markdown pages. The restore check compares every hashed file before startup, then passes health and `--devices`. Tar failure, SIGTERM, disk-space refusal and retention checks pass. The production archive of 2026-10-14 has an empty vault: it fails without `--allow-empty-vault` and passes with it. These are filesystem restore checks, not authenticated sync or real provider sign-in tests. [Earlier recorded output and verification limits](../../deploy/hub/backup/TEST-REPORT.md).
+**Restore test: 2026-10-14.** The Docker host harness seeds two pages through the hub's agent MCP, so the archive holds two Loro documents, two update logs and two Markdown pages. The restore check compares every hashed file before startup, then passes health and `--devices`. Tar failure, SIGTERM, disk-space refusal and retention checks pass. The production archive of 2026-10-14 has an empty vault: it fails without `--allow-empty-vault` and passes with it. These are filesystem restore checks, not authenticated sync or real provider sign-in tests. Earlier recorded output and verification limits were in the former private repo's `deploy/hub/backup/TEST-REPORT.md`; that file is not in Scratch.
 
 ## Verification record and unverified points
 
@@ -243,7 +243,7 @@ The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Dock
 ## Live deployment
 
 - Running at `https://notes.example.com` on the VPS (`<server>`), from `/opt/notes-hub` (compose file plus a `0600` `.env`). The data volume is `notes-hub-data`.
-- Running image: commit `d45af66`, deployed 2026-10-14 by CI (hub image run 38544539596) after the first push to notes-app's `release` branch. It serves `/mcp` with agent tokens. `notes-hub:previous` is the 2026-10-08 hand-loaded image (`0caec07`). Both providers are signed in inside the container.
+- Running image: commit `d45af66`, deployed 2026-10-14 by CI (run 38544539596 in the former private repo) after the first push to that repo's `release` branch. It serves `/mcp` with agent tokens. `notes-hub:previous` is the 2026-10-08 hand-loaded image (`0caec07`). Both providers are signed in inside the container.
 - Authentik (`auth.example.com`):
   - The provider and the application are both called `notes-hub`, created through `ak shell`.
   - It is a confidential client: strict redirect `https://notes.example.com/auth/callback`, signed with the self-signed key, scopes openid, email and profile.
@@ -265,21 +265,23 @@ The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Dock
   - A full browser login.
   - A real phone login, vault sync and agent turn. The app-side browser login UI is committed (`a806fbb`); Android agent wiring is on `mobile-agent` ([state and phone steps](mobile-agent.md)).
 
-## CI deploys (GitHub)
+## CI deploys (scratch-ops)
 
-- **Repos:** `BubbleBuffer/notes-app` and `BubbleBuffer/BubblePaw-base`, both private. BubblePaw's `release` branch is what the hub builds against; move it forward deliberately, e.g. `git push origin agent-integration:release`.
-- **Trigger:** [hub-image.yml](../../.github/workflows/hub-image.yml) runs on a push to notes-app's `release` branch, or by hand. It does three things:
-  - Checks out BubblePaw's `release` next to notes-app (the path dependency) using a read-only deploy key.
-  - Builds `deploy/hub/Dockerfile` for linux/amd64, with layers cached in the GitHub Actions cache.
-  - Pushes `ghcr.io/bubblebuffer/notes-hub:<sha>` and `:latest`; the package is private.
-- **Deploy job:**
-  - It SSHes to `$VPS_USER@$VPS_HOST` (repository variables `VPS_USER`, `VPS_HOST`) with `VPS_DEPLOY_KEY`. In `authorized_keys` that key is `restrict,command="/opt/notes-hub/deploy.sh"`, so it can do nothing else.
-  - The commit sha goes as the command, and the job's own `GITHUB_TOKEN` goes on stdin.
-  - [deploy.sh](../../deploy/hub/deploy.sh):
-    - logs in to GHCR in a temporary `DOCKER_CONFIG`, so no lasting token sits on the VPS
-    - pulls, keeps the old image as `notes-hub:previous` and retags the new one as `notes-hub:latest`
-    - runs `docker compose up -d` and waits up to 2 min for the container to report healthy, rolling back to `:previous` otherwise
-    - prunes old images, since the disk is tight
-- **Setup:** [setup-ci.sh](../../deploy/hub/setup-ci.sh) creates the keys and secrets, sets the `VPS_HOST` and `VPS_USER` repository variables the workflow connects to (run it with `VPS_IP` set), and installs `deploy.sh`. Its VPS half had never been applied (no `deploy.sh`, no key). On 2026-10-14 a new VPS deploy key was generated, `VPS_DEPLOY_KEY` replaced, `/opt/notes-hub/deploy.sh` installed, and the key added to root's `authorized_keys` as `restrict,command="/opt/notes-hub/deploy.sh"` (backup `authorized_keys.bak-notes-app-ci-deploy-20261014`). The first deploy attempt failed with "Permission denied (publickey)" before this; the rerun deployed.
+The hub image is built and deployed from the private scratch-ops repo. The former private repo's `hub-image.yml` is retired; see the history bullet.
+
+- **Repos:** `BubbleBuffer/Scratch` (public) is the source. `BubbleBuffer/scratch-ops` (private) holds the `hub-deploy` workflow, the VPS deploy key and the private patterns. The hub image takes the BubblePaw-Core revision that `Cargo.lock` pins.
+- **Trigger:** by hand, from scratch-ops:
+  `gh workflow run hub-deploy.yml -R BubbleBuffer/scratch-ops -f ref=<tag> -f dry_run=false`
+  `dry_run=true` runs the build without the deploy.
+- **Build:** the workflow builds the image from Scratch at `ref`, with the BubblePaw-Core revision that `Cargo.lock` pins, and pushes `ghcr.io/bubblebuffer/scratch-hub:<sha>`. The package is private. The workflow runs on the home build server, not on GitHub-hosted runners.
+- **Deploy:** the workflow connects to the VPS with a key whose `authorized_keys` entry is `restrict,command="/opt/notes-hub/deploy.sh"`, so it can run nothing else. The 40-character commit sha goes as the command and a GHCR token on stdin. [deploy.sh](../../deploy/hub/deploy.sh):
+  - logs in to GHCR in a temporary `DOCKER_CONFIG`, so no lasting token sits on the VPS
+  - pulls `ghcr.io/bubblebuffer/scratch-hub:<sha>`, keeps the current `notes-hub:latest` as `notes-hub:previous` and retags the new image as `notes-hub:latest`
+  - runs `docker compose up -d` and waits up to 2 min for the container to report healthy, rolling back to `:previous` otherwise
+  - prunes old `scratch-hub` and `notes-hub` images, since the disk is tight
 - **Manual rollback on the VPS:** `docker tag notes-hub:previous notes-hub:latest && docker compose up -d`.
-- **Cost:** a cold Rust release build takes about 15–25 min of Actions time out of the private repo's free monthly minutes. Cached builds are shorter.
+- **Cost:** no GitHub-hosted minutes; the build runs on the home build server.
+- **History (former private repo, until 2026-10-22):**
+  - Deploys ran from the former private repo's `hub-image.yml` on pushes to its `release` branch, with image `notes-hub:<sha>` on GHCR. Its `setup-ci.sh` created the keys; that script is not in Scratch.
+  - On 2026-10-14 a new VPS deploy key was generated, `VPS_DEPLOY_KEY` replaced, `/opt/notes-hub/deploy.sh` installed, and the key added to root's `authorized_keys` as `restrict,command="/opt/notes-hub/deploy.sh"` (backup `authorized_keys.bak-notes-app-ci-deploy-20261014`). The first deploy attempt failed with "Permission denied (publickey)" before this; the rerun deployed.
+  - The image name became `scratch-hub` when the deploy moved to scratch-ops. The VPS container and local tags keep the `notes-hub` name.

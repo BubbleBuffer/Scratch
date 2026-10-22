@@ -14,10 +14,8 @@ vault_core = { path = "../core" }
 vault_tools = { path = "../tools" }
 vault_mcp = { path = "../mcp" }
 notes_agent_wire = { path = "../agent_wire" }
-# Interim: path dependencies into the BubblePaw worktree (branch
-# agent-integration, merged into release) until it becomes a git dependency.
-# scripts/publish-public.sh rewrites these to BubbleBuffer/BubblePaw-Core
-# for the public Scratch copy.
+# BubblePaw crates from the public BubbleBuffer/BubblePaw-Core repository,
+# pinned to one revision (the hub image and CI read it from Cargo.lock).
 # The runner's `web` feature stays off.
 bubblepaw-core = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
 bubblepaw-runner = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }

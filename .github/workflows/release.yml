@@ -1,0 +1,232 @@
+# Pre-alpha (and later) releases, built on GitHub-hosted runners.
+#
+# Push a tag such as v0.1.0-prealpha.1, or run this workflow by hand with an
+# existing tag. The version comes from the tag (without the leading v); a tag
+# with a pre-release part (anything after "-") becomes a GitHub prerelease.
+#
+# Assets:
+#   Scratch-Setup-<version>.exe            Windows installer (Inno Setup, per user)
+#   scratch-<version>-android-arm64.apk    Android app, arm64
+#   notes-cli-<version>-windows-x64.exe    the notes CLI for Windows
+#   notes-cli-<version>-linux-x64.tar.gz   the notes CLI for Linux (glibc)
+#   SHA256SUMS.txt
+#
+# Android versionCode is the build time in epoch minutes, so every release is
+# newer than the last one. The release signing key is not on GitHub: the APK
+# here carries the build's fallback signature, and the release-signed build is
+# published to the private F-Droid repository from it.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and release, e.g. v0.1.0-prealpha.1
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  meta:
+    name: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      version: ${{ steps.v.outputs.version }}
+      numeric: ${{ steps.v.outputs.numeric }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      code: ${{ steps.v.outputs.code }}
+    steps:
+      - id: v
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if ! [[ $TAG =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::tag '$TAG' is not v<major>.<minor>.<patch>[-<pre-release>]"
+            exit 1
+          fi
+          numeric=${BASH_REMATCH[1]}
+          version=${TAG#v}
+          prerelease=false
+          [[ -n ${BASH_REMATCH[2]} ]] && prerelease=true
+          {
+            echo "tag=$TAG"
+            echo "version=$version"
+            echo "numeric=$numeric"
+            echo "prerelease=$prerelease"
+            echo "code=$(( $(date +%s) / 60 ))"
+          } >> "$GITHUB_OUTPUT"
+          echo "tag $TAG, version $version, prerelease $prerelease"
+
+  windows:
+    name: windows app, installer and cli
+    needs: meta
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-windows
+          save-if: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.5
+          cache: true
+      - name: flutter build windows --release
+        working-directory: app
+        run: |
+          flutter pub get
+          # Windows file versions are numeric, so the pre-release part stays out here.
+          flutter build windows --release \
+            --build-name=${{ needs.meta.outputs.numeric }} --build-number=${{ needs.meta.outputs.code }}
+      - name: Build installer
+        working-directory: app
+        run: |
+          iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -x "$iscc" ]; then
+            choco install innosetup --no-progress -y
+          fi
+          out="$(cygpath -w "$PWD/build/windows/installer")"
+          src="$(cygpath -w "$PWD/build/windows/x64/runner/Release")"
+          MSYS_NO_PATHCONV=1 "$iscc" /Q "/DAppVersion=${{ needs.meta.outputs.numeric }}" \
+            "/DVersionText=${{ needs.meta.outputs.version }}" "/DSha7=${GITHUB_SHA::7}" \
+            "/DSourceDir=$src" "/DOutputDir=$out" "$(cygpath -w windows/installer/scratch.iss)"
+          mkdir -p ../dist
+          mv build/windows/installer/Scratch-Setup-*.exe "../dist/Scratch-Setup-${{ needs.meta.outputs.version }}.exe"
+      - name: Build notes CLI
+        run: |
+          cargo build --release --locked -p vault_tools --bin notes
+          cp target/release/notes.exe "dist/notes-cli-${{ needs.meta.outputs.version }}-windows-x64.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  linux-cli:
+    name: linux cli
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-linux-cli
+          save-if: false
+      - name: Build notes CLI
+        run: |
+          cargo build --release --locked -p vault_tools --bin notes
+          mkdir -p dist
+          tar -C target/release -czf "dist/notes-cli-${{ needs.meta.outputs.version }}-linux-x64.tar.gz" notes
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-cli
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  android:
+    name: android apk (arm64)
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.5
+          cache: true
+      - name: flutter build apk --release (arm64)
+        working-directory: app
+        run: |
+          # gradle.properties pins a local Android Studio JBR; the runner uses JAVA_HOME.
+          sed -i '/^org\.gradle\.java\.home=/d' android/gradle.properties
+          flutter pub get
+          flutter build apk --release --target-platform android-arm64 \
+            --build-name=${{ needs.meta.outputs.version }} --build-number=${{ needs.meta.outputs.code }}
+          mkdir -p ../dist
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            "../dist/scratch-${{ needs.meta.outputs.version }}-android-arm64.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish release
+    needs: [meta, windows, linux-cli, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.meta.outputs.tag }}
+          VERSION: ${{ needs.meta.outputs.version }}
+          PRERELEASE: ${{ needs.meta.outputs.prerelease }}
+          CODE: ${{ needs.meta.outputs.code }}
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -- * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cat > ../notes.md <<EOF
+          Scratch $VERSION, built from $TAG on GitHub-hosted runners.
+
+          - Windows: \`Scratch-Setup-$VERSION.exe\` installs per user.
+          - Android (arm64): \`scratch-$VERSION-android-arm64.apk\`, versionCode $CODE. This APK carries a build signature, not the app's release signature, so it does not update an installed release-signed app.
+          - CLI: \`notes-cli-$VERSION-windows-x64.exe\` and \`notes-cli-$VERSION-linux-x64.tar.gz\`.
+
+          Checksums are in \`SHA256SUMS.txt\`.
+          EOF
+          flags=()
+          [ "$PRERELEASE" = true ] && flags+=(--prerelease)
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Scratch $VERSION" --notes-file ../notes.md "${flags[@]}" -- *
