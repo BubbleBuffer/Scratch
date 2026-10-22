@@ -1,4 +1,6 @@
-//! The hub as a confidential OIDC client with PKCE: discovery (cached),
+//! The hub as an OIDC client with PKCE, confidential (HTTP Basic with the
+//! client secret) when a secret is configured and public otherwise:
+//! discovery (cached),
 //! the authorize redirect, and the code exchange with ID token checks
 //! (signature through JWKS, `iss`, `aud`, `exp`, `nonce`), all done by the
 //! `openidconnect` crate.
@@ -118,10 +120,16 @@ impl Oidc {
         let meta = CoreProviderMetadata::discover_async(issuer, &self.http)
             .await
             .map_err(|e| format!("discovery: {}", error_chain(&e)))?;
+        // No secret: a public client. openidconnect then sends `client_id`
+        // in the token request body and no Authorization header (oauth2
+        // always uses the body without a secret), and ID tokens are checked
+        // against the issuer's keys only.
+        let secret = (!self.cfg.client_secret.is_empty())
+            .then(|| ClientSecret::new(self.cfg.client_secret.clone()));
         let client = HubClient::from_provider_metadata(
             meta,
             ClientId::new(self.cfg.client_id.clone()),
-            Some(ClientSecret::new(self.cfg.client_secret.clone())),
+            secret,
         )
         .set_redirect_uri(self.redirect.clone());
         let client = Arc::new(client);
@@ -153,7 +161,7 @@ impl Oidc {
         })
     }
 
-    /// Exchanges `code` (client secret plus PKCE verifier) and verifies
+    /// Exchanges `code` (client secret if configured, plus PKCE verifier) and verifies
     /// the ID token.
     pub async fn finish(
         &self,

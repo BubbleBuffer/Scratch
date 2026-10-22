@@ -100,6 +100,17 @@ struct Issuer {
     key: CoreRsaPrivateSigningKey,
     knobs: Mutex<Knobs>,
     grants: Mutex<HashMap<String, Grant>>,
+    /// Public mode: the token endpoint takes no client secret, only
+    /// `client_id` in the body, and refuses any Authorization header.
+    public: bool,
+    token_requests: Mutex<Vec<TokenRequest>>,
+}
+
+/// What the hub sent to the token endpoint.
+#[derive(Clone)]
+struct TokenRequest {
+    authorization: Option<String>,
+    form: HashMap<String, String>,
 }
 
 fn test_key_pem() -> &'static str {
@@ -120,7 +131,7 @@ async fn discovery(State(i): State<Arc<Issuer>>) -> Json<Value> {
         "response_types_supported": ["code"],
         "subject_types_supported": ["public"],
         "id_token_signing_alg_values_supported": ["RS256"],
-        "token_endpoint_auth_methods_supported": ["client_secret_basic"],
+        "token_endpoint_auth_methods_supported": [if i.public { "none" } else { "client_secret_basic" }],
         "code_challenge_methods_supported": ["S256"],
     }))
 }
@@ -159,12 +170,25 @@ async fn token(
     headers: HeaderMap,
     Form(f): Form<HashMap<String, String>>,
 ) -> Response {
-    let basic =
-        base64::engine::general_purpose::STANDARD.encode(format!("{CLIENT_ID}:{CLIENT_SECRET}"));
-    let auth = headers
+    let authorization = headers
         .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
-    if auth != Some(&format!("Basic {basic}")) {
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    i.token_requests.lock().unwrap().push(TokenRequest {
+        authorization: authorization.clone(),
+        form: f.clone(),
+    });
+    let accepted = if i.public {
+        authorization.is_none()
+            && f.get("client_id").map(String::as_str) == Some(CLIENT_ID)
+            && !f.contains_key("client_secret")
+    } else {
+        let basic = base64::engine::general_purpose::STANDARD
+            .encode(format!("{CLIENT_ID}:{CLIENT_SECRET}"));
+        let expected = format!("Basic {basic}");
+        authorization.as_deref() == Some(expected.as_str())
+    };
+    if !accepted {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({"error": "invalid_client"})),
@@ -240,7 +264,7 @@ async fn token(
     .into_response()
 }
 
-async fn start_issuer() -> Arc<Issuer> {
+async fn start_issuer(public: bool) -> Arc<Issuer> {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let issuer = Arc::new(Issuer {
@@ -252,6 +276,8 @@ async fn start_issuer() -> Arc<Issuer> {
         .unwrap(),
         knobs: Mutex::new(Knobs::user("ann-sub", "ann@example.com", &[])),
         grants: Mutex::new(HashMap::new()),
+        public,
+        token_requests: Mutex::new(Vec::new()),
     });
     let app = Router::new()
         .route("/.well-known/openid-configuration", get(discovery))
@@ -279,8 +305,17 @@ async fn env() -> Env {
     env_with_setup(|_| {}).await
 }
 
+/// The hub configured as a public client: no client secret.
+async fn env_public() -> Env {
+    env_inner(true, |_| {}).await
+}
+
 async fn env_with_setup(setup: impl FnOnce(&Config)) -> Env {
-    let issuer = start_issuer().await;
+    env_inner(false, setup).await
+}
+
+async fn env_inner(public: bool, setup: impl FnOnce(&Config)) -> Env {
+    let issuer = start_issuer(public).await;
     let dir = TempDir::new("data");
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr: SocketAddr = listener.local_addr().unwrap();
@@ -298,7 +333,11 @@ async fn env_with_setup(setup: impl FnOnce(&Config)) -> Env {
         oidc: OidcConfig {
             issuer: issuer.url.clone(),
             client_id: CLIENT_ID.into(),
-            client_secret: CLIENT_SECRET.into(),
+            client_secret: if public {
+                String::new()
+            } else {
+                CLIENT_SECRET.into()
+            },
             allowed_users: vec!["ANN@example.com".into(), "bob-sub".into()],
             allowed_groups: vec!["notes-users".into()],
             scopes: None,
@@ -889,5 +928,31 @@ async fn relogin_replaces_the_token_and_sign_out_drops_it() {
         vault_sync::PURGE_DEVICE_CAPABILITY
     );
     assert_eq!(health.text().await.unwrap(), "notes-hub");
+    e.server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn public_client_signs_in_with_pkce_and_no_secret() {
+    let e = env_public().await;
+    let d = TempDir::new("public");
+    let v = d.open();
+
+    let (token, label) = e.token(&v.device_id(), "phone").await;
+    assert_eq!(label, "phone");
+
+    // One token request, public-client shaped: no Authorization header,
+    // client_id in the body, no secret, and a PKCE verifier (the issuer
+    // already checked it against the S256 challenge of the authorize request).
+    let reqs = e.issuer.token_requests.lock().unwrap().clone();
+    assert_eq!(reqs.len(), 1, "one token request per login");
+    let r = &reqs[0];
+    assert_eq!(r.authorization, None);
+    assert_eq!(r.form.get("client_id").map(String::as_str), Some(CLIENT_ID));
+    assert!(!r.form.contains_key("client_secret"));
+    assert!(r.form.get("code_verifier").is_some_and(|v| v.len() >= 43));
+
+    // The token works for sync.
+    let c = e.client(v.clone(), &token);
+    sync(&c).await.unwrap();
     e.server.stop().await;
 }

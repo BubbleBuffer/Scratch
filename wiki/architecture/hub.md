@@ -36,7 +36,8 @@ A TOML file. Each key can be overridden by `NOTES_HUB_<KEY>` (`NOTES_HUB_OIDC_<K
 | `trust_proxy` | `true` | Use the first `X-Forwarded-For` hop as the client address in logs. Set it to `false` if the hub is reachable without Caddy. It affects nothing else: the public URL is configured, not derived from headers. |
 | `import_source_limit_bytes` | `67108864` | Per-source tar archive bytes before base64; override with `NOTES_HUB_IMPORT_SOURCE_LIMIT_BYTES`. |
 | `oidc.issuer` | empty | Issuer URL (Authentik: `https://<authentik>/application/o/<slug>/`). Empty turns login off, and only `--pair` tokens work. |
-| `oidc.client_id`, `oidc.client_secret` | | The confidential client. |
+| `oidc.client_id` | | The OIDC client ID (required with the issuer). |
+| `oidc.client_secret` | empty | Optional: leave it empty for a public client, which signs in with PKCE only (no secret). With a secret the hub is a confidential client and sends it with HTTP Basic auth at the token endpoint. Environment: `NOTES_HUB_OIDC_CLIENT_SECRET` (empty clears it). |
 | `oidc.allowed_users` | `[]` | Emails (any case) or `sub`s allowed to sign in. |
 | `oidc.allowed_groups` | `[]` | Groups (the ID token's `groups` claim) whose members may sign in. |
 | `oidc.scopes` | `openid email profile`, plus `groups` if `allowed_groups` is set | Scopes asked for. |
@@ -175,7 +176,7 @@ Outside agents, and the app's Ask AI and Agent-assigned tasks (through a signed-
 2. The hub makes a state, a nonce and a PKCE verifier (S256), keeps them in memory for 10 minutes, and redirects to the issuer's authorize endpoint, found through discovery (cached for 10 minutes).
 3. `/auth/callback` takes the started login (single use). An unknown or expired state shows a small HTML error page. Otherwise every failure redirects to the app with `error=` and the app's `state`:
    - `<the issuer's error>` when the issuer sent one
-   - `login_failed`: the code exchange (client secret plus verifier, HTTP Basic) or the ID token check failed. The `openidconnect` crate checks the signature through the JWKS, `iss`, `aud`, `exp` and `nonce`.
+   - `login_failed`: the code exchange (HTTP Basic with the client secret when one is configured, otherwise `client_id` in the body; plus the verifier) or the ID token check failed. The `openidconnect` crate checks the signature through the JWKS, `iss`, `aud`, `exp` and `nonce`.
    - `access_denied`: the user is in neither allow list
    - `device_refused`: the device id is the hub's own
 4. On success the hub creates a device token with `Hub::login_device` (label `<name>`, bound to the device; re-login replaces the device's old token; a clashing label gets ` (2)`) in the usual `tokens.json`, and redirects to `redirect?code=<one-time code>&state=<app state>`. The code is 256 random bits, single use, valid for 2 minutes.
