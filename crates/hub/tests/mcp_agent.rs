@@ -559,6 +559,28 @@ fn archive(files: &[(&str, &[u8])]) -> String {
     base64::engine::general_purpose::STANDARD.encode(archive.into_inner().unwrap())
 }
 
+/// Drops the `http://host:port` base from page links (`.../open/<id>`): the
+/// link base is process-wide, and hubs started by parallel tests change it.
+fn links_by_path(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(i) = rest.find("http://") {
+        out.push_str(&rest[..i]);
+        let link = &rest[i..];
+        match link.find("/open/") {
+            Some(j) if !link[..j].contains(|c: char| c.is_whitespace() || c == '"') => {
+                rest = &link[j..];
+            }
+            _ => {
+                out.push_str("http://");
+                rest = &link["http://".len()..];
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 fn import_archive(bytes: &[u8]) -> String {
     archive(&[("intro.md", bytes)])
 }
@@ -620,15 +642,7 @@ async fn vault_calls_match_notes_mcp_without_a_session_or_available_execution_ho
         );
         // The link base is process-wide and the last started hub sets it, so
         // compare links by path only.
-        let output: String = output
-            .lines()
-            .map(|line| match line.split_once("/open/") {
-                Some((_, path)) if line.starts_with("link: ") => format!("link: /open/{path}"),
-                _ => line.to_owned(),
-            })
-            .collect::<Vec<_>>()
-            .join("
-");
+        let output = links_by_path(&output);
         creates.push(output.replace(&id, "PAGE_ID"));
         let read = env
             .call_at(&notes, &token, None, "read_page", json!({"page":id}))
@@ -636,7 +650,11 @@ async fn vault_calls_match_notes_mcp_without_a_session_or_available_execution_ho
         let gateway_read = env
             .call_at(&gateway, &token, None, "read_page", json!({"page":id}))
             .await;
-        assert_eq!(read, gateway_read);
+        // Another test's hub can change the link base between the two reads.
+        assert_eq!(
+            links_by_path(&read.to_string()),
+            links_by_path(&gateway_read.to_string())
+        );
         assert!(success_text(&read).contains("parityneedle"));
     }
     assert_eq!(creates[0], creates[1]);
