@@ -19,7 +19,7 @@ status: current
 - Page links for the user: `read_page`, `create_page` and `edit_page` results carry a `link:` line (and a `block link:` line for a block), an http address `<base>/open/<id>` (`?block=<id>` for a block). `<base>` is the serving hub's `public_url`, or `http://127.0.0.1:<port>` without one (47100 on the desktop). The Claude app refuses custom-scheme links from chat but opens http ones, so the address bounces to `notes://page/<id>`. The server instructions tell the agent to write `[Title](<link>)` with the `link:` line. See [links](../../docs/notes/links.md) and [app state](../architecture/app-state.md).
 - **Claude:** Claude Code and Claude Desktop can connect locally. Claude on the web and phone uses custom connectors, which need a public HTTPS address.
 - **ChatGPT:** supports MCP connectors too, with the same public-address requirement.
-- Browser connectors that require OAuth: Claude's connector uses Authentik through an optional OAuth path on the hub's `/mcp`, described in [Claude connector](#claude-connector). Otherwise the hub endpoint accepts static agent bearer tokens and rejects every browser `Origin` header.
+- Browser connectors that require OAuth: Claude's connector uses the hub's one Authentik OAuth2 provider through an optional OAuth path on `/mcp`, described in [Claude connector](#claude-connector). ChatGPT, Gemini and CLI MCP clients use the same provider. Otherwise the hub endpoint accepts static agent bearer tokens and rejects every browser `Origin` header.
 
 ## Connecting with `notes setup`
 
@@ -46,66 +46,77 @@ The states, who can see a job, the limits and what the hub does on restart are i
 
 ## Claude connector
 
-**Status:** off by default (the `[mcp_oauth]` settings unset). Not yet verified with a real claude.ai sign-in. Decision 2026-10-16 (0011, internal wiki): Authentik is the authorization server for the connector, with a public client `claude-mcp`; the hub only validates its JWTs offline.
+**Status:** off by default (the `[mcp_oauth]` settings unset). Not yet verified with a real claude.ai sign-in.
 
-Claude on the web and phone reaches the vault through a custom connector. The hub's `/mcp` accepts an OAuth token from Authentik for this, next to the agent tokens.
+Claude on the web and phone reaches the vault through a custom connector. The hub uses one Authentik OAuth2 provider for everything: device sign-in (`[oidc]`) and MCP OAuth (`[mcp_oauth]`) on `/mcp` and `/mcp/agent`. `[mcp_oauth]` `issuer` and `client_id` (environment `NOTES_HUB_MCP_OAUTH_ISSUER` and `NOTES_HUB_MCP_OAUTH_CLIENT_ID`) are the same issuer and client ID as `[oidc]`.
+
+The provider is a confidential client. Connectors need both the client ID and the client secret. PKCE S256 is used too.
 
 ### How it works
 
-- `/mcp` accepts two kinds of bearer token. First the agent tokens, unchanged. Otherwise an OAuth access token from the Authentik provider `claude-mcp`.
+- `/mcp` accepts two kinds of bearer token. First the agent tokens, unchanged. Otherwise an OAuth access token issued by the Authentik provider.
 - The hub validates that token offline as a JWT: RS256 signature against the issuer's JWKS, `iss` equal to the configured issuer, `exp` not passed, and `aud` containing the configured client ID. An additional resource audience may be `<public_url>/mcp`, `<public_url>/mcp/agent` or `<public_url>/mcp/agent?<query>` on either endpoint. The configured client ID remains required: a resource audience alone is refused. No resource indicator is required.
+- The user must be allowed by `[oidc]`: `oidc.allowed_users` by email or `sub`, or `oidc.allowed_groups`, in practice `notes-users`. If the token lacks the `groups` claim (or the email, when users are listed), the hub asks Authentik's userinfo endpoint once per token and caches the answer until the token expires.
 - Discovery and keys are cached for 10 minutes, as app login is. A signing-key rotation in Authentik is picked up within 10 minutes.
-- The allow-list is the same as app login: `oidc.allowed_users` by email or `sub`, and `oidc.allowed_groups`, in practice `notes-users`. If the token lacks the `groups` claim (or the email, when users are listed), the hub asks Authentik's userinfo endpoint once per token and caches the answer until the token expires.
 - Allowed callers get the same tools as a full-access agent token. Their edits are recorded with actor `oauth:<email>`, or `oauth:<sub>` without an email.
-- Without a valid token, `/mcp` answers 401 with `WWW-Authenticate: Bearer resource_metadata="https://notes.example.com/.well-known/oauth-protected-resource/mcp"`. A valid token from an account not on the allow-list gets 403.
-- `GET /.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp` serve the protected-resource metadata (RFC 9728). It names resource `https://notes.example.com/mcp`, the claude-mcp issuer as authorization server, the scopes `openid email profile offline_access`, and bearer tokens in the header only.
+- Without a valid token, `/mcp` answers 401 with `WWW-Authenticate: Bearer resource_metadata="https://hub.example.com/.well-known/oauth-protected-resource/mcp"`. A valid token from an account not on the allow-list gets 403.
+- `GET /.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp` serve the protected-resource metadata (RFC 9728). It names resource `https://hub.example.com/mcp`, the issuer as authorization server, the scopes `openid email profile offline_access`, and bearer tokens in the header only.
 - Origin: a request without `Origin` passes. With the feature on, a single `Origin` of `https://claude.ai`, `https://claude.com` or `https://chatgpt.com` passes; other or multiple Origin values get 403. Origin logging is bounded and uses debug level.
 - With both variables unset, the hub behaves as before: no metadata routes, a bare `Bearer` 401, and every Origin refused.
+- Claude Code and Codex set up with `notes setup` use agent tokens on `/mcp` and don't need OAuth.
 
 The two variables are listed in [Hub deployment](../architecture/hub-deploy.md#claude-connector).
 
-### Authentik side (exists since 2026-10-16)
+### Authentik side
 
 Created over root SSH with `ak shell`. Change Authentik infrastructure the same way, never through the admin web UI.
 
-- Provider `claude-mcp`: OAuth2/OpenID Connect, public client (no secret), PKCE S256.
+- Provider: one OAuth2/OpenID Connect provider for the hub, serving device sign-in and MCP OAuth. Confidential client (client ID and secret), PKCE S256.
   - Grant types `authorization_code` and `refresh_token`, set explicitly. An empty list rejects every login; see [the live deployment note](../architecture/hub-deploy.md#live-deployment).
-  - Strict redirect URIs `https://claude.ai/api/mcp/auth_callback` and `https://claude.com/api/mcp/auth_callback`.
-  - Signing key (RSA, so tokens are RS256) and flows copied from `notes-hub`.
-  - Scopes `openid`, `email`, `profile`, `offline_access`.
-- Application `claude-mcp`, bound to the group `notes-users`.
-- Client ID: `d1QDPw9lEM6jOT2WFfcJkggcMqLuA6BrEIvvWF4b` (public, not a secret).
-- Issuer: `https://auth.example.com/application/o/claude-mcp/`. JWKS: `https://auth.example.com/application/o/claude-mcp/jwks/`. Discovery is public and advertises S256.
+  - Strict redirect URIs:
+    - `https://hub.example.com/auth/callback`: device sign-in.
+    - `https://claude.ai/api/mcp/auth_callback` and `https://claude.com/api/mcp/auth_callback`: Claude.
+    - `https://chatgpt.com/connector_platform_oauth_redirect`: ChatGPT.
+    - `https://chatgpt.com/connector/oauth/<callback-id>`: ChatGPT's per-connector callback. Copy it from the connector's settings page. ChatGPT uses it because Authentik does not advertise RFC 9207 `iss` in authorization responses.
+    - `https://oauth-redirect.googleusercontent.com/r/<id>`: Gemini custom MCP.
+    - `^http://127\.0\.0\.1:[0-9]{1,5}/callback(/[A-Za-z0-9_-]{1,64})?$` and `^http://localhost:[0-9]{1,5}/callback$`: loopback regexes for CLI MCP clients doing OAuth.
+  - Signing key RSA, so tokens are RS256.
+  - Scopes `openid`, `email`, `profile`, `offline_access` (refresh tokens for connectors).
+- Application bound to the group `notes-users`.
+- Issuer: `https://auth.example.com/application/o/<slug>/`, the same as `[oidc] issuer`. Discovery is public and advertises S256.
+- The client ID and secret are not written in this repo. The hub reads them from `[oidc]` (`NOTES_HUB_OIDC_CLIENT_SECRET` for the secret).
+- The old separate public client `claude-mcp` is no longer used by the hub. It may still exist in Authentik; remove it once connectors are moved to this provider.
 
 ### Connector settings in Claude
 
 In Claude, go to **Settings → Connectors → Add custom connector**:
 
 - Name: `Notes` (any name).
-- URL: `https://notes.example.com/mcp`.
-- Advanced settings: OAuth Client ID is the `claude-mcp` Client ID. Leave the OAuth Client Secret blank; the client is public.
+- URL: `https://hub.example.com/mcp`.
+- Advanced settings: OAuth Client ID and OAuth Client Secret are the hub's `[oidc]` client ID and client secret.
 
 Then choose **Connect**. Claude opens Authentik's login. After sign-in, the vault tools appear in chats.
 
+ChatGPT, Gemini and CLI MCP clients use the same client ID and secret, with the redirect URIs listed above.
+
 ### Limits
 
-- No dynamic client registration. Authentik gains it in 2026.8, so until then the client ID is entered by hand.
-- Authentik serves its metadata only at `<issuer>.well-known/openid-configuration`, not at the RFC 8414 path. The MCP spec has clients try that URL last, so discovery should still work. This is unverified with Claude until the first real sign-in (internal wiki: AI assistants).
-- Only the claude.ai and claude.com callbacks are registered. Claude Code's local loopback callback is not, so Claude Code keeps using agent tokens.
+- No dynamic client registration: Authentik does not offer it here, so each connector takes the client ID and secret entered by hand.
+- Authentik serves its metadata only at `<issuer>.well-known/openid-configuration`, not at the RFC 8414 path. The MCP spec has clients try that URL last, so discovery should still work. This is unverified with Claude until the first real sign-in.
 - Streamable HTTP over POST only. `GET /mcp` stays 405 (no SSE stream).
 - OAuth sessions get full access. There is no read-only OAuth scope.
 
 ## Agent gateway connector
 
-**Implemented, off by default; deployment and real connector sign-in are not established here.** Add a separate connector for `https://notes.example.com/mcp/agent` to use the agent runtime. It offers all `/mcp` vault tools, the host's advertised tools and `hosts`. Host tools accept optional `host`; JS and `js_help` appear only when enabled. A connector URL can select a host, for example `https://notes.example.com/mcp/agent?host=hub`. Only the hub host is available; desktop outbound relay is not implemented, and the hub has no desktop tool pack or shell.
+**Implemented, off by default; deployment and real connector sign-in are not established here.** Add a separate connector for `https://hub.example.com/mcp/agent` to use the agent runtime. It offers all `/mcp` vault tools, the host's advertised tools and `hosts`. Host tools accept optional `host`; JS and `js_help` appear only when enabled. A connector URL can select a host, for example `https://hub.example.com/mcp/agent?host=hub`. Only the hub host is available; desktop outbound relay is not implemented, and the hub has no desktop tool pack or shell.
 
-Use the same public Authentik `claude-mcp` client as the `/mcp` connector: OAuth Client ID `d1QDPw9lEM6jOT2WFfcJkggcMqLuA6BrEIvvWF4b`, with the client secret blank. The issuer is `https://auth.example.com/application/o/claude-mcp/`. The existing registered callbacks above still apply; allowing the ChatGPT Origin does not register a ChatGPT OAuth callback or establish a successful ChatGPT connection.
+Use the same Authentik provider as the `/mcp` connector: its client ID and client secret, with PKCE S256. The issuer is the `[mcp_oauth]` issuer. The redirect URIs listed in [Authentik side](#authentik-side) still apply. Allowing the ChatGPT Origin does not register ChatGPT's per-connector callback; add it on the provider from the connector's settings page before connecting. Even then, no successful ChatGPT connection is established until tested.
 
 Enable `NOTES_HUB_MCP_AGENT_ENABLED=true` alongside `NOTES_HUB_MCP_OAUTH_ISSUER` and `NOTES_HUB_MCP_OAUTH_CLIENT_ID`; enabling the gateway without both OAuth settings is a configuration error. `NOTES_HUB_MCP_AGENT_DEFAULT_HOST` defaults to `hub`. These also have TOML keys `mcp_agent_enabled`, `mcp_agent_default_host` and `[mcp_oauth]` `issuer`/`client_id`.
 
 Host selection is per call: tool argument `host` wins, followed by the request URL's `?host=name`, the vault's synced default runner (Settings > AI > Agent > "Agent runs on"; `hub` and `this_device` both mean `hub` on the gateway), the global `NOTES_HUB_MCP_AGENT_DEFAULT_HOST`, then `hub`. Unknown hosts from URL or configuration cause a call error listing available hosts; they do not fall back silently.
 
-The gateway accepts OAuth bearer tokens only. It shares `/mcp`'s issuer, RS256/expiry/audience validation and app-login allow-list (`oidc.allowed_users` or `oidc.allowed_groups`, in practice `notes-users`). The JWT `aud` must contain the configured client ID. Additional resource audiences `<public_url>/mcp`, `<public_url>/mcp/agent` and `<public_url>/mcp/agent?<query>` are accepted on both endpoints; a resource audience alone is refused. Requests without Origin pass; single Origins `https://claude.ai`, `https://claude.com` and `https://chatgpt.com` pass, while other or multiple Origins are refused. Missing/invalid credentials return 401 with metadata at `https://notes.example.com/.well-known/oauth-protected-resource/mcp/agent`; an account outside the allow-list gets 403. That metadata advertises resource `https://notes.example.com/mcp/agent` and the same issuer and scopes.
+The gateway accepts OAuth bearer tokens only. It shares `/mcp`'s issuer, RS256/expiry/audience validation and app-login allow-list (`oidc.allowed_users` or `oidc.allowed_groups`, in practice `notes-users`). The JWT `aud` must contain the configured client ID. Additional resource audiences `<public_url>/mcp`, `<public_url>/mcp/agent` and `<public_url>/mcp/agent?<query>` are accepted on both endpoints; a resource audience alone is refused. Requests without Origin pass; single Origins `https://claude.ai`, `https://claude.com` and `https://chatgpt.com` pass, while other or multiple Origins are refused. Missing/invalid credentials return 401 with metadata at `https://hub.example.com/.well-known/oauth-protected-resource/mcp/agent`; an account outside the allow-list gets 403. That metadata advertises resource `https://hub.example.com/mcp/agent` and the same issuer and scopes.
 
 Discovery preserves URL host selection: a connector at `/mcp/agent?host=hub` receives a 401 challenge pointing to `/.well-known/oauth-protected-resource/mcp/agent?host=hub`, whose resource includes `/mcp/agent?host=hub`. The query selects a host; the shared verifier accepts the query-bearing resource audience on either endpoint, while still requiring the configured client ID in `aud`.
 
@@ -119,7 +130,7 @@ HTTP initialize returns an OAuth-subject-bound `Mcp-Session-Id`. Send it with su
 
 ### Switch an existing connector
 
-Edit the connector URL from `https://notes.example.com/mcp` to `https://notes.example.com/mcp/agent?host=hub`, or back. Keep the same OAuth Client ID and login. Both routes use the same issuer, accepted audiences, allow-list, scopes (`openid email profile offline_access`) and registered redirect URIs. The server accepts the same valid OAuth token on either route, without binding it to the resource URL advertised in metadata. Static agent tokens remain specific to `/mcp`.
+Edit the connector URL from `https://hub.example.com/mcp` to `https://hub.example.com/mcp/agent?host=hub`, or back. Keep the same OAuth Client ID and login. Both routes use the same issuer, accepted audiences, allow-list, scopes (`openid email profile offline_access`) and registered redirect URIs. The server accepts the same valid OAuth token on either route, without binding it to the resource URL advertised in metadata. Static agent tokens remain specific to `/mcp`.
 
 ## Current state (2026-10-01)
 
@@ -171,7 +182,7 @@ For an agent with HTTP support, create a hub token in the app (Settings > AI > A
 
 The `notes` binary in `vault_tools` calls the same hub `/mcp` endpoint. It provides `search`, `read`, `query`, `write` and `append`, plus nine `memory` commands (`list`, `search`, `read`, `write`, `update`, `delete`, `index`, `import` and `rules`; `rules` is answered locally, without hub access) `wiki import`, and `jobs` (`create`, `get`, `wait`, `cancel`, `list`; see [Starting jobs](#starting-jobs-from-an-outside-agent)). Write and append bodies come from stdin; `--json` returns the raw tool result. It does not open a local vault.
 
-`NOTES_HUB_URL` overrides the config's `hub`, then defaults to `https://notes.example.com`. `NOTES_TOKEN` overrides the config's `token`. The config is `%APPDATA%\notes\config.toml` on Windows, or `$XDG_CONFIG_HOME/notes/config.toml` (otherwise `~/.config/notes/config.toml`) on Unix. Tokens are never command-line arguments or printed in diagnostics. See [Agent memory](agent-memory.md) for the index and import rules.
+`NOTES_HUB_URL` overrides the config's `hub`, then defaults to `https://hub.example.com`. `NOTES_TOKEN` overrides the config's `token`. The config is `%APPDATA%\notes\config.toml` on Windows, or `$XDG_CONFIG_HOME/notes/config.toml` (otherwise `~/.config/notes/config.toml`) on Unix. Tokens are never command-line arguments or printed in diagnostics. See [Agent memory](agent-memory.md) for the index and import rules.
 
 ### Desktop connection examples
 
