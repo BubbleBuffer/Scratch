@@ -14,6 +14,8 @@ import 'package:notes_app/ui/ui.dart';
 
 import 'harness.dart';
 
+Finder key(String k) => find.byKey(ValueKey(k));
+
 class _HubPage extends StatelessWidget {
   const _HubPage();
 

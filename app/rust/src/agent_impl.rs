@@ -697,7 +697,7 @@ mod desktop {
                 .call(
                     &session,
                     "write",
-                    serde_json::json!({"path": target.to_string_lossy(), "content": "hello"}),
+                    serde_json::json!({"path": "from-hub.txt", "content": "hello"}),
                     notes_agent_wire::host::Caller { id: "oauth:test".into(), name: None },
                     vault_agent::bubblepaw_core::CancellationToken::new(),
                 )
