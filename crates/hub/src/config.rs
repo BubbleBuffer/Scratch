@@ -116,6 +116,9 @@ pub struct OidcConfig {
     /// `https://auth.example.com/application/o/notes/`. Empty: no login.
     pub issuer: String,
     pub client_id: String,
+    /// The client secret, optional: leave it empty (or unset) for a public
+    /// client, which signs in with PKCE only. Environment:
+    /// `NOTES_HUB_OIDC_CLIENT_SECRET` (empty clears it).
     pub client_secret: String,
     /// Users allowed to sign in, by email or `sub`.
     pub allowed_users: Vec<String>,
@@ -366,10 +369,8 @@ impl Config {
                 return Err("public_url must be an http(s) URL".into());
             }
         }
-        if self.oidc.enabled()
-            && (self.oidc.client_id.is_empty() || self.oidc.client_secret.is_empty())
-        {
-            return Err("oidc.client_id and oidc.client_secret are required".into());
+        if self.oidc.enabled() && self.oidc.client_id.is_empty() {
+            return Err("oidc.client_id is required".into());
         }
         if self.android_package.is_empty() != self.android_sha256_certs.is_empty() {
             return Err("android_package and android_sha256_certs are required together".into());
@@ -598,6 +599,38 @@ mod tests {
         assert!(config
             .apply_env(|key| (key == "NOTES_HUB_IMPORT_SOURCE_LIMIT_BYTES").then(|| "bad".into()))
             .is_err());
+    }
+
+    #[test]
+    fn oidc_client_secret_is_optional() {
+        let with_oidc = |secret: &str| {
+            Config::from_toml(&format!(
+                r#"
+                data_dir = "/data"
+                public_url = "https://notes.example.com"
+                [oidc]
+                issuer = "https://auth.example.com/application/o/notes/"
+                client_id = "notes"
+                {secret}
+                "#
+            ))
+            .unwrap()
+        };
+        // Unset or empty: a public client, valid.
+        with_oidc("").validate().unwrap();
+        with_oidc("client_secret = \"\"").validate().unwrap();
+        // A secret still validates.
+        with_oidc("client_secret = \"s\"").validate().unwrap();
+        // An empty environment value clears a configured secret.
+        let mut c = with_oidc("client_secret = \"s\"");
+        c.apply_env(|k| (k == "NOTES_HUB_OIDC_CLIENT_SECRET").then(String::new))
+            .unwrap();
+        assert!(c.oidc.client_secret.is_empty());
+        c.validate().unwrap();
+        // The client ID is still required when OIDC is on.
+        let mut c = with_oidc("");
+        c.oidc.client_id.clear();
+        assert!(c.validate().unwrap_err().contains("oidc.client_id"));
     }
 
     #[test]
