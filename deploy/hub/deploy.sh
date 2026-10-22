@@ -12,7 +12,7 @@ case "$TAG" in
   *[!0-9a-f]* | "") echo "bad tag" >&2; exit 2 ;;
 esac
 [ "${#TAG}" -eq 40 ] || { echo "bad tag" >&2; exit 2; }
-IMAGE="ghcr.io/bubblebuffer/notes-hub:$TAG"
+IMAGE="ghcr.io/bubblebuffer/scratch-hub:$TAG"
 
 cd /opt/notes-hub
 exec 9>.deploy.lock
@@ -46,7 +46,10 @@ if ! healthy; then
 fi
 
 # Disk is tight: keep only notes-hub:latest and :previous.
-docker images ghcr.io/bubblebuffer/notes-hub --format '{{.Repository}}:{{.Tag}}' \
-  | xargs -r docker rmi >/dev/null 2>&1 || true
+# Images pushed before the move to Scratch are named ghcr.io/bubblebuffer/notes-hub.
+for repo in ghcr.io/bubblebuffer/scratch-hub ghcr.io/bubblebuffer/notes-hub; do
+  docker images "$repo" --format '{{.Repository}}:{{.Tag}}' \
+    | xargs -r docker rmi >/dev/null 2>&1 || true
+done
 docker image prune -f >/dev/null
 echo "deployed $TAG"
