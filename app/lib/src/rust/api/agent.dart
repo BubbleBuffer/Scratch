@@ -255,7 +255,7 @@ abstract class NotesAgent implements RustOpaqueInterface {
   Future<List<AgentSession>> sessions();
 
   /// Replaces this engine's MCP servers. `json` is a JSON object
-  /// {"<name>": <BubblePaw McpServerSettings as serde JSON>, ...}.
+  /// `{"<name>": <BubblePaw McpServerSettings as serde JSON>, ...}`.
   /// Restarts only changed servers; the chat tools, the gateway and the
   /// relay tool list reflect the change at once. Err(text) when the
   /// settings are invalid (state unchanged). A no-op Ok(()) where MCP is
@@ -795,7 +795,7 @@ class AgentMcpServer {
   /// Tools this server currently offers (0 unless running).
   final int tools;
 
-  /// Why it failed (the McpHost warning text without the "MCP server <name>: " prefix).
+  /// Why it failed (the McpHost warning text without the `MCP server <name>: ` prefix).
   final String? error;
 
   const AgentMcpServer({

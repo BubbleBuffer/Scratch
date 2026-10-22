@@ -19922,7 +19922,7 @@ class NotesAgentImpl extends RustOpaque implements NotesAgent {
       RustLib.instance.api.crateApiAgentNotesAgentSessions(that: this);
 
   /// Replaces this engine's MCP servers. `json` is a JSON object
-  /// {"<name>": <BubblePaw McpServerSettings as serde JSON>, ...}.
+  /// `{"<name>": <BubblePaw McpServerSettings as serde JSON>, ...}`.
   /// Restarts only changed servers; the chat tools, the gateway and the
   /// relay tool list reflect the change at once. Err(text) when the
   /// settings are invalid (state unchanged). A no-op Ok(()) where MCP is
