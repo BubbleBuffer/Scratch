@@ -223,6 +223,7 @@ void main() {
     String? toml =
         '{"files": {"command": "npx", "args": ["-y", "@example/files"]},'
         ' "docs": {"url": "https://other.example.com/mcp"}}';
+    final tv = await pumpApp(t, mobile: false);
     final calls = <String>[];
     AgentStore.debugMcpImport = (dir) async {
       calls.add(dir);
@@ -231,16 +232,14 @@ void main() {
       return json;
     };
     addTearDown(_resetHooks);
-    final tv = await pumpApp(t, mobile: false);
     final file = File('${tv.dir.path}/import-settings.json');
     final settings = AiSettings.load(file)
       ..agentEnabled = false
       ..agentMcpServers = {
         'docs': {'url': 'https://hub.example.com/mcp', 'enabled': true},
       };
-    final vault = tv.vault;
-    await real(t, () => AgentStore.closeFor(vault));
-    var store = AgentStore.attach(vault, settings);
+    // The app's own start may already have imported (nothing there).
+    final store = AgentStore.attach(tv.vault, settings)..debugForgetMcpImport();
     await real(t, store.importMcpFile);
     await real(t, store.importMcpFile);
     expect(calls, [file.parent.path], reason: 'once per start');
@@ -254,9 +253,8 @@ void main() {
       'args': ['-y', '@example/files'],
     });
 
-    // The next start finds the file renamed: nothing changes.
-    await real(t, () => AgentStore.closeFor(vault));
-    store = AgentStore.attach(vault, settings);
+    // A later start: the bridge renamed the file, so nothing changes.
+    store.debugForgetMcpImport();
     await real(t, store.importMcpFile);
     expect(calls, hasLength(2));
     expect(AiSettings.load(file).agentMcpServers, saved);

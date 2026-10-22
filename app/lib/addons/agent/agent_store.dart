@@ -1175,6 +1175,10 @@ class AgentStore extends ChangeNotifier {
   /// to `mcp.toml.imported`, so later starts find nothing to import.
   Future<void> importMcpFile() => _mcpImport ??= _importMcpFile();
 
+  /// Tests: forget that this store already imported, like a new start.
+  @visibleForTesting
+  void debugForgetMcpImport() => _mcpImport = null;
+
   Future<void> _importMcpFile() async {
     if (!localAgentPlatform || _disposed) return;
     try {
