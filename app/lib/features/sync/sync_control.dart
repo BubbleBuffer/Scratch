@@ -47,6 +47,8 @@ Future<void> startSyncAtBoot(SyncStore sync, AppSettings s) async {
     final ai = AiSettings.beside(s.file);
     // The agent first: AI tasks with the Agent runner use it.
     final agent = AgentStore.attach(sync.vault, ai)..useAppSettings(s);
+    // Desktop: an old `mcp.toml` becomes MCP servers in the AI settings once.
+    if (localAgentPlatform) await agent.importMcpFile();
     if (agent.enabled) await agent.ensureOpen();
     // A hub job (Ask AI or a task assigned to the agent on the Hub) reads
     // the hub's copy of the page: one sync round first.

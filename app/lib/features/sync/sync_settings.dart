@@ -11,6 +11,7 @@
 
 import 'package:flutter/widgets.dart';
 
+import '../../addons/agent/api.dart' show AgentStore, HostRelayDetails;
 import '../../state/app_state.dart';
 import '../../state/sync_store.dart';
 import '../../ui/app_name.dart';
@@ -199,6 +200,14 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
                 context,
               ).update((s) => s.hubUsesThisComputer = on),
             ),
+          ),
+        // While on: this computer's name on the hub, the connection state
+        // and the connector address.
+        if (signedIn && localAgentPlatform && s.hubUsesThisComputer)
+          HostRelayDetails(
+            link: AgentStore.of(context.app).relay,
+            hubUrl: s.clientUrl!,
+            name: s.clientDeviceLabel!.trim(),
           ),
         if (_error != null)
           Padding(

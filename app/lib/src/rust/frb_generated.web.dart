@@ -198,6 +198,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentHostInfo dco_decode_agent_host_info(dynamic raw);
 
   @protected
+  AgentHostRelayStatus dco_decode_agent_host_relay_status(dynamic raw);
+
+  @protected
+  AgentMcpServer dco_decode_agent_mcp_server(dynamic raw);
+
+  @protected
   AgentMessage dco_decode_agent_message(dynamic raw);
 
   @protected
@@ -516,6 +522,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AgentEvent> dco_decode_list_agent_event(dynamic raw);
+
+  @protected
+  List<AgentMcpServer> dco_decode_list_agent_mcp_server(dynamic raw);
 
   @protected
   List<AgentMessage> dco_decode_list_agent_message(dynamic raw);
@@ -1077,6 +1086,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentHostInfo sse_decode_agent_host_info(SseDeserializer deserializer);
 
   @protected
+  AgentHostRelayStatus sse_decode_agent_host_relay_status(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  AgentMcpServer sse_decode_agent_mcp_server(SseDeserializer deserializer);
+
+  @protected
   AgentMessage sse_decode_agent_message(SseDeserializer deserializer);
 
   @protected
@@ -1469,6 +1486,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AgentEvent> sse_decode_list_agent_event(SseDeserializer deserializer);
+
+  @protected
+  List<AgentMcpServer> sse_decode_list_agent_mcp_server(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<AgentMessage> sse_decode_list_agent_message(
@@ -2135,6 +2157,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_agent_host_info(AgentHostInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_agent_host_relay_status(
+    AgentHostRelayStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_agent_mcp_server(
+    AgentMcpServer self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_agent_message(AgentMessage self, SseSerializer serializer);
 
   @protected
@@ -2632,6 +2666,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_agent_event(
     List<AgentEvent> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_agent_mcp_server(
+    List<AgentMcpServer> self,
     SseSerializer serializer,
   );
 

@@ -136,6 +136,37 @@ impl Inner {
         }
     }
 
+    pub(crate) fn host_relay_status(&self) -> AgentHostRelayStatus {
+        match self {
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            Inner::Local(l) => l.host_relay_status(),
+            Inner::Remote(_) => AgentHostRelayStatus {
+                state: "off".into(),
+                error: None,
+            },
+        }
+    }
+
+    /// A hub never starts MCP servers.
+    pub(crate) fn set_mcp_servers(&self, json: String) -> Result<(), String> {
+        match self {
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            Inner::Local(l) => l.set_mcp_servers(json),
+            Inner::Remote(_) => {
+                let _ = json;
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) fn mcp_status(&self) -> Vec<AgentMcpServer> {
+        match self {
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            Inner::Local(l) => l.mcp_status(),
+            Inner::Remote(_) => Vec::new(),
+        }
+    }
+
     pub(crate) fn host_info(&self) -> Result<AgentHostInfo, String> {
         host!(self, host_info())
     }
@@ -311,6 +342,21 @@ impl Inner {
     }
 }
 
+/// See [`crate::api::agent::agent_mcp_import_file`].
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+pub(crate) fn mcp_import_file(data_dir: &str) -> Result<Option<String>, String> {
+    let settings = vault_agent::mcp::import_file(std::path::Path::new(data_dir))
+        .map_err(|e| format!("{e:#}"))?;
+    settings
+        .map(|settings| serde_json::to_string(&settings.servers).map_err(|e| e.to_string()))
+        .transpose()
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+pub(crate) fn mcp_import_file(_data_dir: &str) -> Result<Option<String>, String> {
+    Ok(None)
+}
+
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod desktop {
     use std::path::PathBuf;
@@ -338,24 +384,6 @@ mod desktop {
         wire::message(&error)
     }
 
-    /// The host relay's engine keeps its store in `<data dir>/host-relay`
-    /// (`host_relay_link.dart`) and reads the app's `mcp.toml`.
-    const RELAY_DIR: &str = "host-relay";
-
-    fn load_mcp(data_dir: &str) -> vault_agent::mcp::McpSettings {
-        let dir = std::path::Path::new(data_dir);
-        let dir = match (dir.file_name(), dir.parent()) {
-            (Some(name), Some(parent)) if name == RELAY_DIR => parent,
-            _ => dir,
-        };
-        let path = dir.join(vault_agent::mcp::FILE);
-        let (settings, error) = vault_agent::mcp::load_settings(&path);
-        if let Some(error) = error {
-            eprintln!("agent: {error}");
-        }
-        settings
-    }
-
     fn opt_path(p: Option<String>) -> Option<PathBuf> {
         p.filter(|s| !s.trim().is_empty()).map(PathBuf::from)
     }
@@ -378,7 +406,6 @@ mod desktop {
             } else {
                 Vec::new()
             };
-            let mcp = load_mcp(&data_dir);
             let config = AgentConfig {
                 host_kind: HostKind::Desktop,
                 packs,
@@ -393,9 +420,8 @@ mod desktop {
                     ..TestHooks::default()
                 },
                 tool_set: None,
-                // `<data dir>/mcp.toml`, in BubblePaw's `[mcp.servers.<name>]`
-                // format. Missing: no servers; unreadable: logged, no servers.
-                mcp,
+                // The app applies its servers with `set_mcp_servers` after open.
+                mcp: Default::default(),
             };
             let agent = Agent::open(vault.inner.clone(), config).map_err(e)?;
             Ok(Local(Arc::new(agent), std::sync::Mutex::new(None)))
@@ -428,6 +454,41 @@ mod desktop {
                 relay.stop();
             }
             Ok(())
+        }
+
+        pub(crate) fn host_relay_status(&self) -> AgentHostRelayStatus {
+            let status = match self.1.lock().unwrap().as_ref() {
+                Some(relay) => relay.status(),
+                None => crate::host_relay::RelayStatus::OFF,
+            };
+            AgentHostRelayStatus {
+                state: status.state.as_str().into(),
+                error: status.error,
+            }
+        }
+
+        /// `json`: {"<name>": <McpServerSettings>, ...}.
+        pub(crate) fn set_mcp_servers(&self, json: String) -> Result<(), String> {
+            let servers = serde_json::from_str(&json)
+                .map_err(|e| format!("invalid MCP server settings: {e}"))?;
+            let settings = vault_agent::mcp::McpSettings {
+                servers,
+                ..Default::default()
+            };
+            self.0.set_mcp(settings).map_err(|e| format!("{e:#}"))
+        }
+
+        pub(crate) fn mcp_status(&self) -> Vec<AgentMcpServer> {
+            self.0
+                .mcp_status()
+                .into_iter()
+                .map(|server| AgentMcpServer {
+                    name: server.name,
+                    state: server.state.as_str().into(),
+                    tools: u32::try_from(server.tools).unwrap_or(u32::MAX),
+                    error: server.error,
+                })
+                .collect()
         }
 
         /// The relay's host surface (tests).
@@ -727,6 +788,40 @@ mod desktop {
             assert!(!result.is_error && !result.pending, "{}", result.content);
             assert_eq!(std::fs::read_to_string(&target).unwrap(), "hello");
             host.close_session(&session).unwrap();
+
+            // MCP settings and the relay status through the bridge.
+            assert_eq!(agent.host_relay_status().state, "off");
+            assert!(agent.set_mcp_servers("[]".into()).is_err());
+            agent
+                .set_mcp_servers(r#"{"x": {"command": "nope", "enabled": false}}"#.into())
+                .unwrap();
+            let status = agent.mcp_status();
+            assert_eq!(status.len(), 1);
+            assert_eq!(
+                (status[0].name.as_str(), status[0].state.as_str()),
+                ("x", "off")
+            );
+            agent.set_mcp_servers("{}".into()).unwrap();
+            assert!(agent.mcp_status().is_empty());
+
+            let data = root.join("import");
+            std::fs::create_dir_all(&data).unwrap();
+            let data_dir = data.to_string_lossy().into_owned();
+            assert_eq!(crate::agent_impl::mcp_import_file(&data_dir), Ok(None));
+            std::fs::write(
+                data.join("mcp.toml"),
+                "[mcp.servers.x]\ncommand = \"nope\"\n",
+            )
+            .unwrap();
+            let json = crate::agent_impl::mcp_import_file(&data_dir)
+                .unwrap()
+                .unwrap();
+            let servers: serde_json::Value = serde_json::from_str(&json).unwrap();
+            assert_eq!(servers["x"]["command"], "nope");
+            assert!(data.join("mcp.toml.imported").exists());
+            agent.set_mcp_servers(json).unwrap();
+            agent.set_mcp_servers("{}".into()).unwrap();
+
             assert!(agent.host_relay_stop().is_ok());
             drop(host);
             drop(agent);

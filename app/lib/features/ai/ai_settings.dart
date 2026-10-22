@@ -253,6 +253,12 @@ class AiSettings extends ChangeNotifier {
   /// message and then keeps its host. Android always runs on the Hub.
   AgentHost? agentHostOverride;
 
+  /// MCP servers of the desktop agent (in-app chats and the host relay), by
+  /// name: each is BubblePaw's `McpServerSettings` as JSON (snake_case keys,
+  /// e.g. `command`, `args`, `env` or `url`, `headers_from`, `enabled`).
+  /// Keys the settings UI does not edit are kept as they are.
+  Map<String, Map<String, dynamic>> agentMcpServers = {};
+
   /// The settings beside [settingsFile] (the app's settings.json).
   static AiSettings beside(File? settingsFile) {
     if (settingsFile == null) return AiSettings();
@@ -326,6 +332,11 @@ class AiSettings extends ChangeNotifier {
         .firstOrNull;
     desktopTools = (j['desktopTools'] as bool?) ?? true;
     desktopRoot = (j['desktopRoot'] as String?) ?? desktopRoot;
+    agentMcpServers = {
+      for (final e in ((j['agentMcpServers'] as Map?) ?? const {}).entries)
+        if (e.key is String && e.value is Map)
+          e.key as String: Map<String, dynamic>.from(e.value as Map),
+    };
   }
 
   Map<String, dynamic> toJson() => {
@@ -353,6 +364,7 @@ class AiSettings extends ChangeNotifier {
     if (agentHostOverride != null) 'agentHostOverride': agentHostOverride!.name,
     'desktopTools': desktopTools,
     'desktopRoot': desktopRoot,
+    if (agentMcpServers.isNotEmpty) 'agentMcpServers': agentMcpServers,
   };
 
   /// Whether [r] can run here as configured (DeepSeek needs a key).

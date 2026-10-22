@@ -32,7 +32,7 @@ pub mod wire;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use anyhow::{ensure, Context, Result};
@@ -115,7 +115,8 @@ pub struct AgentConfig {
     /// its set); None reads the runner's set.
     pub tool_set: Option<vault_tools::ToolSet>,
     /// MCP servers whose tools this engine offers (desktop hosts with the
-    /// Everything set only); see [`mcp::load_settings`]. Empty: none.
+    /// Everything set only), at open; [`Agent::set_mcp`] replaces them.
+    /// Empty: none.
     pub mcp: mcp::McpSettings,
     pub test: TestHooks,
 }
@@ -345,12 +346,53 @@ pub fn close_outline_chapter_at(
     Ok(revision)
 }
 
+/// The MCP servers of a desktop engine with the Everything set.
+struct McpState {
+    /// Their client; dropping it stops the servers.
+    host: Arc<mcp::McpHost>,
+    /// Held through [`Agent::set_mcp`], so applies do not interleave.
+    apply: Mutex<()>,
+    /// The settings last applied and the host's warnings from that reload.
+    applied: Mutex<(mcp::McpSettings, Vec<String>)>,
+}
+
+/// The entrypoint surfaces over this engine's tools and the MCP tools as of
+/// the last [`Agent::set_mcp`].
+struct Surfaces {
+    gateway: gateway::GatewayRuntime,
+    /// The host relay's surface: the same tools, always native and without JS.
+    relay: gateway::GatewayRuntime,
+}
+
+impl Surfaces {
+    fn new(
+        tools: &ToolRegistry,
+        execution_mode: bubblepaw_core::ExecutionMode,
+        enable_js: bool,
+    ) -> Result<Surfaces> {
+        Ok(Surfaces {
+            gateway: gateway::GatewayRuntime::new(tools, execution_mode, enable_js)?,
+            relay: gateway::GatewayRuntime::new(
+                tools,
+                bubblepaw_core::ExecutionMode::Native,
+                false,
+            )?,
+        })
+    }
+}
+
 /// The agent: harness, store, code mode and providers, on its own runtime.
 pub struct Agent {
-    /// The MCP servers' client while any are configured; dropping it stops
-    /// the servers.
-    #[allow(dead_code)]
-    mcp: Option<Arc<mcp::McpHost>>,
+    /// None on a hub host or without the Everything set.
+    mcp: Option<McpState>,
+    /// The tools without MCP's, which [`Agent::set_mcp`] rebuilds the
+    /// surfaces over.
+    base_tools: ToolRegistry,
+    execution_mode: bubblepaw_core::ExecutionMode,
+    enable_js: bool,
+    /// Swapped whole by [`Agent::set_mcp`]; a call keeps the surfaces it
+    /// started with.
+    surfaces: RwLock<Arc<Surfaces>>,
     scheduler: Mutex<std::result::Result<Option<Arc<schedules::Scheduler>>, String>>,
     records: Arc<records::Records>,
     ui: Arc<ui::Ui>,
@@ -360,9 +402,6 @@ pub struct Agent {
     permission_mode: Mutex<PermissionMode>,
     permission_file: PathBuf,
     harness: Arc<Harness>,
-    gateway: gateway::GatewayRuntime,
-    /// The host relay's surface: the same tools, always native and without JS.
-    relay: gateway::GatewayRuntime,
     store: Store,
     /// `<data_dir>/agent/chat_outline.sqlite`, the notes-owned chapters and sections.
     outline_path: PathBuf,
@@ -509,22 +548,36 @@ impl Agent {
             )?;
         }
         // MCP servers (desktop hosts with the Everything set; see `mcp`).
-        // They start once here; a server that fails is logged and left out.
-        let mcp_host = if matches!(config.host_kind, HostKind::Desktop)
+        // The host exists even without servers, so `set_mcp` can add some.
+        // A server that fails is left out and reported by `mcp_status`.
+        let mcp_state = if matches!(config.host_kind, HostKind::Desktop)
             && tool_set == vault_tools::ToolSet::Everything
-            && !config.mcp.servers.is_empty()
         {
-            let host = Arc::new(runtime.block_on(mcp::McpHost::start(&config.mcp, &workspace)));
-            for warning in host.warnings() {
+            let host = Arc::new(runtime.block_on(mcp::McpHost::start(
+                &mcp::McpSettings::default(),
+                &workspace,
+            )));
+            let applied = match runtime.block_on(host.reload(&config.mcp, None)) {
+                Ok(diff) => (config.mcp.clone(), diff.warnings),
+                Err(error) => {
+                    eprintln!("agent: MCP settings: {error:#}; no MCP servers");
+                    (mcp::McpSettings::default(), Vec::new())
+                }
+            };
+            for warning in &applied.1 {
                 eprintln!("agent: {warning}");
             }
-            Some(host)
+            Some(McpState {
+                host,
+                apply: Mutex::new(()),
+                applied: Mutex::new(applied),
+            })
         } else {
             None
         };
         let base_tools = tools.clone();
-        if let Some(host) = &mcp_host {
-            for skipped in mcp::register(&mut tools, host, &records, &vault) {
+        if let Some(state) = &mcp_state {
+            for skipped in mcp::register(&mut tools, &state.host, &records, &vault) {
                 eprintln!("agent: {skipped}");
             }
         }
@@ -535,9 +588,7 @@ impl Agent {
             !model_tools.is_empty(),
             "The agent must expose at least one tool"
         );
-        let gateway = gateway::GatewayRuntime::new(&tools, execution_mode, enable_js)?;
-        let relay =
-            gateway::GatewayRuntime::new(&tools, bubblepaw_core::ExecutionMode::Native, false)?;
+        let surfaces = Surfaces::new(&tools, execution_mode, enable_js)?;
 
         let default_model = if config.default_model.trim().is_empty() {
             DEFAULT_MODEL.to_string()
@@ -661,12 +712,13 @@ impl Agent {
             // A recorded turn can hold ~190 assistant records; see replay::MAX_ROUNDS.
             harness_config.max_rounds = Some(replay::MAX_ROUNDS);
         }
-        if let Some(host) = &mcp_host {
+        if let Some(state) = &mcp_state {
             // Each turn sees the servers' current tools: the resolver asks
             // them to refresh (for `tools/list_changed`) and registers what
             // they list now over the other tools.
-            let (host, handle) = (host.clone(), runtime.handle().clone());
+            let (host, handle) = (state.host.clone(), runtime.handle().clone());
             let (records, vault) = (records.clone(), vault.clone());
+            let base_tools = base_tools.clone();
             harness_config.registry_resolver = Some(Arc::new(move || {
                 let refresh = host.clone();
                 handle.spawn(async move {
@@ -685,7 +737,11 @@ impl Agent {
         ));
         drop(_context);
         Ok(Agent {
-            mcp: mcp_host,
+            mcp: mcp_state,
+            base_tools,
+            execution_mode,
+            enable_js,
+            surfaces: RwLock::new(Arc::new(surfaces)),
             scheduler: Mutex::new(Ok(None)),
             records,
             ui,
@@ -695,8 +751,6 @@ impl Agent {
             permission_mode: Mutex::new(permission_mode),
             permission_file,
             harness,
-            gateway,
-            relay,
             store,
             outline_path: dir.join(vault_tools::outline::FILE_NAME),
             repl,
@@ -715,6 +769,49 @@ impl Agent {
 
     pub fn vault(&self) -> &Arc<Vault> {
         &self.vault
+    }
+
+    /// Replaces the MCP servers (see [`mcp`]): only changed servers restart,
+    /// and chats, the gateway and the relay see the new tools at once.
+    /// Invalid settings are an error and change nothing. A no-op without MCP
+    /// (a hub host, or a tool set other than Everything).
+    pub fn set_mcp(&self, settings: mcp::McpSettings) -> Result<()> {
+        let Some(state) = &self.mcp else {
+            return Ok(());
+        };
+        let _apply = state.apply.lock().unwrap();
+        let diff = self.runtime.block_on(state.host.reload(&settings, None))?;
+        for warning in &diff.warnings {
+            eprintln!("agent: {warning}");
+        }
+        *state.applied.lock().unwrap() = (settings, diff.warnings);
+        let mut tools = self.base_tools.clone();
+        for skipped in mcp::register(&mut tools, &state.host, &self.records, &self.vault) {
+            eprintln!("agent: {skipped}");
+        }
+        let surfaces = Surfaces::new(&tools, self.execution_mode, self.enable_js)?;
+        *self.surfaces.write().unwrap() = Arc::new(surfaces);
+        Ok(())
+    }
+
+    /// Each configured MCP server's state, in name order. Empty without MCP.
+    pub fn mcp_status(&self) -> Vec<mcp::ServerStatus> {
+        let Some(state) = &self.mcp else {
+            return Vec::new();
+        };
+        let (settings, warnings) = state.applied.lock().unwrap().clone();
+        let tools: Vec<String> = state
+            .host
+            .tools()
+            .into_iter()
+            .map(|tool| tool.definition().name)
+            .collect();
+        mcp::status(&settings, &warnings, &tools)
+    }
+
+    /// The gateway and relay surfaces as of now.
+    fn surfaces(&self) -> Arc<Surfaces> {
+        self.surfaces.read().unwrap().clone()
     }
 
     /// Attaches the host's provider-independent schedule engine.

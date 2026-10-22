@@ -29,6 +29,7 @@ import '../../services/addon_services.dart';
 // AI settings. AppState.dispose closes it.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -63,6 +64,8 @@ export '../../src/rust/api/agent.dart'
         AgentEdit,
         AgentProject,
         AgentHostInfo,
+        AgentHostRelayStatus,
+        AgentMcpServer,
         AgentMessage,
         AgentMessageContext,
         AgentModel,
@@ -1052,7 +1055,7 @@ class AgentStore extends ChangeNotifier {
   // ------------------------------- host relay
 
   /// "Let the hub use this computer" ([HostRelayLink]).
-  final _relay = HostRelayLink();
+  late final _relay = HostRelayLink(onChanged: _notify);
   HostRelayLink get relay => _relay;
 
   /// The relay's settings while it should run: desktop, the toggle on and
@@ -1103,7 +1106,108 @@ class AgentStore extends ChangeNotifier {
     return '${hub?.url}\u0000${hub?.token}';
   }
 
+  // ------------------------------- MCP servers (desktop)
+
+  /// The AI settings' MCP servers in the shape `setMcpServers` takes.
+  String get _mcpJson => jsonEncode(settings.agentMcpServers);
+
+  /// What the open chat engine was last given (null: nothing yet).
+  String? _mcpSent;
+
+  /// Why the chat engine refused the MCP servers (null: applied). The
+  /// relay engine's is [HostRelayLink.mcpError].
+  String? mcpError;
+
+  /// Tests: stand-ins for the engine's MCP calls and the one-time import.
+  @visibleForTesting
+  static Future<void> Function(String json)? debugSetMcpServers;
+  @visibleForTesting
+  static Future<List<AgentMcpServer>> Function()? debugMcpStatus;
+  @visibleForTesting
+  static Future<String?> Function(String dataDir)? debugMcpImport;
+
+  /// Gives both desktop engines the current server list: they restart only
+  /// the servers that changed, and the relay keeps its socket.
+  void _syncMcp() {
+    if (!localAgentPlatform || _disposed) return;
+    final json = _mcpJson;
+    _relay.setMcpServers(json);
+    final a = _agent;
+    if (a == null || _agentOnHub || json == _mcpSent) return;
+    unawaited(_sendMcp(a, json));
+  }
+
+  Future<void> _sendMcp(NotesAgent a, String json) async {
+    _mcpSent = json;
+    String? failed;
+    try {
+      final debug = debugSetMcpServers;
+      await _count(
+        () => debug != null ? debug(json) : a.setMcpServers(json: json),
+      );
+    } catch (e) {
+      failed = '$e';
+      AppLog.info('agent MCP servers: $e');
+    }
+    if (!identical(a, _agent)) return;
+    mcpError = failed;
+    _notify();
+  }
+
+  /// The chat engine's MCP servers and their state; null while this
+  /// computer's engine is not open (closed, or the tab is on the hub).
+  Future<List<AgentMcpServer>?> mcpStatus() async {
+    final a = _agent;
+    if (a == null || _agentOnHub || _disposed) return null;
+    try {
+      final debug = debugMcpStatus;
+      return await _count(() => debug != null ? debug() : a.mcpStatus());
+    } catch (e) {
+      AppLog.info('agent MCP status: $e');
+      return null;
+    }
+  }
+
+  Future<void>? _mcpImport;
+
+  /// Imports `<data dir>/mcp.toml` into the AI settings once (desktop):
+  /// servers whose names are taken are skipped. The bridge renames the file
+  /// to `mcp.toml.imported`, so later starts find nothing to import.
+  Future<void> importMcpFile() => _mcpImport ??= _importMcpFile();
+
+  Future<void> _importMcpFile() async {
+    if (!localAgentPlatform || _disposed) return;
+    try {
+      final dir = _folder();
+      final debug = debugMcpImport;
+      final json = debug != null
+          ? await debug(dir)
+          : await agentMcpImportFile(dataDir: dir);
+      if (json == null || _disposed) return;
+      final found = jsonDecode(json);
+      if (found is! Map) return;
+      final taken = settings.agentMcpServers;
+      final added = <String, Map<String, dynamic>>{
+        for (final e in found.entries)
+          if (e.key is String &&
+              e.value is Map &&
+              !taken.containsKey(e.key))
+            e.key as String: Map<String, dynamic>.from(e.value as Map),
+      };
+      AppLog.info(
+        'mcp.toml imported: ${added.length} of ${found.length} servers added',
+      );
+      if (added.isEmpty) return;
+      settings.update(
+        (s) => s.agentMcpServers = {...s.agentMcpServers, ...added},
+      );
+    } catch (e) {
+      AppLog.info('mcp.toml import failed: $e');
+    }
+  }
+
   void _settingsChanged({bool deferNotify = false}) {
+    _syncMcp();
     _relay.sync(_relayConfig());
     // A new default (or a hub coming or going) brings the tab back to it.
     final def = defaultHost;
@@ -1238,6 +1342,9 @@ class AgentStore extends ChangeNotifier {
       hostInfo = info;
       if (hub == null) {
         claudeDetection = await _count(agent.claudeDetection);
+        // A new engine starts with no servers: give it the list.
+        _mcpSent = null;
+        await _sendMcp(agent, _mcpJson);
       }
       _sub = agent.subscribe().listen(
         _onEvent,

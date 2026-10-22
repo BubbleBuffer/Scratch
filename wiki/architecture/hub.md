@@ -127,7 +127,7 @@ Built 2026-10-22. Source: [hosts.rs](../../crates/hub/src/hosts.rs), wire types 
 - **Protocol.** JSON-RPC 2.0, one text frame per message, roles reversed from `/agent/ws`: the hub sends requests, the desktop answers. `tools {session?}` gives `{tools: [{name, description, input_schema, read_only}]}`; `call {session, name, arguments, caller: {id, name?}}` gives `{content, is_error, pending}`; `close_session {session}` ends the desktop's session for that MCP session (sent on DELETE and when the gateway session expires). `cancel {id}` is a notification naming a request to stop.
 - **Routing.** `/mcp/agent` sessions that select a connected host list its tools with `tools` and send each host tool call as `call`, with a session id of their own. `js_help` is not offered for a desktop host. Calls time out after 10 minutes (`cancel` is sent and the call fails); `tools` and `close_session` after 30 s.
 - **Liveness.** Pings every 30 s; 90 s of silence drops the socket.
-- **Tools offered.** Whatever the desktop's relay engine registers: its desktop pack and its MCP servers' tools ([agent.md](../integrations/agent.md#mcp-servers-on-the-desktop-built-2026-10-22)), all run without prompts. The hub needs no change for MCP: the desktop lists them in its `tools` answer.
+- **Tools offered.** Whatever the desktop's relay engine registers: its desktop pack and its MCP servers' tools ([agent.md](../integrations/agent.md#mcp-servers-on-the-desktop-built-2026-10-22)), all run without prompts. The hub needs no change for MCP: the desktop lists them in its `tools` answer, and the list follows the desktop's MCP settings live (no reconnect).
 
 ## Agent (`/agent/ws`)
 

@@ -11,6 +11,8 @@
 //!   are closed when the hub closes the session or the socket drops.
 //! - Drops reconnect with backoff (1 s, doubling, up to 30 s). `stop` (or
 //!   drop) closes the socket, cancels running calls and ends the sessions.
+//! - [`HostRelay::status`] tells the app where it is, with the last error
+//!   (the hub's answer when it refuses the socket).
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -33,6 +35,47 @@ const PING_EVERY: Duration = Duration::from_secs(30);
 const SILENCE: Duration = Duration::from_secs(90);
 const BACKOFF_FIRST: Duration = Duration::from_secs(1);
 const BACKOFF_MAX: Duration = Duration::from_secs(30);
+
+/// Where a relay is ([`HostRelay::status`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RelayState {
+    Off,
+    /// The first attempt, not answered yet.
+    Connecting,
+    Connected,
+    /// Waiting to try again after a failure or a drop.
+    Retrying,
+}
+
+impl RelayState {
+    /// `off`, `connecting`, `connected` or `retrying`.
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            RelayState::Off => "off",
+            RelayState::Connecting => "connecting",
+            RelayState::Connected => "connected",
+            RelayState::Retrying => "retrying",
+        }
+    }
+}
+
+/// A relay's state and, while retrying, why the last attempt failed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RelayStatus {
+    pub(crate) state: RelayState,
+    pub(crate) error: Option<String>,
+}
+
+impl RelayStatus {
+    pub(crate) const OFF: RelayStatus = RelayStatus {
+        state: RelayState::Off,
+        error: None,
+    };
+    const CONNECTING: RelayStatus = RelayStatus {
+        state: RelayState::Connecting,
+        error: None,
+    };
+}
 
 /// What the relay runs calls on: the local agent, or a fake in tests.
 pub(crate) trait RelayHost: Send + Sync + 'static {
@@ -105,7 +148,7 @@ struct Shared {
     token: String,
     stopped: AtomicBool,
     stop: Notify,
-    connected: AtomicBool,
+    status: Mutex<RelayStatus>,
     /// Hub session id → local agent session id.
     sessions: Mutex<HashMap<String, String>>,
     /// Running calls by request id, for `cancel`.
@@ -134,7 +177,7 @@ impl HostRelay {
             token: token.to_owned(),
             stopped: AtomicBool::new(false),
             stop: Notify::new(),
-            connected: AtomicBool::new(false),
+            status: Mutex::new(RelayStatus::CONNECTING),
             sessions: Mutex::new(HashMap::new()),
             running: Mutex::new(HashMap::new()),
         });
@@ -151,10 +194,15 @@ impl HostRelay {
         })
     }
 
+    /// Where the relay is now, with the last connection error.
+    pub(crate) fn status(&self) -> RelayStatus {
+        self.shared.status.lock().unwrap().clone()
+    }
+
     /// Whether the socket to the hub is open now.
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg(test)]
     pub(crate) fn connected(&self) -> bool {
-        self.shared.connected.load(Ordering::SeqCst)
+        self.status().state == RelayState::Connected
     }
 
     /// Closes the socket, cancels running calls and ends every relay session.
@@ -168,7 +216,7 @@ impl HostRelay {
             runtime.shutdown_timeout(Duration::from_secs(2));
         }
         end_sessions_blocking(&self.shared);
-        self.shared.connected.store(false, Ordering::SeqCst);
+        set_status(&self.shared, RelayState::Off, None);
     }
 }
 
@@ -176,6 +224,10 @@ impl Drop for HostRelay {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+fn set_status(shared: &Shared, state: RelayState, error: Option<String>) {
+    *shared.status.lock().unwrap() = RelayStatus { state, error };
 }
 
 fn stopped(shared: &Shared) -> bool {
@@ -192,14 +244,19 @@ async fn run(shared: Arc<Shared>) {
         match opened {
             Ok(socket) => {
                 backoff = BACKOFF_FIRST;
-                shared.connected.store(true, Ordering::SeqCst);
+                set_status(&shared, RelayState::Connected, None);
                 serve(&shared, socket).await;
-                shared.connected.store(false, Ordering::SeqCst);
+                let lost = "the connection to the hub was lost".to_string();
+                set_status(&shared, RelayState::Retrying, Some(lost));
                 let ended = shared.clone();
                 let _ = tokio::task::spawn_blocking(move || end_sessions_blocking(&ended)).await;
             }
-            // Never logged with the token; the message names only the status.
-            Err(error) => eprintln!("host relay: {error}"),
+            // Never logged with the token; the message names only the status
+            // and the hub's answer.
+            Err(error) => {
+                eprintln!("host relay: {error}");
+                set_status(&shared, RelayState::Retrying, Some(error));
+            }
         }
         tokio::select! {
             _ = shared.stop.notified() => break,
@@ -456,7 +513,7 @@ mod tests {
             token: String::new(),
             stopped: AtomicBool::new(false),
             stop: Notify::new(),
-            connected: AtomicBool::new(false),
+            status: Mutex::new(RelayStatus::CONNECTING),
             sessions: Mutex::new(HashMap::new()),
             running: Mutex::new(HashMap::new()),
         };
@@ -539,15 +596,51 @@ mod tests {
         wait(0);
         assert!(!relay.connected());
 
-        // A replaced token is refused; the relay keeps retrying, not connecting.
+        assert_eq!(relay.status(), RelayStatus::OFF);
+
+        // A replaced token is refused; the relay keeps retrying, not connecting,
+        // and reports the hub's answer.
         let refused = HostRelay::start(fake, &url, "dev-pc", "not-the-token").unwrap();
-        std::thread::sleep(Duration::from_millis(300));
+        let status = wait_retrying(&refused);
+        let error = status.error.unwrap_or_default();
+        assert!(error.contains("the hub refused this device"), "{error}");
         assert_eq!(server.hosts_online(), 0);
         assert!(!refused.connected());
         drop(refused);
 
         runtime.block_on(server.stop());
         let _ = std::fs::remove_dir_all(&data);
+    }
+
+    fn wait_retrying(relay: &HostRelay) -> RelayStatus {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let status = relay.status();
+            if status.state == RelayState::Retrying {
+                return status;
+            }
+            assert_ne!(status.state, RelayState::Connected);
+            assert!(Instant::now() < deadline, "{status:?}");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    #[test]
+    fn a_refused_hub_url_retries_with_the_error() {
+        // A port that was just free: nothing listens there.
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let url = format!("http://127.0.0.1:{port}");
+        let mut relay = HostRelay::start(Arc::new(Fake::default()), &url, "pc", "t").unwrap();
+        let status = wait_retrying(&relay);
+        let error = status.error.unwrap_or_default();
+        assert!(error.starts_with("hub unreachable"), "{error}");
+        assert_eq!(RelayState::Retrying.as_str(), "retrying");
+        relay.stop();
+        assert_eq!(relay.status(), RelayStatus::OFF);
     }
 
     #[test]
@@ -560,7 +653,7 @@ mod tests {
             token: String::new(),
             stopped: AtomicBool::new(false),
             stop: Notify::new(),
-            connected: AtomicBool::new(false),
+            status: Mutex::new(RelayStatus::CONNECTING),
             sessions: Mutex::new(HashMap::new()),
             running: Mutex::new(HashMap::new()),
         });

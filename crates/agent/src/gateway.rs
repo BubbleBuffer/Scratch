@@ -185,17 +185,16 @@ impl crate::Agent {
     /// Additional gateway entrypoints, selected by BubblePaw for this session.
     /// Vault MCP tools and `hosts` are owned by the HTTP host instead.
     pub fn gateway_tool_definitions(&self, session: &str) -> Result<Vec<ToolDefinition>> {
-        let harness = self
-            .gateway
-            .harness(self.store.clone(), self.current_policy())?;
-        self.gateway.definitions(&harness, session)
+        let gateway = &self.surfaces().gateway;
+        let harness = gateway.harness(self.store.clone(), self.current_policy())?;
+        gateway.definitions(&harness, session)
     }
 
     /// Discover the normal gateway surface before an MCP session is initialized.
     /// The private session never executes tools and is removed on success/error;
     /// listing repeatedly cannot accumulate sessions or allocate JS heaps.
     pub fn gateway_tool_definitions_for_discovery(&self) -> Result<Vec<ToolDefinition>> {
-        self.discover(&self.gateway, self.current_policy())
+        self.discover(&self.surfaces().gateway, self.current_policy())
     }
 
     fn discover(
@@ -217,12 +216,13 @@ impl crate::Agent {
     /// gateway's exclusions. `None` lists them for discovery.
     pub fn relay_tool_definitions(&self, session: Option<&str>) -> Result<Vec<ToolDefinition>> {
         let policy = crate::permission_policy(crate::PermissionMode::Bypass);
+        let relay = &self.surfaces().relay;
         match session {
             Some(session) => {
-                let harness = self.relay.harness(self.store.clone(), policy)?;
-                self.relay.definitions(&harness, session)
+                let harness = relay.harness(self.store.clone(), policy)?;
+                relay.definitions(&harness, session)
             }
-            None => self.discover(&self.relay, policy),
+            None => self.discover(relay, policy),
         }
     }
 
@@ -237,13 +237,23 @@ impl crate::Agent {
         cancel: CancellationToken,
     ) -> Result<ToolResult> {
         let policy = crate::permission_policy(crate::PermissionMode::Bypass);
-        self.call_on(&self.relay, policy, session, name, input, client, cancel)
+        let surfaces = self.surfaces();
+        self.call_on(
+            &surfaces.relay,
+            policy,
+            session,
+            name,
+            input,
+            client,
+            cancel,
+        )
     }
 
     /// The actual BubblePaw js schema and generated reference, with only this
     /// host's currently enabled, noninteractive gateway capabilities visible.
     pub fn gateway_js_definition(&self) -> ToolDefinition {
-        self.gateway
+        self.surfaces()
+            .gateway
             .registry(&self.current_policy())
             .definitions()
             .into_iter()
@@ -254,7 +264,7 @@ impl crate::Agent {
     /// No query lists callable signatures and descriptions. A query returns
     /// matching capabilities' full schemas/docs; `js` returns runtime guidance.
     pub fn gateway_js_help(&self, query: Option<&str>) -> String {
-        let registry = self.gateway.registry(&self.current_policy());
+        let registry = self.surfaces().gateway.registry(&self.current_policy());
         let query = query.unwrap_or("").trim();
         if matches!(
             query.to_ascii_lowercase().as_str(),
@@ -315,7 +325,7 @@ impl crate::Agent {
     ) -> Result<ToolResult> {
         let policy = self.current_policy();
         self.call_on(
-            &self.gateway,
+            &self.surfaces().gateway,
             policy,
             session,
             name,
@@ -374,6 +384,7 @@ impl crate::Agent {
     /// other sessions, the shared CodeMode, or any model/provider process.
     pub fn gateway_close_session(&self, session: &str) -> Result<()> {
         let harness = self
+            .surfaces()
             .gateway
             .harness(self.store.clone(), self.current_policy())?;
         self.runtime.block_on(async {

@@ -59,6 +59,28 @@ pub struct AgentHostInfo {
     pub projects: bool,
 }
 
+/// One configured MCP server of a desktop engine ([`NotesAgent::mcp_status`]).
+#[derive(Debug, Clone)]
+pub struct AgentMcpServer {
+    pub name: String,
+    /// "running" | "failed" | "off" (disabled in settings)
+    pub state: String,
+    /// Tools this server currently offers (0 unless running).
+    pub tools: u32,
+    /// Why it failed (the McpHost warning text without the "MCP server <name>: " prefix).
+    pub error: Option<String>,
+}
+
+/// The PC host relay's connection ([`NotesAgent::host_relay_status`]).
+#[derive(Debug, Clone)]
+pub struct AgentHostRelayStatus {
+    /// "off" | "connecting" | "connected" | "retrying"
+    pub state: String,
+    /// The last connection error while connecting/retrying (e.g. the hub's
+    /// "this device has no name on the hub"), else None.
+    pub error: Option<String>,
+}
+
 /// A named desktop folder used as the agent's working directory.
 #[derive(Debug, Clone)]
 pub struct AgentProject {
@@ -733,6 +755,26 @@ impl NotesAgent {
         self.inner.host_relay_stop()
     }
 
+    /// The PC host relay's connection state ("off" when not started).
+    pub fn host_relay_status(&self) -> AgentHostRelayStatus {
+        self.inner.host_relay_status()
+    }
+
+    /// Replaces this engine's MCP servers. `json` is a JSON object
+    /// {"<name>": <BubblePaw McpServerSettings as serde JSON>, ...}.
+    /// Restarts only changed servers; the chat tools, the gateway and the
+    /// relay tool list reflect the change at once. Err(text) when the
+    /// settings are invalid (state unchanged). A no-op Ok(()) where MCP is
+    /// unavailable (hub host, tool set not Everything).
+    pub fn set_mcp_servers(&self, json: String) -> Result<(), String> {
+        self.inner.set_mcp_servers(json)
+    }
+
+    /// One entry per configured server, in name order. Empty where MCP is unavailable.
+    pub fn mcp_status(&self) -> Vec<AgentMcpServer> {
+        self.inner.mcp_status()
+    }
+
     /// Capabilities of the connected host.
     pub fn host_info(&self) -> Result<AgentHostInfo, String> {
         self.inner.host_info()
@@ -1045,6 +1087,15 @@ pub fn ai_run_task_with_agent(
     task_id: String,
 ) -> Result<AgentTaskRun, String> {
     agent.inner.run_task(vault, task_id)
+}
+
+/// Imports `<data_dir>/mcp.toml` once: Ok(None) when the file is missing;
+/// Ok(Some(json)) with the servers in the same JSON shape
+/// [`NotesAgent::set_mcp_servers`] takes, after renaming the file to
+/// `mcp.toml.imported`; Err(text) when the file can't be read or parsed (the
+/// file is left in place). Ok(None) where there is no local agent.
+pub fn agent_mcp_import_file(data_dir: String) -> Result<Option<String>, String> {
+    crate::agent_impl::mcp_import_file(&data_dir)
 }
 
 /// Reads assistant text (markdown) as blocks for display, with the vault's

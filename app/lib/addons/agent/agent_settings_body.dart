@@ -3,7 +3,8 @@ import '../../services/addon_services.dart';
 // it runs (this computer, or the hub this vault syncs with when that is an
 // https:// hub with a device token), its default model (listed from the
 // default host, even while the tab is on the other one), and for this
-// computer the Claude Code extension and projects. The default runner and
+// computer the Claude Code extension and projects. The MCP servers
+// ([McpServersSettings]) follow the tool sets. The default runner and
 // model are vault settings (synced); "On this device" overrides them here
 // only (ai_settings.json, like the rest of this section). Each runner's
 // tool set is a vault setting too, read by that runner when its agent starts.
@@ -16,6 +17,7 @@ import '../../ui/toast.dart';
 import '../../ui/ui.dart';
 import '../../core/file_dialogs.dart';
 import '../../core/tool_sets.dart';
+import 'agent_mcp_settings.dart';
 import 'agent_store.dart';
 
 class AgentSettingsSection extends StatefulWidget {
@@ -320,6 +322,7 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
               style: tsRaw(12, 16, 400, c.textSecondary),
             ),
           for (final h in AgentHost.values) _toolSet(h),
+          McpServersSettings(store: store),
         ],
         if (s.agentEnabled && !onHub) ...[
           field(

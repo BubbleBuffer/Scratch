@@ -11,7 +11,7 @@ import 'types.dart';
 import 'vault.dart';
 
 // These functions are ignored because they are not marked as `pub`: `local_close_chapter`, `local_outline_revision`, `local_outline`, `local_replay_control`, `local_replay_load`, `local_replay_status`, `local_upsert_chapter`, `local_upsert_section`, `outline_at`, `outline_data_dir`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 /// Runs the claimed AI task `task_id` with the agent (runner `agent`) in a
 /// session of its own, and writes the result or the error back to the task.
@@ -25,6 +25,14 @@ Future<AgentTaskRun> aiRunTaskWithAgent({
   vault: vault,
   taskId: taskId,
 );
+
+/// Imports `<data_dir>/mcp.toml` once: Ok(None) when the file is missing;
+/// Ok(Some(json)) with the servers in the same JSON shape
+/// [`NotesAgent::set_mcp_servers`] takes, after renaming the file to
+/// `mcp.toml.imported`; Err(text) when the file can't be read or parsed (the
+/// file is left in place). Ok(None) where there is no local agent.
+Future<String?> agentMcpImportFile({required String dataDir}) =>
+    RustLib.instance.api.crateApiAgentAgentMcpImportFile(dataDir: dataDir);
 
 /// Reads assistant text (markdown) as blocks for display, with the vault's
 /// own markdown reader: headings, lists (nested by indent), quotes, code
@@ -112,9 +120,15 @@ abstract class NotesAgent implements RustOpaqueInterface {
     required String token,
   });
 
+  /// The PC host relay's connection state ("off" when not started).
+  Future<AgentHostRelayStatus> hostRelayStatus();
+
   /// Stops the host relay: the socket closes and running calls are
   /// cancelled. Dropping the agent stops it too.
   Future<void> hostRelayStop();
+
+  /// One entry per configured server, in name order. Empty where MCP is unavailable.
+  Future<List<AgentMcpServer>> mcpStatus();
 
   /// Every available model, the default first.
   Future<List<AgentModel>> models();
@@ -239,6 +253,14 @@ abstract class NotesAgent implements RustOpaqueInterface {
 
   /// Newest first.
   Future<List<AgentSession>> sessions();
+
+  /// Replaces this engine's MCP servers. `json` is a JSON object
+  /// {"<name>": <BubblePaw McpServerSettings as serde JSON>, ...}.
+  /// Restarts only changed servers; the chat tools, the gateway and the
+  /// relay tool list reflect the change at once. Err(text) when the
+  /// settings are invalid (state unchanged). A no-op Ok(()) where MCP is
+  /// unavailable (hub host, tool set not Everything).
+  Future<void> setMcpServers({required String json});
 
   /// Steers the running run; returns the queued input's id.
   Future<String> steer({required String sessionId, required String text});
@@ -738,6 +760,64 @@ class AgentHostInfo {
           version == other.version &&
           permissionMode == other.permissionMode &&
           projects == other.projects;
+}
+
+/// The PC host relay's connection ([`NotesAgent::host_relay_status`]).
+class AgentHostRelayStatus {
+  /// "off" | "connecting" | "connected" | "retrying"
+  final String state;
+
+  /// The last connection error while connecting/retrying (e.g. the hub's
+  /// "this device has no name on the hub"), else None.
+  final String? error;
+
+  const AgentHostRelayStatus({required this.state, this.error});
+
+  @override
+  int get hashCode => state.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AgentHostRelayStatus &&
+          runtimeType == other.runtimeType &&
+          state == other.state &&
+          error == other.error;
+}
+
+/// One configured MCP server of a desktop engine ([`NotesAgent::mcp_status`]).
+class AgentMcpServer {
+  final String name;
+
+  /// "running" | "failed" | "off" (disabled in settings)
+  final String state;
+
+  /// Tools this server currently offers (0 unless running).
+  final int tools;
+
+  /// Why it failed (the McpHost warning text without the "MCP server <name>: " prefix).
+  final String? error;
+
+  const AgentMcpServer({
+    required this.name,
+    required this.state,
+    required this.tools,
+    this.error,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^ state.hashCode ^ tools.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AgentMcpServer &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          state == other.state &&
+          tools == other.tools &&
+          error == other.error;
 }
 
 /// A stored message.
