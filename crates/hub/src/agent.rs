@@ -166,6 +166,7 @@ impl AgentHost {
             // Hub hosts never register WorkspaceTools or the desktop process pack.
             packs: vec![],
             tool_set: None,
+            mcp: Default::default(),
             test: self.hooks.as_ref().map(|h| h()).unwrap_or_default(),
         }
     }

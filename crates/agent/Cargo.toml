@@ -19,6 +19,8 @@ notes_agent_wire = { path = "../agent_wire" }
 # The runner's `web` feature stays off.
 bubblepaw-core = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
 bubblepaw-runner = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
+# The desktop agent's MCP client (servers from `<data dir>/mcp.toml`).
+bubblepaw-mcp = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
 anyhow = "1"
 async-trait = "0.1"
 futures-core = "0.3"
@@ -31,6 +33,7 @@ jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 similar = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+toml = "0.8"
 
 [dev-dependencies]
 tempfile = "3"

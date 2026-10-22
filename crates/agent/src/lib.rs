@@ -13,6 +13,7 @@
 pub mod claude;
 mod context;
 mod gateway;
+pub mod mcp;
 mod outline_titles;
 /// Explicitly renamed sessions retain their complete display name.
 pub fn session_user_named_ids_at(data_dir: &std::path::Path) -> anyhow::Result<Vec<String>> {
@@ -113,6 +114,9 @@ pub struct AgentConfig {
     /// the vault. The hub's job engines set it (each job gets an engine of
     /// its set); None reads the runner's set.
     pub tool_set: Option<vault_tools::ToolSet>,
+    /// MCP servers whose tools this engine offers (desktop hosts with the
+    /// Everything set only); see [`mcp::load_settings`]. Empty: none.
+    pub mcp: mcp::McpSettings,
     pub test: TestHooks,
 }
 
@@ -343,6 +347,10 @@ pub fn close_outline_chapter_at(
 
 /// The agent: harness, store, code mode and providers, on its own runtime.
 pub struct Agent {
+    /// The MCP servers' client while any are configured; dropping it stops
+    /// the servers.
+    #[allow(dead_code)]
+    mcp: Option<Arc<mcp::McpHost>>,
     scheduler: Mutex<std::result::Result<Option<Arc<schedules::Scheduler>>, String>>,
     records: Arc<records::Records>,
     ui: Arc<ui::Ui>,
@@ -500,6 +508,26 @@ impl Agent {
                     .expect("support model tool"),
             )?;
         }
+        // MCP servers (desktop hosts with the Everything set; see `mcp`).
+        // They start once here; a server that fails is logged and left out.
+        let mcp_host = if matches!(config.host_kind, HostKind::Desktop)
+            && tool_set == vault_tools::ToolSet::Everything
+            && !config.mcp.servers.is_empty()
+        {
+            let host = Arc::new(runtime.block_on(mcp::McpHost::start(&config.mcp, &workspace)));
+            for warning in host.warnings() {
+                eprintln!("agent: {warning}");
+            }
+            Some(host)
+        } else {
+            None
+        };
+        let base_tools = tools.clone();
+        if let Some(host) = &mcp_host {
+            for skipped in mcp::register(&mut tools, host, &records, &vault) {
+                eprintln!("agent: {skipped}");
+            }
+        }
         let model_tools = tools
             .with_execution_mode(execution_mode, enable_js)
             .definitions();
@@ -633,6 +661,22 @@ impl Agent {
             // A recorded turn can hold ~190 assistant records; see replay::MAX_ROUNDS.
             harness_config.max_rounds = Some(replay::MAX_ROUNDS);
         }
+        if let Some(host) = &mcp_host {
+            // Each turn sees the servers' current tools: the resolver asks
+            // them to refresh (for `tools/list_changed`) and registers what
+            // they list now over the other tools.
+            let (host, handle) = (host.clone(), runtime.handle().clone());
+            let (records, vault) = (records.clone(), vault.clone());
+            harness_config.registry_resolver = Some(Arc::new(move || {
+                let refresh = host.clone();
+                handle.spawn(async move {
+                    refresh.refresh_tools().await;
+                });
+                let mut registry = base_tools.clone();
+                mcp::register(&mut registry, &host, &records, &vault);
+                registry
+            }));
+        }
         let harness = Arc::new(Harness::new(
             store.clone(),
             providers.clone(),
@@ -641,6 +685,7 @@ impl Agent {
         ));
         drop(_context);
         Ok(Agent {
+            mcp: mcp_host,
             scheduler: Mutex::new(Ok(None)),
             records,
             ui,

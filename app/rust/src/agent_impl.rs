@@ -338,6 +338,24 @@ mod desktop {
         wire::message(&error)
     }
 
+    /// The host relay's engine keeps its store in `<data dir>/host-relay`
+    /// (`host_relay_link.dart`) and reads the app's `mcp.toml`.
+    const RELAY_DIR: &str = "host-relay";
+
+    fn load_mcp(data_dir: &str) -> vault_agent::mcp::McpSettings {
+        let dir = std::path::Path::new(data_dir);
+        let dir = match (dir.file_name(), dir.parent()) {
+            (Some(name), Some(parent)) if name == RELAY_DIR => parent,
+            _ => dir,
+        };
+        let path = dir.join(vault_agent::mcp::FILE);
+        let (settings, error) = vault_agent::mcp::load_settings(&path);
+        if let Some(error) = error {
+            eprintln!("agent: {error}");
+        }
+        settings
+    }
+
     fn opt_path(p: Option<String>) -> Option<PathBuf> {
         p.filter(|s| !s.trim().is_empty()).map(PathBuf::from)
     }
@@ -360,6 +378,7 @@ mod desktop {
             } else {
                 Vec::new()
             };
+            let mcp = load_mcp(&data_dir);
             let config = AgentConfig {
                 host_kind: HostKind::Desktop,
                 packs,
@@ -374,6 +393,9 @@ mod desktop {
                     ..TestHooks::default()
                 },
                 tool_set: None,
+                // `<data dir>/mcp.toml`, in BubblePaw's `[mcp.servers.<name>]`
+                // format. Missing: no servers; unreadable: logged, no servers.
+                mcp,
             };
             let agent = Agent::open(vault.inner.clone(), config).map_err(e)?;
             Ok(Local(Arc::new(agent), std::sync::Mutex::new(None)))
