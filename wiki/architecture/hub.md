@@ -80,6 +80,7 @@ allowed_groups = ["notes"]
 | `POST /mcp` | The vault MCP tools over Streamable HTTP (16 listed; 4 are read-only), authenticated by agent tokens, or by Authentik OAuth tokens when the Claude connector is on (below). `GET` and other methods return 405. |
 | `GET /.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp` | Protected-resource metadata (RFC 9728) for `/mcp`. Served only when the Claude connector is on. |
 | `POST /mcp/agent`, `DELETE /mcp/agent` | Opt-in OAuth-only agent gateway: vault tools, advertised host tools and `hosts`; DELETE closes a gateway session. Other methods return 405. Disabled: 404. |
+| `GET /host/ws` | A desktop host's outbound socket for `/mcp/agent?host=<device name>` (below). Device token and `X-Device`. Gateway disabled: 404. |
 | `GET /.well-known/oauth-protected-resource/mcp/agent` | Metadata advertising the separate `/mcp/agent` resource and the existing MCP OAuth issuer; served only when the gateway is enabled. |
 
 ## Agent tokens and MCP (`/mcp`)
@@ -115,6 +116,16 @@ The hub and desktop use the same transport-independent JSON-RPC handler in [vaul
 To switch an existing OAuth connector, change `https://hub.example.com/mcp` to `https://hub.example.com/mcp/agent?host=hub`, or back, retaining the same client ID and login. Both routes share issuer, accepted audiences, allow-list, scopes and registered redirect URIs. The same valid OAuth token is accepted across both routes; the server does not bind it to a metadata resource URL. Static agent tokens remain specific to `/mcp`. See [switching instructions](../integrations/ai-assistants.md#switch-an-existing-connector).
 
 Desktop outbound relay is not implemented. Later integration needs an authenticated outbound desktop connection, host registration and availability reporting, and per-host routing that preserves the host's real tools, permission policy and session ownership. A `desktop` host argument is not desktop access today.
+
+## Host relay (`/host/ws`)
+
+Built 2026-10-22. Source: [hosts.rs](../../crates/hub/src/hosts.rs), wire types in [agent_wire/src/host.rs](../../crates/agent_wire/src/host.rs). The desktop side is in [agent.md](../integrations/agent.md#pc-host-relay-hostcomputer-built-2026-10-22).
+
+- **Auth and name.** `Authorization: Bearer <device token>` and `X-Device`, checked like `/agent/ws` before the upgrade (missing token: 401). The host's name is the device's label on the hub; an empty label or `hub` gets 409. The token is re-checked on every ping; signing the device out closes the socket.
+- **One per name.** A new connection under the same name replaces (closes) the old one. A closed socket leaves the name listed with `online: false`; calls fail with "<name> is offline". Nothing is kept across hub restarts.
+- **Protocol.** JSON-RPC 2.0, one text frame per message, roles reversed from `/agent/ws`: the hub sends requests, the desktop answers. `tools {session?}` gives `{tools: [{name, description, input_schema, read_only}]}`; `call {session, name, arguments, caller: {id, name?}}` gives `{content, is_error, pending}`; `close_session {session}` ends the desktop's session for that MCP session (sent on DELETE and when the gateway session expires). `cancel {id}` is a notification naming a request to stop.
+- **Routing.** `/mcp/agent` sessions that select a connected host list its tools with `tools` and send each host tool call as `call`, with a session id of their own. `js_help` is not offered for a desktop host. Calls time out after 10 minutes (`cancel` is sent and the call fails); `tools` and `close_session` after 30 s.
+- **Liveness.** Pings every 30 s; 90 s of silence drops the socket.
 
 ## Agent (`/agent/ws`)
 
