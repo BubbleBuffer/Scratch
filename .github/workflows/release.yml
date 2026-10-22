@@ -6,15 +6,18 @@
 #
 # Assets:
 #   Scratch-Setup-<version>.exe            Windows installer (Inno Setup, per user)
-#   scratch-<version>-android-arm64.apk    Android app, arm64
+#   scratch-<version>-android-arm64.apk    Android app, arm64, pre-alpha key
+#                                          (-unsigned.apk without the key secrets)
 #   notes-cli-<version>-windows-x64.exe    the notes CLI for Windows
 #   notes-cli-<version>-linux-x64.tar.gz   the notes CLI for Linux (glibc)
 #   SHA256SUMS.txt
 #
 # Android versionCode is the build time in epoch minutes, so every release is
-# newer than the last one. The release signing key is not on GitHub: the APK
-# here carries the build's fallback signature, and the release-signed build is
-# published to the private F-Droid repository from it.
+# newer than the last one. The app's release key is not on GitHub. The APK here
+# is signed with a separate pre-alpha key when the PREALPHA_KEYSTORE_BASE64,
+# PREALPHA_KEYSTORE_PASSWORD, PREALPHA_KEY_ALIAS and PREALPHA_KEY_PASSWORD
+# secrets are set, and ships unsigned (named ...-unsigned.apk) otherwise. A
+# pre-alpha install and a release-signed install cannot update each other.
 name: release
 
 on:
@@ -157,6 +160,8 @@ jobs:
     needs: meta
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    outputs:
+      signed: ${{ steps.key.outputs.signed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -174,6 +179,30 @@ jobs:
           channel: stable
           flutter-version: 3.47.5
           cache: true
+      # app/android/app/build.gradle.kts reads
+      # $LOCALAPPDATA/Notes/android-keystore/keystore.properties.
+      - name: Pre-alpha signing key
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PREALPHA_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.PREALPHA_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.PREALPHA_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.PREALPHA_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "no pre-alpha key secrets: the APK ships unsigned"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          dir="$RUNNER_TEMP/la/Notes/android-keystore"
+          install -m 700 -d "$dir"
+          ( umask 077
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$dir/keystore.jks"
+            printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "$dir/keystore.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > "$dir/keystore.properties" )
+          echo "LOCALAPPDATA=$RUNNER_TEMP/la" >> "$GITHUB_ENV"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
       - name: flutter build apk --release (arm64)
         working-directory: app
         run: |
@@ -183,8 +212,25 @@ jobs:
           flutter build apk --release --target-platform android-arm64 \
             --build-name=${{ needs.meta.outputs.version }} --build-number=${{ needs.meta.outputs.code }}
           mkdir -p ../dist
-          cp build/app/outputs/flutter-apk/app-release.apk \
-            "../dist/scratch-${{ needs.meta.outputs.version }}-android-arm64.apk"
+          name="scratch-${{ needs.meta.outputs.version }}-android-arm64"
+          if [ "${{ steps.key.outputs.signed }}" = true ]; then
+            cp build/app/outputs/flutter-apk/app-release.apk "../dist/$name.apk"
+          else
+            # Without the key the build falls back to a throwaway debug key:
+            # strip that signature (v1 entries; rewriting the zip drops the
+            # v2/v3 signing block) and realign.
+            cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/stripped.apk"
+            zip -q -d "$RUNNER_TEMP/stripped.apk" 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.EC' 'META-INF/*.DSA' 'META-INF/MANIFEST.MF' || true
+            zipalign=$(ls -d "$ANDROID_HOME"/build-tools/*/zipalign | sort -V | tail -1)
+            "$zipalign" -p -f 4 "$RUNNER_TEMP/stripped.apk" "../dist/$name-unsigned.apk"
+          fi
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          for f in ../dist/*.apk; do
+            echo "$f:"; "$apksigner" verify --print-certs "$f" 2>&1 | grep -E 'SHA-256 digest|DOES NOT VERIFY|not signed' || true
+          done
+      - name: Remove the signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/la"
       - uses: actions/upload-artifact@v4
         with:
           name: release-android
@@ -212,16 +258,22 @@ jobs:
           VERSION: ${{ needs.meta.outputs.version }}
           PRERELEASE: ${{ needs.meta.outputs.prerelease }}
           CODE: ${{ needs.meta.outputs.code }}
+          SIGNED: ${{ needs.android.outputs.signed }}
         run: |
           set -euo pipefail
           cd dist
           sha256sum -- * > SHA256SUMS.txt
           cat SHA256SUMS.txt
+          if [ "$SIGNED" = true ]; then
+            APK_LINE="- Android (arm64): \`scratch-$VERSION-android-arm64.apk\`, versionCode $CODE, signed with the pre-alpha key. It does not update (or get updated by) a release-signed install."
+          else
+            APK_LINE="- Android (arm64): \`scratch-$VERSION-android-arm64-unsigned.apk\`, versionCode $CODE, unsigned: sign it before installing (no pre-alpha key was configured for this build)."
+          fi
           cat > ../notes.md <<EOF
           Scratch $VERSION, built from $TAG on GitHub-hosted runners.
 
           - Windows: \`Scratch-Setup-$VERSION.exe\` installs per user.
-          - Android (arm64): \`scratch-$VERSION-android-arm64.apk\`, versionCode $CODE. This APK carries a build signature, not the app's release signature, so it does not update an installed release-signed app.
+          $APK_LINE
           - CLI: \`notes-cli-$VERSION-windows-x64.exe\` and \`notes-cli-$VERSION-linux-x64.tar.gz\`.
 
           Checksums are in \`SHA256SUMS.txt\`.
