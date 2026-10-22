@@ -19,7 +19,7 @@ const askAiEntry = BlockType(
   label: 'Ask AI',
   hint: 'Ask an AI agent to write here.',
   iconText: 'AI',
-  aliases: 'ai assistant agent claude codex deepseek write',
+  aliases: 'ai assistant agent claude codex write',
   editable: false,
   insertOnly: true,
   colorable: false,
@@ -67,8 +67,8 @@ String askAiNote(AiStore s) {
         : 'The agent runs on your hub and writes into the page.';
   }
   return s.canAnswer
-      ? '${s.settings.runner.label} answers on this device and writes into the page.'
-      : 'A desktop with an AI runner (Settings > AI) answers when it is on, and writes into the page.';
+      ? 'The agent answers on this device and writes into the page.'
+      : 'A desktop with the agent on (Settings > AI) answers when it is open, and writes into the page.';
 }
 
 class AskAiBox extends StatefulWidget {

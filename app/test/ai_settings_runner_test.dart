@@ -166,12 +166,13 @@ void main() {
     }
   });
 
-  // Ask AI follows Run AI on: under Hub every request is a hub job, so this
-  // computer's "Answered by" and its fields are not shown.
+  // Ask AI follows Run AI on and always uses the agent: one line says where
+  // it runs; no "Answered by", program paths or DeepSeek fields under either
+  // runner (removed 2026-10-22).
   for (final runner in [AgentHost.hub, AgentHost.local]) {
-    appTest('desktop, ${runner.name} chosen: Ask AI shows '
-        '${runner == AgentHost.hub ? 'that it runs on the hub' : 'Answered by'}',
-        (t) async {
+    final onHub = runner == AgentHost.hub;
+    final line = onHub ? 'Ask AI runs on the hub.' : 'Ask AI runs on this computer.';
+    appTest('desktop, ${runner.name} chosen: Ask AI shows "$line" and nothing else', (t) async {
       final tv = await pumpApp(t, mobile: false);
       AgentStore.debugHostModels =
           (h) async => h == AgentHost.hub ? _hub : _local;
@@ -182,12 +183,30 @@ void main() {
         await _openAiSettings(t);
         Finder any(String k) =>
             find.byKey(ValueKey(k), skipOffstage: false);
-        await settleUntil(
-            t, () => _has(any('ai-runs-on-hub')) || _has(any('ai-runner')));
-        final onHub = runner == AgentHost.hub;
+        await settleUntil(t, () =>
+            _has(any('ai-runs-on-hub')) || _has(any('ai-runs-on-this-computer')));
         expect(any('ai-runs-on-hub'), onHub ? findsOneWidget : findsNothing);
-        expect(any('ai-runner'), onHub ? findsNothing : findsOneWidget);
-        if (onHub) expect(find.text('Ask AI runs on the hub.', skipOffstage: false), findsOneWidget);
+        expect(any('ai-runs-on-this-computer'), onHub ? findsNothing : findsOneWidget);
+        expect(find.text(line, skipOffstage: false), findsOneWidget);
+        for (final gone in [
+          'ai-runner',
+          'ai-path-claude',
+          'ai-path-codex',
+          'ai-deepseek-key',
+          'ai-deepseek-save',
+          'ai-deepseek-remove',
+        ]) {
+          expect(any(gone), findsNothing, reason: gone);
+        }
+        for (final text in [
+          'Answered by',
+          'Claude Code program',
+          'Codex program',
+          'DeepSeek API key',
+          'API address',
+        ]) {
+          expect(find.text(text, skipOffstage: false), findsNothing, reason: text);
+        }
         expect(t.takeException(), isNull);
       } finally {
         await closeAi(t, ai);

@@ -1,8 +1,8 @@
 // Settings > AI: the agent first (an add-on section placed 'top', with "Run
-// AI on" and what that runner uses), then what answers Ask AI on this
-// computer (the agent, Claude Code, Codex or DeepSeek), the vault's MCP
-// endpoint for AI apps, the hub's agent tokens, and the recent tasks with
-// their status. Phones only list tasks: computers answer them.
+// AI on" and what that runner uses), then where Ask AI runs (the agent on
+// the hub or on this computer, per "Run AI on"), the vault's MCP endpoint
+// for AI apps, the hub's agent tokens, and the recent tasks with their
+// status. Phones only list tasks: computers answer them.
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -51,8 +51,8 @@ class AiSettingsBody extends StatelessWidget {
               ))
                 section.build(context),
               const SettingsHeading('Ask AI', top: 24),
-              // Run AI on: Hub sends every Ask AI to the hub as a job, so
-              // this computer's runner settings don't apply.
+              // Ask AI always uses the agent, where "Run AI on" says: a hub
+              // job, or this computer's agent.
               if (store.runsOn == AgentHost.hub)
                 Text(
                   'Ask AI runs on the hub.',
@@ -62,7 +62,13 @@ class AiSettingsBody extends StatelessWidget {
                       : tsRaw(14, 20, 400, c.textSecondary),
                 )
               else
-                _RunnerSection(store: store),
+                Text(
+                  'Ask AI runs on this computer.',
+                  key: const ValueKey('ai-runs-on-this-computer'),
+                  style: m
+                      ? tsRaw(15, 21, 400, c.textSecondary)
+                      : tsRaw(14, 20, 400, c.textSecondary),
+                ),
               const SettingsHeading('MCP endpoint', top: 24),
               _McpSection(store: store),
             ],
@@ -82,128 +88,6 @@ class AiSettingsBody extends StatelessWidget {
       },
     );
   }
-}
-
-class _RunnerSection extends StatefulWidget {
-  const _RunnerSection({required this.store});
-  final AiStore store;
-
-  @override
-  State<_RunnerSection> createState() => _RunnerSectionState();
-}
-
-class _RunnerSectionState extends State<_RunnerSection> {
-  late final _claude = TextEditingController(text: widget.store.settings.claudePath);
-  late final _codex = TextEditingController(text: widget.store.settings.codexPath);
-  late final _model = TextEditingController(text: widget.store.settings.deepSeekModel);
-  late final _url = TextEditingController(text: widget.store.settings.deepSeekUrl);
-  final _key = TextEditingController();
-
-  @override
-  void dispose() {
-    for (final c in [_claude, _codex, _model, _url, _key]) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  void _set(void Function(AiSettings s) f) {
-    widget.store.settings.update(f);
-    widget.store.pump();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = widget.store.settings;
-    final c = context.colors;
-    Widget path(String label, TextEditingController ctl, String name, void Function(AiSettings, String) save) =>
-        SettingsRow(
-          label: label,
-          description: 'Full path of the program. Leave empty to use $name from PATH.',
-          stack: true,
-          trailing: SettingsField(
-            fieldKey: ValueKey('ai-path-$name'),
-            controller: ctl,
-            mono: true,
-            placeholder: name,
-            onChanged: (v) => _set((s) => save(s, v.trim())),
-          ),
-        );
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SettingsRow(
-        label: 'Answered by',
-        description: 'What answers Ask AI on this computer. DeepSeek only reads the page.',
-        trailing: SelectButton<AiRunner>(
-          key: const ValueKey('ai-runner'),
-          title: 'Answered by',
-          value: s.runner,
-          options: [
-            for (final r in AiRunner.values)
-              if (r != AiRunner.agent || s.agentEnabled || s.runner == AiRunner.agent) r,
-          ],
-          labelOf: (r) => switch (r) {
-            AiRunner.agent => "This computer's agent",
-            AiRunner.claude => 'Claude Code on this computer',
-            AiRunner.codex => 'Codex on this computer',
-            _ => r.label,
-          },
-          onChanged: (r) => _set((s) => s.runner = r),
-        ),
-      ),
-      if (s.runner == AiRunner.claude) path('Claude Code program', _claude, 'claude', (s, v) => s.claudePath = v),
-      if (s.runner == AiRunner.codex) path('Codex program', _codex, 'codex', (s, v) => s.codexPath = v),
-      if (s.runner == AiRunner.deepseek) ...[
-        if (s.deepSeekKey.isEmpty)
-          SettingsRow(
-            label: 'DeepSeek API key',
-            description: 'Kept on this device only.',
-            stack: true,
-            trailing: Row(children: [
-              Expanded(child: SettingsField(fieldKey: const ValueKey('ai-deepseek-key'), controller: _key, mono: true)),
-              const SizedBox(width: 8),
-              OutlineButton(
-                key: const ValueKey('ai-deepseek-save'),
-                label: 'Save',
-                onTap: () {
-                  final k = _key.text.trim();
-                  if (k.isEmpty) return;
-                  _key.clear();
-                  _set((s) => s.deepSeekKey = k);
-                },
-              ),
-            ]),
-          )
-        else
-          SettingsRow(
-            label: 'DeepSeek API key',
-            description: 'Saved on this device (ends in ${_tail(s.deepSeekKey)}).',
-            trailing: OutlineButton(
-              key: const ValueKey('ai-deepseek-remove'),
-              label: 'Remove',
-              danger: true,
-              onTap: () => _set((s) => s.deepSeekKey = ''),
-            ),
-          ),
-        SettingsRow(
-          label: 'Model',
-          stack: true,
-          trailing: SettingsField(
-              controller: _model, mono: true, onChanged: (v) => _set((s) => s.deepSeekModel = v.trim())),
-        ),
-        SettingsRow(
-          label: 'API address',
-          stack: true,
-          trailing: SettingsField(
-              controller: _url, mono: true, onChanged: (v) => _set((s) => s.deepSeekUrl = v.trim())),
-        ),
-      ],
-      if (s.runner != AiRunner.none && !s.ready(s.runner))
-        Text(s.runner == AiRunner.agent ? 'Turn on the agent above to answer Ask AI.' : 'Add the API key to answer Ask AI.',
-            style: tsRaw(12, 16, 400, c.inlineCodeText)),
-    ]);
-  }
-
-  static String _tail(String k) => k.length <= 4 ? k : k.substring(k.length - 4);
 }
 
 class _McpSection extends StatefulWidget {

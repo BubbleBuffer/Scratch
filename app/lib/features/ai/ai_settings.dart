@@ -1,11 +1,15 @@
-// AI settings of this device: which runner does AI tasks here and where
-// its program is, the DeepSeek key, the vault's MCP endpoint and the
-// in-app agent (on or off, this device's override of where it runs and of
-// the default model, Claude Code extension, approvals). Kept in
+// AI settings of this device: the vault's MCP endpoint and the in-app
+// agent (on or off, this device's override of where it runs and of the
+// default model, Claude Code extension, approvals). Kept in
 // `<data dir>/ai_settings.json` next to settings.json (per device, never
-// synced; the DeepSeek key stays on this device). The default runner and
-// default model themselves are vault settings, synced (see
-// [resolveAgentHost]); this file only holds the device's overrides.
+// synced). The default runner and default model themselves are vault
+// settings, synced (see [resolveAgentHost]); this file only holds the
+// device's overrides. The only AI that runs inside the app is the agent
+// (BubblePaw), here or on the hub; Claude Code, Codex and other apps
+// connect to the vault from outside (MCP endpoint, agent tokens). Keys of
+// the Ask AI runners removed on 2026-10-22 (the runner choice, the Claude
+// Code and Codex program paths, the DeepSeek key, model and address, the
+// run timeout) are ignored when loading and dropped on the next save.
 
 import 'dart:convert';
 import 'dart:io';
@@ -13,22 +17,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../core/tool_sets.dart';
-
-/// Who does AI tasks on this device.
-enum AiRunner {
-  none('Off'),
-  agent('Agent'),
-  claude('Claude Code'),
-  codex('Codex'),
-  deepseek('DeepSeek API');
-
-  const AiRunner(this.label);
-  final String label;
-
-  /// Command-line agents get the vault's MCP tools; DeepSeek only the
-  /// page's text. The in-app agent calls the vault tools directly.
-  bool get usesMcp => this == claude || this == codex;
-}
 
 /// How the agent handles tools that ask for confirmation.
 enum AgentPermissionMode {
@@ -222,37 +210,16 @@ bool get agentPlatform => localAgentPlatform || hubAgentPlatform;
 /// The MCP endpoint's default address: this computer only.
 const defaultMcpAddress = '127.0.0.1:47101';
 
-const defaultDeepSeekUrl = 'https://api.deepseek.com';
-const defaultDeepSeekModel = 'deepseek-chat';
-
 class AiSettings extends ChangeNotifier {
   AiSettings({this.file});
 
   /// Where the settings are saved (null: in memory only).
   final File? file;
 
-  /// The runner the user chose; null until one is chosen, when the agent
-  /// (if on) or nothing runs tasks.
-  AiRunner? _runner;
-  AiRunner get runner =>
-      _runner ?? (agentEnabled ? AiRunner.agent : AiRunner.none);
-  set runner(AiRunner r) => _runner = r;
-
-  /// Full paths of the agents' programs (empty: found on PATH).
-  String claudePath = '';
-  String codexPath = '';
-
-  String deepSeekKey = '';
-  String deepSeekModel = defaultDeepSeekModel;
-  String deepSeekUrl = defaultDeepSeekUrl;
-
   /// Serve the vault's MCP endpoint on [mcpAddress] so AI apps (Claude,
   /// Codex, ChatGPT through a tunnel) can use the vault while the app runs.
   bool mcpEnabled = false;
   String mcpAddress = defaultMcpAddress;
-
-  /// Minutes an agent may run before it is stopped.
-  int timeoutMinutes = 10;
 
   /// The in-app agent (local on desktop, always available through the Hub
   /// on Android, including installs whose old settings saved it as off).
@@ -323,15 +290,8 @@ class AiSettings extends ChangeNotifier {
   }
 
   void _fromJson(Map<String, dynamic> j) {
-    _runner = AiRunner.values.where((r) => r.name == j['runner']).firstOrNull;
-    claudePath = (j['claudePath'] as String?) ?? '';
-    codexPath = (j['codexPath'] as String?) ?? '';
-    deepSeekKey = (j['deepSeekKey'] as String?) ?? '';
-    deepSeekModel = (j['deepSeekModel'] as String?) ?? defaultDeepSeekModel;
-    deepSeekUrl = (j['deepSeekUrl'] as String?) ?? defaultDeepSeekUrl;
     mcpEnabled = (j['mcpEnabled'] as bool?) ?? false;
     mcpAddress = (j['mcpAddress'] as String?) ?? defaultMcpAddress;
-    timeoutMinutes = (j['timeoutMinutes'] as int?) ?? 10;
     agentEnabled =
         hubAgentPlatform ||
         (localAgentPlatform && ((j['agentEnabled'] as bool?) ?? true));
@@ -378,15 +338,8 @@ class AiSettings extends ChangeNotifier {
   }
 
   Map<String, dynamic> toJson() => {
-    if (_runner != null) 'runner': _runner!.name,
-    'claudePath': claudePath,
-    'codexPath': codexPath,
-    'deepSeekKey': deepSeekKey,
-    'deepSeekModel': deepSeekModel,
-    'deepSeekUrl': deepSeekUrl,
     'mcpEnabled': mcpEnabled,
     'mcpAddress': mcpAddress,
-    'timeoutMinutes': timeoutMinutes,
     'agentEnabled': agentEnabled,
     if (legacyAgentModel != null) 'agentModel': legacyAgentModel,
     if (agentModelOverrides.isNotEmpty)
@@ -405,23 +358,9 @@ class AiSettings extends ChangeNotifier {
     if (agentMcpServers.isNotEmpty) 'agentMcpServers': agentMcpServers,
   };
 
-  /// Whether [r] can run here as configured (DeepSeek needs a key).
-  bool ready(AiRunner r) => switch (r) {
-    AiRunner.none => false,
-    AiRunner.agent => agentEnabled && agentPlatform,
-    AiRunner.deepseek => deepSeekKey.trim().isNotEmpty,
-    _ => true,
-  };
-
-  /// The program override for a command-line runner (null: on PATH).
-  String? programOf(AiRunner r) {
-    final p = switch (r) {
-      AiRunner.claude => claudePath,
-      AiRunner.codex => codexPath,
-      _ => '',
-    };
-    return p.trim().isEmpty ? null : p.trim();
-  }
+  /// Whether the agent answers Ask AI on this device (on, and a platform
+  /// that runs it).
+  bool get answersAskAi => agentEnabled && agentPlatform;
 
   /// Applies [change], saves and notifies.
   void update(void Function(AiSettings s) change) {

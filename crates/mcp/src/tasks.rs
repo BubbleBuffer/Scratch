@@ -51,8 +51,9 @@ pub struct Task {
     pub page: Option<PageId>,
     /// The placeholder block in that page.
     pub block: Option<String>,
-    /// `agent` (the desktop BubblePaw agent), `claude`, `codex`, `deepseek`,
-    /// or empty for the desktop's default.
+    /// `agent` (the BubblePaw agent) or empty. Rows from before 2026-10-22
+    /// may name a removed runner (`claude`, `codex`, `deepseek`); the agent
+    /// answers them like any other.
     pub runner: String,
     /// Where it runs: empty (any desktop), a device id (only that device),
     /// or `hub` (a job, see [`crate::jobs`]).
@@ -670,23 +671,16 @@ pub fn finish(v: &Vault, id: &str, result: std::result::Result<String, String>) 
 /// How the agent running a task reaches the vault; sets the prompt's wording.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptTools {
-    /// A command-line agent with the "notes" MCP server.
-    Mcp,
     /// A BubblePaw agent whose `js` tool exposes vault actions as `tools.*`.
     Js,
 }
 
 /// The prompt given to an agent: the task, the target page's content and
-/// how the result is used. Command-line agents also get the vault's MCP
-/// tools; API runners only this text. A BubblePaw agent (`PromptTools::Js`)
-/// reaches the vault through its `js` tool instead.
+/// how the result is used. A BubblePaw agent (`PromptTools::Js`) reaches
+/// the vault through its `js` tool.
 pub fn agent_prompt(v: &Vault, t: &Task, tools: PromptTools) -> Result<String> {
     let mut out = String::new();
     match tools {
-        PromptTools::Mcp => out.push_str(
-            "You are helping the user with their personal notes app. You can read and edit the \
-             notes vault with the \"notes\" MCP tools when they are available.\n\n",
-        ),
         PromptTools::Js => out.push_str(
             "You are helping the user with their personal notes app. You can read and edit the \
              notes vault with your js tool, where vault actions are async tools.* functions. \

@@ -7,11 +7,10 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-import 'types.dart';
 import 'vault.dart';
 
 // These functions are ignored because they are not marked as `pub`: `lock`, `task`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
 
 /// The default listen address of the app's MCP endpoint.
 String mcpDefaultAddr() => RustLib.instance.api.crateApiAiMcpDefaultAddr();
@@ -76,11 +75,6 @@ Future<int> aiRecoverTasks({required NotesVault vault}) =>
 Future<void> aiRetryTask({required NotesVault vault, required String id}) =>
     RustLib.instance.api.crateApiAiAiRetryTask(vault: vault, id: id);
 
-/// The full prompt for a command-line agent: the task, the page's markdown
-/// and how to use the vault's MCP tools.
-Future<String> aiTaskPrompt({required NotesVault vault, required String id}) =>
-    RustLib.instance.api.crateApiAiAiTaskPrompt(vault: vault, id: id);
-
 /// Writes the result back: on success `text` (markdown) replaces the
 /// placeholder; on failure `text` is the error.
 Future<void> aiFinishTask({
@@ -95,56 +89,6 @@ Future<void> aiFinishTask({
   text: text,
 );
 
-/// The built-in argument list for "claude" or "codex" (placeholders
-/// `{mcp_config}`, `{mcp_url}`, `{output_file}` included); None otherwise.
-List<String>? aiDefaultArgs({required String kind}) =>
-    RustLib.instance.api.crateApiAiAiDefaultArgs(kind: kind);
-
-/// Runs a command-line agent with `prompt` on stdin. `kind` picks the
-/// built-in arguments ("claude", "codex") unless `args` is given;
-/// `program` overrides the executable. `model` is the synced default model
-/// (`codex/<m>` or `claude-code/<m>`; another provider's adds nothing). No
-/// shell is involved.
-Future<AgentRun> aiRunAgent({
-  required String kind,
-  String? program,
-  List<String>? args,
-  required String prompt,
-  required String mcpUrl,
-  required String mcpToken,
-  required String workDir,
-  required int timeoutSecs,
-  String? model,
-}) => RustLib.instance.api.crateApiAiAiRunAgent(
-  kind: kind,
-  program: program,
-  args: args,
-  prompt: prompt,
-  mcpUrl: mcpUrl,
-  mcpToken: mcpToken,
-  workDir: workDir,
-  timeoutSecs: timeoutSecs,
-  model: model,
-);
-
-/// The prompt asking an agent to merge the conflict on `block` of `page`.
-Future<String> aiMergePrompt({
-  required NotesVault vault,
-  required String page,
-  required String block,
-}) => RustLib.instance.api.crateApiAiAiMergePrompt(
-  vault: vault,
-  page: page,
-  block: block,
-);
-
-/// Reads an agent's merge answer (inline markdown) as text and marks.
-/// Changes nothing.
-Future<MergeText> aiParseMerge({
-  required NotesVault vault,
-  required String answer,
-}) => RustLib.instance.api.crateApiAiAiParseMerge(vault: vault, answer: answer);
-
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesMcp>>
 abstract class NotesMcp implements RustOpaqueInterface {
   factory NotesMcp({required NotesVault vault}) =>
@@ -157,52 +101,14 @@ abstract class NotesMcp implements RustOpaqueInterface {
   /// Starts serving on `addr` (restarts if running) and returns the URL.
   Future<String> start({required String addr});
 
-  /// Stops serving and removes the endpoint file (the AI tasks' endpoint
-  /// stops too).
+  /// Stops serving and removes the endpoint file.
   Future<void> stop();
-
-  /// The URL of the endpoint AI tasks run by Claude Code or Codex get:
-  /// 127.0.0.1 on a free port, the same token, and only `tool_set`'s tools
-  /// (`read`, `write` or `everything`; the runner's set). Started, or
-  /// restarted for another set, on demand. It writes no endpoint file.
-  Future<String> taskUrl({required String toolSet});
 
   /// The bearer token (created on first use, kept in `.vault/mcp/token`).
   Future<String> token();
 
   /// The URL while running.
   String? url();
-}
-
-/// What a run of an agent gave.
-class AgentRun {
-  final bool ok;
-
-  /// The answer when `ok`, else why it failed.
-  final String text;
-  final String stderr;
-  final bool timedOut;
-
-  const AgentRun({
-    required this.ok,
-    required this.text,
-    required this.stderr,
-    required this.timedOut,
-  });
-
-  @override
-  int get hashCode =>
-      ok.hashCode ^ text.hashCode ^ stderr.hashCode ^ timedOut.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AgentRun &&
-          runtimeType == other.runtimeType &&
-          ok == other.ok &&
-          text == other.text &&
-          stderr == other.stderr &&
-          timedOut == other.timedOut;
 }
 
 /// An AI task (a row of the "AI tasks" collection).
@@ -216,8 +122,8 @@ class AiTask {
   /// The placeholder block in that page.
   final String? block;
 
-  /// "", "agent" (the desktop agent, `ai_run_task_with_agent`), "claude",
-  /// "codex" or "deepseek"; "" = the desktop's default.
+  /// "" or "agent"; rows from before 2026-10-22 may name a removed runner
+  /// ("claude", "codex", "deepseek"). The agent answers every row.
   final String runner;
 
   /// "queued", "running", "done" or "failed".
@@ -277,24 +183,4 @@ class AiTask {
           createdMs == other.createdMs &&
           updatedMs == other.updatedMs &&
           node == other.node;
-}
-
-/// A proposed ordinary page edit: text and marks. Conflict confirmation is
-/// a separate Keep action after applying the edit.
-class MergeText {
-  final String text;
-  final List<BMark> marks;
-
-  const MergeText({required this.text, required this.marks});
-
-  @override
-  int get hashCode => text.hashCode ^ marks.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is MergeText &&
-          runtimeType == other.runtimeType &&
-          text == other.text &&
-          marks == other.marks;
 }

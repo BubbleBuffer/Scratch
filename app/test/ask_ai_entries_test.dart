@@ -1,8 +1,8 @@
 // Ask AI from the selection toolbar, the block menu and sheet, and the
 // page menu, on desktop and phone, and tasks assigned to the agent. Runs
 // on the synced default runner:
-// - this computer: the fake agent (crates/mcp/examples/fake_agent.rs) as
-//   Claude Code, with the synced `this_device` model and tool set;
+// - this computer: the in-app agent with BubblePaw's fake Claude Code
+//   extension (agent_test.dart), which answers "ok";
 // - the Hub: a fake hub jobs client records the jobs (the hub side is
 //   tested in crates/hub/tests/jobs.rs).
 // Never calls a real AI.
@@ -19,6 +19,7 @@ import 'package:notes_app/features/ai/hub_jobs_client.dart';
 import 'package:notes_app/registry/note_type_registry.dart';
 
 import 'addons/tasks/task_fixture.dart' show pumpTaskHost;
+import 'agent_test.dart' show fakeAgentSettings, openAgentStore;
 import 'ai_test.dart' show aiStore, closeAi;
 import 'editor_agent_partb_test.dart' show editor, open;
 import 'harness.dart';
@@ -67,6 +68,13 @@ Future<AiStore> phoneAi(WidgetTester tester) async {
   return store;
 }
 
+/// A desktop AI store whose agent (the fake extension) answers Ask AI here.
+Future<AiStore> agentAi(WidgetTester tester) async {
+  final settings = fakeAgentSettings();
+  await openAgentStore(tester, settings: settings);
+  return aiStore(tester, settings: settings);
+}
+
 List<String> textsOf(List<dynamic> blocks) => [for (final b in blocks) b.text as String];
 
 Future<void> send(WidgetTester tester, String prompt) async {
@@ -80,12 +88,10 @@ void main() {
   setUp(() => HttpOverrides.global = null);
 
   group('desktop', () {
-    appTest('selection toolbar: this computer runs it with the synced model', (t) async {
+    appTest("selection toolbar: this computer's agent answers it", (t) async {
       final tv = await pumpApp(t, mobile: false);
-      final store = await aiStore(t);
+      final store = await agentAi(t);
       try {
-        final agents = AgentStore.attach(tv.vault, store.settings);
-        await real(t, () => agents.setVaultDefaultModel(AgentHost.local, 'claude-code/test-model'));
         final id = tv.pages['Recipes']!;
         await open(t, id);
         final ed = editor(t, id);
@@ -100,8 +106,8 @@ void main() {
         await tapAndSettle(t, key('fmt-ask-ai'));
         expect(key('ask-ai-field'), findsOneWidget);
         expect(textOf(t, 'ask-ai-selection'), '“${n.text.substring(2, 7)}”');
-        expect(textOf(t, 'ask-ai-note'), contains('Claude Code answers on this device'));
-        await send(t, 'FAKE:args');
+        expect(textOf(t, 'ask-ai-note'), 'The agent answers on this device and writes into the page.');
+        await send(t, 'Say ok');
         await settleUntil(t, () => store.tasks.isNotEmpty && store.tasks.first.status == AiStatus.done,
             timeout: const Duration(seconds: 30));
         final task = store.tasks.first;
@@ -110,17 +116,15 @@ void main() {
         expect(task.page, id);
         expect(task.prompt, contains('> ${n.text.substring(2, 7)}'));
         final texts = textsOf(await blocksOf(t, id));
-        final answer = texts.indexWhere((s) => s.startsWith('Args: '));
-        expect(answer, greaterThan(texts.indexOf(n.text)), reason: '$texts');
-        expect(texts[answer], contains('--model test-model'));
+        expect(texts.indexOf('ok'), greaterThan(texts.indexOf(n.text)), reason: '$texts');
       } finally {
         await closeAi(t, store);
       }
     });
 
-    appTest('block menu: the answer goes after the block; the synced tool set applies', (t) async {
+    appTest('block menu: the answer goes after the block', (t) async {
       final tv = await pumpApp(t, mobile: false);
-      final store = await aiStore(t);
+      final store = await agentAi(t);
       try {
         final id = tv.pages['Garden plan']!;
         await open(t, id);
@@ -128,26 +132,13 @@ void main() {
         final n = ed.doc!.flat.first;
         ed.openBlockMenu(n, const Rect.fromLTWH(400, 150, 18, 24));
         await t.pump();
-        expect(key('menu-ask-agent'), findsNothing, reason: 'Ask agent stays as it was (agent off)');
         await tapAndSettle(t, key('menu-ask-ai'));
         expect(textOf(t, 'ask-ai-selection'), contains(n.text.substring(0, 8)));
         await send(t, 'List what to plant');
         await settleUntil(t, () => store.tasks.isNotEmpty && store.tasks.first.status == AiStatus.done,
             timeout: const Duration(seconds: 30));
         final texts = textsOf(await blocksOf(t, id));
-        expect(texts.indexOf('Read over MCP: Garden plan'), greaterThan(texts.indexOf(n.text)));
-
-        // With `tool_sets.this_device = read` the agent can't edit.
-        final agents = AgentStore.attach(tv.vault, store.settings);
-        await real(t, () => agents.setVaultToolSet(AgentHost.local, 'read'));
-        ed.openBlockMenu(n, const Rect.fromLTWH(400, 150, 18, 24));
-        await t.pump();
-        await tapAndSettle(t, key('menu-ask-ai'));
-        await send(t, 'FAKE:edit');
-        await settleUntil(t, () => store.tasks.length > 1 && !AiStatus.active(store.tasks.first.status),
-            timeout: const Duration(seconds: 30));
-        expect(store.tasks.first.status, AiStatus.failed);
-        expect(textsOf(await blocksOf(t, id)), isNot(contains('Edited by the fake agent')));
+        expect(texts.indexOf('ok'), greaterThan(texts.indexOf(n.text)), reason: '$texts');
       } finally {
         await closeAi(t, store);
       }
@@ -294,7 +285,7 @@ void main() {
 
     appTest('desktop on this computer: the run answers into the task page and its status shows', (t) async {
       final tv = await pumpApp(t, mobile: false, empty: true);
-      final store = await aiStore(t);
+      final store = await agentAi(t);
       try {
         final page = await taskPage(t, 'Plan the garden');
         await pumpTaskHost(t, tv, taskNote(page, 'Plan the garden'));
@@ -306,7 +297,7 @@ void main() {
         expect(run.page, page);
         expect((await core(t, (v) => loadTask(v, page))).agentRun, run.id);
         final texts = textsOf(await blocksOf(t, page));
-        expect(texts, contains('Read over MCP: Plan the garden'));
+        expect(texts, contains('ok'));
         await settleUntil(t, () => find.text('The agent finished; its answer is on this page.').evaluate().isNotEmpty);
         expect(textOf(t, 'task-agent-note'), 'The agent finished; its answer is on this page.');
       } finally {

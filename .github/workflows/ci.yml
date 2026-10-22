@@ -95,13 +95,11 @@ jobs:
         with:
           channel: stable
           cache: true
-      # The harness loads target/release/libnotes_bridge.so (app/test/harness.dart);
-      # ai_test.dart runs target/release/examples/fake_agent.
-      - name: Build host bridge and test fixtures
+      # The harness loads target/release/libnotes_bridge.so (app/test/harness.dart).
+      - name: Build host bridge
         working-directory: scratch
         run: |
           cargo build --release --locked -p notes_bridge
-          cargo build --release --locked -p vault_mcp --examples
       - name: Build BubblePaw fake extension
         working-directory: BubblePaw-Core
         run: cargo build -p bubblepaw-runner --bin bubblepaw-fake-extension
@@ -131,7 +129,6 @@ jobs:
         working-directory: scratch/app
         env:
           NOTES_BRIDGE_LIB: ${{ github.workspace }}/scratch/target/release/libnotes_bridge.so
-          NOTES_FAKE_AGENT: ${{ github.workspace }}/scratch/target/release/examples/fake_agent
           NOTES_FAKE_EXTENSION: ${{ github.workspace }}/BubblePaw-Core/target/debug/bubblepaw-fake-extension
         run: |
           # Skip golden-named files and any file that compares against a golden image.

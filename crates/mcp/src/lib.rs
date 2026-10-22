@@ -1,6 +1,6 @@
 //! `vault_mcp`: gives AI assistants (Claude, ChatGPT, Codex) access to a
-//! notes vault over the Model Context Protocol, and runs AI tasks on the
-//! desktop.
+//! notes vault over the Model Context Protocol, and stores the AI tasks the
+//! in-app agent answers.
 //!
 //! - [`McpServer`]: JSON-RPC handling and the vault tools ([`tools`]).
 //! - [`stdio`]: newline-delimited JSON-RPC over stdin/stdout.
@@ -8,9 +8,10 @@
 //!   token, bound to 127.0.0.1 by default.
 //! - [`endpoint`]: the vault's MCP token and the running endpoint's address
 //!   (`.vault/mcp/`), so `notes-mcp` can reach the app that holds the vault.
-//! - [`tasks`], [`runner`], [`merge`]: AI tasks stored in the vault, the
-//!   desktop runner that executes them with a command-line agent, and
-//!   AI-proposed merges of sync conflicts.
+//! - [`tasks`]: AI tasks stored in the vault (answered by the BubblePaw
+//!   agent on the desktop or the hub; the app starts no other AI program).
+//! - [`merge`]: the prompt and answer format for an agent merging a sync
+//!   conflict.
 //!
 //! Design notes: `wiki/integrations/ai-assistants.md`.
 
@@ -20,7 +21,6 @@ pub mod jobs;
 pub mod merge;
 pub use vault_tools::props;
 pub mod proxy;
-pub mod runner;
 mod server;
 pub mod stdio;
 pub mod tasks;

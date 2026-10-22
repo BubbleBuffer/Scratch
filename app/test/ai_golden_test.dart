@@ -1,6 +1,5 @@
-// Golden screenshots of AI: Settings > AI with tasks in each state, the
-// Ask AI box, and a conflict with an AI proposal (the fake agent), at
-// 1440x900 and 375x812, light and dark, on the real core.
+// Golden screenshots of AI: Settings > AI with tasks in each state and the
+// Ask AI box, at 1440x900 and 375x812, light and dark, on the real core.
 // Regenerate with: flutter test --update-goldens test/ai_golden_test.dart
 
 @Tags(['golden'])
@@ -53,12 +52,9 @@ void main() {
         // otherwise claim a fixture task between its create and finish calls.
         final store = await aiStore(tester,
             // The agent off: its model list comes from this computer.
-            settings: AiSettings()
-              ..agentEnabled = false
-              ..claudePath = r'C:\Tools\claude.exe');
+            settings: AiSettings()..agentEnabled = false);
         try {
           await _tasks(tester, store);
-          store.settings.update((s) => s.runner = AiRunner.claude);
           if (mobile) {
             await openMobileSettings(tester);
           } else {
@@ -87,27 +83,4 @@ void main() {
       });
     }
   }
-
-  appTest('conflict ai proposal desktop-light', (tester) async {
-    final tv = await pumpApp(tester, mobile: false);
-    final other = await openOtherDevice(tester);
-    final store = await aiStore(tester);
-    try {
-      await pairOther(tester, other);
-      final block = await makeConflict(tester, other, 'Weekly review',
-          base: 'Review the week', here: 'Review the week on Monday', there: 'Friday: review the week');
-      await tapAndSettle(tester, find.text('Weekly review').last);
-      await tapAndSettle(tester, key('conflict-review'));
-      await settleUntil(tester, () => key('ai-merge-$block').evaluate().isNotEmpty);
-      await tester.tap(key('ai-merge-$block'));
-      await settleUntil(tester, () => key('ai-proposal-$block').evaluate().isNotEmpty,
-          timeout: const Duration(seconds: 30));
-      await settle(tester);
-      await shot('desktop-light-conflict-ai');
-      expect(tv.app.sync.conflicts, isNotEmpty);
-    } finally {
-      await closeAi(tester, store);
-      await other.close(tester);
-    }
-  });
 }

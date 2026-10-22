@@ -219,9 +219,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentProject dco_decode_agent_project(dynamic raw);
 
   @protected
-  AgentRun dco_decode_agent_run(dynamic raw);
-
-  @protected
   AgentRunRecord dco_decode_agent_run_record(dynamic raw);
 
   @protected
@@ -694,9 +691,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MatchedFilterValue dco_decode_matched_filter_value(dynamic raw);
 
   @protected
-  MergeText dco_decode_merge_text(dynamic raw);
-
-  @protected
   MountInfo dco_decode_mount_info(dynamic raw);
 
   @protected
@@ -770,9 +764,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
-
-  @protected
-  List<String>? dco_decode_opt_list_String(dynamic raw);
 
   @protected
   List<CertificateInfo>? dco_decode_opt_list_certificate_info(dynamic raw);
@@ -1111,9 +1102,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AgentProject sse_decode_agent_project(SseDeserializer deserializer);
-
-  @protected
-  AgentRun sse_decode_agent_run(SseDeserializer deserializer);
 
   @protected
   AgentRunRecord sse_decode_agent_run_record(SseDeserializer deserializer);
@@ -1708,9 +1696,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  MergeText sse_decode_merge_text(SseDeserializer deserializer);
-
-  @protected
   MountInfo sse_decode_mount_info(SseDeserializer deserializer);
 
   @protected
@@ -1804,9 +1789,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
-
-  @protected
-  List<String>? sse_decode_opt_list_String(SseDeserializer deserializer);
 
   @protected
   List<CertificateInfo>? sse_decode_opt_list_certificate_info(
@@ -2188,9 +2170,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_agent_project(AgentProject self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_agent_run(AgentRun self, SseSerializer serializer);
 
   @protected
   void sse_encode_agent_run_record(
@@ -2952,9 +2931,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_merge_text(MergeText self, SseSerializer serializer);
-
-  @protected
   void sse_encode_mount_info(MountInfo self, SseSerializer serializer);
 
   @protected
@@ -3073,9 +3049,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_opt_list_String(List<String>? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_list_certificate_info(

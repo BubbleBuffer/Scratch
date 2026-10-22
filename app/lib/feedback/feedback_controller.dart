@@ -13,7 +13,6 @@ import 'package:flutter/widgets.dart';
 
 import '../core/models.dart';
 import '../core/vault.dart';
-import '../features/ai/ai_store.dart';
 import '../shell/page_stack.dart';
 import '../state/app_state.dart';
 import '../ui/modal.dart';
@@ -57,10 +56,7 @@ class FeedbackController {
           ? route?.settings.arguments as String?
           : null;
       final pageTitle = pageId == null ? null : stack?.titles[pageId];
-      final secrets = [
-        ?settings.clientToken,
-        AiStore.of(app).settings.deepSeekKey,
-      ];
+      final secrets = [?settings.clientToken];
 
       // The colours the app is drawn with: the setting, or the system (and NOTES_THEME).
       final dark = identical(AppTheme.of(context).colors, AppColors.darkTheme);

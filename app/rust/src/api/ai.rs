@@ -1,19 +1,15 @@
-//! vault_mcp for Dart: the vault's MCP endpoint the desktop app serves,
-//! AI tasks (rows of the synced "AI tasks" collection), the command-line
-//! agent runner (Claude Code, Codex) and AI-proposed conflict merges.
-//! Only type conversion happens here.
+//! vault_mcp for Dart: the vault's MCP endpoint the desktop app serves and
+//! AI tasks (rows of the synced "AI tasks" collection, answered by the
+//! in-app agent, `ai_run_task_with_agent`). Only type conversion happens
+//! here.
 
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use flutter_rust_bridge::frb;
 use vault_core::Vault;
 use vault_mcp::http::{HttpOptions, McpHttp};
-use vault_mcp::runner::{self, AgentCommand, RunContext};
-use vault_mcp::{endpoint, merge, tasks, McpServer};
+use vault_mcp::{endpoint, tasks, McpServer};
 
-use crate::api::types::BMark;
 use crate::api::vault::NotesVault;
 use crate::convert::*;
 
@@ -37,16 +33,13 @@ pub struct NotesMcp {
     root: String,
     http: Mutex<Option<McpHttp>>,
     addr: Mutex<String>,
-    /// The endpoint AI tasks run by Claude Code or Codex get: loopback, a
-    /// free port, only the runner's tool set, and the tool set it serves.
-    task_http: Mutex<Option<(String, McpHttp)>>,
 }
 
 impl NotesMcp {
     #[frb(sync)]
     pub fn new(vault: &NotesVault) -> NotesMcp {
         let root = vault.inner.root();
-        NotesMcp { vault: vault.inner.clone(), root, http: Mutex::new(None), addr: Mutex::new(String::new()), task_http: Mutex::new(None) }
+        NotesMcp { vault: vault.inner.clone(), root, http: Mutex::new(None), addr: Mutex::new(String::new()) }
     }
 
     /// Starts serving on `addr` (restarts if running) and returns the URL.
@@ -62,39 +55,12 @@ impl NotesMcp {
         Ok(url)
     }
 
-    /// Stops serving and removes the endpoint file (the AI tasks' endpoint
-    /// stops too).
+    /// Stops serving and removes the endpoint file.
     pub fn stop(&self) {
         if let Some(h) = lock(&self.http).take() {
             endpoint::clear_endpoint(&self.root, &h.url());
             h.stop();
         }
-        if let Some((_, h)) = lock(&self.task_http).take() {
-            h.stop();
-        }
-    }
-
-    /// The URL of the endpoint AI tasks run by Claude Code or Codex get:
-    /// 127.0.0.1 on a free port, the same token, and only `tool_set`'s tools
-    /// (`read`, `write` or `everything`; the runner's set). Started, or
-    /// restarted for another set, on demand. It writes no endpoint file.
-    pub fn task_url(&self, tool_set: String) -> Result<String, String> {
-        let set: vault_tools::ToolSet = tool_set.trim().parse()?;
-        let mut slot = lock(&self.task_http);
-        if let Some((have, h)) = slot.as_ref() {
-            if *have == set.as_str() {
-                return Ok(h.url());
-            }
-        }
-        if let Some((_, h)) = slot.take() {
-            h.stop();
-        }
-        let token = endpoint::token(&self.root).map_err(err)?;
-        let server = Arc::new(McpServer::new(self.vault.clone()).with_tool_set(set));
-        let http = McpHttp::serve("127.0.0.1:0", server, token, HttpOptions::default()).map_err(err)?;
-        let url = http.url();
-        *slot = Some((set.as_str().to_string(), http));
-        Ok(url)
     }
 
     /// The URL while running.
@@ -112,10 +78,6 @@ impl NotesMcp {
     /// configured with the old one stop working.
     pub fn rotate_token(&self) -> Result<String, String> {
         let t = endpoint::rotate_token(&self.root).map_err(err)?;
-        // The AI tasks' endpoint starts again with the new token when needed.
-        if let Some((_, h)) = lock(&self.task_http).take() {
-            h.stop();
-        }
         let running = lock(&self.http).is_some();
         if running {
             let addr = lock(&self.addr).clone();
@@ -134,8 +96,8 @@ pub struct AiTask {
     pub page: Option<String>,
     /// The placeholder block in that page.
     pub block: Option<String>,
-    /// "", "agent" (the desktop agent, `ai_run_task_with_agent`), "claude",
-    /// "codex" or "deepseek"; "" = the desktop's default.
+    /// "" or "agent"; rows from before 2026-10-22 may name a removed runner
+    /// ("claude", "codex", "deepseek"). The agent answers every row.
     pub runner: String,
     /// "queued", "running", "done" or "failed".
     pub status: String,
@@ -226,101 +188,9 @@ pub fn ai_retry_task(vault: &NotesVault, id: String) -> Result<(), String> {
     tasks::retry(&vault.inner, &id).map_err(err)
 }
 
-/// The full prompt for a command-line agent: the task, the page's markdown
-/// and how to use the vault's MCP tools.
-pub fn ai_task_prompt(vault: &NotesVault, id: String) -> Result<String, String> {
-    let v = &vault.inner;
-    let t = tasks::get(v, &id).map_err(err)?;
-    tasks::agent_prompt(v, &t, tasks::PromptTools::Mcp).map_err(err)
-}
-
 /// Writes the result back: on success `text` (markdown) replaces the
 /// placeholder; on failure `text` is the error.
 pub fn ai_finish_task(vault: &NotesVault, id: String, ok: bool, text: String) -> Result<(), String> {
     let r = if ok { Ok(text) } else { Err(text) };
     tasks::finish(&vault.inner, &id, r).map_err(err)
-}
-
-/// The built-in argument list for "claude" or "codex" (placeholders
-/// `{mcp_config}`, `{mcp_url}`, `{output_file}` included); None otherwise.
-#[frb(sync)]
-pub fn ai_default_args(kind: String) -> Option<Vec<String>> {
-    runner::default_command(&kind, None).map(|c| c.args)
-}
-
-/// What a run of an agent gave.
-#[derive(Debug, Clone)]
-pub struct AgentRun {
-    pub ok: bool,
-    /// The answer when `ok`, else why it failed.
-    pub text: String,
-    pub stderr: String,
-    pub timed_out: bool,
-}
-
-/// Runs a command-line agent with `prompt` on stdin. `kind` picks the
-/// built-in arguments ("claude", "codex") unless `args` is given;
-/// `program` overrides the executable. `model` is the synced default model
-/// (`codex/<m>` or `claude-code/<m>`; another provider's adds nothing). No
-/// shell is involved.
-#[allow(clippy::too_many_arguments)]
-pub fn ai_run_agent(
-    kind: String,
-    program: Option<String>,
-    args: Option<Vec<String>>,
-    prompt: String,
-    mcp_url: String,
-    mcp_token: String,
-    work_dir: String,
-    timeout_secs: u32,
-    model: Option<String>,
-) -> Result<AgentRun, String> {
-    let cmd = match (args, runner::default_command_with_model(&kind, program.as_deref(), model.as_deref())) {
-        (Some(args), d) => AgentCommand {
-            program: program.filter(|p| !p.trim().is_empty()).or(d.map(|d| d.program)).unwrap_or(kind),
-            args,
-        },
-        (None, Some(d)) => d,
-        (None, None) => return Err(format!("unknown agent \"{kind}\"")),
-    };
-    let ctx = RunContext {
-        mcp_url,
-        mcp_token,
-        work_dir: PathBuf::from(work_dir),
-        timeout: Duration::from_secs(timeout_secs.max(1) as u64),
-    };
-    let out = runner::run(&cmd, &prompt, &ctx).map_err(err)?;
-    let (ok, text) = match out.result() {
-        Ok(t) => (true, t),
-        Err(e) => (false, e),
-    };
-    Ok(AgentRun { ok, text, stderr: out.stderr, timed_out: out.timed_out })
-}
-
-/// The prompt asking an agent to merge the conflict on `block` of `page`.
-pub fn ai_merge_prompt(vault: &NotesVault, page: String, block: String) -> Result<String, String> {
-    let v = &vault.inner;
-    let c = v
-        .list_conflicts(Some(page))
-        .map_err(err)?
-        .into_iter()
-        .find(|c| matches!(c.scope, vault_core::ConflictScope::Block { .. }) && (c.id == block || c.block == block))
-        .ok_or("the conflict is already resolved")?;
-    Ok(merge::prompt(v, &c))
-}
-
-/// A proposed ordinary page edit: text and marks. Conflict confirmation is
-/// a separate Keep action after applying the edit.
-#[derive(Debug, Clone)]
-pub struct MergeText {
-    pub text: String,
-    pub marks: Vec<BMark>,
-}
-
-/// Reads an agent's merge answer (inline markdown) as text and marks.
-/// Changes nothing.
-pub fn ai_parse_merge(vault: &NotesVault, answer: String) -> MergeText {
-    let p = merge::parse(&vault.inner, &answer);
-    let marks = marks_from(&p.text, p.marks);
-    MergeText { text: p.text, marks }
 }

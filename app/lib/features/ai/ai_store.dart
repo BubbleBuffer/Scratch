@@ -1,25 +1,24 @@
-// AI on this device: the vault's MCP endpoint, AI tasks and merges.
+// AI on this device: the vault's MCP endpoint and AI tasks.
 //
 // - Tasks are rows of the synced "AI tasks" collection (vault_mcp::tasks).
 //   "Ask AI" (the `/` menu, the selection toolbar, the block menu and the
 //   page menu) and tasks assigned to the agent start one, on the synced
 //   default runner ([AiStore.runsOn]; phones: always the Hub):
 //   - this computer: a row pinned to this device, which runs it with its
-//     AI tasks runner and the synced model and tool set of `this_device`;
+//     agent and the synced model and tool set of `this_device`;
 //   - the Hub: a hub job about the page (hub_jobs_client.dart), run with
 //     the hub runner's model and tool set.
 //   Either way the answer replaces the task's placeholder in the page.
 //   Status (queued, running, done, failed, cancelled) is in the row, so
 //   every device sees it.
-// - The in-app agent (runner "Agent", the default while it is on) runs the
-//   task in an agent session of its own and writes the answer itself.
-// - Claude Code and Codex run as programs with an argument list (no shell)
-//   and get the vault's MCP endpoint; DeepSeek is called over HTTPS with
-//   the page's text only.
+// - The in-app agent (BubblePaw) is the only thing that answers: it runs
+//   the task in an agent session of its own and writes the answer itself.
+//   Rows that name a runner removed on 2026-10-22 (`claude`, `codex`,
+//   `deepseek`) are answered by the agent too. Claude Code, Codex and
+//   other apps reach the vault from outside, through the MCP endpoint or
+//   agent tokens; the app never starts them.
 // - The MCP endpoint is served on the configured address when enabled in
-//   settings, otherwise on a free local port while an agent needs it.
-// - Merges: the conflict's versions go to the runner; the answer is only a
-//   proposal until the user accepts it in the conflict view.
+//   settings.
 //
 // One store per open vault ([AiStore.of]); boot attaches the device's
 // settings and starts it.
@@ -27,8 +26,6 @@
 import '../../core/debounce.dart';
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -43,7 +40,7 @@ import '../../addons/agent/api.dart';
 import 'ai_settings.dart';
 import 'hub_jobs_client.dart';
 
-export '../../src/rust/api/ai.dart' show AiTask, MergeText;
+export '../../src/rust/api/ai.dart' show AiTask;
 
 /// Task statuses (the "Status" select of the AI tasks collection).
 abstract final class AiStatus {
@@ -112,10 +109,6 @@ class AiStore extends ChangeNotifier implements AgentRuns {
   static bool get canRun =>
       !kIsWeb && (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.linux);
 
-  /// Overrides the agents' working folder (tests).
-  @visibleForTesting
-  static String? workDirOverride;
-
   /// Makes the hub jobs client (tests use a fake hub).
   @visibleForTesting
   static HubJobs Function(HubLink hub, String deviceId)? hubJobsOverride;
@@ -154,19 +147,13 @@ class AiStore extends ChangeNotifier implements AgentRuns {
 
   bool get mcpRunning => mcpUrl != null;
 
-  /// Whether this device runs tasks and merges.
-  bool get canAnswer => canRun && _ready(settings.runner);
-
-  bool _ready(AiRunner runner) => settings.ready(runner) && (runner != AiRunner.agent || _agents.canRunTasks);
+  /// Whether this device runs tasks: its agent is on and can run them.
+  bool get canAnswer => canRun && settings.answersAskAi && _agents.canRunTasks;
 
   void _onAgentChanged() {
     _notify();
     if (_started && _agents.canRunTasks) unawaited(pump());
   }
-
-  /// Whether Resolve with AI can run here: the agent has no one-shot
-  /// answer, so not with the Agent runner.
-  bool get canMerge => canAnswer && settings.runner != AiRunner.agent;
 
   // ---------------------------------------------------------------- MCP
 
@@ -324,7 +311,7 @@ class AiStore extends ChangeNotifier implements AgentRuns {
   /// Runs queued tasks one at a time while this device can answer.
   Future<void> pump() async {
     if (_pumping || _disposed) return;
-    if (settings.runner == AiRunner.agent && settings.ready(AiRunner.agent)) {
+    if (canRun && settings.answersAskAi) {
       await _agents.ensureOpen();
       if (_pumping || _disposed) return;
     }
@@ -336,17 +323,8 @@ class AiStore extends ChangeNotifier implements AgentRuns {
         if (t == null) break;
         runningId = t.id;
         await refresh();
-        if (_runnerFor(t) == AiRunner.agent) {
-          await _runWithAgent(t);
-        } else {
-          final (ok, text) = await _runTask(t);
-          if (_disposed) break;
-          try {
-            await vault.run((v) => aiFinishTask(vault: v, id: t.id, ok: ok, text: text), writes: true);
-          } catch (e) {
-            AppLog.info('ai task ${t.id} not written back: $e');
-          }
-        }
+        // Whatever runner the row names, the agent answers it.
+        await _runWithAgent(t);
         if (_disposed) break;
         runningId = null;
         await refresh();
@@ -358,15 +336,6 @@ class AiStore extends ChangeNotifier implements AgentRuns {
       runningId = null;
       _notify();
     }
-  }
-
-  /// The task's own runner when it can run here, else this device's.
-  AiRunner _runnerFor(AiTask t) =>
-      AiRunner.values.where((r) => r.name == t.runner && _ready(r)).firstOrNull ?? settings.runner;
-
-  Future<(bool, String)> _runTask(AiTask t) async {
-    final prompt = await vault.run((v) => aiTaskPrompt(vault: v, id: t.id));
-    return _answer(_runnerFor(t), prompt, tools: true);
   }
 
   /// Runs the claimed task [t] with the in-app agent, which writes the
@@ -385,88 +354,6 @@ class AiStore extends ChangeNotifier implements AgentRuns {
       await vault.run((v) => aiFinishTask(vault: v, id: t.id, ok: false, text: '$e'), writes: true);
     }
     unawaited(agents.refreshSessions());
-  }
-
-  /// [prompt]'s answer from [runner]: (true, answer) or (false, why not).
-  Future<(bool, String)> _answer(AiRunner runner, String prompt, {required bool tools}) async {
-    try {
-      if (runner == AiRunner.deepseek) return (true, await _deepSeek(prompt));
-      var url = '', token = '';
-      if (tools && runner.usesMcp) {
-        // An endpoint with only the synced tool set of this computer's
-        // runner (`tool_sets.this_device`).
-        await _agents.refreshVaultDefaults();
-        final set = _agents.vaultDefaults.toolSetFor(AgentHost.local);
-        try {
-          url = await (_mcp ??= NotesMcp(vault: vault.raw)).taskUrl(toolSet: set);
-          token = await this.token();
-        } catch (e) {
-          return (false, '$e');
-        }
-      }
-      // The synced model of this computer's runner, when it is one of
-      // this runner's (`claude-code/…`, `codex/…`).
-      final model = tools ? _agents.resolvedModel(AgentHost.local).model : null;
-      final work = workDirOverride ?? '${Directory.systemTemp.path}${Platform.pathSeparator}notes-ai';
-      final r = await vault.run((_) => aiRunAgent(
-            kind: runner.name,
-            program: settings.programOf(runner),
-            prompt: prompt,
-            mcpUrl: url,
-            mcpToken: token,
-            workDir: work,
-            timeoutSecs: settings.timeoutMinutes * 60,
-            model: model,
-          ));
-      return (r.ok, r.text);
-    } catch (e) {
-      return (false, '$e');
-    }
-  }
-
-  static const _system = 'You are an assistant inside a personal notes app. Follow the instructions exactly.';
-
-  Future<String> _deepSeek(String prompt) async {
-    final s = settings;
-    final base = s.deepSeekUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
-    try {
-      final req = await client.postUrl(Uri.parse('$base/chat/completions'));
-      req.headers.contentType = ContentType.json;
-      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${s.deepSeekKey.trim()}');
-      req.add(utf8.encode(jsonEncode({
-        'model': s.deepSeekModel.trim().isEmpty ? defaultDeepSeekModel : s.deepSeekModel.trim(),
-        'messages': [
-          {'role': 'system', 'content': _system},
-          {'role': 'user', 'content': prompt},
-        ],
-        'stream': false,
-      })));
-      final res = await req.close().timeout(Duration(minutes: s.timeoutMinutes));
-      final body = await res.transform(utf8.decoder).join();
-      if (res.statusCode != 200) {
-        final msg = body.length > 300 ? '${body.substring(0, 300)}…' : body;
-        throw 'DeepSeek answered ${res.statusCode}: $msg';
-      }
-      final j = jsonDecode(body) as Map<String, dynamic>;
-      return ((j['choices'] as List).first['message']['content'] as String?)?.trim() ?? '';
-    } on TimeoutException {
-      throw 'DeepSeek took too long';
-    } finally {
-      client.close(force: true);
-    }
-  }
-
-  // ------------------------------------------------------------- merges
-
-  /// Asks the runner to merge [c]'s versions. Changes nothing: the result
-  /// is a proposal for a normal page edit followed by confirmation.
-  Future<MergeText> proposeMerge(Conflict c) async {
-    if (!canMerge) throw 'Set up Claude Code, Codex or DeepSeek in Settings > AI first.';
-    final prompt = await vault.run((v) => aiMergePrompt(vault: v, page: c.page, block: c.id));
-    final (ok, text) = await _answer(settings.runner, prompt, tools: false);
-    if (!ok) throw text;
-    return vault.run((v) => aiParseMerge(vault: v, answer: text));
   }
 
   void _notify() {

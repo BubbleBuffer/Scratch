@@ -1,15 +1,13 @@
-//! AI tasks, the agent runner and merge proposals, with the fake agent
-//! (`examples/fake_agent.rs`) in place of Claude Code or Codex.
+//! AI tasks stored in the vault (placeholders, claiming, the agent's prompt,
+//! writing the answer back, cancelling) and the merge prompt and answer. The BubblePaw agent that answers
+//! them is tested in crates/agent; the command-line runners (Claude Code,
+//! Codex) and their fake were removed on 2026-10-22.
 
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
 
 use vault_core::*;
-use vault_mcp::http::{HttpOptions, McpHttp};
-use vault_mcp::runner::{self, AgentCommand, RunContext};
-use vault_mcp::{endpoint, merge, tasks, McpServer};
+use vault_mcp::{merge, tasks};
 
 struct Temp(PathBuf);
 
@@ -28,63 +26,6 @@ impl Drop for Temp {
     }
 }
 
-/// The fake agent, built with the tests (`target/<profile>/examples`).
-fn fake_agent() -> String {
-    let exe = std::env::current_exe().unwrap();
-    let dir = exe.parent().unwrap().parent().unwrap().join("examples");
-    let name = if cfg!(windows) {
-        "fake_agent.exe"
-    } else {
-        "fake_agent"
-    };
-    let p = dir.join(name);
-    assert!(p.is_file(), "build the examples first: {}", p.display());
-    p.to_string_lossy().into_owned()
-}
-
-struct App {
-    v: Arc<Vault>,
-    http: McpHttp,
-    token: String,
-    work: PathBuf,
-}
-
-fn app(t: &Temp) -> App {
-    let v = Arc::new(Vault::open(t.root()).unwrap());
-    let token = endpoint::token(&t.root()).unwrap();
-    let http = McpHttp::serve(
-        "127.0.0.1:0",
-        Arc::new(McpServer::new(v.clone())),
-        token.clone(),
-        HttpOptions::default(),
-    )
-    .unwrap();
-    App {
-        v,
-        http,
-        token,
-        work: t.0.join("work"),
-    }
-}
-
-impl App {
-    fn ctx(&self, timeout: Duration) -> RunContext {
-        RunContext {
-            mcp_url: self.http.url(),
-            mcp_token: self.token.clone(),
-            work_dir: self.work.clone(),
-            timeout,
-        }
-    }
-}
-
-fn claude_like() -> AgentCommand {
-    AgentCommand {
-        program: fake_agent(),
-        args: vec!["-p".into(), "--mcp-config".into(), "{mcp_config}".into()],
-    }
-}
-
 fn texts(v: &Vault, page: &str) -> Vec<String> {
     v.load_page(page.into())
         .unwrap()
@@ -95,10 +36,9 @@ fn texts(v: &Vault, page: &str) -> Vec<String> {
 }
 
 #[test]
-fn task_runs_with_a_fake_agent_and_writes_back() {
+fn a_task_gets_a_placeholder_a_prompt_and_its_answer() {
     let t = Temp::new();
-    let a = app(&t);
-    let v = &a.v;
+    let v = &Vault::open(t.root()).unwrap();
     let page = v.create_page(None, "Trip plan".into()).unwrap();
     let ids = v
         .insert_markdown(
@@ -132,129 +72,30 @@ fn task_runs_with_a_fake_agent_and_writes_back() {
     assert!(texts(v, &page)[1].starts_with("AI is working on this"));
     assert!(tasks::claim_next(v, "x").unwrap().is_none());
 
-    let prompt = tasks::agent_prompt(v, &claimed, tasks::PromptTools::Mcp).unwrap();
+    let prompt = tasks::agent_prompt(v, &claimed, tasks::PromptTools::Js).unwrap();
     assert!(
         prompt.contains("Summarize the plan")
             && prompt.contains("Day two")
+            && prompt.contains("js tool")
             && !prompt.contains("AI is working")
     );
-    let out = runner::run(&claude_like(), &prompt, &a.ctx(Duration::from_secs(60))).unwrap();
-    assert!(out.ok(), "{out:?}");
-    // The config file with the token is gone after the run.
-    assert_eq!(fs::read_dir(&a.work).unwrap().count(), 0);
-    tasks::finish(v, &claimed.id, out.result()).unwrap();
+    tasks::finish(v, &claimed.id, Ok("- Fake answer
+- Read the plan".into())).unwrap();
 
     let after = texts(v, &page);
     assert_eq!(
         after,
         [
             "Day one",
-            "Fake answer to: Summarize the plan",
-            "Read over MCP: Trip plan",
+            "Fake answer",
+            "Read the plan",
             "Day two"
         ]
     );
     assert_eq!(v.load_page(page.clone()).unwrap().blocks[0].id, ids[0]);
     let done = tasks::get(v, &claimed.id).unwrap();
     assert_eq!(done.status, tasks::DONE);
-    assert!(v.page_markdown(done.id).unwrap().contains("Fake answer to"));
-}
-
-#[test]
-fn agent_edits_fails_and_times_out() {
-    let t = Temp::new();
-    let a = app(&t);
-    let v = &a.v;
-    let me = v.device_id();
-    let page = v.create_page(None, "Notes".into()).unwrap();
-    v.insert_markdown(page.clone(), None, None, true, "Hello".into())
-        .unwrap();
-
-    // Codex-style: the answer goes to {output_file}; empty means "I edited".
-    let codex_like = AgentCommand {
-        program: fake_agent(),
-        args: vec![
-            "exec".into(),
-            "--answer-file".into(),
-            "{output_file}".into(),
-        ],
-    };
-    tasks::create(v, "FAKE:edit please", &page, None, "codex").unwrap();
-    let t1 = tasks::claim_next(v, &me).unwrap().unwrap();
-    assert_eq!(t1.runner, "codex");
-    let out = runner::run(
-        &codex_like,
-        &tasks::agent_prompt(v, &t1, tasks::PromptTools::Mcp).unwrap(),
-        &a.ctx(Duration::from_secs(60)),
-    )
-    .unwrap();
-    assert!(out.ok() && out.stdout.is_empty(), "{out:?}");
-    tasks::finish(v, &t1.id, out.result()).unwrap();
-    assert_eq!(texts(v, &page), ["Hello", "Edited by the fake agent"]);
-
-    // A failing agent: the task fails and the placeholder says why.
-    tasks::create(v, "FAKE:fail now", &page, None, "").unwrap();
-    let t2 = tasks::claim_next(v, &me).unwrap().unwrap();
-    let out = runner::run(
-        &claude_like(),
-        &tasks::agent_prompt(v, &t2, tasks::PromptTools::Mcp).unwrap(),
-        &a.ctx(Duration::from_secs(60)),
-    )
-    .unwrap();
-    let res = out.result();
-    assert!(
-        res.as_ref().unwrap_err().contains("code 3")
-            && res.as_ref().unwrap_err().contains("asked to fail"),
-        "{res:?}"
-    );
-    tasks::finish(v, &t2.id, res).unwrap();
-    let failed = tasks::get(v, &t2.id).unwrap();
-    assert_eq!(failed.status, tasks::FAILED);
-    let p = v.load_page(page.clone()).unwrap();
-    let ph = p.blocks.last().unwrap();
-    assert!(
-        ph.text.starts_with("AI task failed") && ph.text.contains("code 3"),
-        "{}",
-        ph.text
-    );
-    assert_eq!(ph.color.as_deref(), Some("red_background"));
-    tasks::retry(v, &t2.id).unwrap();
-    let again = tasks::get(v, &t2.id).unwrap();
-    assert_eq!(again.status, tasks::QUEUED);
-    assert!(again.error.is_empty());
-
-    // A timeout kills the agent.
-    let out = runner::run(
-        &claude_like(),
-        "FAKE:sleep",
-        &a.ctx(Duration::from_millis(500)),
-    )
-    .unwrap();
-    assert!(out.timed_out && out.result().is_err());
-
-    // A missing program is an error, not a panic.
-    let missing = AgentCommand {
-        program: "no-such-agent-xyz".into(),
-        args: vec![],
-    };
-    assert!(runner::run(&missing, "x", &a.ctx(Duration::from_secs(5))).is_err());
-
-    // Tasks left running by this device fail after a restart.
-    let t3 = tasks::claim_next(v, &me).unwrap().unwrap();
-    assert_eq!(t3.id, t2.id);
-    assert_eq!(tasks::recover(v, &me).unwrap(), 1);
-    assert_eq!(tasks::get(v, &t3.id).unwrap().status, tasks::FAILED);
-}
-
-#[test]
-fn default_commands_are_argument_lists() {
-    let c = runner::default_command("claude", None).unwrap();
-    assert_eq!(c.program, "claude");
-    assert!(c.args.contains(&"{mcp_config}".to_string()) && c.args.contains(&"-p".to_string()));
-    let x = runner::default_command("codex", Some("C:\\tools\\codex.exe")).unwrap();
-    assert_eq!(x.program, "C:\\tools\\codex.exe");
-    assert_eq!(x.args.last().unwrap(), "-");
-    assert!(runner::default_command("deepseek", None).is_none());
+    assert!(v.page_markdown(done.id).unwrap().contains("Fake answer"));
 }
 
 #[test]
@@ -286,10 +127,60 @@ fn task_from_the_phone_runs_on_the_desktop() {
 }
 
 #[test]
-fn merge_proposal_from_the_agent() {
+fn ask_ai_on_this_device_is_pinned_and_cancellable() {
     let t = Temp::new();
-    let a = app(&t);
-    let v = &a.v;
+    let v = &Vault::open(t.root()).unwrap();
+    let me = v.device_id();
+    let page = v.create_page(None, "Notes".into()).unwrap();
+    // Pinned to this device: no other desktop claims it.
+    let task = tasks::create_on(v, "Explain this", &page, None, "", &me).unwrap();
+    assert_eq!(task.node, me);
+    assert!(tasks::claim_next(v, "another-desktop").unwrap().is_none());
+    let got = tasks::claim_next(v, &me).unwrap().unwrap();
+    assert_eq!(got.id, task.id);
+
+    // Cancelled while running: the late result is dropped and the
+    // placeholder says it was cancelled.
+    assert!(tasks::cancel(v, &got.id).unwrap());
+    assert_eq!(tasks::get(v, &got.id).unwrap().status, tasks::CANCELLED);
+    tasks::finish(v, &got.id, Ok("Too late".into())).unwrap();
+    let after = texts(v, &page);
+    assert!(after.iter().all(|t| !t.contains("Too late")), "{after:?}");
+    assert!(after.iter().any(|t| t.contains("AI task cancelled")), "{after:?}");
+    assert_eq!(tasks::get(v, &got.id).unwrap().status, tasks::CANCELLED);
+    // A second cancel does nothing.
+    assert!(!tasks::cancel(v, &got.id).unwrap());
+
+    // A hub job is cancelled on the hub, not here.
+    let hub = tasks::create_on(v, "On the hub", &page, None, "", "hub").unwrap();
+    assert!(tasks::cancel(v, &hub.id).is_err());
+    assert!(tasks::claim_next(v, "hub").unwrap().is_none());
+}
+
+#[test]
+fn a_row_naming_a_removed_runner_is_claimed_like_any_other() {
+    let t = Temp::new();
+    let v = &Vault::open(t.root()).unwrap();
+    let page = v.create_page(None, "Old row".into()).unwrap();
+    for runner in ["claude", "codex", "deepseek"] {
+        let task = tasks::create(v, "Answer me", &page, None, runner).unwrap();
+        let got = tasks::claim_next(v, &v.device_id()).unwrap().unwrap();
+        assert_eq!(got.id, task.id);
+        assert_eq!(got.runner, runner);
+        tasks::agent_prompt(v, &got, tasks::PromptTools::Js).unwrap();
+        tasks::finish(v, &got.id, Ok(format!("Answered for {runner}"))).unwrap();
+        assert_eq!(tasks::get(v, &got.id).unwrap().status, tasks::DONE);
+    }
+    let after = texts(v, &page);
+    for runner in ["claude", "codex", "deepseek"] {
+        assert!(after.contains(&format!("Answered for {runner}")), "{after:?}");
+    }
+}
+
+#[test]
+fn merge_prompt_and_answer() {
+    let t = Temp::new();
+    let v = &Vault::open(t.root()).unwrap();
     let page = v.create_page(None, "Shared".into()).unwrap();
     let ids = v
         .insert_markdown(page.clone(), None, None, true, "Meet at 10".into())
@@ -330,9 +221,8 @@ fn merge_proposal_from_the_agent() {
             && prompt.contains("Meet at 11")
             && prompt.contains("\"Shared\"")
     );
-    let out = runner::run(&claude_like(), &prompt, &a.ctx(Duration::from_secs(60))).unwrap();
-    let p = merge::parse(v, &out.result().unwrap());
-    assert_eq!(p.text, "Merged by the fake agent");
+    let p = merge::parse(v, "**Merged** by the agent");
+    assert_eq!(p.text, "Merged by the agent");
     assert_eq!(p.marks.len(), 1);
     assert_eq!(p.marks[0].kind, MarkKind::Bold);
     // Fences and several paragraphs.
@@ -340,90 +230,4 @@ fn merge_proposal_from_the_agent() {
     assert_eq!(merge::parse(v, "One\n\nTwo").text, "One\nTwo");
     // Nothing was written.
     assert_eq!(texts(v, &page), ["Meet at 10"]);
-}
-
-#[test]
-fn ask_ai_on_this_device_is_pinned_and_cancellable() {
-    let t = Temp::new();
-    let a = app(&t);
-    let v = &a.v;
-    let me = v.device_id();
-    let page = v.create_page(None, "Notes".into()).unwrap();
-    // Pinned to this device: no other desktop claims it.
-    let task = tasks::create_on(v, "Explain this", &page, None, "", &me).unwrap();
-    assert_eq!(task.node, me);
-    assert!(tasks::claim_next(v, "another-desktop").unwrap().is_none());
-    let got = tasks::claim_next(v, &me).unwrap().unwrap();
-    assert_eq!(got.id, task.id);
-
-    // Cancelled while running: the late result is dropped and the
-    // placeholder says it was cancelled.
-    assert!(tasks::cancel(v, &got.id).unwrap());
-    assert_eq!(tasks::get(v, &got.id).unwrap().status, tasks::CANCELLED);
-    tasks::finish(v, &got.id, Ok("Too late".into())).unwrap();
-    let after = texts(v, &page);
-    assert!(after.iter().all(|t| !t.contains("Too late")), "{after:?}");
-    assert!(after.iter().any(|t| t.contains("AI task cancelled")), "{after:?}");
-    assert_eq!(tasks::get(v, &got.id).unwrap().status, tasks::CANCELLED);
-    // A second cancel does nothing.
-    assert!(!tasks::cancel(v, &got.id).unwrap());
-
-    // A hub job is cancelled on the hub, not here.
-    let hub = tasks::create_on(v, "On the hub", &page, None, "", "hub").unwrap();
-    assert!(tasks::cancel(v, &hub.id).is_err());
-    assert!(tasks::claim_next(v, "hub").unwrap().is_none());
-}
-
-#[test]
-fn the_synced_model_goes_on_the_command_line() {
-    let codex = runner::default_command_with_model("codex", None, Some("codex/gpt-6-luna")).unwrap();
-    let n = codex.args.len();
-    assert_eq!(&codex.args[n - 3..], ["-m", "gpt-6-luna", "-"]);
-    let claude =
-        runner::default_command_with_model("claude", None, Some("claude-code/sonnet")).unwrap();
-    assert_eq!(&claude.args[claude.args.len() - 2..], ["--model", "sonnet"]);
-    // Another provider's model, or none, leaves the program's default.
-    let plain = runner::default_command("codex", None).unwrap();
-    for m in [None, Some(""), Some("deepseek/v4"), Some("codex/")] {
-        assert_eq!(runner::default_command_with_model("codex", None, m).unwrap(), plain);
-    }
-    assert!(runner::model_args("claude", Some("codex/x")).is_empty());
-}
-
-#[test]
-fn a_task_endpoint_has_only_the_runner_set() {
-    let t = Temp::new();
-    let a = app(&t);
-    let v = &a.v;
-    // An endpoint narrowed to Read, as for `tool_sets.this_device = read`.
-    let read = McpHttp::serve(
-        "127.0.0.1:0",
-        Arc::new(McpServer::new(v.clone()).with_tool_set(vault_tools::ToolSet::Read)),
-        a.token.clone(),
-        HttpOptions::default(),
-    )
-    .unwrap();
-    let page = v.create_page(None, "Read only".into()).unwrap();
-    let task = tasks::create(v, "FAKE:edit", &page, None, "").unwrap();
-    let claimed = tasks::claim_next(v, &v.device_id()).unwrap().unwrap();
-    assert_eq!(claimed.id, task.id);
-    let prompt = tasks::agent_prompt(v, &claimed, tasks::PromptTools::Mcp).unwrap();
-    let ctx = RunContext {
-        mcp_url: read.url(),
-        ..a.ctx(Duration::from_secs(60))
-    };
-    let out = runner::run(&claude_like(), &prompt, &ctx).unwrap();
-    // The edit was refused (the agent exits with an error, or the tool
-    // reports one): the page never gets the paragraph.
-    let _ = out;
-    let md = v.page_markdown(page.clone()).unwrap();
-    assert!(!md.contains("Edited by the fake agent"), "{md}");
-    // The full endpoint lets the same agent edit.
-    let task = tasks::create(v, "FAKE:edit", &page, None, "").unwrap();
-    let claimed = tasks::claim_next(v, &v.device_id()).unwrap().unwrap();
-    assert_eq!(claimed.id, task.id);
-    let prompt = tasks::agent_prompt(v, &claimed, tasks::PromptTools::Mcp).unwrap();
-    let out = runner::run(&claude_like(), &prompt, &a.ctx(Duration::from_secs(60))).unwrap();
-    assert!(out.ok(), "{out:?}");
-    assert!(v.page_markdown(page).unwrap().contains("Edited by the fake agent"));
 }

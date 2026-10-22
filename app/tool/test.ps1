@@ -9,7 +9,6 @@ $appRoot = Split-Path $PSScriptRoot -Parent
 $repoRoot = Split-Path $appRoot -Parent
 $targetRoot = Join-Path $repoRoot 'target/release'
 $bridge = Join-Path $targetRoot 'notes_bridge.dll'
-$agent = Join-Path $targetRoot 'examples/fake_agent.exe'
 $sources = @(
     Get-ChildItem (Join-Path $repoRoot 'crates'), (Join-Path $appRoot 'rust') -Recurse -File |
         Where-Object { $_.Extension -eq '.rs' -or $_.Name -eq 'Cargo.toml' }
@@ -17,7 +16,6 @@ $sources = @(
 )
 $newest = ($sources | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1).LastWriteTimeUtc
 $oldBridge = $env:NOTES_BRIDGE_LIB
-$oldAgent = $env:NOTES_FAKE_AGENT
 $oldIncremental = $env:CARGO_INCREMENTAL
 $env:CARGO_INCREMENTAL = '0'
 Push-Location $repoRoot
@@ -26,12 +24,7 @@ try {
         & cargo build --release -p notes_bridge
         if ($LASTEXITCODE -ne 0) { throw 'Bridge build failed' }
     }
-    if (!(Test-Path $agent) -or (Get-Item $agent).LastWriteTimeUtc -lt $newest) {
-        & cargo build --release -p vault_mcp --examples
-        if ($LASTEXITCODE -ne 0) { throw 'Fake agent build failed' }
-    }
     $env:NOTES_BRIDGE_LIB = $bridge
-    $env:NOTES_FAKE_AGENT = $agent
     Set-Location $appRoot
     $flutter = if (Get-Command flutter -ErrorAction SilentlyContinue) { 'flutter' } else { (Join-Path $HOME 'flutter\bin\flutter.bat') }
     $tiers = if ($Tier -eq 'all') { @('fast', 'golden', 'perf') } else { @($Tier) }
@@ -71,7 +64,6 @@ try {
     Write-Host ('Total tests: {0:N2}s' -f $total)
 } finally {
     $env:NOTES_BRIDGE_LIB = $oldBridge
-    $env:NOTES_FAKE_AGENT = $oldAgent
     $env:CARGO_INCREMENTAL = $oldIncremental
     Pop-Location
 }

@@ -36,7 +36,7 @@ enum Source {
 pub struct McpServer {
     source: Source,
     /// The tools [`McpServer::handle`] and [`McpServer::handle_body`] list
-    /// and call (Everything unless [`McpServer::with_tool_set`] narrows it).
+    /// and call.
     set: ToolSet,
 }
 
@@ -55,13 +55,6 @@ impl McpServer {
             source: Source::Open(vault),
             set: ToolSet::Everything,
         }
-    }
-
-    /// This server with only the tools of `set` listed and callable (the
-    /// desktop gives Claude Code and Codex AI tasks the runner's set).
-    pub fn with_tool_set(mut self, set: ToolSet) -> McpServer {
-        self.set = set;
-        self
     }
 
     /// Opens the vault at `root` for each tool call (see `Source::PerCall`).

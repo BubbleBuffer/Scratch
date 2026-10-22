@@ -728,9 +728,9 @@ void main() {
     final tv = await pumpApp(tester, mobile: false);
     final settings = fakeAgentSettings();
     expect(
-      settings.runner,
-      AiRunner.agent,
-      reason: 'the default when the agent is on',
+      settings.answersAskAi,
+      isTrue,
+      reason: 'the agent answers Ask AI while it is on',
     );
     await openAgentStore(tester, settings: settings);
     final store = await aiStore(tester, settings: settings);

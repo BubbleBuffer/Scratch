@@ -43,7 +43,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1871233708;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1185988593;
 
 // Section: executor
 
@@ -2920,57 +2920,6 @@ fn wire__crate__api__ai__NotesMcp_stop_impl(
                     let output_ok = Ok::<_, ()>({
                         crate::api::ai::NotesMcp::stop(&*api_that_guard);
                     })?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__ai__NotesMcp_task_url_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "NotesMcp_task_url",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_that = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesMcp>,
-            >>::sse_decode(&mut deserializer);
-            let api_tool_set = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, String>((move || {
-                    let mut api_that_guard = None;
-                    let decode_indices_ =
-                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_that, 0, false,
-                            ),
-                        ]);
-                    for i in decode_indices_ {
-                        match i {
-                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
-                            _ => unreachable!(),
-                        }
-                    }
-                    let api_that_guard = api_that_guard.unwrap();
-                    let output_ok =
-                        crate::api::ai::NotesMcp::task_url(&*api_that_guard, api_tool_set)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -11374,36 +11323,6 @@ fn wire__crate__api__ai__ai_create_task_here_impl(
         },
     )
 }
-fn wire__crate__api__ai__ai_default_args_impl(
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "ai_default_args",
-            port: None,
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_kind = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            transform_result_sse::<_, ()>((move || {
-                let output_ok = Ok::<_, ()>(crate::api::ai::ai_default_args(api_kind))?;
-                std::result::Result::Ok(output_ok)
-            })())
-        },
-    )
-}
 fn wire__crate__api__ai__ai_finish_task_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -11561,111 +11480,6 @@ fn wire__crate__api__ai__ai_list_tasks_impl(
         },
     )
 }
-fn wire__crate__api__ai__ai_merge_prompt_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "ai_merge_prompt",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_vault = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesVault>,
-            >>::sse_decode(&mut deserializer);
-            let api_page = <String>::sse_decode(&mut deserializer);
-            let api_block = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, String>((move || {
-                    let mut api_vault_guard = None;
-                    let decode_indices_ =
-                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_vault, 0, false,
-                            ),
-                        ]);
-                    for i in decode_indices_ {
-                        match i {
-                            0 => api_vault_guard = Some(api_vault.lockable_decode_sync_ref()),
-                            _ => unreachable!(),
-                        }
-                    }
-                    let api_vault_guard = api_vault_guard.unwrap();
-                    let output_ok =
-                        crate::api::ai::ai_merge_prompt(&*api_vault_guard, api_page, api_block)?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__ai__ai_parse_merge_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "ai_parse_merge",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_vault = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesVault>,
-            >>::sse_decode(&mut deserializer);
-            let api_answer = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let mut api_vault_guard = None;
-                    let decode_indices_ =
-                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_vault, 0, false,
-                            ),
-                        ]);
-                    for i in decode_indices_ {
-                        match i {
-                            0 => api_vault_guard = Some(api_vault.lockable_decode_sync_ref()),
-                            _ => unreachable!(),
-                        }
-                    }
-                    let api_vault_guard = api_vault_guard.unwrap();
-                    let output_ok = Ok::<_, ()>(crate::api::ai::ai_parse_merge(
-                        &*api_vault_guard,
-                        api_answer,
-                    ))?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
 fn wire__crate__api__ai__ai_recover_tasks_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -11765,57 +11579,6 @@ fn wire__crate__api__ai__ai_retry_task_impl(
         },
     )
 }
-fn wire__crate__api__ai__ai_run_agent_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "ai_run_agent",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_kind = <String>::sse_decode(&mut deserializer);
-            let api_program = <Option<String>>::sse_decode(&mut deserializer);
-            let api_args = <Option<Vec<String>>>::sse_decode(&mut deserializer);
-            let api_prompt = <String>::sse_decode(&mut deserializer);
-            let api_mcp_url = <String>::sse_decode(&mut deserializer);
-            let api_mcp_token = <String>::sse_decode(&mut deserializer);
-            let api_work_dir = <String>::sse_decode(&mut deserializer);
-            let api_timeout_secs = <u32>::sse_decode(&mut deserializer);
-            let api_model = <Option<String>>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, String>((move || {
-                    let output_ok = crate::api::ai::ai_run_agent(
-                        api_kind,
-                        api_program,
-                        api_args,
-                        api_prompt,
-                        api_mcp_url,
-                        api_mcp_token,
-                        api_work_dir,
-                        api_timeout_secs,
-                        api_model,
-                    )?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
 fn wire__crate__api__agent__ai_run_task_with_agent_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -11873,56 +11636,6 @@ fn wire__crate__api__agent__ai_run_task_with_agent_impl(
                         &*api_vault_guard,
                         api_task_id,
                     )?;
-                    std::result::Result::Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__ai__ai_task_prompt_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "ai_task_prompt",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_vault = <RustOpaqueMoi<
-                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesVault>,
-            >>::sse_decode(&mut deserializer);
-            let api_id = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, String>((move || {
-                    let mut api_vault_guard = None;
-                    let decode_indices_ =
-                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
-                                &api_vault, 0, false,
-                            ),
-                        ]);
-                    for i in decode_indices_ {
-                        match i {
-                            0 => api_vault_guard = Some(api_vault.lockable_decode_sync_ref()),
-                            _ => unreachable!(),
-                        }
-                    }
-                    let api_vault_guard = api_vault_guard.unwrap();
-                    let output_ok = crate::api::ai::ai_task_prompt(&*api_vault_guard, api_id)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -13020,22 +12733,6 @@ impl SseDecode for crate::api::agent::AgentProject {
             name: var_name,
             path: var_path,
             added_at: var_addedAt,
-        };
-    }
-}
-
-impl SseDecode for crate::api::ai::AgentRun {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_ok = <bool>::sse_decode(deserializer);
-        let mut var_text = <String>::sse_decode(deserializer);
-        let mut var_stderr = <String>::sse_decode(deserializer);
-        let mut var_timedOut = <bool>::sse_decode(deserializer);
-        return crate::api::ai::AgentRun {
-            ok: var_ok,
-            text: var_text,
-            stderr: var_stderr,
-            timed_out: var_timedOut,
         };
     }
 }
@@ -14836,18 +14533,6 @@ impl SseDecode for crate::api::types::MatchedFilterValue {
     }
 }
 
-impl SseDecode for crate::api::ai::MergeText {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_text = <String>::sse_decode(deserializer);
-        let mut var_marks = <Vec<crate::api::types::BMark>>::sse_decode(deserializer);
-        return crate::api::ai::MergeText {
-            text: var_text,
-            marks: var_marks,
-        };
-    }
-}
-
 impl SseDecode for crate::api::types::MountInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -15114,17 +14799,6 @@ impl SseDecode for Option<u64> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<u64>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
-impl SseDecode for Option<Vec<String>> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<Vec<String>>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -16184,689 +15858,684 @@ fn pde_ffi_dispatcher_primary_impl(
         53 => wire__crate__api__ai__NotesMcp_rotate_token_impl(port, ptr, rust_vec_len, data_len),
         54 => wire__crate__api__ai__NotesMcp_start_impl(port, ptr, rust_vec_len, data_len),
         55 => wire__crate__api__ai__NotesMcp_stop_impl(port, ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__ai__NotesMcp_task_url_impl(port, ptr, rust_vec_len, data_len),
-        57 => wire__crate__api__ai__NotesMcp_token_impl(port, ptr, rust_vec_len, data_len),
-        59 => wire__crate__api__sync__NotesSync_fetch_attachment_impl(
+        56 => wire__crate__api__ai__NotesMcp_token_impl(port, ptr, rust_vec_len, data_len),
+        58 => wire__crate__api__sync__NotesSync_fetch_attachment_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        60 => wire__crate__api__sync__NotesSync_fetch_missing_attachments_impl(
+        59 => wire__crate__api__sync__NotesSync_fetch_missing_attachments_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        62 => wire__crate__api__sync__NotesSync_start_impl(port, ptr, rust_vec_len, data_len),
-        64 => wire__crate__api__sync__NotesSync_stop_impl(port, ptr, rust_vec_len, data_len),
-        66 => wire__crate__api__sync__NotesSync_sync_once_impl(port, ptr, rust_vec_len, data_len),
-        69 => wire__crate__api__vault__NotesVault_add_attachment_bytes_impl(
+        61 => wire__crate__api__sync__NotesSync_start_impl(port, ptr, rust_vec_len, data_len),
+        63 => wire__crate__api__sync__NotesSync_stop_impl(port, ptr, rust_vec_len, data_len),
+        65 => wire__crate__api__sync__NotesSync_sync_once_impl(port, ptr, rust_vec_len, data_len),
+        68 => wire__crate__api__vault__NotesVault_add_attachment_bytes_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        70 => wire__crate__api__vault__NotesVault_add_attachment_from_path_impl(
+        69 => wire__crate__api__vault__NotesVault_add_attachment_from_path_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        71 => wire__crate__api__vault__NotesVault_add_mount_impl(port, ptr, rust_vec_len, data_len),
-        72 => wire__crate__api__vault__NotesVault_add_view_impl(port, ptr, rust_vec_len, data_len),
-        73 => wire__crate__api__vault__NotesVault_agenda_impl(port, ptr, rust_vec_len, data_len),
-        74 => wire__crate__api__vault__NotesVault_agenda_settings_impl(
+        70 => wire__crate__api__vault__NotesVault_add_mount_impl(port, ptr, rust_vec_len, data_len),
+        71 => wire__crate__api__vault__NotesVault_add_view_impl(port, ptr, rust_vec_len, data_len),
+        72 => wire__crate__api__vault__NotesVault_agenda_impl(port, ptr, rust_vec_len, data_len),
+        73 => wire__crate__api__vault__NotesVault_agenda_settings_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        75 => wire__crate__api__vault__NotesVault_agent_defaults_impl(
+        74 => wire__crate__api__vault__NotesVault_agent_defaults_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        76 => wire__crate__api__vault__NotesVault_agent_tool_set_impl(
+        75 => wire__crate__api__vault__NotesVault_agent_tool_set_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        77 => {
+        76 => {
             wire__crate__api__vault__NotesVault_append_log_impl(port, ptr, rust_vec_len, data_len)
         }
-        78 => wire__crate__api__vault__NotesVault_apply_impl(port, ptr, rust_vec_len, data_len),
-        79 => wire__crate__api__vault__NotesVault_apply_template_impl(
+        77 => wire__crate__api__vault__NotesVault_apply_impl(port, ptr, rust_vec_len, data_len),
+        78 => wire__crate__api__vault__NotesVault_apply_template_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        80 => wire__crate__api__vault__NotesVault_attachment_ids_impl(
+        79 => wire__crate__api__vault__NotesVault_attachment_ids_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        81 => wire__crate__api__vault__NotesVault_attachment_info_impl(
+        80 => wire__crate__api__vault__NotesVault_attachment_info_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        82 => wire__crate__api__vault__NotesVault_attachment_path_impl(
+        81 => wire__crate__api__vault__NotesVault_attachment_path_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        83 => wire__crate__api__vault__NotesVault_backlinks_impl(port, ptr, rust_vec_len, data_len),
-        84 => wire__crate__api__vault__NotesVault_calendar_items_impl(
+        82 => wire__crate__api__vault__NotesVault_backlinks_impl(port, ptr, rust_vec_len, data_len),
+        83 => wire__crate__api__vault__NotesVault_calendar_items_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        85 => wire__crate__api__vault__NotesVault_clear_search_source_impl(
+        84 => wire__crate__api__vault__NotesVault_clear_search_source_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        86 => wire__crate__api__vault__NotesVault_complete_search_impl(
+        85 => wire__crate__api__vault__NotesVault_complete_search_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        87 => wire__crate__api__vault__NotesVault_conflict_auto_resolve_impl(
+        86 => wire__crate__api__vault__NotesVault_conflict_auto_resolve_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        88 => wire__crate__api__vault__NotesVault_conflict_diff_impl(
+        87 => wire__crate__api__vault__NotesVault_conflict_diff_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        89 => {
+        88 => {
             wire__crate__api__vault__NotesVault_conflict_log_impl(port, ptr, rust_vec_len, data_len)
         }
-        90 => wire__crate__api__vault__NotesVault_conflicts_impl(port, ptr, rust_vec_len, data_len),
-        91 => wire__crate__api__vault__NotesVault_create_calendar_impl(
+        89 => wire__crate__api__vault__NotesVault_conflicts_impl(port, ptr, rust_vec_len, data_len),
+        90 => wire__crate__api__vault__NotesVault_create_calendar_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        92 => {
+        91 => {
             wire__crate__api__vault__NotesVault_create_page_impl(port, ptr, rust_vec_len, data_len)
         }
-        93 => wire__crate__api__vault__NotesVault_create_page_from_impl(
+        92 => wire__crate__api__vault__NotesVault_create_page_from_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        94 => wire__crate__api__vault__NotesVault_create_template_impl(
+        93 => wire__crate__api__vault__NotesVault_create_template_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        95 => {
+        94 => {
             wire__crate__api__vault__NotesVault_daily_note_impl(port, ptr, rust_vec_len, data_len)
         }
-        96 => wire__crate__api__vault__NotesVault_day_notes_in_range_impl(
+        95 => wire__crate__api__vault__NotesVault_day_notes_in_range_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        97 => wire__crate__api__vault__NotesVault_default_template_impl(
+        96 => wire__crate__api__vault__NotesVault_default_template_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        98 => wire__crate__api__vault__NotesVault_delete_calendar_impl(
+        97 => wire__crate__api__vault__NotesVault_delete_calendar_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        99 => {
+        98 => {
             wire__crate__api__vault__NotesVault_delete_page_impl(port, ptr, rust_vec_len, data_len)
         }
-        100 => wire__crate__api__vault__NotesVault_delete_search_row_impl(
+        99 => wire__crate__api__vault__NotesVault_delete_search_row_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        101 => {
+        100 => {
             wire__crate__api__vault__NotesVault_delete_view_impl(port, ptr, rust_vec_len, data_len)
         }
-        103 => {
+        102 => {
             wire__crate__api__vault__NotesVault_done_since_impl(port, ptr, rust_vec_len, data_len)
         }
-        104 => wire__crate__api__vault__NotesVault_duplicate_page_impl(
+        103 => wire__crate__api__vault__NotesVault_duplicate_page_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        105 => {
+        104 => {
             wire__crate__api__vault__NotesVault_empty_trash_impl(port, ptr, rust_vec_len, data_len)
         }
-        106 => wire__crate__api__vault__NotesVault_ensure_space_colors_impl(
+        105 => wire__crate__api__vault__NotesVault_ensure_space_colors_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        107 => wire__crate__api__vault__NotesVault_export_markdown_impl(
+        106 => wire__crate__api__vault__NotesVault_export_markdown_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        108 => wire__crate__api__vault__NotesVault_export_updates_impl(
+        107 => wire__crate__api__vault__NotesVault_export_updates_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        109 => wire__crate__api__vault__NotesVault_feedback_page_impl(
+        108 => wire__crate__api__vault__NotesVault_feedback_page_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        110 => {
+        109 => {
             wire__crate__api__vault__NotesVault_find_by_role_impl(port, ptr, rust_vec_len, data_len)
         }
-        111 => wire__crate__api__vault__NotesVault_find_indexed_note_impl(
+        110 => wire__crate__api__vault__NotesVault_find_indexed_note_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        112 => wire__crate__api__vault__NotesVault_flush_impl(port, ptr, rust_vec_len, data_len),
-        113 => wire__crate__api__vault__NotesVault_gc_attachments_impl(
+        111 => wire__crate__api__vault__NotesVault_flush_impl(port, ptr, rust_vec_len, data_len),
+        112 => wire__crate__api__vault__NotesVault_gc_attachments_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        114 => {
+        113 => {
             wire__crate__api__vault__NotesVault_get_schema_impl(port, ptr, rust_vec_len, data_len)
         }
-        115 => wire__crate__api__vault__NotesVault_import_markdown_impl(
+        114 => wire__crate__api__vault__NotesVault_import_markdown_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        116 => wire__crate__api__vault__NotesVault_import_purged_impl(
+        115 => wire__crate__api__vault__NotesVault_import_purged_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        117 => wire__crate__api__vault__NotesVault_import_updates_impl(
+        116 => wire__crate__api__vault__NotesVault_import_updates_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        118 => wire__crate__api__vault__NotesVault_import_updates_batch_impl(
+        117 => wire__crate__api__vault__NotesVault_import_updates_batch_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        119 => {
+        118 => {
             wire__crate__api__vault__NotesVault_in_motion_impl(port, ptr, rust_vec_len, data_len)
         }
-        120 => wire__crate__api__vault__NotesVault_link_task_to_day_impl(
+        119 => wire__crate__api__vault__NotesVault_link_task_to_day_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        121 => wire__crate__api__vault__NotesVault_list_calendars_impl(
+        120 => wire__crate__api__vault__NotesVault_list_calendars_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        122 => wire__crate__api__vault__NotesVault_list_children_impl(
+        121 => wire__crate__api__vault__NotesVault_list_children_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        123 => wire__crate__api__vault__NotesVault_list_conflicts_impl(
+        122 => wire__crate__api__vault__NotesVault_list_conflicts_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        124 => wire__crate__api__vault__NotesVault_list_favorites_impl(
+        123 => wire__crate__api__vault__NotesVault_list_favorites_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        126 => {
+        125 => {
             wire__crate__api__vault__NotesVault_list_pages_impl(port, ptr, rust_vec_len, data_len)
         }
-        127 => wire__crate__api__vault__NotesVault_list_templates_impl(
+        126 => wire__crate__api__vault__NotesVault_list_templates_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        128 => {
+        127 => {
             wire__crate__api__vault__NotesVault_list_trash_impl(port, ptr, rust_vec_len, data_len)
         }
-        129 => wire__crate__api__vault__NotesVault_list_versions_impl(
+        128 => wire__crate__api__vault__NotesVault_list_versions_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        130 => {
+        129 => {
             wire__crate__api__vault__NotesVault_list_views_impl(port, ptr, rust_vec_len, data_len)
         }
-        131 => {
+        130 => {
             wire__crate__api__vault__NotesVault_load_page_impl(port, ptr, rust_vec_len, data_len)
         }
-        132 => {
+        131 => {
             wire__crate__api__vault__NotesVault_load_page_at_impl(port, ptr, rust_vec_len, data_len)
         }
-        133 => wire__crate__api__vault__NotesVault_local_node_id_impl(
+        132 => wire__crate__api__vault__NotesVault_local_node_id_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        134 => wire__crate__api__vault__NotesVault_local_runner_set_available_impl(
+        133 => wire__crate__api__vault__NotesVault_local_runner_set_available_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        135 => wire__crate__api__vault__NotesVault_local_schedule_accept_impl(
+        134 => wire__crate__api__vault__NotesVault_local_schedule_accept_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        136 => wire__crate__api__vault__NotesVault_local_schedule_pause_impl(
+        135 => wire__crate__api__vault__NotesVault_local_schedule_pause_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        137 => wire__crate__api__vault__NotesVault_local_schedule_run_now_impl(
+        136 => wire__crate__api__vault__NotesVault_local_schedule_run_now_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        138 => wire__crate__api__vault__NotesVault_local_schedule_state_impl(
+        137 => wire__crate__api__vault__NotesVault_local_schedule_state_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        139 => wire__crate__api__vault__NotesVault_make_collection_impl(
+        138 => wire__crate__api__vault__NotesVault_make_collection_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        140 => wire__crate__api__vault__NotesVault_missing_attachments_impl(
+        139 => wire__crate__api__vault__NotesVault_missing_attachments_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        141 => wire__crate__api__vault__NotesVault_move_date_mark_impl(
+        140 => wire__crate__api__vault__NotesVault_move_date_mark_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        142 => {
+        141 => {
             wire__crate__api__vault__NotesVault_move_page_impl(port, ptr, rust_vec_len, data_len)
         }
-        143 => {
+        142 => {
             wire__crate__api__vault__NotesVault_move_view_impl(port, ptr, rust_vec_len, data_len)
         }
-        144 => wire__crate__api__vault__NotesVault_open_impl(port, ptr, rust_vec_len, data_len),
-        145 => wire__crate__api__vault__NotesVault_overdue_impl(port, ptr, rust_vec_len, data_len),
-        146 => wire__crate__api__vault__NotesVault_overdue_count_impl(
+        143 => wire__crate__api__vault__NotesVault_open_impl(port, ptr, rust_vec_len, data_len),
+        144 => wire__crate__api__vault__NotesVault_overdue_impl(port, ptr, rust_vec_len, data_len),
+        145 => wire__crate__api__vault__NotesVault_overdue_count_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        147 => {
+        146 => {
             wire__crate__api__vault__NotesVault_page_count_impl(port, ptr, rust_vec_len, data_len)
         }
-        148 => wire__crate__api__vault__NotesVault_page_versions_impl(
+        147 => wire__crate__api__vault__NotesVault_page_versions_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        149 => {
+        148 => {
             wire__crate__api__vault__NotesVault_parse_search_impl(port, ptr, rust_vec_len, data_len)
         }
-        150 => {
+        149 => {
             wire__crate__api__vault__NotesVault_poll_changes_impl(port, ptr, rust_vec_len, data_len)
         }
-        151 => {
+        150 => {
             wire__crate__api__vault__NotesVault_purge_page_impl(port, ptr, rust_vec_len, data_len)
         }
-        152 => {
+        151 => {
             wire__crate__api__vault__NotesVault_purged_pages_impl(port, ptr, rust_vec_len, data_len)
         }
-        153 => wire__crate__api__vault__NotesVault_query_impl(port, ptr, rust_vec_len, data_len),
-        154 => {
+        152 => wire__crate__api__vault__NotesVault_query_impl(port, ptr, rust_vec_len, data_len),
+        153 => {
             wire__crate__api__vault__NotesVault_query_groups_impl(port, ptr, rust_vec_len, data_len)
         }
-        155 => {
+        154 => {
             wire__crate__api__vault__NotesVault_query_range_impl(port, ptr, rust_vec_len, data_len)
         }
-        156 => wire__crate__api__vault__NotesVault_reindex_impl(port, ptr, rust_vec_len, data_len),
-        157 => {
+        155 => wire__crate__api__vault__NotesVault_reindex_impl(port, ptr, rust_vec_len, data_len),
+        156 => {
             wire__crate__api__vault__NotesVault_remove_mount_impl(port, ptr, rust_vec_len, data_len)
         }
-        158 => wire__crate__api__vault__NotesVault_remove_property_impl(
+        157 => wire__crate__api__vault__NotesVault_remove_property_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        159 => {
+        158 => {
             wire__crate__api__vault__NotesVault_rename_page_impl(port, ptr, rust_vec_len, data_len)
         }
-        160 => wire__crate__api__vault__NotesVault_reorder_calendars_impl(
+        159 => wire__crate__api__vault__NotesVault_reorder_calendars_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        161 => wire__crate__api__vault__NotesVault_rescan_impl(port, ptr, rust_vec_len, data_len),
-        162 => wire__crate__api__vault__NotesVault_rescan_mounts_impl(
+        160 => wire__crate__api__vault__NotesVault_rescan_impl(port, ptr, rust_vec_len, data_len),
+        161 => wire__crate__api__vault__NotesVault_rescan_mounts_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        163 => wire__crate__api__vault__NotesVault_resolve_conflict_impl(
+        162 => wire__crate__api__vault__NotesVault_resolve_conflict_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        164 => {
+        163 => {
             wire__crate__api__vault__NotesVault_restore_page_impl(port, ptr, rust_vec_len, data_len)
         }
-        165 => wire__crate__api__vault__NotesVault_restore_version_impl(
+        164 => wire__crate__api__vault__NotesVault_restore_version_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        167 => wire__crate__api__vault__NotesVault_schedule_preview_impl(
+        166 => wire__crate__api__vault__NotesVault_schedule_preview_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        168 => wire__crate__api__vault__NotesVault_search_impl(port, ptr, rust_vec_len, data_len),
-        169 => wire__crate__api__vault__NotesVault_search_adaptive_impl(
+        167 => wire__crate__api__vault__NotesVault_search_impl(port, ptr, rust_vec_len, data_len),
+        168 => wire__crate__api__vault__NotesVault_search_adaptive_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        170 => {
+        169 => {
             wire__crate__api__vault__NotesVault_search_spec_impl(port, ptr, rust_vec_len, data_len)
         }
-        171 => wire__crate__api__vault__NotesVault_seed_impl(port, ptr, rust_vec_len, data_len),
-        172 => wire__crate__api__vault__NotesVault_seed_agent_defaults_impl(
+        170 => wire__crate__api__vault__NotesVault_seed_impl(port, ptr, rust_vec_len, data_len),
+        171 => wire__crate__api__vault__NotesVault_seed_agent_defaults_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        174 => {
+        173 => {
             wire__crate__api__vault__NotesVault_seed_tasks_impl(port, ptr, rust_vec_len, data_len)
         }
-        175 => wire__crate__api__vault__NotesVault_set_agenda_done_impl(
+        174 => wire__crate__api__vault__NotesVault_set_agenda_done_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        176 => wire__crate__api__vault__NotesVault_set_agenda_settings_impl(
+        175 => wire__crate__api__vault__NotesVault_set_agenda_settings_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        177 => wire__crate__api__vault__NotesVault_set_agent_default_model_impl(
+        176 => wire__crate__api__vault__NotesVault_set_agent_default_model_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        178 => wire__crate__api__vault__NotesVault_set_agent_default_runner_impl(
+        177 => wire__crate__api__vault__NotesVault_set_agent_default_runner_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        179 => wire__crate__api__vault__NotesVault_set_agent_tool_set_impl(
+        178 => wire__crate__api__vault__NotesVault_set_agent_tool_set_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        180 => wire__crate__api__vault__NotesVault_set_conflict_auto_resolve_impl(
+        179 => wire__crate__api__vault__NotesVault_set_conflict_auto_resolve_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        181 => {
+        180 => {
             wire__crate__api__vault__NotesVault_set_cover_impl(port, ptr, rust_vec_len, data_len)
         }
-        182 => wire__crate__api__vault__NotesVault_set_database_calendar_visibility_impl(
+        181 => wire__crate__api__vault__NotesVault_set_database_calendar_visibility_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        183 => wire__crate__api__vault__NotesVault_set_default_template_impl(
+        182 => wire__crate__api__vault__NotesVault_set_default_template_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        184 => {
+        183 => {
             wire__crate__api__vault__NotesVault_set_favorite_impl(port, ptr, rust_vec_len, data_len)
         }
-        185 => wire__crate__api__vault__NotesVault_set_icon_impl(port, ptr, rust_vec_len, data_len),
-        186 => wire__crate__api__vault__NotesVault_set_page_color_impl(
+        184 => wire__crate__api__vault__NotesVault_set_icon_impl(port, ptr, rust_vec_len, data_len),
+        185 => wire__crate__api__vault__NotesVault_set_page_color_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        187 => wire__crate__api__vault__NotesVault_set_page_prefs_impl(
+        186 => wire__crate__api__vault__NotesVault_set_page_prefs_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        188 => wire__crate__api__vault__NotesVault_set_page_role_impl(
+        187 => wire__crate__api__vault__NotesVault_set_page_role_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        189 => wire__crate__api__vault__NotesVault_set_page_type_impl(
+        188 => wire__crate__api__vault__NotesVault_set_page_type_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        190 => {
+        189 => {
             wire__crate__api__vault__NotesVault_set_property_impl(port, ptr, rust_vec_len, data_len)
         }
-        191 => {
+        190 => {
             wire__crate__api__vault__NotesVault_set_schema_impl(port, ptr, rust_vec_len, data_len)
         }
-        192 => {
+        191 => {
             wire__crate__api__vault__NotesVault_set_template_impl(port, ptr, rust_vec_len, data_len)
         }
-        193 => wire__crate__api__vault__NotesVault_set_type_markdown_body_impl(
+        192 => wire__crate__api__vault__NotesVault_set_type_markdown_body_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        194 => wire__crate__api__vault__NotesVault_store_attachment_impl(
+        193 => wire__crate__api__vault__NotesVault_store_attachment_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        195 => {
+        194 => {
             wire__crate__api__vault__NotesVault_type_data_impl(port, ptr, rust_vec_len, data_len)
         }
-        196 => wire__crate__api__vault__NotesVault_type_data_all_impl(
+        195 => wire__crate__api__vault__NotesVault_type_data_all_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        197 => wire__crate__api__vault__NotesVault_type_data_delete_impl(
+        196 => wire__crate__api__vault__NotesVault_type_data_delete_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        198 => wire__crate__api__vault__NotesVault_type_data_list_delete_impl(
+        197 => wire__crate__api__vault__NotesVault_type_data_list_delete_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        199 => wire__crate__api__vault__NotesVault_type_data_list_insert_impl(
+        198 => wire__crate__api__vault__NotesVault_type_data_list_insert_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        200 => wire__crate__api__vault__NotesVault_type_data_list_move_impl(
+        199 => wire__crate__api__vault__NotesVault_type_data_list_move_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        201 => wire__crate__api__vault__NotesVault_type_data_set_impl(
+        200 => wire__crate__api__vault__NotesVault_type_data_set_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        202 => wire__crate__api__vault__NotesVault_type_markdown_body_impl(
+        201 => wire__crate__api__vault__NotesVault_type_markdown_body_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        203 => wire__crate__api__vault__NotesVault_undo_conflict_impl(
+        202 => wire__crate__api__vault__NotesVault_undo_conflict_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        204 => wire__crate__api__vault__NotesVault_unwatch_query_impl(
+        203 => wire__crate__api__vault__NotesVault_unwatch_query_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        205 => wire__crate__api__vault__NotesVault_update_calendar_impl(
+        204 => wire__crate__api__vault__NotesVault_update_calendar_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        206 => {
+        205 => {
             wire__crate__api__vault__NotesVault_update_view_impl(port, ptr, rust_vec_len, data_len)
         }
-        207 => wire__crate__api__vault__NotesVault_upsert_search_row_impl(
+        206 => wire__crate__api__vault__NotesVault_upsert_search_row_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        208 => {
+        207 => {
             wire__crate__api__vault__NotesVault_wait_changes_impl(port, ptr, rust_vec_len, data_len)
         }
-        209 => {
+        208 => {
             wire__crate__api__vault__NotesVault_watch_query_impl(port, ptr, rust_vec_len, data_len)
         }
-        211 => {
+        210 => {
             wire__crate__api__agent__agent_mcp_import_file_impl(port, ptr, rust_vec_len, data_len)
         }
-        212 => wire__crate__api__ai__ai_cancel_task_impl(port, ptr, rust_vec_len, data_len),
-        213 => wire__crate__api__ai__ai_claim_next_impl(port, ptr, rust_vec_len, data_len),
-        214 => wire__crate__api__ai__ai_create_task_impl(port, ptr, rust_vec_len, data_len),
-        215 => wire__crate__api__ai__ai_create_task_here_impl(port, ptr, rust_vec_len, data_len),
-        217 => wire__crate__api__ai__ai_finish_task_impl(port, ptr, rust_vec_len, data_len),
-        218 => wire__crate__api__ai__ai_get_task_impl(port, ptr, rust_vec_len, data_len),
-        219 => wire__crate__api__ai__ai_list_tasks_impl(port, ptr, rust_vec_len, data_len),
-        220 => wire__crate__api__ai__ai_merge_prompt_impl(port, ptr, rust_vec_len, data_len),
-        221 => wire__crate__api__ai__ai_parse_merge_impl(port, ptr, rust_vec_len, data_len),
-        222 => wire__crate__api__ai__ai_recover_tasks_impl(port, ptr, rust_vec_len, data_len),
-        223 => wire__crate__api__ai__ai_retry_task_impl(port, ptr, rust_vec_len, data_len),
-        224 => wire__crate__api__ai__ai_run_agent_impl(port, ptr, rust_vec_len, data_len),
-        225 => {
+        211 => wire__crate__api__ai__ai_cancel_task_impl(port, ptr, rust_vec_len, data_len),
+        212 => wire__crate__api__ai__ai_claim_next_impl(port, ptr, rust_vec_len, data_len),
+        213 => wire__crate__api__ai__ai_create_task_impl(port, ptr, rust_vec_len, data_len),
+        214 => wire__crate__api__ai__ai_create_task_here_impl(port, ptr, rust_vec_len, data_len),
+        215 => wire__crate__api__ai__ai_finish_task_impl(port, ptr, rust_vec_len, data_len),
+        216 => wire__crate__api__ai__ai_get_task_impl(port, ptr, rust_vec_len, data_len),
+        217 => wire__crate__api__ai__ai_list_tasks_impl(port, ptr, rust_vec_len, data_len),
+        218 => wire__crate__api__ai__ai_recover_tasks_impl(port, ptr, rust_vec_len, data_len),
+        219 => wire__crate__api__ai__ai_retry_task_impl(port, ptr, rust_vec_len, data_len),
+        220 => {
             wire__crate__api__agent__ai_run_task_with_agent_impl(port, ptr, rust_vec_len, data_len)
         }
-        226 => wire__crate__api__ai__ai_task_prompt_impl(port, ptr, rust_vec_len, data_len),
-        227 => wire__crate__api__ai__ai_tasks_collection_impl(port, ptr, rust_vec_len, data_len),
-        230 => wire__crate__api__vault__first_option_in_impl(port, ptr, rust_vec_len, data_len),
-        231 => wire__crate__api__vault__init_app_impl(port, ptr, rust_vec_len, data_len),
-        234 => {
+        221 => wire__crate__api__ai__ai_tasks_collection_impl(port, ptr, rust_vec_len, data_len),
+        224 => wire__crate__api__vault__first_option_in_impl(port, ptr, rust_vec_len, data_len),
+        225 => wire__crate__api__vault__init_app_impl(port, ptr, rust_vec_len, data_len),
+        228 => {
             wire__crate__api__types__page_prefs_data_default_impl(port, ptr, rust_vec_len, data_len)
         }
-        235 => wire__crate__api__types__search_spec_to_query_string_impl(
+        229 => wire__crate__api__types__search_spec_to_query_string_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        237 => wire__crate__api__vault__sha256_hex_impl(port, ptr, rust_vec_len, data_len),
-        238 => wire__crate__api__vault__status_group_impl(port, ptr, rust_vec_len, data_len),
-        239 => wire__crate__api__types__sync_report_default_impl(port, ptr, rust_vec_len, data_len),
-        240 => wire__crate__api__types__sync_status_default_impl(port, ptr, rust_vec_len, data_len),
-        241 => wire__crate__api__vault__version_includes_impl(port, ptr, rust_vec_len, data_len),
+        231 => wire__crate__api__vault__sha256_hex_impl(port, ptr, rust_vec_len, data_len),
+        232 => wire__crate__api__vault__status_group_impl(port, ptr, rust_vec_len, data_len),
+        233 => wire__crate__api__types__sync_report_default_impl(port, ptr, rust_vec_len, data_len),
+        234 => wire__crate__api__types__sync_status_default_impl(port, ptr, rust_vec_len, data_len),
+        235 => wire__crate__api__vault__version_includes_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -16881,27 +16550,26 @@ fn pde_ffi_dispatcher_sync_impl(
     match func_id {
         45 => wire__crate__api__sync__NotesHub_address_impl(ptr, rust_vec_len, data_len),
         52 => wire__crate__api__ai__NotesMcp_new_impl(ptr, rust_vec_len, data_len),
-        58 => wire__crate__api__ai__NotesMcp_url_impl(ptr, rust_vec_len, data_len),
-        61 => wire__crate__api__sync__NotesSync_new_impl(ptr, rust_vec_len, data_len),
-        63 => wire__crate__api__sync__NotesSync_status_impl(ptr, rust_vec_len, data_len),
-        65 => wire__crate__api__sync__NotesSync_sync_now_impl(ptr, rust_vec_len, data_len),
-        67 => wire__crate__api__sync__NotesSync_untrusted_certificate_impl(
+        57 => wire__crate__api__ai__NotesMcp_url_impl(ptr, rust_vec_len, data_len),
+        60 => wire__crate__api__sync__NotesSync_new_impl(ptr, rust_vec_len, data_len),
+        62 => wire__crate__api__sync__NotesSync_status_impl(ptr, rust_vec_len, data_len),
+        64 => wire__crate__api__sync__NotesSync_sync_now_impl(ptr, rust_vec_len, data_len),
+        66 => wire__crate__api__sync__NotesSync_untrusted_certificate_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        68 => wire__crate__api__sync__NotesSync_with_trusted_impl(ptr, rust_vec_len, data_len),
-        102 => wire__crate__api__vault__NotesVault_device_id_impl(ptr, rust_vec_len, data_len),
-        125 => wire__crate__api__vault__NotesVault_list_mounts_impl(ptr, rust_vec_len, data_len),
-        166 => wire__crate__api__vault__NotesVault_root_impl(ptr, rust_vec_len, data_len),
-        173 => wire__crate__api__vault__NotesVault_seed_progress_impl(ptr, rust_vec_len, data_len),
-        210 => wire__crate__api__agent__agent_markdown_blocks_impl(ptr, rust_vec_len, data_len),
-        216 => wire__crate__api__ai__ai_default_args_impl(ptr, rust_vec_len, data_len),
-        228 => wire__crate__api__sync__default_sync_options_impl(ptr, rust_vec_len, data_len),
-        229 => wire__crate__api__clock__device_time_zone_impl(ptr, rust_vec_len, data_len),
-        232 => wire__crate__api__ai__mcp_default_addr_impl(ptr, rust_vec_len, data_len),
-        233 => wire__crate__api__vault__new_id_impl(ptr, rust_vec_len, data_len),
-        236 => wire__crate__api__clock__set_test_clock_impl(ptr, rust_vec_len, data_len),
+        67 => wire__crate__api__sync__NotesSync_with_trusted_impl(ptr, rust_vec_len, data_len),
+        101 => wire__crate__api__vault__NotesVault_device_id_impl(ptr, rust_vec_len, data_len),
+        124 => wire__crate__api__vault__NotesVault_list_mounts_impl(ptr, rust_vec_len, data_len),
+        165 => wire__crate__api__vault__NotesVault_root_impl(ptr, rust_vec_len, data_len),
+        172 => wire__crate__api__vault__NotesVault_seed_progress_impl(ptr, rust_vec_len, data_len),
+        209 => wire__crate__api__agent__agent_markdown_blocks_impl(ptr, rust_vec_len, data_len),
+        222 => wire__crate__api__sync__default_sync_options_impl(ptr, rust_vec_len, data_len),
+        223 => wire__crate__api__clock__device_time_zone_impl(ptr, rust_vec_len, data_len),
+        226 => wire__crate__api__ai__mcp_default_addr_impl(ptr, rust_vec_len, data_len),
+        227 => wire__crate__api__vault__new_id_impl(ptr, rust_vec_len, data_len),
+        230 => wire__crate__api__clock__set_test_clock_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -17513,24 +17181,6 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::agent::AgentProject>
     for crate::api::agent::AgentProject
 {
     fn into_into_dart(self) -> crate::api::agent::AgentProject {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::ai::AgentRun {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.ok.into_into_dart().into_dart(),
-            self.text.into_into_dart().into_dart(),
-            self.stderr.into_into_dart().into_dart(),
-            self.timed_out.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::ai::AgentRun {}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::ai::AgentRun> for crate::api::ai::AgentRun {
-    fn into_into_dart(self) -> crate::api::ai::AgentRun {
         self
     }
 }
@@ -18791,22 +18441,6 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::types::MatchedFilterValue>
     for crate::api::types::MatchedFilterValue
 {
     fn into_into_dart(self) -> crate::api::types::MatchedFilterValue {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::ai::MergeText {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.text.into_into_dart().into_dart(),
-            self.marks.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::ai::MergeText {}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::ai::MergeText> for crate::api::ai::MergeText {
-    fn into_into_dart(self) -> crate::api::ai::MergeText {
         self
     }
 }
@@ -20274,16 +19908,6 @@ impl SseEncode for crate::api::agent::AgentProject {
     }
 }
 
-impl SseEncode for crate::api::ai::AgentRun {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.ok, serializer);
-        <String>::sse_encode(self.text, serializer);
-        <String>::sse_encode(self.stderr, serializer);
-        <bool>::sse_encode(self.timed_out, serializer);
-    }
-}
-
 impl SseEncode for crate::api::agent::AgentRunRecord {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -21611,14 +21235,6 @@ impl SseEncode for crate::api::types::MatchedFilterValue {
     }
 }
 
-impl SseEncode for crate::api::ai::MergeText {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.text, serializer);
-        <Vec<crate::api::types::BMark>>::sse_encode(self.marks, serializer);
-    }
-}
-
 impl SseEncode for crate::api::types::MountInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -21856,16 +21472,6 @@ impl SseEncode for Option<u64> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <u64>::sse_encode(value, serializer);
-        }
-    }
-}
-
-impl SseEncode for Option<Vec<String>> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <Vec<String>>::sse_encode(value, serializer);
         }
     }
 }
