@@ -50,7 +50,7 @@ The states, who can see a job, the limits and what the hub does on restart are i
 
 Claude on the web and phone reaches the vault through a custom connector. The hub uses one Authentik OAuth2 provider for everything: device sign-in (`[oidc]`) and MCP OAuth (`[mcp_oauth]`) on `/mcp` and `/mcp/agent`. `[mcp_oauth]` `issuer` and `client_id` (environment `NOTES_HUB_MCP_OAUTH_ISSUER` and `NOTES_HUB_MCP_OAUTH_CLIENT_ID`) are the same issuer and client ID as `[oidc]`.
 
-The provider is a confidential client. Connectors need both the client ID and the client secret. PKCE S256 is used too.
+The provider is a public client, with no client secret (since 2026-10-22; it was confidential before). Connectors need only the client ID: leave the client secret field blank. The hub and these connectors always send PKCE S256. Authentik does not itself require PKCE for public clients, so the protection of the code is PKCE plus the strict redirect URIs listed below.
 
 ### How it works
 
@@ -71,7 +71,7 @@ The two variables are listed in [Hub deployment](../architecture/hub-deploy.md#c
 
 Created over root SSH with `ak shell`. Change Authentik infrastructure the same way, never through the admin web UI.
 
-- Provider: one OAuth2/OpenID Connect provider for the hub, serving device sign-in and MCP OAuth. Confidential client (client ID and secret), PKCE S256.
+- Provider: one OAuth2/OpenID Connect provider for the hub, serving device sign-in and MCP OAuth. Public client (client ID only, no client secret), PKCE S256.
   - Grant types `authorization_code` and `refresh_token`, set explicitly. An empty list rejects every login; see [the live deployment note](../architecture/hub-deploy.md#live-deployment).
   - Strict redirect URIs:
     - `https://hub.example.com/auth/callback`: device sign-in.
@@ -84,7 +84,7 @@ Created over root SSH with `ak shell`. Change Authentik infrastructure the same 
   - Scopes `openid`, `email`, `profile`, `offline_access` (refresh tokens for connectors).
 - Application bound to the group `notes-users`.
 - Issuer: `https://auth.example.com/application/o/<slug>/`, the same as `[oidc] issuer`. Discovery is public and advertises S256.
-- The client ID and secret are not written in this repo. The hub reads them from `[oidc]` (`NOTES_HUB_OIDC_CLIENT_SECRET` for the secret).
+- The client ID is not written in this repo. The hub reads it from `[oidc]`. `NOTES_HUB_OIDC_CLIENT_SECRET` stays empty for this public client; set it only for a confidential provider.
 - The old separate public client `claude-mcp` is no longer used by the hub. It may still exist in Authentik; remove it once connectors are moved to this provider.
 
 ### Connector settings in Claude
@@ -93,15 +93,15 @@ In Claude, go to **Settings → Connectors → Add custom connector**:
 
 - Name: `Notes` (any name).
 - URL: `https://hub.example.com/mcp`.
-- Advanced settings: OAuth Client ID and OAuth Client Secret are the hub's `[oidc]` client ID and client secret.
+- Advanced settings: OAuth Client ID is the hub's `[oidc]` client ID. Leave OAuth Client Secret blank.
 
 Then choose **Connect**. Claude opens Authentik's login. After sign-in, the vault tools appear in chats.
 
-ChatGPT, Gemini and CLI MCP clients use the same client ID and secret, with the redirect URIs listed above.
+ChatGPT, Gemini and CLI MCP clients use the same client ID, with no secret, and the redirect URIs listed above.
 
 ### Limits
 
-- No dynamic client registration: Authentik does not offer it here, so each connector takes the client ID and secret entered by hand.
+- No dynamic client registration: Authentik does not offer it here, so each connector takes the client ID entered by hand. There is no secret to enter.
 - Authentik serves its metadata only at `<issuer>.well-known/openid-configuration`, not at the RFC 8414 path. The MCP spec has clients try that URL last, so discovery should still work. This is unverified with Claude until the first real sign-in.
 - Streamable HTTP over POST only. `GET /mcp` stays 405 (no SSE stream).
 - OAuth sessions get full access. There is no read-only OAuth scope.
@@ -110,7 +110,7 @@ ChatGPT, Gemini and CLI MCP clients use the same client ID and secret, with the 
 
 **Implemented, off by default; deployment and real connector sign-in are not established here.** Add a separate connector for `https://hub.example.com/mcp/agent` to use the agent runtime. It offers all `/mcp` vault tools, the host's advertised tools and `hosts`. Host tools accept optional `host`; JS and `js_help` appear only when enabled. A connector URL can select a host, for example `https://hub.example.com/mcp/agent?host=hub`. Only the hub host is available; desktop outbound relay is not implemented, and the hub has no desktop tool pack or shell.
 
-Use the same Authentik provider as the `/mcp` connector: its client ID and client secret, with PKCE S256. The issuer is the `[mcp_oauth]` issuer. The redirect URIs listed in [Authentik side](#authentik-side) still apply. Allowing the ChatGPT Origin does not register ChatGPT's per-connector callback; add it on the provider from the connector's settings page before connecting. Even then, no successful ChatGPT connection is established until tested.
+Use the same Authentik provider as the `/mcp` connector: its client ID, with no client secret, and PKCE S256. The issuer is the `[mcp_oauth]` issuer. The redirect URIs listed in [Authentik side](#authentik-side) still apply. Allowing the ChatGPT Origin does not register ChatGPT's per-connector callback; add it on the provider from the connector's settings page before connecting. Even then, no successful ChatGPT connection is established until tested.
 
 Enable `NOTES_HUB_MCP_AGENT_ENABLED=true` alongside `NOTES_HUB_MCP_OAUTH_ISSUER` and `NOTES_HUB_MCP_OAUTH_CLIENT_ID`; enabling the gateway without both OAuth settings is a configuration error. `NOTES_HUB_MCP_AGENT_DEFAULT_HOST` defaults to `hub`. These also have TOML keys `mcp_agent_enabled`, `mcp_agent_default_host` and `[mcp_oauth]` `issuer`/`client_id`.
 
