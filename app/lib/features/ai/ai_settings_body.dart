@@ -39,7 +39,7 @@ class AiSettingsBody extends StatelessWidget {
           children: [
             const SettingsHeading('AI', primary: true),
             Text(
-              'Chat with the agent, or ask AI from the / menu on any device. A computer set up to answer writes into the page.',
+              'Chat with the agent, or ask AI from the / menu on any device.',
               style: m
                   ? tsRaw(15, 21, 400, c.textSecondary)
                   : tsRaw(14, 20, 400, c.textSecondary),
@@ -67,10 +67,14 @@ class AiSettingsBody extends StatelessWidget {
               _McpSection(store: store),
             ],
             for (final section in beforeTasks) section.build(context),
-            ConnectAgentSection(
-              top: AiStore.canRun || beforeTasks.isNotEmpty ? 24 : 0,
+            // Its `notes setup` commands run in a desktop terminal.
+            if (!m)
+              ConnectAgentSection(
+                top: AiStore.canRun || beforeTasks.isNotEmpty ? 24 : 0,
+              ),
+            AgentTokensSection(
+              top: !m || AiStore.canRun || beforeTasks.isNotEmpty ? 24 : 0,
             ),
-            AgentTokensSection(top: 24),
             const SettingsHeading('Recent tasks', top: 24),
             _TaskList(store: store),
           ],

@@ -174,7 +174,7 @@ Built in the original implementation: an MCP server for the vault, AI tasks run 
 
 ### Connecting AI apps
 
-**Connect an agent** (Settings > AI, on every platform, above Agent tokens) shows one command per agent, each with Copy: `notes setup claude` for Claude Code and `notes setup codex` for Codex. Run it on the computer where that agent runs; what it does is under [Connecting with `notes setup`](#connecting-with-notes-setup). The app writes no config files and makes no network call from this section.
+**Connect an agent** (Settings > AI on desktop, above Agent tokens; hidden on phones since 2026-10-22, its commands run in a desktop terminal) shows one command per agent, each with Copy: `notes setup claude` for Claude Code and `notes setup codex` for Codex. Run it on the computer where that agent runs; what it does is under [Connecting with `notes setup`](#connecting-with-notes-setup). The app writes no config files and makes no network call from this section.
 
 For an agent with HTTP support, create a hub token in the app (Settings > AI > Agent tokens: name, tool set Read only, Read and write or Everything, expiry Never, 30, 90 or 365 days, default 90; the secret is shown once with Copy) or with `notes-hub --config <file> --agent-token add <name> --scope read|write|everything [--expires 90d]`, and configure `https://<hub>/mcp` with `Authorization: Bearer <token>`. Keep the plaintext in the client's secret configuration. Settings lists each token's creation, last use and expiry; Revoke there, or `--agent-token revoke <name>`, removes access while the server runs. These are local implementation and integration-test guarantees; they do not establish that a live hub has been deployed with this endpoint.
 

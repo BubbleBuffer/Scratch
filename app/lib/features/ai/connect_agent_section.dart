@@ -1,9 +1,9 @@
 // Settings > AI > Connect an agent: one command per agent (Claude Code and
 // Codex), each with a Copy button. The command is run on the computer where
 // that agent runs. It creates a token for the agent, adds the notes server to
-// its config and uses the Notes desktop app's hub sign-in on that computer.
-// This app writes no config files and makes no network calls here. Shown on
-// every platform.
+// its config and uses the Scratch desktop app's hub sign-in on that computer.
+// This app writes no config files and makes no network calls here. Desktop
+// only: Settings > AI leaves it out on phones.
 
 import 'package:flutter/widgets.dart';
 
@@ -29,7 +29,7 @@ class ConnectAgentSection extends StatelessWidget {
       children: [
         SettingsHeading('Connect an agent', top: top),
         Text(
-          "Run one command on the computer where the agent runs. It creates a token for that agent and adds the notes server to its config. It uses the Notes desktop app's hub sign-in on that computer.",
+          "Run one command on the computer where the agent runs. It creates a token for that agent and adds the notes server to its config. It uses the Scratch desktop app's hub sign-in on that computer.",
           style: tsRaw(13, 18, 400, c.textSecondary),
         ),
         const SizedBox(height: 12),

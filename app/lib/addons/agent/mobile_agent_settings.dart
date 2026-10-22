@@ -72,10 +72,6 @@ class MobileAgentSettings extends StatelessWidget {
                   style: tsRaw(13, 18, 400, c.textSecondary),
                 ),
               ),
-            SettingsRow(
-              label: 'Hub',
-              description: 'The agent runs on your notes hub, with its own models and sign-ins.',
-            ),
             HubSignInSettings(auth: auth),
             SettingsRow(
               label: 'Sync',

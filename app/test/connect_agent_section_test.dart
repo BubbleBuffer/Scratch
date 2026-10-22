@@ -98,16 +98,16 @@ void main() {
     await t.pump(const Duration(seconds: 3));
   });
 
-  appTest('phones show the connect an agent section too', (t) async {
+  appTest('phones do not show the connect an agent section: its commands '
+      'run in a desktop terminal', (t) async {
     await pumpApp(t, mobile: true);
     await openMobileSettings(t);
     await tapAndSettle(t, key('settings-nav-ai'));
     await real(t, () => Future<void>.delayed(const Duration(milliseconds: 20)));
     await settle(t);
-    await showSection(t);
 
-    expect(find.text('Connect an agent'), findsOneWidget);
-    expect(textOf(t, 'connect-agent-claude'), 'notes setup claude');
-    expect(textOf(t, 'connect-agent-codex'), 'notes setup codex');
+    expect(find.byKey(const ValueKey('connect-agent'), skipOffstage: false),
+        findsNothing);
+    expect(find.text('Agent tokens', skipOffstage: false), findsOneWidget);
   });
 }
