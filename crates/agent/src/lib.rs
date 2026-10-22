@@ -353,6 +353,8 @@ pub struct Agent {
     permission_file: PathBuf,
     harness: Arc<Harness>,
     gateway: gateway::GatewayRuntime,
+    /// The host relay's surface: the same tools, always native and without JS.
+    relay: gateway::GatewayRuntime,
     store: Store,
     /// `<data_dir>/agent/chat_outline.sqlite`, the notes-owned chapters and sections.
     outline_path: PathBuf,
@@ -506,6 +508,8 @@ impl Agent {
             "The agent must expose at least one tool"
         );
         let gateway = gateway::GatewayRuntime::new(&tools, execution_mode, enable_js)?;
+        let relay =
+            gateway::GatewayRuntime::new(&tools, bubblepaw_core::ExecutionMode::Native, false)?;
 
         let default_model = if config.default_model.trim().is_empty() {
             DEFAULT_MODEL.to_string()
@@ -647,6 +651,7 @@ impl Agent {
             permission_file,
             harness,
             gateway,
+            relay,
             store,
             outline_path: dir.join(vault_tools::outline::FILE_NAME),
             repl,

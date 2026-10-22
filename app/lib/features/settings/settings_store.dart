@@ -56,6 +56,11 @@ class AppSettings extends ChangeNotifier {
   /// device's settings file, never in the vault. Off by default.
   bool scheduleRunsHere = false;
 
+  /// "Let the hub use this computer" (desktop): the hub this device is
+  /// signed in to may run this computer's agent tools. Device-local, off by
+  /// default.
+  bool hubUsesThisComputer = false;
+
   /// Phones: a shake opens the feedback sheet. Device-local, on by default.
   bool shakeToSend = true;
 
@@ -117,6 +122,7 @@ class AppSettings extends ChangeNotifier {
     vaultPath = j['vaultPath'] as String?;
     _hubEnabled = j['hubEnabled'] as bool?;
     scheduleRunsHere = (j['scheduleRunsHere'] as bool?) ?? false;
+    hubUsesThisComputer = (j['hubUsesThisComputer'] as bool?) ?? false;
     shakeToSend = (j['shakeToSend'] as bool?) ?? true;
     hubAddress = (j['hubAddress'] as String?) ?? defaultHubAddress;
     clientUrl = j['clientUrl'] as String?;
@@ -157,6 +163,7 @@ class AppSettings extends ChangeNotifier {
     'vaultPath': ?vaultPath,
     'hubEnabled': ?_hubEnabled,
     'scheduleRunsHere': scheduleRunsHere,
+    'hubUsesThisComputer': hubUsesThisComputer,
     'shakeToSend': shakeToSend,
     'hubAddress': hubAddress,
     'clientUrl': ?clientUrl,

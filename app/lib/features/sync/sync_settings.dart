@@ -15,6 +15,7 @@ import '../../state/app_state.dart';
 import '../../state/sync_store.dart';
 import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
+import '../ai/ai_settings.dart' show localAgentPlatform;
 import '../settings/controls.dart';
 import '../settings/settings_screen.dart';
 import '../settings/settings_store.dart';
@@ -184,6 +185,21 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
             ],
           ),
         ],
+        // Desktop only: the hub may run this computer's agent tools.
+        if (signedIn && localAgentPlatform)
+          SettingsRow(
+            label: 'Let the hub use this computer',
+            description:
+                'AI apps connected to the hub can read and edit files and run '
+                'commands on this computer while the app is open. Off by default.',
+            trailing: Toggle(
+              key: const ValueKey('host-relay-toggle'),
+              value: s.hubUsesThisComputer,
+              onChanged: (on) => AppSettings.read(
+                context,
+              ).update((s) => s.hubUsesThisComputer = on),
+            ),
+          ),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),

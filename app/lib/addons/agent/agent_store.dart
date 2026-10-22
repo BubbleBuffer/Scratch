@@ -46,6 +46,7 @@ import '../../src/rust/api/vault.dart' as bridge
     show VaultAgentDefaults, VaultAgentModel;
 import '../../state/app_state.dart';
 import 'dev_replay.dart';
+import 'host_relay_link.dart';
 import 'agent_chat_prefs.dart';
 import 'agent_search_source.dart';
 import 'agent_search_vault.dart';
@@ -1048,12 +1049,62 @@ class AgentStore extends ChangeNotifier {
 
   void _onSettings() => _settingsChanged();
 
+  // ------------------------------- host relay
+
+  /// "Let the hub use this computer" ([HostRelayLink]).
+  final _relay = HostRelayLink();
+  HostRelayLink get relay => _relay;
+
+  /// The relay's settings while it should run: desktop, the toggle on and
+  /// signed in to an https hub.
+  HostRelayConfig? _relayConfig() {
+    if (!localAgentPlatform || _disposed) return null;
+    final app = _appSettings();
+    if (!app.hubUsesThisComputer) return null;
+    final hub = HubLink.of(app, allowLoopback: kDebugMode);
+    if (hub == null) return null;
+    final s = settings;
+    String? opt(String v) => v.trim().isEmpty ? null : v.trim();
+    final dataDir = '${_folder()}${Platform.pathSeparator}host-relay';
+    final agentSettings = AgentSettings(
+      defaultModel: '',
+      bunPath: opt(s.agentBunPath),
+      claudeCodeDir: opt(s.agentClaudeCodeDir),
+      permissionMode: bridge.AgentPermissionMode.bypass,
+      testTools: testTools,
+      desktopTools: s.desktopTools,
+      desktopRoot: s.desktopRoot.trim(),
+    );
+    return HostRelayConfig(
+      url: hub.url,
+      device: vault.deviceId,
+      token: hub.token,
+      open: () => NotesAgent.open(
+        vault: vault.raw,
+        dataDir: dataDir,
+        settings: agentSettings,
+      ),
+      key: [
+        hub.url,
+        hub.token,
+        vault.deviceId,
+        dataDir,
+        agentSettings.bunPath,
+        agentSettings.claudeCodeDir,
+        agentSettings.desktopTools,
+        agentSettings.desktopRoot,
+        testTools,
+      ].join('\u0000'),
+    );
+  }
+
   String _hubConnectionKey() {
     final hub = hubLink;
     return '${hub?.url}\u0000${hub?.token}';
   }
 
   void _settingsChanged({bool deferNotify = false}) {
+    _relay.sync(_relayConfig());
     // A new default (or a hub coming or going) brings the tab back to it.
     final def = defaultHost;
     if (def != _seenDefault) {
@@ -1988,6 +2039,7 @@ class AgentStore extends ChangeNotifier {
     unawaited(_search?.close());
     _settings.removeListener(_onSettings);
     _app?.removeListener(_onSettings);
+    unawaited(_relay.close());
     if (_agent != null || _sub != null) unawaited(_close());
     unawaited(_uiActions.close());
     _stores[vault] = null;

@@ -67,6 +67,7 @@ fn page_named(vault: &vault_core::Vault, name: &str) -> Option<String> {
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 const UNAVAILABLE: &str = "The agent is not available on this device";
+const RELAY_LOCAL_ONLY: &str = "Only the agent on this computer can be used by the hub";
 const REMOTE_TASKS: &str =
     "AI tasks run with the agent on this computer; the agent here runs on the hub";
 
@@ -107,6 +108,32 @@ impl Inner {
 
     pub(crate) fn connect(url: String, device: String, token: String) -> Result<Inner, String> {
         crate::agent_remote::Remote::connect(url, device, token).map(Inner::Remote)
+    }
+
+    /// Lets the hub at `url` use this computer (`/host/ws`). Only the agent
+    /// on this computer can be a host.
+    pub(crate) fn host_relay_start(
+        &self,
+        url: String,
+        device: String,
+        token: String,
+    ) -> Result<(), String> {
+        match self {
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            Inner::Local(l) => l.host_relay_start(url, device, token),
+            Inner::Remote(_) => {
+                let _ = (url, device, token);
+                Err(RELAY_LOCAL_ONLY.into())
+            }
+        }
+    }
+
+    pub(crate) fn host_relay_stop(&self) -> Result<(), String> {
+        match self {
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            Inner::Local(l) => l.host_relay_stop(),
+            Inner::Remote(_) => Ok(()),
+        }
     }
 
     pub(crate) fn host_info(&self) -> Result<AgentHostInfo, String> {
@@ -297,7 +324,11 @@ mod desktop {
 
     /// The agent on this computer. Commands name the client `desktop`. Schedules are
     /// not run here: the vault's local runner runs them, whether or not this agent is open.
-    pub(crate) struct Local(Arc<Agent>);
+    pub(crate) struct Local(
+        Arc<Agent>,
+        /// The host relay ("Let the hub use this computer"), while it runs.
+        std::sync::Mutex<Option<crate::host_relay::HostRelay>>,
+    );
 
     /// The answer to every local schedule call.
     const SCHEDULES_IN_VAULT: &str =
@@ -345,11 +376,42 @@ mod desktop {
                 tool_set: None,
             };
             let agent = Agent::open(vault.inner.clone(), config).map_err(e)?;
-            Ok(Local(Arc::new(agent)))
+            Ok(Local(Arc::new(agent), std::sync::Mutex::new(None)))
         }
 
         pub(crate) fn host_info(&self) -> Result<AgentHostInfo, String> {
             Ok(self.0.host_info().into())
+        }
+
+        /// Starts (or restarts) the host relay to the hub at `url`.
+        pub(crate) fn host_relay_start(
+            &self,
+            url: String,
+            device: String,
+            token: String,
+        ) -> Result<(), String> {
+            let mut relay = self.1.lock().unwrap();
+            if let Some(mut old) = relay.take() {
+                old.stop();
+            }
+            let host: Arc<dyn crate::host_relay::RelayHost> = self.0.clone();
+            *relay = Some(crate::host_relay::HostRelay::start(
+                host, &url, &device, &token,
+            )?);
+            Ok(())
+        }
+
+        pub(crate) fn host_relay_stop(&self) -> Result<(), String> {
+            if let Some(mut relay) = self.1.lock().unwrap().take() {
+                relay.stop();
+            }
+            Ok(())
+        }
+
+        /// The relay's host surface (tests).
+        #[cfg(test)]
+        pub(crate) fn relay_host(&self) -> Arc<dyn crate::host_relay::RelayHost> {
+            self.0.clone()
         }
 
         pub(crate) fn claude_detection(&self) -> AgentClaudeDetection {
@@ -598,6 +660,57 @@ mod desktop {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn the_relay_offers_the_desktop_pack_and_runs_it_without_approval() {
+            let root = std::env::temp_dir()
+                .join(format!("notes_bridge_relay_host_{}", vault_core::new_id()));
+            let files = root.join("files");
+            std::fs::create_dir_all(&files).unwrap();
+            let vault = NotesVault::open(
+                root.join("vault").to_string_lossy().into_owned(),
+                None,
+            )
+            .unwrap();
+            let agent = Local::open(
+                &vault,
+                root.join("state").to_string_lossy().into_owned(),
+                AgentSettings {
+                    default_model: String::new(),
+                    bun_path: None,
+                    claude_code_dir: None,
+                    permission_mode: AgentPermissionMode::Manual,
+                    desktop_tools: true,
+                    desktop_root: files.to_string_lossy().into_owned(),
+                    test_tools: false,
+                },
+            )
+            .unwrap();
+            let host = agent.relay_host();
+            let names: Vec<String> = host.tools(None).unwrap().into_iter().map(|t| t.name).collect();
+            for tool in ["read", "write", "edit", "exec"] {
+                assert!(names.iter().any(|n| n == tool), "{tool} missing from {names:?}");
+            }
+            let session = host.open_session().unwrap();
+            let target = files.join("from-hub.txt");
+            let result = host
+                .call(
+                    &session,
+                    "write",
+                    serde_json::json!({"path": target.to_string_lossy(), "content": "hello"}),
+                    notes_agent_wire::host::Caller { id: "oauth:test".into(), name: None },
+                    vault_agent::bubblepaw_core::CancellationToken::new(),
+                )
+                .unwrap();
+            assert!(!result.is_error && !result.pending, "{}", result.content);
+            assert_eq!(std::fs::read_to_string(&target).unwrap(), "hello");
+            host.close_session(&session).unwrap();
+            assert!(agent.host_relay_stop().is_ok());
+            drop(host);
+            drop(agent);
+            drop(vault);
+            std::fs::remove_dir_all(root).ok();
+        }
 
         #[test]
         fn local_agent_schedule_calls_point_to_the_vault() {

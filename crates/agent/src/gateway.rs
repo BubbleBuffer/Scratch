@@ -195,15 +195,49 @@ impl crate::Agent {
     /// The private session never executes tools and is removed on success/error;
     /// listing repeatedly cannot accumulate sessions or allocate JS heaps.
     pub fn gateway_tool_definitions_for_discovery(&self) -> Result<Vec<ToolDefinition>> {
-        let harness = self
-            .gateway
-            .harness(self.store.clone(), self.current_policy())?;
+        self.discover(&self.gateway, self.current_policy())
+    }
+
+    fn discover(
+        &self,
+        gateway: &GatewayRuntime,
+        policy: ApprovalPolicy,
+    ) -> Result<Vec<ToolDefinition>> {
+        let harness = gateway.harness(self.store.clone(), policy)?;
         let session = self.store.create_session("MCP tool discovery")?;
-        let definitions = self.gateway.definitions(&harness, &session.id);
+        let definitions = gateway.definitions(&harness, &session.id);
         self.runtime
             .block_on(harness.delete_session(&session.id))
             .context("remove private gateway discovery session")?;
         definitions
+    }
+
+    /// The host relay's tools (the hub's `/mcp/agent?host=<this computer>`):
+    /// this host's own tools as native entrypoints, under Bypass, with the
+    /// gateway's exclusions. `None` lists them for discovery.
+    pub fn relay_tool_definitions(&self, session: Option<&str>) -> Result<Vec<ToolDefinition>> {
+        let policy = crate::permission_policy(crate::PermissionMode::Bypass);
+        match session {
+            Some(session) => {
+                let harness = self.relay.harness(self.store.clone(), policy)?;
+                self.relay.definitions(&harness, session)
+            }
+            None => self.discover(&self.relay, policy),
+        }
+    }
+
+    /// Runs one relay tool under Bypass, like [`Self::gateway_call_as`];
+    /// `cancel` stops it.
+    pub fn relay_call(
+        &self,
+        session: &str,
+        name: &str,
+        input: Value,
+        client: ClientInfo,
+        cancel: CancellationToken,
+    ) -> Result<ToolResult> {
+        let policy = crate::permission_policy(crate::PermissionMode::Bypass);
+        self.call_on(&self.relay, policy, session, name, input, client, cancel)
     }
 
     /// The actual BubblePaw js schema and generated reference, with only this
@@ -279,6 +313,29 @@ impl crate::Agent {
         input: Value,
         client: ClientInfo,
     ) -> Result<ToolResult> {
+        let policy = self.current_policy();
+        self.call_on(
+            &self.gateway,
+            policy,
+            session,
+            name,
+            input,
+            client,
+            CancellationToken::new(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn call_on(
+        &self,
+        gateway: &GatewayRuntime,
+        policy: ApprovalPolicy,
+        session: &str,
+        name: &str,
+        input: Value,
+        client: ClientInfo,
+        cancel: CancellationToken,
+    ) -> Result<ToolResult> {
         self.store.session(session)?;
         if let Some(subject) = client
             .id
@@ -293,11 +350,8 @@ impl crate::Agent {
             self.records
                 .bind_session_actor(session, &client.id, format!("oauth:{author}"))?;
         }
-        let harness = self
-            .gateway
-            .harness(self.store.clone(), self.current_policy())?;
-        let tool_names = self
-            .gateway
+        let harness = gateway.harness(self.store.clone(), policy)?;
+        let tool_names = gateway
             .definitions(&harness, session)?
             .into_iter()
             .map(|tool| tool.name)
@@ -311,7 +365,7 @@ impl crate::Agent {
                 client: Some(client),
                 ..RunOptions::default()
             },
-            CancellationToken::new(),
+            cancel,
         ))
     }
 

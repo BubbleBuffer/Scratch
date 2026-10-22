@@ -718,6 +718,21 @@ impl NotesAgent {
         })
     }
 
+    /// "Let the hub use this computer": keeps one socket open to the hub at
+    /// `url` (`/host/ws`) as device `device` with its device token, so
+    /// `/mcp/agent?host=<this device's name>` runs this agent's tools here
+    /// (desktop pack included, no approval prompts). Restarts a running
+    /// relay; drops reconnect with backoff. Fails on a hub connection.
+    pub fn host_relay_start(&self, url: String, device: String, token: String) -> Result<(), String> {
+        self.inner.host_relay_start(url, device, token)
+    }
+
+    /// Stops the host relay: the socket closes and running calls are
+    /// cancelled. Dropping the agent stops it too.
+    pub fn host_relay_stop(&self) -> Result<(), String> {
+        self.inner.host_relay_stop()
+    }
+
     /// Capabilities of the connected host.
     pub fn host_info(&self) -> Result<AgentHostInfo, String> {
         self.inner.host_info()

@@ -8,6 +8,7 @@ pub mod agent;
 mod agent_token_api;
 pub mod agent_tokens;
 pub mod config;
+mod hosts;
 mod jobs;
 mod login;
 mod mcp;
@@ -56,6 +57,8 @@ pub(crate) struct AppState {
     /// The `/.well-known/assetlinks.json` body; None serves no route.
     pub assetlinks: Option<String>,
     pub mcp_agent: mcp_agent::Gateway,
+    /// Desktops connected at `/host/ws` as execution hosts.
+    pub hosts: hosts::Hosts,
     pub scheduler: Option<Arc<vault_agent::schedules::Scheduler>>,
     schedule_runner: std::sync::Mutex<Option<vault_agent::schedules::RunningScheduler>>,
     /// The jobs API (`jobs` tool) and its worker's state.
@@ -103,6 +106,18 @@ impl Server {
         self.state.agent.socket_count()
     }
 
+    /// Desktops connected as execution hosts (tests).
+    #[doc(hidden)]
+    pub fn hosts_online(&self) -> usize {
+        self.state.hosts.online()
+    }
+
+    /// Test hook: how long a relayed host call may take (10 min).
+    #[doc(hidden)]
+    pub fn set_host_call_timeout(&self, timeout: std::time::Duration) {
+        self.state.hosts.set_call_timeout(timeout);
+    }
+
     /// Stops accepting, ends long-polls and agent sockets, waits for open
     /// requests and shuts the agent down.
     pub async fn stop(mut self) {
@@ -110,6 +125,7 @@ impl Server {
         self.state.jobs.stop();
         let runner = self.state.schedule_runner.lock().unwrap().take();
         let _ = tokio::task::spawn_blocking(move || drop(runner)).await;
+        self.state.hosts.shutdown();
         if let Some(s) = self.stop.take() {
             let _ = s.send(());
         }
@@ -245,6 +261,7 @@ pub async fn start_with(
             config.mcp_agent_enabled,
             config.mcp_agent_default_host.clone(),
         ),
+        hosts: hosts::Hosts::new(),
         scheduler,
         schedule_runner: std::sync::Mutex::new(schedule_runner),
         jobs: jobs::Jobs::new(
@@ -350,6 +367,7 @@ fn router(state: Arc<AppState>) -> Router {
         .route("/auth/redeem", post(login::redeem))
         .route("/auth/signout", post(login::signout))
         .route("/agent/ws", get(agent::ws))
+        .route("/host/ws", get(hosts::ws))
         .route(
             "/agent-tokens",
             get(agent_token_api::list).post(agent_token_api::create),

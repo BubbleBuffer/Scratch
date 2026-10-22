@@ -431,6 +431,7 @@ pub(crate) async fn signout(State(state): State<Arc<AppState>>, headers: HeaderM
         Ok(Ok(true)) => {
             // The device's agent sockets end with its token.
             state.agent.close_token(&token);
+            state.hosts.close_token(&token);
             StatusCode::NO_CONTENT.into_response()
         }
         Ok(Ok(false)) => json_error(StatusCode::UNAUTHORIZED, "unknown token"),

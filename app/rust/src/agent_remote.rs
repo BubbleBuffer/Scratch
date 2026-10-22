@@ -36,7 +36,7 @@ const SILENCE: Duration = Duration::from_secs(90);
 const BACKOFF_FIRST: Duration = Duration::from_secs(1);
 const BACKOFF_MAX: Duration = Duration::from_secs(30);
 
-type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
+pub(crate) type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 type Reply = Result<Value, String>;
 
 /// Receives events; returning false drops it.
@@ -102,6 +102,33 @@ pub(crate) fn ws_url(base: &str) -> Result<String, String> {
         return Err(format!("not an http(s) hub URL: {base:?}"));
     };
     Ok(format!("{rest}/agent/ws"))
+}
+
+/// The hub's `/host/ws` for `base` (the host relay, `host_relay.rs`).
+#[cfg_attr(not(any(target_os = "windows", target_os = "linux")), allow(dead_code))]
+pub(crate) fn host_ws_url(base: &str) -> Result<String, String> {
+    let agent = ws_url(base)?;
+    Ok(format!(
+        "{}{}",
+        agent.trim_end_matches("/agent/ws"),
+        notes_agent_wire::host::PATH
+    ))
+}
+
+/// Opens a socket to `url` as `device` with its device token, like the
+/// agent connection does (same TLS roots, timeout and refusal messages).
+#[cfg_attr(not(any(target_os = "windows", target_os = "linux")), allow(dead_code))]
+pub(crate) async fn open_device_socket(
+    url: &str,
+    device: &str,
+    token: &str,
+) -> Result<Socket, String> {
+    open_socket(&Target {
+        url: url.to_owned(),
+        device: device.to_owned(),
+        token: token.to_owned(),
+    })
+    .await
 }
 
 fn tls() -> tokio_tungstenite::Connector {
@@ -823,6 +850,10 @@ mod tests {
         );
         assert_eq!(ws_url("https://h/base").unwrap(), "wss://h/base/agent/ws");
         assert!(ws_url("ftp://h").is_err());
+        assert_eq!(
+            host_ws_url("https://h/base/").unwrap(),
+            "wss://h/base/host/ws"
+        );
     }
 
     #[test]

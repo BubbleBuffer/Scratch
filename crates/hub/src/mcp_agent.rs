@@ -1,5 +1,6 @@
-//! OAuth-only MCP gateway for vault tools and the embedded host's advertised tools.
-use std::collections::HashMap;
+//! OAuth-only MCP gateway for vault tools and the advertised tools of the
+//! embedded host (`hub`) or a desktop connected at `/host/ws`.
+use std::collections::{BTreeSet, HashMap};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -10,8 +11,10 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Value};
 use vault_agent::bubblepaw_core::{ClientInfo, ToolDefinition};
+use vault_agent::wire::notes_agent_wire::host as relay;
 
 use crate::agent::Shared;
+use crate::hosts::{self, HostConn, Hosts, Lookup};
 use crate::mcp_log;
 use crate::mcp_oauth::AuthError;
 use crate::AppState;
@@ -20,10 +23,16 @@ const SESSION_HEADER: &str = "mcp-session-id";
 const MAX_BODY: usize = 8 << 20;
 const MAX_SESSIONS: usize = 256;
 const SESSION_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+/// Listing a desktop host's tools or closing its session.
+const HOST_QUICK_TIMEOUT: Duration = Duration::from_secs(30);
 
 struct Session {
     owner: String,
     agent_session: String,
+    /// The opaque session id desktop hosts see for this session.
+    relay_id: String,
+    /// Desktop hosts that ran a call in this session; closed with it.
+    remote_hosts: Mutex<BTreeSet<String>>,
     touched: Mutex<Instant>,
     gate: tokio::sync::Mutex<()>,
     closed: AtomicBool,
@@ -60,7 +69,7 @@ impl Gateway {
         Some(session.clone())
     }
 
-    async fn reap(&self, agent: &Shared) {
+    async fn reap(&self, agent: &Shared, hosts: &Hosts) {
         let expired: Vec<_> = {
             let sessions = self.sessions.lock().unwrap();
             sessions
@@ -75,6 +84,7 @@ impl Gateway {
         };
         for (id, session) in expired {
             session.closed.store(true, Ordering::SeqCst);
+            close_remote(hosts, &session).await;
             if cleanup(agent.clone(), session).await {
                 self.sessions.lock().unwrap().remove(&id);
             }
@@ -110,6 +120,28 @@ async fn cleanup(agent: Shared, session: Arc<Session>) -> bool {
     }
 }
 
+/// Ends the session's counterpart on every desktop host it used. Best effort:
+/// a desktop also closes its relay sessions when its socket drops.
+async fn close_remote(hosts: &Hosts, session: &Session) {
+    let names: Vec<String> = std::mem::take(&mut *session.remote_hosts.lock().unwrap())
+        .into_iter()
+        .collect();
+    for name in names {
+        if let Lookup::Online(conn) = hosts.lookup(&name) {
+            let params = relay::CloseParams {
+                session: session.relay_id.clone(),
+            };
+            let _ = conn
+                .request(
+                    relay::method::CLOSE,
+                    serde_json::to_value(params).unwrap_or_default(),
+                    HOST_QUICK_TIMEOUT,
+                )
+                .await;
+        }
+    }
+}
+
 fn rpc_error(id: Value, code: i64, message: &str) -> Value {
     json!({"jsonrpc":"2.0","id":id,"error":{"code":code,"message":message}})
 }
@@ -127,8 +159,26 @@ fn tool_result(id: Value, outcome: Result<String, String>) -> Value {
     )
 }
 
-fn unavailable_host(host: &str, why: &str) -> String {
-    format!("Host {host:?} is unavailable: {why}. Available hosts: hub")
+fn unavailable_host(state: &AppState, host: &str, why: &str) -> String {
+    let mut available = vec!["hub".to_owned()];
+    available.extend(
+        state
+            .hosts
+            .list()
+            .into_iter()
+            .filter(|(_, online)| *online)
+            .map(|(name, _)| name),
+    );
+    format!(
+        "Host {host:?} is unavailable: {why}. Available hosts: {}",
+        available.join(", ")
+    )
+}
+
+/// Where a session's host tools run.
+enum Target {
+    Hub(Shared),
+    Remote(Arc<HostConn>),
 }
 
 fn selected_host(state: &AppState, args: &Value, query: Option<&str>) -> Result<String, String> {
@@ -142,7 +192,7 @@ fn selected_host(state: &AppState, args: &Value, query: Option<&str>) -> Result<
     // `mcp_agent_default_host`, then `hub`.
     let selected = match args.get("host") {
         Some(Value::String(host)) => host.clone(),
-        Some(_) => return Err("host must be a string. Available hosts: hub".into()),
+        Some(_) => return Err("host must be a string; call hosts for the list".into()),
         None => match url_host {
             Some(host) => host,
             None => state.agent.vault_default_host().unwrap_or_else(|| {
@@ -157,30 +207,65 @@ fn selected_host(state: &AppState, args: &Value, query: Option<&str>) -> Result<
     Ok(selected)
 }
 
-async fn host(state: &AppState, args: &Value, query: Option<&str>) -> Result<Shared, String> {
+async fn host(state: &AppState, args: &Value, query: Option<&str>) -> Result<Target, String> {
     let selected = selected_host(state, args, query)?;
-    if selected != "hub" {
-        return Err(unavailable_host(&selected, "unknown host"));
+    if selected == "hub" {
+        return state
+            .agent
+            .get()
+            .await
+            .map(Target::Hub)
+            .map_err(|why| unavailable_host(state, &selected, &why));
     }
-    state
-        .agent
-        .get()
-        .await
-        .map_err(|why| unavailable_host(&selected, &why))
+    match state.hosts.lookup(&selected) {
+        Lookup::Online(conn) => Ok(Target::Remote(conn)),
+        Lookup::Offline => Err(hosts::offline(&selected)),
+        Lookup::Unknown => Err(unavailable_host(state, &selected, "unknown host")),
+    }
 }
 
 async fn host_definitions(
-    agent: Shared,
+    target: &Target,
     session: Option<&Arc<Session>>,
 ) -> Result<Vec<ToolDefinition>, String> {
-    let session = session.map(|session| session.agent_session.clone());
-    tokio::task::spawn_blocking(move || match session {
-        Some(session) => agent.gateway_tool_definitions(&session),
-        None => agent.gateway_tool_definitions_for_discovery(),
-    })
-    .await
-    .map_err(|_| "Host discovery failed".to_owned())?
-    .map_err(|error| error.to_string())
+    match target {
+        Target::Hub(agent) => {
+            let agent = agent.clone();
+            let session = session.map(|session| session.agent_session.clone());
+            tokio::task::spawn_blocking(move || match session {
+                Some(session) => agent.gateway_tool_definitions(&session),
+                None => agent.gateway_tool_definitions_for_discovery(),
+            })
+            .await
+            .map_err(|_| "Host discovery failed".to_owned())?
+            .map_err(|error| error.to_string())
+        }
+        Target::Remote(conn) => {
+            let params = relay::ToolsParams {
+                session: session.map(|session| session.relay_id.clone()),
+            };
+            let reply = conn
+                .request(
+                    relay::method::TOOLS,
+                    serde_json::to_value(params).unwrap_or_default(),
+                    HOST_QUICK_TIMEOUT,
+                )
+                .await?;
+            let listed: relay::ToolsResult = serde_json::from_value(reply)
+                .map_err(|_| format!("{} sent an invalid tool list", conn.name))?;
+            Ok(listed
+                .tools
+                .into_iter()
+                .map(|tool| ToolDefinition {
+                    name: tool.name,
+                    description: tool.description,
+                    input_schema: tool.input_schema,
+                    read_only: tool.read_only,
+                    approval: Default::default(),
+                })
+                .collect())
+        }
+    }
 }
 
 fn list_tools(definitions: Vec<ToolDefinition>) -> Result<Vec<Value>, String> {
@@ -304,6 +389,7 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
             return (StatusCode::BAD_REQUEST, "Mcp-Session-Id required").into_response();
         };
         session.closed.store(true, Ordering::SeqCst);
+        close_remote(&state.hosts, &session).await;
         if let Ok(agent) = state.agent.get().await {
             if cleanup(agent, session).await {
                 state
@@ -368,12 +454,12 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
             Err(why) => {
                 return (
                     StatusCode::SERVICE_UNAVAILABLE,
-                    Json(rpc_error(id, -32000, &unavailable_host("hub", &why))),
+                    Json(rpc_error(id, -32000, &unavailable_host(&state, "hub", &why))),
                 )
                     .into_response()
             }
         };
-        state.mcp_agent.reap(&agent).await;
+        state.mcp_agent.reap(&agent, &state.hosts).await;
         let slot = match state.mcp_agent.slots.clone().try_acquire_owned() {
             Ok(slot) => slot,
             Err(_) => {
@@ -396,6 +482,8 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
             Arc::new(Session {
                 owner: user.sub,
                 agent_session,
+                relay_id: vault_core::new_id().to_string(),
+                remote_hosts: Mutex::new(BTreeSet::new()),
                 touched: Mutex::new(Instant::now()),
                 gate: tokio::sync::Mutex::new(()),
                 closed: AtomicBool::new(false),
@@ -421,7 +509,7 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
         "ping" => result(id, json!({})),
         "tools/list" => match host(&state, &json!({}), query.as_deref()).await {
             Err(why) => rpc_error(id, -32000, &why),
-            Ok(agent) => match host_definitions(agent, session.as_ref())
+            Ok(target) => match host_definitions(&target, session.as_ref())
                 .await
                 .and_then(list_tools)
             {
@@ -443,19 +531,29 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
                 } else {
                     match selected_host(&state, &args, query.as_deref()) {
                         Err(error) => tool_result(id, Err(error)),
-                        Ok(selected) if selected != "hub" => {
-                            tool_result(id, Err(unavailable_host(&selected, "unknown host")))
+                        Ok(selected)
+                            if selected != "hub"
+                                && matches!(state.hosts.lookup(&selected), Lookup::Unknown) =>
+                        {
+                            tool_result(id, Err(unavailable_host(&state, &selected, "unknown host")))
                         }
-                        Ok(selected) => tool_result(id, Ok(json!([{
-                            "name":"hub", "online":state.agent.get().await.is_ok(), "default":selected == "hub"
-                        }]).to_string())),
+                        Ok(selected) => {
+                            let mut list = vec![json!({
+                                "name":"hub", "online":state.agent.get().await.is_ok(), "default":selected == "hub"
+                            })];
+                            for (name, online) in state.hosts.list() {
+                                let default = selected == name;
+                                list.push(json!({"name":name, "online":online, "default":default}));
+                            }
+                            tool_result(id, Ok(Value::Array(list).to_string()))
+                        }
                     }
                 }
             } else {
                 match host(&state, &args, query.as_deref()).await {
                     Err(error) => tool_result(id, Err(error)),
-                    Ok(agent) => {
-                        let definitions = host_definitions(agent.clone(), session.as_ref()).await;
+                    Ok(target) => {
+                        let definitions = host_definitions(&target, session.as_ref()).await;
                         let tools = match definitions.and_then(list_tools) {
                             Ok(tools) => tools,
                             Err(error) => {
@@ -485,7 +583,16 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
                                     "js_help accepts optional string query and host",
                                 )
                             } else {
-                                tool_result(id, Ok(agent.gateway_js_help(args["query"].as_str())))
+                                match &target {
+                                    Target::Hub(agent) => tool_result(
+                                        id,
+                                        Ok(agent.gateway_js_help(args["query"].as_str())),
+                                    ),
+                                    Target::Remote(conn) => tool_result(
+                                        id,
+                                        Err(format!("js_help is not offered by {}", conn.name)),
+                                    ),
+                                }
                             }
                         } else {
                             let Some(session) = session else {
@@ -515,7 +622,6 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
                                 }
                                 return StatusCode::NOT_FOUND.into_response();
                             }
-                            let agent_session = session.agent_session.clone();
                             let mut arguments = args;
                             arguments.as_object_mut().unwrap().remove("host");
                             let name = name.to_owned();
@@ -523,12 +629,35 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
                                 id: format!("oauth:{}", user.sub),
                                 name: Some(user.email.unwrap_or(user.sub)),
                             };
-                            match tokio::task::spawn_blocking(move || {
-                                agent.gateway_call_as(&agent_session, &name, arguments, client)
-                            })
-                            .await
-                            {
-                                Ok(Ok(outcome)) => result(
+                            let outcome = match target {
+                                Target::Hub(agent) => {
+                                    let agent_session = session.agent_session.clone();
+                                    match tokio::task::spawn_blocking(move || {
+                                        agent.gateway_call_as(&agent_session, &name, arguments, client)
+                                    })
+                                    .await
+                                    {
+                                        Ok(Ok(outcome)) => Ok(relay::CallResult {
+                                            content: outcome.content,
+                                            is_error: outcome.is_error,
+                                            pending: outcome.pending,
+                                        }),
+                                        Ok(Err(error)) => Err(error.to_string()),
+                                        Err(_) => Err("Host tool execution failed".into()),
+                                    }
+                                }
+                                Target::Remote(conn) => {
+                                    session
+                                        .remote_hosts
+                                        .lock()
+                                        .unwrap()
+                                        .insert(conn.name.clone());
+                                    call_remote(&state, &conn, &session, name, arguments, client)
+                                        .await
+                                }
+                            };
+                            match outcome {
+                                Ok(outcome) => result(
                                     id,
                                     json!({
                                         "content":[{"type":"text","text":outcome.content}],
@@ -536,8 +665,7 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
                                         "_meta":{"notes/pending":outcome.pending}
                                     }),
                                 ),
-                                Ok(Err(error)) => tool_result(id, Err(error.to_string())),
-                                Err(_) => tool_result(id, Err("Host tool execution failed".into())),
+                                Err(error) => tool_result(id, Err(error)),
                             }
                         }
                     }
@@ -554,4 +682,32 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
         );
     }
     Json(reply).into_response()
+}
+
+/// Runs one host tool on a desktop, within the hub's call timeout.
+async fn call_remote(
+    state: &AppState,
+    conn: &HostConn,
+    session: &Session,
+    name: String,
+    arguments: Value,
+    client: ClientInfo,
+) -> Result<relay::CallResult, String> {
+    let params = relay::CallParams {
+        session: session.relay_id.clone(),
+        name,
+        arguments,
+        caller: relay::Caller {
+            id: client.id,
+            name: client.name,
+        },
+    };
+    let reply = conn
+        .request(
+            relay::method::CALL,
+            serde_json::to_value(params).unwrap_or_default(),
+            state.hosts.call_timeout(),
+        )
+        .await?;
+    serde_json::from_value(reply).map_err(|_| format!("{} sent an invalid result", conn.name))
 }

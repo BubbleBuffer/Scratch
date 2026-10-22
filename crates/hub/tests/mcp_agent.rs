@@ -1660,3 +1660,331 @@ async fn vault_default_runner_replaces_the_configured_default_host() {
     );
     env.stop().await;
 }
+
+// ------------------------------------------------- desktop hosts (/host/ws)
+
+/// What a scripted desktop answers to one request: a result, or nothing
+/// (the request then waits for the hub's timeout).
+type Script = Arc<dyn Fn(&notes_agent_wire::Request) -> Option<Value> + Send + Sync>;
+
+/// A scripted desktop over a real `/host/ws` socket. It records every frame
+/// the hub sends.
+struct FakeHost {
+    seen: Arc<std::sync::Mutex<Vec<Value>>>,
+    closed: Arc<tokio::sync::Notify>,
+    is_closed: Arc<std::sync::atomic::AtomicBool>,
+    stop: Option<oneshot::Sender<()>>,
+}
+
+impl FakeHost {
+    async fn connect(base: &str, token: &str, device: &str, script: Script) -> FakeHost {
+        use futures_util::{SinkExt, StreamExt};
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        use tokio_tungstenite::tungstenite::http::HeaderValue;
+        use tokio_tungstenite::tungstenite::Message;
+        let url = format!("{}/host/ws", base.replacen("http://", "ws://", 1));
+        let mut req = url.into_client_request().unwrap();
+        req.headers_mut().insert(
+            "Authorization",
+            HeaderValue::from_str(&format!("Bearer {token}")).unwrap(),
+        );
+        req.headers_mut()
+            .insert("X-Device", HeaderValue::from_str(device).unwrap());
+        let (socket, _) = tokio_tungstenite::connect_async(req).await.unwrap();
+        let (mut sink, mut stream) = socket.split();
+        let seen: Arc<std::sync::Mutex<Vec<Value>>> = Arc::default();
+        let closed = Arc::new(tokio::sync::Notify::new());
+        let is_closed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (stop_tx, mut stop_rx) = oneshot::channel::<()>();
+        let (seen2, closed2, is_closed2) = (seen.clone(), closed.clone(), is_closed.clone());
+        tokio::spawn(async move {
+            loop {
+                let frame = tokio::select! {
+                    _ = &mut stop_rx => {
+                        let _ = sink.send(Message::Close(None)).await;
+                        break;
+                    }
+                    frame = stream.next() => frame,
+                };
+                let text = match frame {
+                    Some(Ok(Message::Text(text))) => text,
+                    Some(Ok(Message::Close(_))) | None | Some(Err(_)) => break,
+                    Some(Ok(_)) => continue,
+                };
+                let value: Value = serde_json::from_str(text.as_str()).unwrap();
+                seen2.lock().unwrap().push(value.clone());
+                if value.get("id").is_none() {
+                    continue;
+                }
+                let request: notes_agent_wire::Request = serde_json::from_value(value).unwrap();
+                if let Some(result) = script(&request) {
+                    let reply = notes_agent_wire::Response::ok(request.id.clone(), result);
+                    let text = serde_json::to_string(&reply).unwrap();
+                    if sink.send(Message::Text(text.into())).await.is_err() {
+                        break;
+                    }
+                }
+            }
+            is_closed2.store(true, std::sync::atomic::Ordering::SeqCst);
+            closed2.notify_waiters();
+        });
+        FakeHost {
+            seen,
+            closed,
+            is_closed,
+            stop: Some(stop_tx),
+        }
+    }
+
+    /// Closes the socket from the desktop's side.
+    fn disconnect(&mut self) {
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+    }
+
+    async fn wait_closed(&self) {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        while !self.is_closed.load(std::sync::atomic::Ordering::SeqCst) {
+            assert!(tokio::time::Instant::now() < deadline, "socket stayed open");
+            let _ = tokio::time::timeout(Duration::from_millis(50), self.closed.notified()).await;
+        }
+    }
+
+    fn seen(&self, method: &str) -> Vec<Value> {
+        self.seen
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|frame| frame["method"] == method)
+            .cloned()
+            .collect()
+    }
+}
+
+/// A desktop offering one `read` tool that answers `answer`.
+fn reader(answer: &'static str) -> Script {
+    Arc::new(move |request| match request.method.as_str() {
+        "tools" => Some(json!({"tools":[{
+            "name":"read",
+            "description":"Reads a file in the current project.",
+            "input_schema":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},
+            "read_only":true
+        }]})),
+        "call" => Some(json!({"content":answer,"is_error":false,"pending":false})),
+        "close_session" => Some(Value::Null),
+        _ => None,
+    })
+}
+
+async fn wait_online(env: &Env, count: usize) {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    while env.server.hosts_online() != count {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "expected {count} hosts online, have {}",
+            env.server.hosts_online()
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}
+
+fn hosts_list(reply: &Value) -> Vec<Value> {
+    serde_json::from_str::<Vec<Value>>(&success_text(reply)).unwrap()
+}
+
+#[tokio::test]
+async fn a_desktop_host_registers_lists_and_runs_a_routed_call() {
+    let env = Env::new().await;
+    let (device_token, name) = env.server.hub().login_device("dev-pc", "work-pc").unwrap();
+    assert_eq!(name, "work-pc");
+    let host = FakeHost::connect(&env.base, &device_token, "dev-pc", reader("file body")).await;
+    wait_online(&env, 1).await;
+    let token = env.ann();
+
+    let at_host = format!("{}?host=work-pc", env.url);
+    let reply = env.call_at(&at_host, &token, None, "hosts", json!({})).await;
+    let hosts = hosts_list(&reply);
+    assert!(
+        hosts.contains(&json!({"name":"work-pc","online":true,"default":true})),
+        "{hosts:?}"
+    );
+    assert!(hosts.iter().any(|h| h["name"] == "hub" && h["default"] == false));
+
+    // Discovery lists the desktop's tools next to the hub's vault tools.
+    let response = env
+        .send_at(&at_host, Some(&token), None, rpc("tools/list", json!({})))
+        .await;
+    let listed: Value = response.json().await.unwrap();
+    let names: BTreeSet<_> = listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap().to_owned())
+        .collect();
+    assert!(names.contains("read") && names.contains("read_page") && names.contains("hosts"));
+
+    let session = env.initialize(&token).await;
+    let reply = env
+        .call_at(&at_host, &token, Some(&session), "read", json!({"path":"notes.txt"}))
+        .await;
+    assert_eq!(success_text(&reply), "file body");
+    // The host argument also selects it, from the plain URL.
+    let reply = env
+        .call(&token, Some(&session), "read", json!({"path":"b.txt","host":"work-pc"}))
+        .await;
+    assert_eq!(success_text(&reply), "file body");
+
+    let calls = host.seen("call");
+    assert_eq!(calls.len(), 2, "{calls:?}");
+    let params = &calls[0]["params"];
+    assert_eq!(params["name"], "read");
+    assert_eq!(params["arguments"], json!({"path":"notes.txt"}));
+    assert_eq!(params["caller"]["id"], "oauth:ann-sub");
+    let relay_session = params["session"].as_str().unwrap();
+    assert!(!relay_session.is_empty() && relay_session != session);
+    assert_eq!(calls[1]["params"]["session"], relay_session);
+    assert_eq!(calls[1]["params"]["arguments"], json!({"path":"b.txt"}));
+
+    // Closing the MCP session closes its counterpart on the desktop.
+    let response = env
+        .client
+        .delete(&env.url)
+        .bearer_auth(&token)
+        .header(SESSION, &session)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    let closes = host.seen("close_session");
+    assert_eq!(closes.len(), 1, "{closes:?}");
+    assert_eq!(closes[0]["params"]["session"], relay_session);
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn a_closed_host_connection_goes_offline_with_a_clear_error() {
+    let env = Env::new().await;
+    let (device_token, _) = env.server.hub().login_device("dev-pc", "work-pc").unwrap();
+    let mut host = FakeHost::connect(&env.base, &device_token, "dev-pc", reader("x")).await;
+    wait_online(&env, 1).await;
+    let token = env.ann();
+    let session = env.initialize(&token).await;
+
+    host.disconnect();
+    host.wait_closed().await;
+    wait_online(&env, 0).await;
+
+    let reply = env.call(&token, None, "hosts", json!({})).await;
+    assert!(
+        hosts_list(&reply).contains(&json!({"name":"work-pc","online":false,"default":false})),
+        "{reply}"
+    );
+    let at_host = format!("{}?host=work-pc", env.url);
+    let reply = env
+        .call_at(&at_host, &token, Some(&session), "read", json!({"path":"a"}))
+        .await;
+    assert_eq!(tool_error(&reply), "work-pc is offline");
+    // Discovery against it fails the same way.
+    let listed: Value = env
+        .send_at(&at_host, Some(&token), None, rpc("tools/list", json!({})))
+        .await
+        .json()
+        .await
+        .unwrap();
+    assert!(
+        listed["error"]["message"].as_str().unwrap().contains("work-pc is offline"),
+        "{listed}"
+    );
+    // A name never seen is still unknown.
+    let reply = env
+        .call(&token, Some(&session), "read", json!({"path":"a","host":"other-pc"}))
+        .await;
+    assert!(tool_error(&reply).contains("unknown host"), "{reply}");
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn a_reconnect_replaces_the_old_host_connection() {
+    let env = Env::new().await;
+    let (device_token, _) = env.server.hub().login_device("dev-pc", "work-pc").unwrap();
+    let first = FakeHost::connect(&env.base, &device_token, "dev-pc", reader("first")).await;
+    wait_online(&env, 1).await;
+    let second = FakeHost::connect(&env.base, &device_token, "dev-pc", reader("second")).await;
+    first.wait_closed().await;
+    wait_online(&env, 1).await;
+
+    let token = env.ann();
+    let session = env.initialize(&token).await;
+    let reply = env
+        .call(&token, Some(&session), "read", json!({"path":"a","host":"work-pc"}))
+        .await;
+    assert_eq!(success_text(&reply), "second");
+    assert!(first.seen("call").is_empty());
+    assert_eq!(second.seen("call").len(), 1);
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn agent_and_device_tokens_cannot_drive_a_host() {
+    let env = Env::new().await;
+    let (device_token, _) = env.server.hub().login_device("dev-pc", "work-pc").unwrap();
+    let host = FakeHost::connect(&env.base, &device_token, "dev-pc", reader("x")).await;
+    wait_online(&env, 1).await;
+    let at_host = format!("{}?host=work-pc", env.url);
+    for bearer in [env.static_token.as_str(), device_token.as_str()] {
+        let response = env
+            .send_at(
+                &at_host,
+                Some(bearer),
+                None,
+                call("read", json!({"path":"a","host":"work-pc"})),
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+    assert!(host.seen("call").is_empty() && host.seen("tools").is_empty());
+    // Without a device token there is no host socket at all.
+    let refused = tokio_tungstenite::connect_async(
+        format!("{}/host/ws", env.base.replacen("http://", "ws://", 1)).as_str(),
+    )
+    .await;
+    assert!(refused.is_err());
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn a_host_call_times_out_and_is_cancelled_on_the_desktop() {
+    let env = Env::new().await;
+    env.server.set_host_call_timeout(Duration::from_millis(300));
+    let (device_token, _) = env.server.hub().login_device("dev-pc", "work-pc").unwrap();
+    let base = reader("never");
+    let silent: Script = Arc::new(move |request| {
+        if request.method == "call" {
+            None
+        } else {
+            base(request)
+        }
+    });
+    let host = FakeHost::connect(&env.base, &device_token, "dev-pc", silent).await;
+    wait_online(&env, 1).await;
+    let token = env.ann();
+    let session = env.initialize(&token).await;
+    let reply = env
+        .call(&token, Some(&session), "read", json!({"path":"a","host":"work-pc"}))
+        .await;
+    assert!(tool_error(&reply).contains("did not finish"), "{reply}");
+    let call_id = host.seen("call")[0]["id"].clone();
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while host.seen("cancel").is_empty() {
+        assert!(tokio::time::Instant::now() < deadline, "no cancel frame");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(host.seen("cancel")[0]["params"]["id"], call_id);
+    // The session is free again for the next call.
+    let reply = env
+        .call(&token, Some(&session), "read", json!({"path":"a","host":"work-pc"}))
+        .await;
+    assert!(tool_error(&reply).contains("did not finish"), "{reply}");
+    env.stop().await;
+}
