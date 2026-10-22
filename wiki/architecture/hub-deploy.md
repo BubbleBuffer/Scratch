@@ -17,7 +17,7 @@ The target is **linux/amd64** at **https://notes.example.com**. Build on this Wi
 The existing installation is Authentik 2026.5 in `/home/networking/authentik`, container `authentik-server-1`. In its admin UI:
 
 1. Create the group `notes-users` and add the intended users.
-2. Create an OAuth2/OpenID provider with **Confidential** client type. Record its client ID and secret. Set the redirect URI to **strict** `https://notes.example.com/auth/callback`.
+2. Create an OAuth2/OpenID provider with **Public** client type (PKCE, no client secret). Record its client ID. Set the redirect URI to **strict** `https://notes.example.com/auth/callback`.
 3. Select an RSA **Signing Key** so ID tokens use **RS256**; leave token encryption unset. Use the provider's existing authorization flow and select the `openid`, `email` and `profile` scope mappings.
 4. Keep issuer mode **Each provider has a different issuer, based on the application slug**. Create an application with slug **notes-hub** and associate this provider. Its issuer is `https://<authentik host>/application/o/notes-hub/`, including the trailing slash.
 
@@ -78,7 +78,7 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Edit `.env`: set the real issuer, client ID and client secret, and `NOTES_HUB_OIDC_ALLOWED_GROUPS=notes-users`. Keep `NOTES_HUB_PUBLIC_URL=https://notes.example.com`. Comma-separated or space-separated lists work. Environment variables override `/data/hub.toml`; keep secrets in `.env` rather than in the wiki or shell command history.
+Edit `.env`: set the real issuer and client ID, and `NOTES_HUB_OIDC_ALLOWED_GROUPS=notes-users`. Leave `NOTES_HUB_OIDC_CLIENT_SECRET` empty for the public provider; set it only for a confidential one (then the hub sends it with HTTP Basic auth). Keep `NOTES_HUB_PUBLIC_URL=https://notes.example.com`. Comma-separated or space-separated lists work. Environment variables override `/data/hub.toml`; keep secrets in `.env` rather than in the wiki or shell command history.
 
 ### Claude connector
 
@@ -89,7 +89,7 @@ The Claude connector is off by default. Set both variables, or neither:
 | `NOTES_HUB_MCP_OAUTH_ISSUER` | `[mcp_oauth] issuer` | `https://auth.example.com/application/o/<provider>/`, the same as `[oidc] issuer` |
 | `NOTES_HUB_MCP_OAUTH_CLIENT_ID` | `[mcp_oauth] client_id` | `<client-id>`, the same as `[oidc] client_id` |
 
-- MCP OAuth uses the `[oidc]` provider: one confidential client serves device sign-in and every connector. Connectors also need the client secret (`NOTES_HUB_OIDC_CLIENT_SECRET`); the hub itself only validates tokens.
+- MCP OAuth uses the `[oidc]` provider: one public client serves device sign-in and every connector. Connectors need only the client ID, with no client secret; the hub itself only validates tokens.
 - Setting only one of them is a startup error. Both need `NOTES_HUB_PUBLIC_URL`.
 - The allow-list comes from the `oidc` section. If both allow lists are empty, the hub warns at start and refuses every OAuth request.
 - What exists on the Authentik side is in [Claude connector](../integrations/ai-assistants.md#claude-connector). What the endpoint accepts is in [Hub server](hub.md#agent-tokens-and-mcp-mcp).
@@ -247,7 +247,7 @@ The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Dock
 - Running image: commit `d45af66`, deployed 2026-10-14 by CI (run 38544539596 in the former private repo) after the first push to that repo's `release` branch. It serves `/mcp` with agent tokens. `notes-hub:previous` is the 2026-10-08 hand-loaded image (`0caec07`). Both providers are signed in inside the container.
 - Authentik (`auth.example.com`):
   - The provider and the application are both called `notes-hub`, created through `ak shell`.
-  - It is a confidential client: strict redirect `https://notes.example.com/auth/callback`, signed with the self-signed key, scopes openid, email and profile.
+  - It is a public client, with no client secret since 2026-10-22 (it was confidential before): strict redirect `https://notes.example.com/auth/callback`, signed with the self-signed key, scopes openid, email and profile.
   - Allowed grant types: authorization code and refresh token. Authentik 2026.5 checks this list per provider; a provider created through `ak shell` had it empty, and every login failed with "Invalid grant_type for provider" until it was set by hand (2026-10-15). The first real login, from the PC (`RobinPC`), succeeded right after.
   - The group is `notes-users`, with `akadmin` in it.
   - The hub asks for `openid email profile` (`NOTES_HUB_OIDC_SCOPES`); Authentik's profile scope carries `groups`.
