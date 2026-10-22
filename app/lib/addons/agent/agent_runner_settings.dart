@@ -196,7 +196,7 @@ class RunnerToolSetSetting extends StatelessWidget {
     };
     return SettingsRow(
       label: 'Tools',
-      description: onHub ? '$what Applies when the hub restarts.' : what,
+      description: onHub ? '$what Jobs use it at once; hub chats after the hub restarts (an update or reboot).' : what,
       trailing: SelectButton<String>(
         key: ValueKey('agent-tool-set-${runner.runner}'),
         title: 'Tools',

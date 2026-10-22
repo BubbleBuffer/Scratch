@@ -27,13 +27,14 @@ String hostRelayToolsLine(AgentStore store) {
   final n = store.settings.agentMcpServers.values
       .where((v) => v['enabled'] != false)
       .length;
-  final servers = switch (n) {
-    0 => 'no MCP servers',
-    1 => '1 MCP server',
-    _ => '$n MCP servers',
+  final tools = store.settings.desktopTools
+      ? 'The vault, files and commands.'
+      : 'The vault.';
+  return switch (n) {
+    0 => tools,
+    1 => '$tools Plus 1 MCP server.',
+    _ => '$tools Plus $n MCP servers.',
   };
-  final files = store.settings.desktopTools ? ', files, commands' : '';
-  return "Shares this computer's tools: the vault$files and $servers.";
 }
 
 /// Opens Settings > AI at the MCP servers.
@@ -159,9 +160,9 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
               key: const ValueKey('host-relay-tools'),
               label: 'What it shares',
               description: hostRelayToolsLine(store),
-              trailing: TextBtn(
-                'MCP servers',
+              trailing: OutlineButton(
                 key: const ValueKey('host-relay-mcp-link'),
+                label: 'Edit MCP servers',
                 onTap: () => showMcpServers(context),
               ),
             ),

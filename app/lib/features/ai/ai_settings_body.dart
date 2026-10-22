@@ -51,7 +51,18 @@ class AiSettingsBody extends StatelessWidget {
               ))
                 section.build(context),
               const SettingsHeading('Ask AI', top: 24),
-              _RunnerSection(store: store),
+              // Run AI on: Hub sends every Ask AI to the hub as a job, so
+              // this computer's runner settings don't apply.
+              if (store.runsOn == AgentHost.hub)
+                Text(
+                  'Ask AI runs on the hub.',
+                  key: const ValueKey('ai-runs-on-hub'),
+                  style: m
+                      ? tsRaw(15, 21, 400, c.textSecondary)
+                      : tsRaw(14, 20, 400, c.textSecondary),
+                )
+              else
+                _RunnerSection(store: store),
               const SettingsHeading('MCP endpoint', top: 24),
               _McpSection(store: store),
             ],
@@ -117,7 +128,7 @@ class _RunnerSectionState extends State<_RunnerSection> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SettingsRow(
         label: 'Answered by',
-        description: 'What answers Ask AI on this computer. DeepSeek only sees the page; the others can edit the vault.',
+        description: 'What answers Ask AI on this computer. DeepSeek only reads the page.',
         trailing: SelectButton<AiRunner>(
           key: const ValueKey('ai-runner'),
           title: 'Answered by',
@@ -126,7 +137,12 @@ class _RunnerSectionState extends State<_RunnerSection> {
             for (final r in AiRunner.values)
               if (r != AiRunner.agent || s.agentEnabled || s.runner == AiRunner.agent) r,
           ],
-          labelOf: (r) => r.label,
+          labelOf: (r) => switch (r) {
+            AiRunner.agent => "This computer's agent",
+            AiRunner.claude => 'Claude Code on this computer',
+            AiRunner.codex => 'Codex on this computer',
+            _ => r.label,
+          },
           onChanged: (r) => _set((s) => s.runner = r),
         ),
       ),

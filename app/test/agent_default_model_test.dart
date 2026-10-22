@@ -183,7 +183,7 @@ void main() {
       await t.ensureVisible(key('agent-tool-set-hub'));
       picker = t.widget<SelectButton<String>>(key('agent-tool-set-hub'));
       expect(picker.value, 'everything', reason: 'the default');
-      expect(find.textContaining('Applies when the hub restarts.'),
+      expect(find.textContaining('hub chats after the hub restarts'),
           findsOneWidget);
 
       picker.onChanged!('write');

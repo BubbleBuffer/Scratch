@@ -166,6 +166,35 @@ void main() {
     }
   });
 
+  // Ask AI follows Run AI on: under Hub every request is a hub job, so this
+  // computer's "Answered by" and its fields are not shown.
+  for (final runner in [AgentHost.hub, AgentHost.local]) {
+    appTest('desktop, ${runner.name} chosen: Ask AI shows '
+        '${runner == AgentHost.hub ? 'that it runs on the hub' : 'Answered by'}',
+        (t) async {
+      final tv = await pumpApp(t, mobile: false);
+      AgentStore.debugHostModels =
+          (h) async => h == AgentHost.hub ? _hub : _local;
+      addTearDown(_resetHostFakes);
+      final (_, settings) = await _desktop(t, tv, runner: runner);
+      final ai = await aiStore(t, settings: settings);
+      try {
+        await _openAiSettings(t);
+        Finder any(String k) =>
+            find.byKey(ValueKey(k), skipOffstage: false);
+        await settleUntil(
+            t, () => _has(any('ai-runs-on-hub')) || _has(any('ai-runner')));
+        final onHub = runner == AgentHost.hub;
+        expect(any('ai-runs-on-hub'), onHub ? findsOneWidget : findsNothing);
+        expect(any('ai-runner'), onHub ? findsNothing : findsOneWidget);
+        if (onHub) expect(find.text('Ask AI runs on the hub.', skipOffstage: false), findsOneWidget);
+        expect(t.takeException(), isNull);
+      } finally {
+        await closeAi(t, ai);
+      }
+    });
+  }
+
   appTest('phone, This computer chosen: the settings say phones use the hub, '
       'and Hub chosen does not', (t) async {
     final tv = await pumpApp(t, mobile: true);
@@ -247,7 +276,7 @@ void main() {
     expect(find.text(hostRelayToolsLine(store)), findsOneWidget);
     expect(
       hostRelayToolsLine(store),
-      startsWith("Shares this computer's tools:"),
+      startsWith('The vault'),
     );
     expect(key('host-relay-mcp-link'), findsOneWidget);
     expect(t.takeException(), isNull);
