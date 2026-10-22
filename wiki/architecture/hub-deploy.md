@@ -86,9 +86,10 @@ The Claude connector is off by default. Set both variables, or neither:
 
 | Variable | TOML key | Value |
 |---|---|---|
-| `NOTES_HUB_MCP_OAUTH_ISSUER` | `[mcp_oauth] issuer` | `https://auth.example.com/application/o/claude-mcp/` |
-| `NOTES_HUB_MCP_OAUTH_CLIENT_ID` | `[mcp_oauth] client_id` | `d1QDPw9lEM6jOT2WFfcJkggcMqLuA6BrEIvvWF4b` (the public `claude-mcp` client) |
+| `NOTES_HUB_MCP_OAUTH_ISSUER` | `[mcp_oauth] issuer` | `https://auth.example.com/application/o/<provider>/`, the same as `[oidc] issuer` |
+| `NOTES_HUB_MCP_OAUTH_CLIENT_ID` | `[mcp_oauth] client_id` | `<client-id>`, the same as `[oidc] client_id` |
 
+- MCP OAuth uses the `[oidc]` provider: one confidential client serves device sign-in and every connector. Connectors also need the client secret (`NOTES_HUB_OIDC_CLIENT_SECRET`); the hub itself only validates tokens.
 - Setting only one of them is a startup error. Both need `NOTES_HUB_PUBLIC_URL`.
 - The allow-list comes from the `oidc` section. If both allow lists are empty, the hub warns at start and refuses every OAuth request.
 - What exists on the Authentik side is in [Claude connector](../integrations/ai-assistants.md#claude-connector). What the endpoint accepts is in [Hub server](hub.md#agent-tokens-and-mcp-mcp).
