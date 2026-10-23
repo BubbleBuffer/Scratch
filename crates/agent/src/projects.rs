@@ -32,12 +32,16 @@ pub(crate) fn save_json(path: &Path, value: &impl Serialize) -> Result<()> {
 impl Projects {
     pub fn open(file: PathBuf, seed: &Path) -> Result<Self> {
         let state = if file.exists() {
-            let state: State = serde_json::from_slice(&std::fs::read(&file)?)
+            let mut state: State = serde_json::from_slice(&std::fs::read(&file)?)
                 .with_context(|| format!("read {}", file.display()))?;
             ensure!(
                 !state.projects.is_empty(),
                 "projects.json contains no projects"
             );
+            // Older files keep the verbatim prefix on disk; the next save writes the clean form.
+            for project in &mut state.projects {
+                project.path = stored_path(&project.path);
+            }
             state
         } else {
             let project = make_project("Home", seed)?;
@@ -147,7 +151,7 @@ impl Projects {
         let base = name.unwrap_or(&derived).trim();
         ensure!(!base.is_empty(), "project name must not be empty");
         self.update(|state| {
-            let path = path.to_string_lossy().into_owned();
+            let path = stored_path(&path.to_string_lossy());
             ensure!(
                 !state.projects.iter().any(|p| same_path(&p.path, &path)),
                 "folder is already a project"
@@ -228,12 +232,39 @@ fn make_project(name: &str, path: &Path) -> Result<Project> {
     ensure!(!name.trim().is_empty(), "project name must not be empty");
     let path = std::fs::canonicalize(path).context("project folder does not exist")?;
     ensure!(path.is_dir(), "project path must be a folder");
-    Ok(Project {
+    Ok(project_at(name, &path))
+}
+
+/// A new project for a canonical folder, stored without the verbatim prefix.
+fn project_at(name: &str, canonical: &Path) -> Project {
+    Project {
         id: uuid::Uuid::new_v4().to_string(),
         name: name.trim().into(),
-        path: path.to_string_lossy().into_owned(),
+        path: stored_path(&canonical.to_string_lossy()),
         added_at: chrono::Utc::now().to_rfc3339(),
-    })
+    }
+}
+
+/// The folder path as stored and shown. `std::fs::canonicalize` returns Windows
+/// verbatim paths (`\\?\C:\…`, `\\?\UNC\server\share\…`); this drops that prefix.
+/// Other paths come back unchanged, and so do verbatim paths the prefix cannot
+/// be dropped from safely: a `/` in one is part of a name, and a volume GUID
+/// (`\\?\Volume{…}`) has no drive form.
+fn stored_path(path: &str) -> String {
+    let Some(rest) = path.strip_prefix(r"\\?\") else {
+        return path.to_owned();
+    };
+    if rest.contains('/') {
+        return path.to_owned();
+    }
+    let bytes = rest.as_bytes();
+    if bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'\\' {
+        return rest.to_owned();
+    }
+    match rest.strip_prefix(r"UNC\") {
+        Some(share) if !share.is_empty() => format!(r"\\{share}"),
+        _ => path.to_owned(),
+    }
 }
 
 fn same_path(left: &str, right: &str) -> bool {
@@ -241,5 +272,88 @@ fn same_path(left: &str, right: &str) -> bool {
         left.to_lowercase() == right.to_lowercase()
     } else {
         left == right
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn project(id: &str, path: &str) -> Project {
+        Project {
+            id: id.into(),
+            name: id.into(),
+            path: path.into(),
+            added_at: "2026-10-23T00:00:00Z".into(),
+        }
+    }
+
+    #[test]
+    fn verbatim_prefix_is_dropped_only_where_it_is_safe() {
+        let cases = [
+            (r"\\?\C:\Users\Example", r"C:\Users\Example"),
+            (r"\\?\c:\", r"c:\"),
+            (r"\\?\UNC\server\share\notes", r"\\server\share\notes"),
+            (r"C:\Users\Example", r"C:\Users\Example"),
+            (r"\\server\share\notes", r"\\server\share\notes"),
+            (r"/srv/notes", r"/srv/notes"),
+            (r"\\?\Volume{1234}\notes", r"\\?\Volume{1234}\notes"),
+            (r"\\?\UNC\", r"\\?\UNC\"),
+            (r"\\?\C:", r"\\?\C:"),
+            (r"\\?\C:\a/b", r"\\?\C:\a/b"),
+            (r"\\?\é:\x", r"\\?\é:\x"),
+            ("", ""),
+        ];
+        for (input, want) in cases {
+            assert_eq!(stored_path(input), want, "input {input:?}");
+        }
+    }
+
+    #[test]
+    fn new_projects_store_the_folder_without_the_verbatim_prefix() {
+        let project = project_at("Home", Path::new(r"\\?\C:\Users\Example"));
+        assert_eq!(project.path, r"C:\Users\Example");
+        assert_eq!(project.name, "Home");
+    }
+
+    #[test]
+    fn a_new_home_project_is_a_plain_canonical_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("projects.json");
+        let projects = Projects::open(file, dir.path()).unwrap();
+        let home = projects.list().remove(0);
+        let canonical = std::fs::canonicalize(dir.path()).unwrap();
+        assert_eq!(home.path, stored_path(&canonical.to_string_lossy()));
+        assert!(!home.path.starts_with(r"\\?\"));
+    }
+
+    #[test]
+    fn loaded_projects_drop_the_prefix_and_the_next_save_writes_it_dropped() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("projects.json");
+        let state = State {
+            projects: vec![
+                project("a", r"\\?\C:\Users\Example"),
+                project("b", r"\\?\UNC\server\share\notes"),
+                project("c", r"D:\Work"),
+            ],
+            ..State::default()
+        };
+        save_json(&file, &state).unwrap();
+
+        let projects = Projects::open(file.clone(), dir.path()).unwrap();
+        let paths: Vec<String> = projects.list().into_iter().map(|p| p.path).collect();
+        assert_eq!(
+            paths,
+            [r"C:\Users\Example", r"\\server\share\notes", r"D:\Work"]
+        );
+
+        projects.rename("c", "Work").unwrap();
+        let saved: State = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        let saved: Vec<&str> = saved.projects.iter().map(|p| p.path.as_str()).collect();
+        assert_eq!(
+            saved,
+            [r"C:\Users\Example", r"\\server\share\notes", r"D:\Work"]
+        );
     }
 }
