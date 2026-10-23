@@ -9,11 +9,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'vault.dart';
 
-// These functions are ignored because they are not marked as `pub`: `lock`, `task`
+// These functions are ignored because they are not marked as `pub`: `task`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
-
-/// The default listen address of the app's MCP endpoint.
-String mcpDefaultAddr() => RustLib.instance.api.crateApiAiMcpDefaultAddr();
 
 /// Queues a task about `page`; its placeholder goes after block `after`
 /// (an empty paragraph there becomes the placeholder) or at the end.
@@ -88,28 +85,6 @@ Future<void> aiFinishTask({
   ok: ok,
   text: text,
 );
-
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesMcp>>
-abstract class NotesMcp implements RustOpaqueInterface {
-  factory NotesMcp({required NotesVault vault}) =>
-      RustLib.instance.api.crateApiAiNotesMcpNew(vault: vault);
-
-  /// Replaces the token (and restarts the endpoint if it runs); clients
-  /// configured with the old one stop working.
-  Future<String> rotateToken();
-
-  /// Starts serving on `addr` (restarts if running) and returns the URL.
-  Future<String> start({required String addr});
-
-  /// Stops serving and removes the endpoint file.
-  Future<void> stop();
-
-  /// The bearer token (created on first use, kept in `.vault/mcp/token`).
-  Future<String> token();
-
-  /// The URL while running.
-  String? url();
-}
 
 /// An AI task (a row of the "AI tasks" collection).
 class AiTask {

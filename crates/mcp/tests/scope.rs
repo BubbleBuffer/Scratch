@@ -1,6 +1,6 @@
 //! The request scope (read-only or full) and the shared body handler, in
-//! process on a temporary vault. Covers what the desktop HTTP endpoint and
-//! the hub both rely on: the tool list and call policy, the JSON-RPC error
+//! process on a temporary vault. Covers what the hub relies on:
+//! the tool list and call policy, the JSON-RPC error
 //! shapes, and the status codes of [`McpServer::handle_body`].
 
 use std::cell::Cell;
@@ -335,7 +335,7 @@ fn handle_body_notification_is_202_with_empty_body() {
 }
 
 #[test]
-fn handle_body_batch_rules_match_the_desktop_endpoint() {
+fn handle_body_batch_rules_follow_json_rpc() {
     let t = Temp::new();
     let (s, _v) = server(&t);
     // Only notifications: nothing to answer.

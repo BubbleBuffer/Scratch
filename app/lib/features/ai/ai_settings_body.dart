@@ -1,10 +1,9 @@
 // Settings > AI: the agent first (an add-on section placed 'top', with "Run
 // AI on" and what that runner uses), then where Ask AI runs (the agent on
-// the hub or on this computer, per "Run AI on"), the vault's MCP endpoint
-// for AI apps, the hub's agent tokens, and the recent tasks with their
-// status. Phones only list tasks: computers answer them.
+// the hub or on this computer, per "Run AI on"), the hub's agent tokens,
+// and the recent tasks with their status. Phones only list tasks: computers
+// answer them.
 
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../state/app_state.dart';
@@ -69,8 +68,6 @@ class AiSettingsBody extends StatelessWidget {
                       ? tsRaw(15, 21, 400, c.textSecondary)
                       : tsRaw(14, 20, 400, c.textSecondary),
                 ),
-              const SettingsHeading('MCP endpoint', top: 24),
-              _McpSection(store: store),
             ],
             for (final section in beforeTasks) section.build(context),
             // Its `notes setup` commands run in a desktop terminal.
@@ -89,96 +86,6 @@ class AiSettingsBody extends StatelessWidget {
     );
   }
 }
-
-class _McpSection extends StatefulWidget {
-  const _McpSection({required this.store});
-  final AiStore store;
-
-  @override
-  State<_McpSection> createState() => _McpSectionState();
-}
-
-class _McpSectionState extends State<_McpSection> {
-  late final _addr = TextEditingController(text: widget.store.settings.mcpAddress);
-  String? _copied;
-
-  @override
-  void dispose() {
-    _addr.dispose();
-    super.dispose();
-  }
-
-  Future<void> _copy(String what, Future<String> Function() text) async {
-    await Clipboard.setData(ClipboardData(text: await text()));
-    if (!mounted) return;
-    setState(() => _copied = what);
-    await Future<void>.delayed(const Duration(seconds: 2));
-    if (mounted && _copied == what) setState(() => _copied = null);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final store = widget.store;
-    final s = store.settings;
-    final c = context.colors;
-    final url = store.mcpRunning ? store.mcpUrl! : 'http://${s.mcpAddress}/mcp';
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SettingsRow(
-        label: 'Serve the vault to AI apps',
-        description: 'Lets Claude, Codex and other MCP clients on this computer read and edit the vault while the app is open. They need the token.',
-        trailing: Toggle(key: const ValueKey('ai-mcp-toggle'), value: s.mcpEnabled, onChanged: store.setMcpEnabled),
-      ),
-      if (s.mcpEnabled) ...[
-        SettingsRow(
-          label: 'Address',
-          description: 'Keep 127.0.0.1 (this computer only); reach it from elsewhere through a tunnel with HTTPS.',
-          stack: true,
-          trailing: SettingsField(
-            fieldKey: const ValueKey('ai-mcp-address'),
-            controller: _addr,
-            mono: true,
-            onSubmitted: (v) => store.setMcpAddress(v.trim()),
-          ),
-        ),
-        if (store.mcpError != null)
-          Text(store.mcpError!, key: const ValueKey('ai-mcp-error'), style: tsRaw(12, 16, 400, c.inlineCodeText)),
-        if (store.mcpRunning) ...[
-          const SizedBox(height: 4),
-          CopyableText(url, textKey: const ValueKey('ai-mcp-url')),
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            OutlineButton(
-              key: const ValueKey('ai-copy-token'),
-              label: _copied == 'token' ? 'Copied' : 'Copy token',
-              onTap: () => _copy('token', store.token),
-            ),
-            OutlineButton(
-              key: const ValueKey('ai-copy-claude'),
-              label: _copied == 'claude' ? 'Copied' : 'Copy Claude Code command',
-              onTap: () => _copy('claude', () async => claudeAddCommand(url, await store.token())),
-            ),
-            OutlineButton(
-              key: const ValueKey('ai-new-token'),
-              label: 'New token',
-              onTap: () async {
-                if (await showConfirm(context,
-                    title: 'Make a new token?',
-                    message: 'AI apps set up with the current token stop working until you give them the new one.',
-                    confirmLabel: 'New token')) {
-                  await store.rotateToken();
-                }
-              },
-            ),
-          ]),
-        ],
-      ],
-    ]);
-  }
-}
-
-/// The command that adds the endpoint to Claude Code.
-String claudeAddCommand(String url, String token) =>
-    'claude mcp add --transport http notes $url --header "Authorization: Bearer $token"';
 
 class _TaskList extends StatelessWidget {
   const _TaskList({required this.store});

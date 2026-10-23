@@ -1,91 +1,11 @@
-//! vault_mcp for Dart: the vault's MCP endpoint the desktop app serves and
-//! AI tasks (rows of the synced "AI tasks" collection, answered by the
-//! in-app agent, `ai_run_task_with_agent`). Only type conversion happens
-//! here.
+//! vault_mcp for Dart: AI tasks (rows of the synced "AI tasks" collection,
+//! answered by the in-app agent, `ai_run_task_with_agent`). Only type
+//! conversion happens here.
 
-use std::sync::{Arc, Mutex};
-
-use flutter_rust_bridge::frb;
-use vault_core::Vault;
-use vault_mcp::http::{HttpOptions, McpHttp};
-use vault_mcp::{endpoint, tasks, McpServer};
+use vault_mcp::tasks;
 
 use crate::api::vault::NotesVault;
 use crate::convert::*;
-
-fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
-
-/// The default listen address of the app's MCP endpoint.
-#[frb(sync)]
-pub fn mcp_default_addr() -> String {
-    endpoint::DEFAULT_ADDR.to_string()
-}
-
-/// The vault's MCP endpoint over HTTP (bearer token, 127.0.0.1 by
-/// default). While it runs, `<vault>/.vault/mcp/endpoint.json` names it so
-/// `notes-mcp` (stdio, started by Claude desktop or Claude Code) forwards
-/// to the app instead of opening the vault itself.
-#[frb(opaque)]
-pub struct NotesMcp {
-    vault: Arc<Vault>,
-    root: String,
-    http: Mutex<Option<McpHttp>>,
-    addr: Mutex<String>,
-}
-
-impl NotesMcp {
-    #[frb(sync)]
-    pub fn new(vault: &NotesVault) -> NotesMcp {
-        let root = vault.inner.root();
-        NotesMcp { vault: vault.inner.clone(), root, http: Mutex::new(None), addr: Mutex::new(String::new()) }
-    }
-
-    /// Starts serving on `addr` (restarts if running) and returns the URL.
-    pub fn start(&self, addr: String) -> Result<String, String> {
-        self.stop();
-        let token = endpoint::token(&self.root).map_err(err)?;
-        let http = McpHttp::serve(&addr, Arc::new(McpServer::new(self.vault.clone())), token, HttpOptions::default())
-            .map_err(err)?;
-        let url = http.url();
-        endpoint::write_endpoint(&self.root, &url).map_err(err)?;
-        *lock(&self.addr) = addr;
-        *lock(&self.http) = Some(http);
-        Ok(url)
-    }
-
-    /// Stops serving and removes the endpoint file.
-    pub fn stop(&self) {
-        if let Some(h) = lock(&self.http).take() {
-            endpoint::clear_endpoint(&self.root, &h.url());
-            h.stop();
-        }
-    }
-
-    /// The URL while running.
-    #[frb(sync)]
-    pub fn url(&self) -> Option<String> {
-        lock(&self.http).as_ref().map(|h| h.url())
-    }
-
-    /// The bearer token (created on first use, kept in `.vault/mcp/token`).
-    pub fn token(&self) -> Result<String, String> {
-        endpoint::token(&self.root).map_err(err)
-    }
-
-    /// Replaces the token (and restarts the endpoint if it runs); clients
-    /// configured with the old one stop working.
-    pub fn rotate_token(&self) -> Result<String, String> {
-        let t = endpoint::rotate_token(&self.root).map_err(err)?;
-        let running = lock(&self.http).is_some();
-        if running {
-            let addr = lock(&self.addr).clone();
-            self.start(addr)?;
-        }
-        Ok(t)
-    }
-}
 
 /// An AI task (a row of the "AI tasks" collection).
 #[derive(Debug, Clone)]

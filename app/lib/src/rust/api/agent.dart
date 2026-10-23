@@ -351,13 +351,24 @@ class AgentApproval {
 
 /// Detected local runtime paths. Remote hosts do not expose filesystem paths.
 class AgentClaudeDetection {
+  /// The `bun` that runs Claude Code: the override when it is a file, otherwise
+  /// the one found on PATH or in `~/.bun/bin`.
   final String? bunPath;
   final String? claudeCodeDir;
 
-  const AgentClaudeDetection({this.bunPath, this.claudeCodeDir});
+  /// The bun override from settings when it is not a file. It was ignored, and
+  /// `bun_path` is what detection found instead.
+  final String? ignoredBunOverride;
+
+  const AgentClaudeDetection({
+    this.bunPath,
+    this.claudeCodeDir,
+    this.ignoredBunOverride,
+  });
 
   @override
-  int get hashCode => bunPath.hashCode ^ claudeCodeDir.hashCode;
+  int get hashCode =>
+      bunPath.hashCode ^ claudeCodeDir.hashCode ^ ignoredBunOverride.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -365,7 +376,8 @@ class AgentClaudeDetection {
       other is AgentClaudeDetection &&
           runtimeType == other.runtimeType &&
           bunPath == other.bunPath &&
-          claudeCodeDir == other.claudeCodeDir;
+          claudeCodeDir == other.claudeCodeDir &&
+          ignoredBunOverride == other.ignoredBunOverride;
 }
 
 /// Another chat explicitly attached to a user message.

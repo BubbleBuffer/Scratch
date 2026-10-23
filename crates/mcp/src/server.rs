@@ -24,12 +24,11 @@ pub const PROTOCOL_VERSIONS: &[&str] = &["2025-11-25", "2025-06-18", "2025-03-26
 const INSTRUCTIONS: &str = vault_tools::help::SERVER_INSTRUCTIONS;
 
 enum Source {
-    /// A vault open for the server's lifetime (the app's endpoint, or
-    /// `notes-mcp --http`).
+    /// A vault open for the server's lifetime (the hub's).
     Open(Arc<Vault>),
     /// Opened for each tool call and closed after it, so the vault lock is
-    /// held only during the call (`notes-mcp` over stdio while the app is
-    /// not running). The call fails if another process holds the lock.
+    /// held only during the call (`notes-mcp` over stdio). The call fails
+    /// if another process holds the lock.
     PerCall(String),
 }
 
@@ -90,7 +89,7 @@ impl McpServer {
     }
 
     /// [`McpServer::handle_body`] with `set` and `call` as in
-    /// [`McpServer::handle_with`].
+    /// [`McpServer::handle_with`] (the hub's HTTP endpoint uses it).
     pub fn handle_body_with<F>(&self, body: &[u8], set: ToolSet, call: F) -> BodyReply
     where
         F: Fn(&str, &Value) -> Result<String>,
@@ -124,8 +123,9 @@ impl McpServer {
             Source::PerCall(root) => match Vault::open(root.clone()) {
                 Err(e) => Err(e.into()),
                 Ok(v) if !v.is_owner() => Err(crate::McpError(
-                    "the vault is open in another program (the notes app?) that does not \
-                     serve MCP; turn on Settings > AI > MCP endpoint, or close it"
+                    "the vault is open in another program (the notes app, probably), so this \
+                     tool call cannot run. Use the hub's MCP server instead. Close that program \
+                     and try again to use standalone stdio."
                         .into(),
                 )),
                 Ok(v) => {

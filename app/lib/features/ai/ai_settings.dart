@@ -1,12 +1,12 @@
-// AI settings of this device: the vault's MCP endpoint and the in-app
-// agent (on or off, this device's override of where it runs and of the
+// AI settings of this device: the in-app agent (on or off, this device's
+// override of where it runs and of the
 // default model, Claude Code extension, approvals). Kept in
 // `<data dir>/ai_settings.json` next to settings.json (per device, never
 // synced). The default runner and default model themselves are vault
 // settings, synced (see [resolveAgentHost]); this file only holds the
 // device's overrides. The only AI that runs inside the app is the agent
 // (BubblePaw), here or on the hub; Claude Code, Codex and other apps
-// connect to the vault from outside (MCP endpoint, agent tokens). Keys of
+// connect to the vault from outside (the hub, agent tokens). Keys of
 // the Ask AI runners removed on 2026-10-22 (the runner choice, the Claude
 // Code and Codex program paths, the DeepSeek key, model and address, the
 // run timeout) are ignored when loading and dropped on the next save.
@@ -207,19 +207,11 @@ bool get hubAgentPlatform =>
 
 bool get agentPlatform => localAgentPlatform || hubAgentPlatform;
 
-/// The MCP endpoint's default address: this computer only.
-const defaultMcpAddress = '127.0.0.1:47101';
-
 class AiSettings extends ChangeNotifier {
   AiSettings({this.file});
 
   /// Where the settings are saved (null: in memory only).
   final File? file;
-
-  /// Serve the vault's MCP endpoint on [mcpAddress] so AI apps (Claude,
-  /// Codex, ChatGPT through a tunnel) can use the vault while the app runs.
-  bool mcpEnabled = false;
-  String mcpAddress = defaultMcpAddress;
 
   /// The in-app agent (local on desktop, always available through the Hub
   /// on Android, including installs whose old settings saved it as off).
@@ -290,8 +282,6 @@ class AiSettings extends ChangeNotifier {
   }
 
   void _fromJson(Map<String, dynamic> j) {
-    mcpEnabled = (j['mcpEnabled'] as bool?) ?? false;
-    mcpAddress = (j['mcpAddress'] as String?) ?? defaultMcpAddress;
     agentEnabled =
         hubAgentPlatform ||
         (localAgentPlatform && ((j['agentEnabled'] as bool?) ?? true));
@@ -338,8 +328,6 @@ class AiSettings extends ChangeNotifier {
   }
 
   Map<String, dynamic> toJson() => {
-    'mcpEnabled': mcpEnabled,
-    'mcpAddress': mcpAddress,
     'agentEnabled': agentEnabled,
     if (legacyAgentModel != null) 'agentModel': legacyAgentModel,
     if (agentModelOverrides.isNotEmpty)
