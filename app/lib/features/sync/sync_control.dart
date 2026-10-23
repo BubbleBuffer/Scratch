@@ -23,12 +23,7 @@ import 'hub_auth.dart';
 /// Called once the vault is open.
 Future<void> startSyncAtBoot(SyncStore sync, AppSettings s) async {
   if (SyncStore.canHost && s.hubEnabled) {
-    try {
-      final at = await sync.startHub(s.hubAddress);
-      AppLog.info('hub serving on $at');
-    } catch (e) {
-      AppLog.info('hub failed: $e');
-    }
+    await setHubEnabled(sync, s, true);
   }
   final url = s.clientUrl, token = s.clientToken;
   if (url != null && token != null) {
@@ -42,7 +37,7 @@ Future<void> startSyncAtBoot(SyncStore sync, AppSettings s) async {
   try {
     await sync.refreshConflicts();
   } catch (_) {}
-  // AI: the MCP endpoint (if enabled) and queued AI tasks.
+  // AI: the agent and queued AI tasks.
   try {
     final ai = AiSettings.beside(s.file);
     // The agent first: AI tasks with the Agent runner use it.
@@ -71,13 +66,20 @@ SyncOptions syncOptionsFor(AppSettings s) {
 }
 
 Future<void> setHubEnabled(SyncStore sync, AppSettings s, bool on) async {
-  s.update((s) => s.hubEnabled = on);
   if (on) {
     try {
-      await sync.startHub(s.hubAddress);
-    } catch (_) {}
+      final at = await sync.startHub(s.hubAddress);
+      AppLog.info('hub serving on $at');
+    } catch (e) {
+      // SyncStore retains hubError and clears its bound address. Keep the
+      // saved switch in step with the actual server, including failed restarts.
+      AppLog.info('hub failed: $e');
+    } finally {
+      s.update((s) => s.hubEnabled = sync.hosting);
+    }
   } else {
     await sync.stopHub();
+    s.update((s) => s.hubEnabled = sync.hosting);
   }
 }
 
@@ -85,9 +87,7 @@ Future<void> setHubEnabled(SyncStore sync, AppSettings s, bool on) async {
 Future<void> setHubAddress(SyncStore sync, AppSettings s, String addr) async {
   s.update((s) => s.hubAddress = addr);
   if (s.hubEnabled) {
-    try {
-      await sync.startHub(addr);
-    } catch (_) {}
+    await setHubEnabled(sync, s, true);
   }
 }
 

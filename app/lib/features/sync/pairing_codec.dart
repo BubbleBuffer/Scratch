@@ -111,14 +111,25 @@ String hostOf(String addr) => addr.substring(0, addr.lastIndexOf(':').clamp(0, a
 
 /// URLs other devices can use for a hub bound to [bound]: one per
 /// reachable address when it listens on every interface, else its own.
+/// Empty means no address is available for pairing another device. Loopback
+/// addresses are never offered, since they refer to the receiving device.
 Future<List<(String url, String label)>> hubUrls(String bound) async {
   final host = hostOf(bound);
   final port = portOf(bound);
   if (host == '0.0.0.0' || host == '[::]' || host == '::') {
     final list = await hubAddresses();
-    if (list.isEmpty) return [('http://127.0.0.1:$port', 'This computer')];
-    return [for (final a in list) (a.url(port), a.kindLabel)];
+    return [
+      for (final a in list)
+        if (a.kind != AddressKind.loopback && !_loopback(a.ip))
+          (a.url(port), a.kindLabel),
+    ];
   }
-  final ip = host == '127.0.0.1' || host == 'localhost' ? 'This computer' : 'Hub address';
-  return [('http://$host:$port', ip)];
+  if (_loopback(host)) return [];
+  return [('http://$host:$port', 'Hub address')];
+}
+
+bool _loopback(String host) {
+  final bare = host.replaceAll('[', '').replaceAll(']', '').toLowerCase();
+  return bare == 'localhost' || bare == 'localhost.' ||
+      (InternetAddress.tryParse(bare)?.isLoopback ?? false);
 }

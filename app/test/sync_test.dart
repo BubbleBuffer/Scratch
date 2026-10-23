@@ -30,9 +30,13 @@ void main() {
   appTest('pair a device from settings; edits sync both ways; unpair', (tester) async {
     final tv = await pumpApp(tester, mobile: false);
     final other = await openOtherDevice(tester);
+    // Discovery is deterministic; the transport below reaches this same hub
+    // through loopback, since the test does not own a physical LAN address.
+    debugHubAddresses = const [HubAddress('192.168.0.5', AddressKind.lan, 'test')];
+    addTearDown(() => debugHubAddresses = null);
     try {
       final sync = tv.app.sync;
-      await real(tester, () => sync.startHub('127.0.0.1:0'));
+      await real(tester, () => sync.startHub('0.0.0.0:0'));
       await settle(tester);
 
       await tapAndSettle(tester, key('sidebar-settings'));
@@ -47,7 +51,7 @@ void main() {
       final url = textOf(tester, 'pair-url');
       final code = Pairing.parse(textOf(tester, 'pair-code'))!;
       expect(key('pairing-qr'), findsOneWidget);
-      expect(url, 'http://${sync.hubAddress}');
+      expect(url, 'http://192.168.0.5:${portOf(sync.hubAddress!)}');
       expect(code.url, url);
       expect(code.token, token);
 
@@ -55,7 +59,11 @@ void main() {
       expect(key('device-Pixel'), findsOneWidget);
 
       // The other device's first sync brings every page.
-      other.client = NotesSync(vault: other.vault.raw, url: url, token: token);
+      other.client = NotesSync(
+        vault: other.vault.raw,
+        url: 'http://127.0.0.1:${portOf(sync.hubAddress!)}',
+        token: token,
+      );
       final first = await real(tester, () => other.client!.syncOnce());
       expect(first.full, isTrue);
       expect(await real(tester, () => other.vault.pageCount()), tv.pages.length);
