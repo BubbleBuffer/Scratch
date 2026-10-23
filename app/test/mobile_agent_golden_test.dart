@@ -1,8 +1,9 @@
 // Golden screenshots of the Android Hub agent at phone size (375x812 logical,
 // light and dark), built from the real screens with fake state:
-// - settings signed out: Settings > AI > Agent with the Hub address and Sign in;
+// - settings signed out: Settings > Agent with the sign-in notice and its link to Sync and devices;
 // - chat signed out: the Agent screen's Sign in prompt, no composer;
-// - settings signed in: the account, the connection line and the stub models.
+// - settings signed in: the connection line and the stub models (the account
+//   is on Settings > Sync and devices).
 // Regenerate the new files with:
 //   flutter test --update-goldens test/mobile_agent_golden_test.dart
 
@@ -31,9 +32,9 @@ const _stubModels = [
   AgentModel(id: 'hub/opus', name: 'Opus 5.5'),
 ];
 
-Future<void> _openAiSettings(WidgetTester tester) async {
+Future<void> _openAgentSettings(WidgetTester tester) async {
   await openMobileSettings(tester);
-  await tapAndSettle(tester, key('settings-nav-ai'));
+  await tapAndSettle(tester, key('settings-nav-agent'));
 }
 
 void main() {
@@ -44,8 +45,8 @@ void main() {
 
     appTest('mobile agent settings signed out $tag', (tester) async {
       await pumpApp(tester, mobile: true, dark: dark);
-      await _openAiSettings(tester);
-      await tester.ensureVisible(key('hub-sign-in'));
+      await _openAgentSettings(tester);
+      await tester.ensureVisible(key('agent-open-sync'));
       await settle(tester);
       await shot('mobile-agent-settings-signed-out-$tag');
     });
@@ -68,7 +69,7 @@ void main() {
         s.clientAccount = 'alice';
       });
       store.models = _stubModels;
-      await _openAiSettings(tester);
+      await _openAgentSettings(tester);
       await tester.ensureVisible(key('agent-hub-model'));
       await settle(tester);
       await shot('mobile-agent-settings-signed-in-$tag');

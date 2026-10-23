@@ -7,7 +7,7 @@
 // - an approval card decides (fake state), while the shipped bridge
 //   runs Confirm tools without asking in Bypass;
 // - while a run is going, Send says Steer and Stop cancels it;
-// - turning the agent off in Settings > AI hides the sidebar row;
+// - turning the agent off in Settings > Agent hides the sidebar row;
 // - an AI task with the Agent runner ends done;
 // - closing the agent ends its event stream at once.
 
@@ -21,7 +21,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/debounce.dart';
 import 'package:notes_app/addons/agent/api.dart';
-import 'package:notes_app/ui/ui.dart' show TextBtn;
 import 'package:notes_app/features/ai/ai_settings.dart';
 import 'package:notes_app/features/ai/ai_store.dart';
 import 'package:notes_app/src/rust/api/ai.dart';
@@ -441,14 +440,14 @@ void main() {
     expect(find.text('Stopped.'), findsOneWidget);
   });
 
-  appTest('turning the agent off in Settings > AI hides its sidebar row', (
+  appTest('turning the agent off in Settings > Agent hides its sidebar row', (
     tester,
   ) async {
     await pumpApp(tester, mobile: false);
     final store = await openAgentStore(tester);
     expect(key('sidebar-agent'), findsOneWidget);
     await tapAndSettle(tester, key('sidebar-settings'));
-    await tapAndSettle(tester, key('settings-nav-ai'));
+    await tapAndSettle(tester, key('settings-nav-agent'));
     expect(key('agent-enabled-toggle'), findsOneWidget);
     await tapAndSettle(tester, key('agent-enabled-toggle'));
     await settleUntil(tester, () => !store.isOpen);
@@ -470,7 +469,7 @@ void main() {
     expect(store.hostInfo?.packs, contains('desktop'));
     expect(store.hostInfo?.tools, contains('exec'));
     await tapAndSettle(tester, key('sidebar-settings'));
-    await tapAndSettle(tester, key('settings-nav-ai'));
+    await tapAndSettle(tester, key('settings-nav-agent'));
     expect(key('agent-desktop-tools'), findsOneWidget);
     expect(key('agent-permissions'), findsNothing);
     expect(key('agent-projects'), findsOneWidget);
@@ -589,7 +588,7 @@ void main() {
     expect(store.state!.session.projectId, store.projects.single.id);
   });
 
-  appTest('projects settings block last removal and hide permission controls', (
+  appTest('projects settings keep the last folder and hide permission controls', (
     tester,
   ) async {
     await pumpApp(tester, mobile: false);
@@ -597,14 +596,16 @@ void main() {
     final ai = await aiStore(tester, settings: store.settings);
     try {
       await tapAndSettle(tester, key('sidebar-settings'));
-      await tapAndSettle(tester, key('settings-nav-ai'));
+      await tapAndSettle(tester, key('settings-nav-agent'));
       expect(key('agent-permissions'), findsNothing);
       expect(find.text('Permissions'), findsNothing);
       expect(key('agent-projects'), findsOneWidget);
-      final removal = tester.widget<TextBtn>(
+      // The last folder has no remove button at all now; the page says why.
+      expect(
         key('agent-project-remove-${store.projects.single.id}'),
+        findsNothing,
       );
-      expect(removal.onTap, isNull);
+      expect(find.textContaining('so far'), findsOneWidget);
     } finally {
       await closeAi(tester, ai);
     }

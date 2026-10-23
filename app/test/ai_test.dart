@@ -7,7 +7,8 @@
 //   page;
 // - a task queued on another device runs here and its status syncs back;
 // - a row that names a removed runner is answered by the agent;
-// - the MCP endpoint from settings: bearer token required.
+// - the MCP endpoint (through AiStore; its settings UI is gone): bearer token
+//   required.
 
 import 'dart:convert';
 import 'dart:io';
@@ -176,18 +177,18 @@ void main() {
     });
   }
 
-  appTest('the MCP endpoint from settings requires the token', (tester) async {
+  // The endpoint has no settings UI any more (the MCP section left the Agent
+  // page), so the test turns it on and off through AiStore.
+  appTest('the MCP endpoint requires the token', (tester) async {
     await pumpApp(tester, mobile: false);
     final store = await aiStore(tester, settings: AiSettings()
       ..agentEnabled = false
       ..mcpAddress = '127.0.0.1:0');
     try {
-      await tapAndSettle(tester, key('sidebar-settings'));
-      await tapAndSettle(tester, key('settings-nav-ai'));
-      expect(key('ai-mcp-url'), findsNothing);
-      await tester.tap(key('ai-mcp-toggle'));
-      await settleUntil(tester, () => key('ai-mcp-url').evaluate().isNotEmpty);
-      final url = textOf(tester, 'ai-mcp-url');
+      expect(store.mcpRunning, isFalse);
+      await real(tester, () => store.setMcpEnabled(true));
+      expect(store.mcpRunning, isTrue);
+      final url = store.mcpUrl!;
       expect(url, startsWith('http://127.0.0.1:'));
       final endpointFile = File('${current.vault.root}/.vault/mcp/endpoint.json');
       expect(endpointFile.existsSync(), isTrue);
@@ -219,8 +220,7 @@ void main() {
       expect(ok, 200);
       expect(body, contains('Garden plan'));
 
-      await tester.tap(key('ai-mcp-toggle'));
-      await settleUntil(tester, () => key('ai-mcp-url').evaluate().isEmpty);
+      await real(tester, () => store.setMcpEnabled(false));
       expect(store.mcpRunning, isFalse);
       expect(endpointFile.existsSync(), isFalse);
     } finally {

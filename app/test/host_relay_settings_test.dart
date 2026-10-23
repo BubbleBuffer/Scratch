@@ -1,8 +1,8 @@
-// "Let the hub use this computer": one desktop toggle under the hub sign-in,
-// off by default, saved in this device's settings file only. Phones never
-// show it; neither does a device that is not signed in. While it is on, the
-// computer's name on the hub, the relay's state and the connector address
-// show below it.
+// "Let the hub use this computer": one desktop toggle on Settings > Connectors >
+// "This computer for hub apps", off by default, saved in this device's settings
+// file only. Phones never show it. Without a hub sign-in the toggle is there
+// but can't be turned on. While it is on, the computer's name on the hub, the
+// relay's state and the connector address show below it.
 
 import 'dart:io';
 
@@ -11,29 +11,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart'
     show AgentHostRelayStatus, HostRelayLink;
-import 'package:notes_app/features/settings/controls.dart';
+import 'package:notes_app/features/settings/settings_kit.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
 import 'package:notes_app/features/sync/hub_device_client.dart';
-import 'package:notes_app/features/sync/sync_settings.dart';
-import 'package:notes_app/shell/home.dart';
-import 'package:notes_app/ui/ui.dart';
 
 import 'harness.dart';
 
 Finder key(String k) => find.byKey(ValueKey(k));
-
-class _HubPage extends StatelessWidget {
-  const _HubPage();
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: context.colors.bgPrimary,
-    child: const SingleChildScrollView(
-      padding: EdgeInsets.all(24),
-      child: HubSignInSettings(),
-    ),
-  );
-}
 
 /// Signs in to a hub the relay cannot use (plain http), so turning the
 /// toggle on never opens a socket in the test.
@@ -44,10 +28,16 @@ void _signIn(AppSettings s) => s.update(
     ..clientDeviceLabel = 'Work PC',
 );
 
-Future<void> _openHubPage(WidgetTester tester) async {
-  Navigator.of(
-    tester.element(find.byType(HomeScreen)),
-  ).push(PageRouteBuilder<void>(pageBuilder: (_, _, _) => const _HubPage()));
+/// Opens Settings > Connectors with "This computer for hub apps" open.
+Future<void> _openHubPanel(WidgetTester tester, {bool mobile = false}) async {
+  if (mobile) {
+    await openMobileSettings(tester);
+  } else {
+    await tapAndSettle(tester, key('sidebar-settings'));
+  }
+  await tapAndSettle(tester, key('settings-nav-connectors'));
+  await tester.ensureVisible(key('connectors-hub'));
+  await tapAndSettle(tester, key('connectors-hub'));
   await settle(tester);
 }
 
@@ -69,29 +59,27 @@ void main() {
     }
   });
 
-  appTest('desktop: the toggle shows when signed in and turns on and off', (
+  appTest('desktop: the toggle needs a hub sign-in, then turns on and off', (
     tester,
   ) async {
     final tv = await pumpApp(tester, mobile: false);
     final settings = tv.app.settings;
-    await _openHubPage(tester);
-    expect(
-      key('host-relay-toggle'),
-      findsNothing,
-      reason: 'not signed in to a hub',
-    );
+    await _openHubPanel(tester);
+    // Not signed in: the toggle shows, disabled, with the reason.
+    expect(find.text('Sign in to a hub first.'), findsOneWidget);
+    expect(tester.widget<SSwitch>(key('host-relay-toggle')).onChanged, isNull);
 
     _signIn(settings);
     await settle(tester);
     expect(find.text('Let the hub use this computer'), findsOneWidget);
-    expect(tester.widget<Toggle>(key('host-relay-toggle')).value, isFalse);
+    expect(tester.widget<SSwitch>(key('host-relay-toggle')).value, isFalse);
 
     await tapAndSettle(tester, key('host-relay-toggle'));
-    expect(tester.widget<Toggle>(key('host-relay-toggle')).value, isTrue);
+    expect(tester.widget<SSwitch>(key('host-relay-toggle')).value, isTrue);
     expect(settings.hubUsesThisComputer, isTrue);
 
     await tapAndSettle(tester, key('host-relay-toggle'));
-    expect(tester.widget<Toggle>(key('host-relay-toggle')).value, isFalse);
+    expect(tester.widget<SSwitch>(key('host-relay-toggle')).value, isFalse);
     expect(settings.hubUsesThisComputer, isFalse);
   });
 
@@ -120,7 +108,7 @@ void main() {
     final tv = await pumpApp(tester, mobile: false);
     final settings = tv.app.settings;
     _signIn(settings);
-    await _openHubPage(tester);
+    await _openHubPanel(tester);
     expect(key('host-relay-name'), findsNothing, reason: 'off');
 
     await tapAndSettle(tester, key('host-relay-toggle'));
@@ -128,13 +116,18 @@ void main() {
     expect(
       find.text(
         'The name AI apps use for this computer. Renaming it changes the '
-        'address below; the old address stops working.',
+        'addresses below; the old ones stop working.',
       ),
       findsOneWidget,
     );
+    // The connection row says it in words; its pill says "Connected".
+    expect(find.text('Connected to the hub.'), findsOneWidget);
     expect(
-      tester.widget<Text>(key('host-relay-status')).data,
-      'Connected to the hub.',
+      find.descendant(
+        of: key('host-relay-status'),
+        matching: find.text('Connected'),
+      ),
+      findsOneWidget,
     );
     const url = 'http://hub.example.com/mcp/agent?host=Work%20PC';
     expect(find.text('This computer only'), findsOneWidget);
@@ -186,7 +179,7 @@ void main() {
     final tv = await pumpApp(tester, mobile: false);
     final settings = tv.app.settings;
     _signIn(settings);
-    await _openHubPage(tester);
+    await _openHubPanel(tester);
     await tapAndSettle(tester, key('host-relay-toggle'));
     final field = find.descendant(
       of: key('host-relay-rename-field'),
@@ -199,8 +192,8 @@ void main() {
     await tester.enterText(field, 'Laptop');
     await tapAndSettle(tester, key('host-relay-rename-save'));
     expect(
-      tester.widget<Text>(key('host-relay-rename-error')).data,
-      'Another computer is already called Laptop',
+      find.text('Another computer is already called Laptop'),
+      findsOneWidget,
     );
     expect(settings.clientDeviceLabel, 'Work PC');
     expect(
@@ -225,8 +218,11 @@ void main() {
   appTest('Android: phones never show the toggle', (tester) async {
     final tv = await pumpApp(tester, mobile: true);
     _signIn(tv.app.settings);
-    await _openHubPage(tester);
-    expect(find.textContaining('Signed in to'), findsOneWidget);
+    await _openHubPanel(tester, mobile: true);
+    expect(
+      find.text('Set these from Scratch on a computer. Phones always use the hub.'),
+      findsOneWidget,
+    );
     expect(key('host-relay-toggle'), findsNothing);
   });
 }
