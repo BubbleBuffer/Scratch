@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280">
-  <metadata id="pawth-kit" type="application/json">{"version":1,"name":"BubbleBuffer","canvas":1280,"roles":{"desk":"#F3EFE7","milk":"#FFFAF1","facet":"#E4DCCF","page":"#D3C8B6","charcoal":"#282A2F","apricot":"#DE945F","apricot-light":"#EBC095","paw":"#DDA39D"},"contour":{"role":"charcoal","width":54.52,"tiers":[41.48,37.93],"join":"bevel","cap":"butt"},"icon":{"template":"android-adaptive"}}</metadata>
+  <metadata id="pawth-kit" type="application/json">{"version":1,"name":"BubbleBuffer","canvas":1280,"roles":{"desk":"#F2EBDD","milk":"#FFFAF1","facet":"#E4DCCF","page":"#D3C8B6","charcoal":"#282A2F","apricot":"#DE945F","apricot-light":"#EBC095","paw":"#DDA39D"},"contour":{"role":"charcoal","width":54.52,"tiers":[41.48,37.93],"join":"bevel","cap":"butt"},"icon":{"template":"android-adaptive"}}</metadata>
   <defs id="kit-defs" data-name="Kit defs">
     <linearGradient id="ear-highlight" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#EBC095"/>
       <stop offset="1" stop-color="#DE945F"/>
     </linearGradient>
   </defs>
-  <rect id="kit-desk" data-name="Background" data-icon-layer="background" x="0" y="0" width="1280" height="1280" fill="#F3EFE7"/>
+  <rect id="kit-desk" data-name="Background" data-icon-layer="background" x="0" y="0" width="1280" height="1280" fill="#F2EBDD"/>
 
   <!-- Faceted head: the family silhouette (from NeedleBub), outline closed. -->
   <g id="part-head-faceted" data-name="Faceted head" data-part="head/faceted">
@@ -48,7 +48,7 @@
   <g id="part-object-needle" data-name="Needle and thread" data-part="object/needle" transform="matrix(1 0 0 1 1.5 -31)">
     <g id="needle-metal" data-name="Needle and eye">
       <path id="needle-body" data-name="Needle with rounded tip" d="M668.4261 961.843L895.1227 613.2057Q930.1081 563.5922 973.4885 590.4094Q1014.07 617.2275 974.8869 661.4778L729.9985 999.3872Q710.407 1028.8875 679.6197 1010.1153Q648.834 992.6832 668.4261 961.843Z" fill="#282A2F"/>
-      <path id="needle-eye" data-name="Rounded needle eye" transform="matrix(1.492647 0 0 1.492647 -420.391844 -322.884306)" d="M908.8285 636.9507L890.6362 662.4269" fill="none" stroke="#F3EFE7" stroke-width="23.7" stroke-linecap="round"/>
+      <path id="needle-eye" data-name="Rounded needle eye" transform="matrix(1.492647 0 0 1.492647 -420.391844 -322.884306)" d="M908.8285 636.9507L890.6362 662.4269" fill="none" stroke="#F2EBDD" stroke-width="23.7" stroke-linecap="round"/>
     </g>
     <path id="thread" data-name="Apricot thread" transform="matrix(1 0 0 1 -0.84241 16.848202)" d="M936.9522 632.8504C1083.8864 679.7827 1139.8605 800.4645 1069.8929 894.3281C1013.9176 974.7837 901.967 947.9655 929.9561 867.5109" fill="none" stroke="#DE945F" stroke-width="41.48" stroke-linecap="round"/>
   </g>

@@ -7,7 +7,7 @@
       <stop offset="1" stop-color="#DE945F"/>
     </linearGradient></defs>
   <g id="background" data-name="Background" data-icon-layer="background">
-    <rect id="background-desk" data-name="Desk" x="0" y="0" width="1280" height="1280" rx="0" ry="0" fill="#F3EFE7" stroke="none" stroke-width="0"/>
+    <rect id="background-desk" data-name="Desk" x="0" y="0" width="1280" height="1280" rx="0" ry="0" fill="#F2EBDD" stroke="none" stroke-width="0"/>
   </g>
   <metadata id="pawth-style" type="application/json" data-name="Style kit">{"version":1,"kit":"kits/bubblebuffer.kit.svg"}</metadata>
   <g id="group-muyoffx7-54-df8a82fe" data-name="Notebook cat" transform="matrix(1.197214 0 0 1.197214 -161.751 -198.05)">

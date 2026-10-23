@@ -1,6 +1,6 @@
 # App icon
 
-The app icon source is `notes-icon.svg` (1280 x 1280): a `background` layer (the cream "Desk" rect `#F3EFE7`) and a "Notebook cat" group, the glyph. The glyph is scaled to **80% of the canvas height** (the user's choice), centred on (640, 640): `matrix(1.197214 0 0 1.197214 -161.751 -198.05)`. Paths are unchanged. `rebuild.sh` rebuilds the source through Pawth (`pawthctl`) with the same transform. `export_icons.py` exports every platform icon from the source.
+The app icon source is `notes-icon.svg` (1280 x 1280): a `background` layer (the cream "Desk" rect `#F2EBDD`) and a "Notebook cat" group, the glyph. The glyph is scaled to **80% of the canvas height** (the user's choice), centred on (640, 640): `matrix(1.197214 0 0 1.197214 -161.751 -198.05)`. Paths are unchanged. `rebuild.sh` rebuilds the source through Pawth (`pawthctl`) with the same transform. `export_icons.py` exports every platform icon from the source.
 
 ## Folders
 
@@ -45,7 +45,7 @@ Not replaced: `ic_launcher_background.png`. No Linux, tray or hub favicon file i
 
 ## Notes
 
-- The full icon's desk colour is `#F3EFE7` (243, 239, 231), from the source. The previous shipped files used `#F2EBDD`, so the replaced icons are a little lighter.
+- The desk colour is `#F2EBDD` (242, 235, 221), the same as the previously shipped icons; the desk token in the kit, the source and `rebuild.sh` all use it.
 - The adaptive foreground is smaller than the full icon by design: the 80% glyph is 1024 px tall, which does not fit the 66/108 safe circle at full size (61% of the diameter), so the foreground is scaled to 52.8% of canvas height.
 - `crates/core/tests/feedback_markdown.rs` embeds `app_icon_64.png` and checks only a byte round trip, so the new bytes should not affect it. Not run on this PC (no builds here); CI covers it.
 

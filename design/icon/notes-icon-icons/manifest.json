@@ -2,7 +2,7 @@
   "version": 1,
   "template": "android-adaptive",
   "sourceDocument": "scratch.svg",
-  "sourceRevision": 4,
+  "sourceRevision": 5,
   "sizes": {
     "android": [
       48,

@@ -5,7 +5,7 @@ cat > notes-icon.svg <<'SVG'
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280">
   <g id="background" data-name="Background" data-icon-layer="background">
-    <rect id="background-desk" data-name="Desk" x="0" y="0" width="1280" height="1280" fill="#F3EFE7"/>
+    <rect id="background-desk" data-name="Desk" x="0" y="0" width="1280" height="1280" fill="#F2EBDD"/>
   </g>
 </svg>
 SVG
