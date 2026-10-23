@@ -912,7 +912,7 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
                         key: const ValueKey('agent-sign-in'),
                         label: 'Sign in',
                         onTap: () =>
-                            showSettings(context, section: SettingsSection.ai),
+                            showSettings(context, section: SettingsSection.sync),
                       ),
                     ],
                   ),

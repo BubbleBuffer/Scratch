@@ -1,10 +1,10 @@
-// Settings. Desktop: a centred panel over a dimmed
-// page, sections on the left, the section on the right). Mobile: a
-// full-screen list of sections, each opening its own screen.
+// Settings. Desktop: a centred panel over a dimmed page, the pages listed
+// on the left in groups, the page on the right. Mobile: a full-screen list
+// of the pages in the same groups, each opening its own screen under a
+// "‹ Settings" crumb.
 //
-// Sections: Preferences (theme), Sync (hub, connection, attachments),
-// Devices (desktop: devices paired with the hub), Conflicts, AI, Vault
-// (location; desktop: mounted folders) and About.
+// Pages: General, Reminders; Your vault: Sync and devices, Conflicts,
+// Storage; AI: Agent, Connectors; About.
 
 import 'dart:io';
 
@@ -20,73 +20,108 @@ import '../../state/sync_store.dart';
 import '../../shell/addons.dart';
 import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
+import '../ai/ai_settings.dart' show AgentHost, hubAgentPlatform;
 import '../ai/ai_settings_body.dart';
-import '../ai/ask_ai.dart';
+import '../ai/ai_store.dart';
 import '../mounts/mounts.dart';
 import '../sync/conflicts.dart';
-import '../sync/sync_icons.dart';
 import '../sync/sync_settings.dart';
+import 'connectors_body.dart';
 import 'controls.dart';
+import 'settings_kit.dart';
 import 'settings_store.dart';
 
 const appVersion = '0.1.0';
 
 enum SettingsSection {
-  preferences('Preferences'),
-  reminders('Reminders'),
-  sync('Sync'),
-  devices('Devices'),
-  conflicts('Conflicts'),
-  ai('AI'),
-  vault('Vault'),
-  about('About');
+  general('General', Sx.general),
+  reminders('Reminders', Sx.reminders),
+  sync('Sync and devices', Sx.sync, group: 'Your vault'),
+  conflicts('Conflicts', Sx.conflicts, group: 'Your vault'),
+  storage('Storage', Sx.storage, group: 'Your vault'),
+  agent('Agent', Sx.agent, group: 'AI'),
+  connectors('Connectors', Sx.connectors, group: 'AI'),
+  about('About', Sx.info);
 
-  const SettingsSection(this.label);
+  const SettingsSection(this.label, this.icon, {this.group});
   final String label;
+  final Sx icon;
 
-  /// Devices are the hub's, so only desktop lists them.
-  static List<SettingsSection> get visible =>
-      [for (final s in values) if (s != devices || SyncStore.canHost) s];
+  /// The nav heading this page sits under, or null.
+  final String? group;
+
+  static List<SettingsSection> get visible => values;
 }
 
-Widget sectionIcon(SettingsSection s, Color color, double size) => switch (s) {
-      SettingsSection.preferences => SyncIcon(SyncIco.sun, size: size, color: color),
-      SettingsSection.reminders => Icon20(Ico.clock, size: size, color: color),
-      SettingsSection.sync => SyncIcon(SyncIco.cloud, size: size, color: color),
-      SettingsSection.devices => SyncIcon(SyncIco.devices, size: size, color: color),
-      SettingsSection.conflicts => SyncIcon(SyncIco.conflict, size: size, color: color),
-      SettingsSection.ai =>
-        SizedBox.square(dimension: size, child: Center(child: AiMark(size: size * 0.9, color: color))),
-      SettingsSection.vault => SyncIcon(SyncIco.folder, size: size, color: color),
-      SettingsSection.about => SyncIcon(SyncIco.info, size: size, color: color),
-    };
+Widget sectionIcon(SettingsSection s, Color color, double size) =>
+    SIcon(s.icon, size: size, color: color);
 
 Widget sectionBody(SettingsSection s) => switch (s) {
-      SettingsSection.preferences => const PreferencesBody(),
-      SettingsSection.reminders => const RemindersBody(),
-      SettingsSection.sync => const SyncBody(),
-      SettingsSection.devices => const DevicesBody(),
-      SettingsSection.conflicts => const ConflictsBody(),
-      SettingsSection.ai => const AiSettingsBody(),
-      SettingsSection.vault => const VaultBody(),
-      SettingsSection.about => const AboutBody(),
-    };
+  SettingsSection.general => const PreferencesBody(),
+  SettingsSection.reminders => const RemindersBody(),
+  SettingsSection.sync => const _SyncAndDevicesBody(),
+  SettingsSection.conflicts => const ConflictsBody(),
+  SettingsSection.storage => const VaultBody(),
+  SettingsSection.agent => const AiSettingsBody(),
+  SettingsSection.connectors => const ConnectorsBody(),
+  SettingsSection.about => const AboutBody(),
+};
 
-/// Opens settings at [section].
-Future<void> showSettings(BuildContext context, {SettingsSection section = SettingsSection.preferences}) {
-  if (context.mobile) {
-    final nav = Navigator.of(context);
-    if (section == SettingsSection.preferences) {
-      return nav.push(pageRoute((_) => const SettingsPage(), motion: Motion.of(context), mobile: true, settings: const RouteSettings(name: '/settings')));
-    }
-    return pushSettingsPage(context, section.label, sectionBody(section));
+/// Sync, then (desktop) the devices paired with this computer's hub, then
+/// add-on sections placed with them ("Run schedules on this device").
+class _SyncAndDevicesBody extends StatelessWidget {
+  const _SyncAndDevicesBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final extra = appAddonContext.settingsSections.all.where(
+      (s) => s.location == 'addons' && (s.isVisible?.call(context) ?? true),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SyncBody(),
+        if (SyncStore.canHost) ...[
+          const SizedBox(height: 24),
+          const DevicesBody(),
+        ],
+        for (final s in extra)
+          SSection(title: s.label, children: [s.build(context)]),
+      ],
+    );
   }
-  return showPanel(context, (_) => SettingsModal(initial: section), width: 1150, height: 715);
+}
+
+/// Opens settings at [section]. With none, a phone opens the list of
+/// pages and a computer opens General.
+Future<void> showSettings(BuildContext context, {SettingsSection? section}) {
+  if (context.mobile) {
+    if (section == null) {
+      return Navigator.of(context).push(
+        pageRoute(
+          (_) => const SettingsPage(),
+          motion: Motion.of(context),
+          mobile: true,
+          settings: const RouteSettings(name: '/settings'),
+        ),
+      );
+    }
+    return pushSectionPage(context, section);
+  }
+  return showPanel(
+    context,
+    (_) => SettingsModal(initial: section ?? SettingsSection.general),
+    width: 1150,
+    height: 715,
+  );
 }
 
 /// Opens [section]: in the settings already open on a desktop, else as
 /// [showSettings] does.
-Future<void> openSettingsSection(BuildContext context, SettingsSection section) {
+Future<void> openSettingsSection(
+  BuildContext context,
+  SettingsSection section,
+) {
   final jump = context.dependOnInheritedWidgetOfExactType<_SettingsJump>();
   if (jump == null) return showSettings(context, section: section);
   jump.go(section);
@@ -159,11 +194,39 @@ class _PanelRoute<T> extends PopupRoute<T> {
 Future<void> pushSettingsPage(BuildContext context, String title, Widget body, {Key? key}) =>
     Navigator.of(context).push(pageRoute((_) => MobileSettingsScaffold(key: key, title: title, body: body), motion: Motion.of(context), mobile: true));
 
+/// Mobile: one settings page under a "‹ Settings" crumb; the page shows
+/// its own title.
+Future<void> pushSectionPage(BuildContext context, SettingsSection s) =>
+    Navigator.of(context).push(
+      pageRoute(
+        (_) => MobileSettingsScaffold(
+          key: ValueKey('settings-page-${s.name}'),
+          title: 'Settings',
+          crumb: true,
+          body: _SettingsJump(
+            go: (next) => pushSectionPage(context, next),
+            child: sectionBody(s),
+          ),
+        ),
+        motion: Motion.of(context),
+        mobile: true,
+      ),
+    );
+
 class MobileSettingsScaffold extends StatelessWidget {
-  const MobileSettingsScaffold({super.key, required this.title, required this.body, this.padded = true});
+  const MobileSettingsScaffold({
+    super.key,
+    required this.title,
+    required this.body,
+    this.padded = true,
+    this.crumb = false,
+  });
   final String title;
   final Widget body;
   final bool padded;
+
+  /// Shows [title] as a back crumb ("‹ Settings") instead of a heading.
+  final bool crumb;
 
   @override
   Widget build(BuildContext context) {
@@ -178,21 +241,42 @@ class MobileSettingsScaffold extends StatelessWidget {
             height: Layout.topbarHeight,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(children: [
-                IconBtn(Ico.chevronLeft,
-                    key: const ValueKey('back'),
-                    onTap: () => Navigator.of(context).maybePop(),
-                    size: 44,
-                    glyph: 24,
-                    color: c.iconPrimary,
-                    semanticLabel: 'Back'),
-                Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary))),
-              ]),
+              child: crumb
+                  ? Row(children: [
+                      Hover(
+                        key: const ValueKey('back'),
+                        onTap: () => Navigator.of(context).maybePop(),
+                        lift: 0,
+                        padding: const EdgeInsets.fromLTRB(6, 0, 12, 0),
+                        child: Semantics(
+                          button: true,
+                          label: 'Back to $title',
+                          child: SizedBox(
+                            height: 44,
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              SIcon(Sx.chevronLeft, size: 20, color: c.textSecondary),
+                              const SizedBox(width: 2),
+                              Text(title, style: tsRaw(15, 20, 600, c.textSecondary)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ])
+                  : Row(children: [
+                      IconBtn(Ico.chevronLeft,
+                          key: const ValueKey('back'),
+                          onTap: () => Navigator.of(context).maybePop(),
+                          size: 44,
+                          glyph: 24,
+                          color: c.iconPrimary,
+                          semanticLabel: 'Back'),
+                      Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary))),
+                    ]),
             ),
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(padded ? Layout.gutter : 0, 8, padded ? Layout.gutter : 0, mq.padding.bottom + 24),
+              padding: EdgeInsets.fromLTRB(padded ? Layout.gutter : 0, 8, padded ? Layout.gutter : 0, mq.padding.bottom + 48),
               child: body,
             ),
           ),
@@ -206,7 +290,7 @@ class MobileSettingsScaffold extends StatelessWidget {
 // Desktop modal
 
 class SettingsModal extends StatefulWidget {
-  const SettingsModal({super.key, this.initial = SettingsSection.preferences});
+  const SettingsModal({super.key, this.initial = SettingsSection.general});
   final SettingsSection initial;
 
   @override
@@ -220,41 +304,82 @@ class _SettingsModalState extends State<SettingsModal> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final conflicts = context.watch<SyncStore>().conflicts.length;
+    String? group;
+    final nav = <Widget>[];
+    for (final s in SettingsSection.visible) {
+      if (s.group != group) {
+        group = s.group;
+        if (group != null) nav.add(_NavGroup(group));
+      }
+      nav.add(_NavItem(
+        key: ValueKey('settings-nav-${s.name}'),
+        section: s,
+        selected: s == _section,
+        badge: s == SettingsSection.conflicts && conflicts > 0 ? '$conflicts' : null,
+        onTap: () => setState(() => _section = s),
+      ));
+      // About sits apart from the AI group.
+      if (s == SettingsSection.connectors) {
+        group = null;
+        nav.add(const SizedBox(height: 12));
+      }
+    }
     return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
-        width: 240,
-        color: c.bgSecondary,
-        padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
-            child: Text('Settings', style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
-          ),
-          for (final s in SettingsSection.visible)
-            _NavItem(
-              key: ValueKey('settings-nav-${s.name}'),
-              section: s,
-              selected: s == _section,
-              badge: s == SettingsSection.conflicts && conflicts > 0 ? '$conflicts' : null,
-              onTap: () => setState(() => _section = s),
+        width: 236,
+        decoration: BoxDecoration(
+          color: c.bgSecondary,
+          border: Border(right: BorderSide(color: c.border)),
+        ),
+        padding: const EdgeInsets.fromLTRB(10, 18, 10, 18),
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Semantics(
+                header: true,
+                child: Text('Settings', style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
+              ),
             ),
-        ]),
+            ...nav,
+          ]),
+        ),
       ),
       Expanded(
         child: ColoredBox(
           color: c.bgPrimary,
           child: SingleChildScrollView(
             key: ValueKey('settings-body-${_section.name}'),
-            padding: const EdgeInsets.fromLTRB(60, 36, 60, 48),
-            child: _SettingsJump(
-              go: (s) => setState(() => _section = s),
-              child: sectionBody(_section),
+            padding: const EdgeInsets.fromLTRB(48, 36, 48, 64),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: _SettingsJump(
+                  go: (s) => setState(() => _section = s),
+                  child: KeyedSubtree(
+                    key: ValueKey('settings-page-${_section.name}'),
+                    child: sectionBody(_section),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
       ),
     ]);
   }
+}
+
+class _NavGroup extends StatelessWidget {
+  const _NavGroup(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(10, 16, 10, 4),
+    child: Text(label, style: tsRaw(11, 16, 720, context.colors.textTertiary)),
+  );
 }
 
 class _NavItem extends StatelessWidget {
@@ -269,23 +394,33 @@ class _NavItem extends StatelessWidget {
     final c = context.colors;
     return Padding(
       padding: const EdgeInsets.only(bottom: 1),
-      child: Hover(
-        onTap: onTap,
+      child: Semantics(
         selected: selected,
-        selectedColor: c.bgPressed,
-        radius: Radii.md,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: SizedBox(
-          height: 30,
-          child: Row(children: [
-            sectionIcon(section, selected ? c.iconPrimary : c.iconSecondary, 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(section.label,
-                  style: ts(TypeScale.desktop.ui, selected ? c.textPrimary : c.textSecondary)),
+        child: Hover(
+          onTap: onTap,
+          selected: selected,
+          selectedColor: c.bgPrimary,
+          lift: 0,
+          radius: Radii.md,
+          border: selected ? Border.all(color: c.border) : null,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 32),
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(color: selected ? c.accent : const Color(0x00000000), width: 3),
+              ),
             ),
-            if (badge != null) _Badge(badge!),
-          ]),
+            padding: const EdgeInsets.fromLTRB(7, 6, 10, 6),
+            child: Row(children: [
+              sectionIcon(section, selected ? c.iconPrimary : c.iconSecondary, 16),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(section.label,
+                    style: tsRaw(13.5, 18, selected ? 620 : 500, selected ? c.textPrimary : c.textSecondary)),
+              ),
+              if (badge != null) _Badge(badge!),
+            ]),
+          ),
         ),
       ),
     );
@@ -300,8 +435,8 @@ class _Badge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6),
         height: 18,
         alignment: Alignment.center,
-        decoration: BoxDecoration(color: context.colors.dangerBg, borderRadius: Radii.pill),
-        child: Text(text, style: tsRaw(11, 14, 600, context.colors.textPrimary)),
+        decoration: BoxDecoration(color: context.colors.attnBg, borderRadius: Radii.pill),
+        child: Text(text, style: tsRaw(11, 14, 650, context.colors.textPrimary)),
       );
 }
 
@@ -315,41 +450,71 @@ class SettingsPage extends StatelessWidget {
     final sync = context.watch<SyncStore>();
     final settings = AppSettings.of(context);
     return switch (s) {
-      SettingsSection.preferences => settings.theme == ThemePref.system ? 'System' : settings.theme.label,
+      SettingsSection.general => settings.theme == ThemePref.system ? 'System theme' : settings.theme.label,
       SettingsSection.reminders => settings.reminders.enabled ? 'On' : 'Off',
-      SettingsSection.sync => sync.connected ? 'On' : (sync.hosting ? 'Hub on' : 'Off'),
+      SettingsSection.sync => sync.connected ? 'Synced' : (sync.hosting ? 'Hub on' : 'Off'),
       SettingsSection.conflicts => sync.conflicts.isEmpty ? null : '${sync.conflicts.length}',
+      SettingsSection.agent => _agentValue(context),
       _ => null,
     };
+  }
+
+  String _agentValue(BuildContext context) {
+    final ai = AiStore.of(context.app);
+    if (hubAgentPlatform) return 'Hub';
+    if (!ai.settings.agentEnabled) return 'Off';
+    return ai.runsOn == AgentHost.hub ? 'Hub' : 'This computer';
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    String? group;
+    final rows = <Widget>[];
+    for (final s in SettingsSection.visible) {
+      if (s.group != group) {
+        group = s.group;
+        if (group != null) {
+          rows.add(Padding(
+            padding: const EdgeInsets.fromLTRB(Layout.gutter, 20, Layout.gutter, 6),
+            child: Text(group, style: tsRaw(12, 16, 720, c.textTertiary)),
+          ));
+        }
+      }
+      if (s == SettingsSection.about) rows.add(const SizedBox(height: 20));
+      rows.add(Hover(
+        key: ValueKey('settings-nav-${s.name}'),
+        onTap: () => pushSectionPage(context, s),
+        radius: 0,
+        lift: 0,
+        padding: const EdgeInsets.symmetric(horizontal: Layout.gutter),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Row(children: [
+            sectionIcon(s, c.iconSecondary, 20),
+            const SizedBox(width: 14),
+            Expanded(child: Text(s.label, style: tsRaw(15, 20, 500, c.textPrimary))),
+            if (_value(context, s) case final v?) ...[
+              Text(v, style: tsRaw(14, 20, 400, c.textTertiary)),
+              const SizedBox(width: 6),
+            ],
+            SIcon(Sx.chevronRight, size: 16, color: c.iconTertiary),
+          ]),
+        ),
+      ));
+    }
     return MobileSettingsScaffold(
-      title: 'Settings',
+      title: '',
       padded: false,
       body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (final s in SettingsSection.visible)
-          Hover(
-            key: ValueKey('settings-nav-${s.name}'),
-            onTap: () => pushSettingsPage(context, s.label, sectionBody(s)),
-            radius: 0,
-            padding: const EdgeInsets.symmetric(horizontal: Layout.gutter),
-            child: SizedBox(
-              height: 48,
-              child: Row(children: [
-                sectionIcon(s, c.iconPrimary, 22),
-                const SizedBox(width: 14),
-                Expanded(child: Text(s.label, style: ts(context.type.body, c.textPrimary))),
-                if (_value(context, s) case final v?) ...[
-                  Text(v, style: ts(context.type.body, c.textTertiary)),
-                  const SizedBox(width: 4),
-                ],
-                Icon20(Ico.chevronRight, size: 18, color: c.iconTertiary),
-              ]),
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Layout.gutter, 0, Layout.gutter, 4),
+          child: Semantics(
+            header: true,
+            child: Text('Settings', style: tsDisplay(const TypeSpec(24, 28, 680), c.textPrimary)),
           ),
+        ),
+        ...rows,
       ]),
     );
   }
@@ -619,10 +784,6 @@ class AddonsBody extends StatelessWidget {
                   else { s.disabledAddons.add(entry.addon.id); }
                 }))
             : const Text('Enabled')),
-      for (final section in appAddonContext.settingsSections.all.where((s) => s.location == 'addons')) ...[
-        SettingsHeading(section.label),
-        section.build(context),
-      ],
     ]);
   }
 }

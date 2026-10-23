@@ -24,6 +24,7 @@ export '../features/settings/controls.dart'
         Toggle,
         OutlineButton,
         CopyableText;
+export '../features/settings/settings_kit.dart';
 export '../features/settings/settings_screen.dart'
     show showSettings, openSettingsSection, SettingsSection;
 export '../features/sync/hub_auth.dart' show HubAuthService;
