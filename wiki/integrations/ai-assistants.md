@@ -112,7 +112,7 @@ ChatGPT, Gemini and CLI MCP clients use the same client ID, with no secret, and 
 **Implemented, off by default; deployment and real connector sign-in are not established here.** Add a separate custom connector in ChatGPT or claude.ai with one of these addresses. Each one offers the `/mcp` vault tools.
 
 - `https://hub.example.com/mcp/agent` lets the assistant use any of your computers. It calls `hosts`, then names the computer in each call.
-- `https://hub.example.com/mcp/agent?host=Work%20PC` uses one computer, with its tools listed directly.
+- `https://hub.example.com/mcp/agent?host=Work%20PC` uses one computer, with its tools listed directly. The name is the computer's name on the hub (matched ignoring case); after a Rename in Settings > Sync the old address stops working, so update the connector.
 - `https://hub.example.com/mcp/agent?host=hub` uses the hub's own runtime (`js` when enabled, `chat_read`, environments).
 
 Settings > Sync shows the per-computer and any-computer addresses, with Copy, while "Let the hub use this computer" is on. The hub has no desktop tool pack or shell; computers are reached through the [PC host relay](agent.md#pc-host-relay-hostcomputer-built-2026-10-22). JS and `js_help` appear only when enabled.
@@ -131,7 +131,7 @@ Discovery preserves URL host selection: a connector at `/mcp/agent?host=hub` rec
 
 The hub defaults to `[agent] execution_mode = "native"` and `enable_js = false`. Set `enable_js = true` to also offer `js` and `js_help`; `execution_mode = "js"` selects the legacy mode. Environment overrides are `NOTES_HUB_AGENT_EXECUTION_MODE` and `NOTES_HUB_AGENT_ENABLE_JS`. The local in-app agent keeps its JS mode. Only tools the host actually registers are available: the hub has no desktop filesystem or process pack.
 
-In any-computer mode, `hosts` returns `[{name, online}]` for every computer seen since the hub started; an offline computer reports `online: false`. A pinned connection, `?host=hub` included, has no `hosts` tool. When JS is advertised, `js_help` lists its capabilities and full schemas, and `query: "js"` describes the runtime. `tools.hosts()` remains available inside JS. Tools requiring interactive confirmation are omitted and refused, including nested JS calls. `history_*`, web tools, `ui_*`, `todo`, `question` and `reload` remain excluded.
+In any-computer mode, `hosts` returns `[{name, online}]` for every computer that has connected as a host, kept across hub restarts; an offline computer reports `online: false`. A pinned connection, `?host=hub` included, has no `hosts` tool. When JS is advertised, `js_help` lists its capabilities and full schemas, and `query: "js"` describes the runtime. `tools.hosts()` remains available inside JS. Tools requiring interactive confirmation are omitted and refused, including nested JS calls. `history_*`, web tools, `ui_*`, `todo`, `question` and `reload` remain excluded.
 
 HTTP initialize returns an OAuth-subject-bound `Mcp-Session-Id`. Send it with subsequent host tool calls. When JS is enabled, its environments persist within that session and remain isolated from other sessions. `DELETE` with that header closes the session and environments. Idle sessions expire after 24 hours and are reclaimed on a later initialize; after a hub restart, initialize again. This endpoint accepts POST and DELETE, with JSON replies and no SSE stream. More detail: [Agent gateway](agent.md#agent-mcp-gateway-mcpagent).
 

@@ -38,6 +38,10 @@ pub struct PairedDevice {
     /// it has not synced).
     pub device: Option<String>,
     pub created_ms: i64,
+    /// The device has connected to `/host/ws` ("Let the hub use this
+    /// computer"); it stays a host, online or not, until it signs out.
+    #[serde(default)]
+    pub host: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -46,7 +50,16 @@ struct Entry {
     label: String,
     device: Option<String>,
     created_ms: i64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    host: bool,
+    /// The user named the device ([`Tokens::rename`]); a re-login keeps
+    /// the name.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    named: bool,
 }
+
+/// The longest device name, in characters (as `/auth/start` allows).
+pub const MAX_NAME_CHARS: usize = 64;
 
 /// The entry holding `token`, comparing hashes in constant time and
 /// looking at every entry.
@@ -232,6 +245,8 @@ impl Tokens {
             label: label.to_string(),
             device: None,
             created_ms: now_ms(),
+            host: false,
+            named: false,
         });
         self.save(&mut cache, entries)?;
         Ok(token)
@@ -267,13 +282,88 @@ impl Tokens {
                 label: x.label.clone(),
                 device: x.device.clone(),
                 created_ms: x.created_ms,
+                host: x.host,
             })
             .collect()
     }
 
+    /// Marks `device` as a host (it connected to `/host/ws`). Writes only
+    /// when the mark is new.
+    pub fn mark_host(&self, device: &str) -> Result<()> {
+        {
+            let mut cache = self.lock();
+            self.refresh(&mut cache)?;
+            if cache
+                .entries
+                .iter()
+                .filter(|x| x.device.as_deref() == Some(device))
+                .all(|x| x.host)
+            {
+                return Ok(());
+            }
+        }
+        let _file_lock = self.lock_file()?;
+        let mut cache = self.lock();
+        self.reload(&mut cache)?;
+        let mut entries = cache.entries.clone();
+        let mut changed = false;
+        for x in entries.iter_mut().filter(|x| x.device.as_deref() == Some(device)) {
+            changed |= !x.host;
+            x.host = true;
+        }
+        if changed {
+            self.save(&mut cache, entries)?;
+        }
+        Ok(())
+    }
+
+    /// Renames `device` to `name` (trimmed). Refused (400) when empty,
+    /// too long or `hub`, and (409) when another host already has the
+    /// name, ignoring case. Devices that never connected as hosts don't
+    /// hold a name. Returns the name used.
+    pub fn rename(&self, device: &str, name: &str) -> Result<String> {
+        let name: String = name.chars().filter(|c| !c.is_control()).collect();
+        let name = name.trim().to_string();
+        if name.is_empty() {
+            return Err(SyncError::Status(400, "Enter a name".into()));
+        }
+        if name.chars().count() > MAX_NAME_CHARS {
+            return Err(SyncError::Status(
+                400,
+                format!("A name has at most {MAX_NAME_CHARS} characters"),
+            ));
+        }
+        if name.eq_ignore_ascii_case("hub") {
+            return Err(SyncError::Status(400, "hub is the hub's own name".into()));
+        }
+        let _file_lock = self.lock_file()?;
+        let mut cache = self.lock();
+        self.reload(&mut cache)?;
+        let mut entries = cache.entries.clone();
+        if !entries.iter().any(|x| x.device.as_deref() == Some(device)) {
+            return Err(SyncError::Status(404, "this device is not on the hub".into()));
+        }
+        let lower = name.to_lowercase();
+        if entries.iter().any(|x| {
+            x.host && x.device.as_deref() != Some(device) && x.label.to_lowercase() == lower
+        }) {
+            return Err(SyncError::Status(
+                409,
+                format!("Another computer is already called {name}"),
+            ));
+        }
+        for x in entries.iter_mut().filter(|x| x.device.as_deref() == Some(device)) {
+            x.label = name.clone();
+            x.named = true;
+        }
+        self.save(&mut cache, entries)?;
+        Ok(name)
+    }
+
     /// A token for `device` after a login: the device's earlier tokens are
     /// dropped (a re-login replaces them), and the label gets a ` (2)`,
-    /// ` (3)`, ... suffix if another device already uses `name`. Returns
+    /// ` (3)`, ... suffix if another device already uses `name`. A device
+    /// the user renamed keeps its name, and a host stays a host. Returns
     /// the token (shown once) and the label used.
     pub fn login(&self, name: &str, device: &str, hub_device: &str) -> Result<(String, String)> {
         if device.is_empty() {
@@ -295,18 +385,33 @@ impl Tokens {
         let mut cache = self.lock();
         self.reload(&mut cache)?;
         let mut entries = cache.entries.clone();
+        let earlier: Vec<Entry> = entries
+            .iter()
+            .filter(|x| x.device.as_deref() == Some(device))
+            .cloned()
+            .collect();
         entries.retain(|x| x.device.as_deref() != Some(device));
-        let mut label = name.to_string();
-        let mut n = 2;
-        while entries.iter().any(|x| x.label == label) {
-            label = format!("{name} ({n})");
-            n += 1;
-        }
+        let host = earlier.iter().any(|x| x.host);
+        let named = earlier.iter().find(|x| x.named).map(|x| x.label.clone());
+        let label = match &named {
+            Some(label) => label.clone(),
+            None => {
+                let mut label = name.to_string();
+                let mut n = 2;
+                while entries.iter().any(|x| x.label == label) {
+                    label = format!("{name} ({n})");
+                    n += 1;
+                }
+                label
+            }
+        };
         entries.push(Entry {
             hash: sha256_hex(token.as_bytes()),
             label: label.clone(),
             device: Some(device.to_string()),
             created_ms: now_ms(),
+            host,
+            named: named.is_some(),
         });
         self.save(&mut cache, entries)?;
         Ok((token, label))
@@ -534,6 +639,45 @@ mod tests {
         assert_eq!(devices.len(), 1);
         assert_eq!(devices[0].label, "laptop");
         assert_eq!(devices[0].device.as_deref(), Some("dev-a"));
+    }
+
+    #[test]
+    fn rename_is_unique_among_hosts_only_and_survives_a_relogin() {
+        let root = TempRoot::new();
+        let store = Tokens::open(&root.path()).unwrap();
+        store.login("pc", "dev-a", "hub").unwrap();
+        // A stale sign-in that never ran the relay holds "pc" too.
+        let (_, label) = store.login("pc", "dev-b", "hub").unwrap();
+        assert_eq!(label, "pc (2)");
+        store.login("laptop", "dev-c", "hub").unwrap();
+        store.mark_host("dev-b").unwrap();
+        store.mark_host("dev-c").unwrap();
+        // dev-a is no host, so it does not block the name.
+        assert_eq!(store.rename("dev-b", "  PC ").unwrap(), "PC");
+        assert!(matches!(
+            store.rename("dev-c", "pc"),
+            Err(SyncError::Status(409, m)) if m == "Another computer is already called pc"
+        ));
+        assert!(matches!(store.rename("dev-c", " "), Err(SyncError::Status(400, _))));
+        assert!(matches!(store.rename("dev-c", "Hub"), Err(SyncError::Status(400, _))));
+        assert!(matches!(store.rename("dev-x", "x"), Err(SyncError::Status(404, _))));
+        // Renaming to its own name in another case is fine.
+        assert_eq!(store.rename("dev-b", "pc").unwrap(), "pc");
+        // A re-login keeps the user's name and the host mark.
+        let (_, label) = store.login("Other", "dev-b", "hub").unwrap();
+        assert_eq!(label, "pc");
+        let b = store
+            .devices()
+            .into_iter()
+            .find(|d| d.device.as_deref() == Some("dev-b"))
+            .unwrap();
+        assert!(b.host);
+        let a = store
+            .devices()
+            .into_iter()
+            .find(|d| d.device.as_deref() == Some("dev-a"))
+            .unwrap();
+        assert!(!a.host);
     }
 
     #[test]

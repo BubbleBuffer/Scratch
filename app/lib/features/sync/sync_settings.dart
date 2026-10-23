@@ -24,6 +24,7 @@ import 'cert_trust.dart';
 import 'certificate_view.dart';
 import 'pairing_codec.dart';
 import 'hub_auth.dart';
+import 'hub_device_client.dart';
 import 'qr.dart';
 import 'sync_control.dart';
 import 'sync_icons.dart';
@@ -209,6 +210,17 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
             store: AgentStore.of(context.app),
             hubUrl: s.clientUrl!,
             name: s.clientDeviceLabel!.trim(),
+            onRename: (name) async {
+              final settings = AppSettings.read(context);
+              final deviceId = context.read<SyncStore>().vault.deviceId;
+              final used = await renameHubDevice(
+                hubUrl: s.clientUrl!,
+                token: s.clientToken ?? '',
+                deviceId: deviceId,
+                name: name,
+              );
+              settings.update((s) => s.clientDeviceLabel = used);
+            },
           ),
         if (_error != null)
           Padding(

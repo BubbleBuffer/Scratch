@@ -5,8 +5,10 @@
 // computer's tools and MCP servers, with a link to the MCP servers (shown in
 // Settings > AI whichever runner the vault uses while this is on).
 //
-// The name is the hub's label for this device, from sign-in
-// (`clientDeviceLabel`); the hub matches `?host=` against it exactly.
+// The name is the hub's label for this device (`clientDeviceLabel`), from
+// sign-in or a Rename here; the hub matches `?host=` against it (exactly,
+// else ignoring case). A rename changes the address at once and the old one
+// stops working; the hub refuses a name another computer already has.
 
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
@@ -68,6 +70,7 @@ class HostRelayDetails extends StatefulWidget {
     required this.hubUrl,
     required this.name,
     this.store,
+    this.onRename,
   });
 
   final HostRelayLink link;
@@ -78,11 +81,19 @@ class HostRelayDetails extends StatefulWidget {
   /// The signed-in hub's address and this computer's name on it.
   final String hubUrl, name;
 
+  /// Renames this computer on the hub (null: no Rename). Throws with a
+  /// message to show when the hub refuses the name.
+  final Future<void> Function(String name)? onRename;
+
   @override
   State<HostRelayDetails> createState() => _HostRelayDetailsState();
 }
 
 class _HostRelayDetailsState extends State<HostRelayDetails> {
+  final _rename = TextEditingController();
+  bool _renaming = false, _saving = false;
+  String? _renameError;
+
   @override
   void initState() {
     super.initState();
@@ -101,7 +112,91 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
   @override
   void dispose() {
     widget.link.unwatchStatus();
+    _rename.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveName() async {
+    final rename = widget.onRename;
+    if (rename == null || _saving) return;
+    final name = _rename.text.trim();
+    if (name.isEmpty) {
+      setState(() => _renameError = 'Enter a name.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _renameError = null;
+    });
+    try {
+      await rename(name);
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _renaming = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _renameError = '$e';
+      });
+    }
+  }
+
+  Widget? _nameTrailing(AppColors c) {
+    if (!_renaming) {
+      if (widget.onRename == null) return null;
+      return TextBtn(
+        'Rename',
+        key: const ValueKey('host-relay-rename'),
+        onTap: () => setState(() {
+          _renaming = true;
+          _renameError = null;
+          _rename.text = widget.name;
+        }),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: SettingsField(
+                fieldKey: const ValueKey('host-relay-rename-field'),
+                controller: _rename,
+                autofocus: true,
+                onSubmitted: (_) => _saveName(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextBtn(
+              'Save',
+              key: const ValueKey('host-relay-rename-save'),
+              onTap: _saving ? null : _saveName,
+            ),
+            TextBtn(
+              'Cancel',
+              key: const ValueKey('host-relay-rename-cancel'),
+              onTap: () => setState(() {
+                _renaming = false;
+                _renameError = null;
+              }),
+            ),
+          ],
+        ),
+        if (_renameError case final error?)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              error,
+              key: const ValueKey('host-relay-rename-error'),
+              style: tsRaw(12, 16, 400, c.inlineCodeText),
+            ),
+          ),
+      ],
+    );
   }
 
   /// The state in words, and whether it is a problem.
@@ -135,9 +230,14 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
       children: [
         SettingsRow(
           key: const ValueKey('host-relay-name'),
-          label: 'Appears on the hub as ${widget.name}',
+          label: _renaming
+              ? 'Name on the hub'
+              : 'Appears on the hub as ${widget.name}',
           description:
-              "This computer's name from when it signed in to the hub.",
+              'The name AI apps use for this computer. Renaming it changes '
+              'the address below; the old address stops working.',
+          stack: _renaming,
+          trailing: _nameTrailing(c),
         ),
         ValueListenableBuilder<AgentHostRelayStatus?>(
           valueListenable: widget.link.status,

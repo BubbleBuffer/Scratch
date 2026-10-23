@@ -13,6 +13,7 @@ import 'package:notes_app/addons/agent/api.dart'
     show AgentHostRelayStatus, HostRelayLink;
 import 'package:notes_app/features/settings/controls.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
+import 'package:notes_app/features/sync/hub_device_client.dart';
 import 'package:notes_app/features/sync/sync_settings.dart';
 import 'package:notes_app/shell/home.dart';
 import 'package:notes_app/ui/ui.dart';
@@ -125,7 +126,10 @@ void main() {
     await tapAndSettle(tester, key('host-relay-toggle'));
     expect(find.text('Appears on the hub as Work PC'), findsOneWidget);
     expect(
-      find.text("This computer's name from when it signed in to the hub."),
+      find.text(
+        'The name AI apps use for this computer. Renaming it changes the '
+        'address below; the old address stops working.',
+      ),
       findsOneWidget,
     );
     expect(
@@ -156,6 +160,66 @@ void main() {
     await tapAndSettle(tester, key('host-relay-toggle'));
     expect(key('host-relay-name'), findsNothing);
     expect(key('host-relay-any-url'), findsNothing);
+  });
+
+  appTest('desktop: Rename renames this computer on the hub', (tester) async {
+    HostRelayLink.debugStatus = () async =>
+        const AgentHostRelayStatus(state: 'connected');
+    addTearDown(() => HostRelayLink.debugStatus = null);
+    final asked = <String>[];
+    debugRenameHubDevice =
+        ({
+          required String hubUrl,
+          required String token,
+          required String deviceId,
+          required String name,
+        }) async {
+          asked.add(name);
+          expect(hubUrl, 'http://hub.example.com');
+          expect(token, 'test-token');
+          if (name.toLowerCase() == 'laptop') {
+            throw HubRenameException('Another computer is already called $name');
+          }
+          return name;
+        };
+    addTearDown(() => debugRenameHubDevice = null);
+    final tv = await pumpApp(tester, mobile: false);
+    final settings = tv.app.settings;
+    _signIn(settings);
+    await _openHubPage(tester);
+    await tapAndSettle(tester, key('host-relay-toggle'));
+    final field = find.descendant(
+      of: key('host-relay-rename-field'),
+      matching: find.byType(EditableText),
+    );
+
+    // Another computer's name: an inline error, nothing saved.
+    await tapAndSettle(tester, key('host-relay-rename'));
+    expect(tester.widget<EditableText>(field).controller.text, 'Work PC');
+    await tester.enterText(field, 'Laptop');
+    await tapAndSettle(tester, key('host-relay-rename-save'));
+    expect(
+      tester.widget<Text>(key('host-relay-rename-error')).data,
+      'Another computer is already called Laptop',
+    );
+    expect(settings.clientDeviceLabel, 'Work PC');
+    expect(
+      tester.widget<Text>(key('host-relay-url-text')).data,
+      'http://hub.example.com/mcp/agent?host=Work%20PC',
+    );
+
+    // A free name: saved, and the address follows it.
+    await tester.enterText(field, '  Desk 2 ');
+    await tapAndSettle(tester, key('host-relay-rename-save'));
+    expect(asked, ['Laptop', 'Desk 2']);
+    expect(settings.clientDeviceLabel, 'Desk 2');
+    expect(key('host-relay-rename-field'), findsNothing);
+    expect(key('host-relay-rename-error'), findsNothing);
+    expect(find.text('Appears on the hub as Desk 2'), findsOneWidget);
+    expect(
+      tester.widget<Text>(key('host-relay-url-text')).data,
+      'http://hub.example.com/mcp/agent?host=Desk%202',
+    );
   });
 
   appTest('Android: phones never show the toggle', (tester) async {

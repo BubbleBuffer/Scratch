@@ -1,21 +1,23 @@
 //! Execution hosts that connect out to the hub: `GET /host/ws`.
 //!
 //! A desktop with "Let the hub use this computer" on keeps one socket here,
-//! authenticated with its device token exactly like `/agent/ws`. It
-//! registers under its device's name (the token's label). `/mcp/agent`
-//! sessions that select that host send their host tool calls down the socket
-//! (`notes_agent_wire::host`); the desktop runs them and answers.
+//! authenticated with its device token exactly like `/agent/ws`. The first
+//! connection marks the device as a host in `tokens.json`; it stays one,
+//! online or offline, until it signs out. A host's name is its device's
+//! current label, so a rename (`POST /device/name`) takes effect at once and
+//! the old name stops working. `/mcp/agent` sends host tool calls down the
+//! socket (`notes_agent_wire::host`); the desktop runs them and answers.
 //!
-//! - One connection per name: a new one replaces (closes) the old one.
-//! - A closed connection leaves the host listed offline; calls to it fail
-//!   with "<name> is offline". Nothing survives a hub restart: desktops
-//!   reconnect on their own.
+//! - One connection per device: a new one replaces (closes) the old one.
+//! - A host without a connection is listed offline; calls to it fail with
+//!   "<name> is offline". After a hub restart every host is offline until
+//!   its desktop reconnects (on its own).
 //! - Each call has a timeout ([`DEFAULT_CALL_TIMEOUT`]); when it fires the
 //!   hub sends `cancel` for that request and the call fails.
 //! - Pings, silence and token checks follow `/agent/ws`; signing the device
 //!   out closes its socket.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -25,13 +27,14 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
+use axum::Json;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 use vault_agent::wire::notes_agent_wire as w;
 use vault_core::sha256_hex;
-use vault_sync::DEVICE_HEADER;
+use vault_sync::{Hub, SyncError, DEVICE_HEADER};
 
 use crate::agent::{check, PING_EVERY, SILENCE};
 use crate::AppState;
@@ -44,7 +47,9 @@ type Reply = Result<Value, String>;
 /// One live desktop socket.
 pub(crate) struct HostConn {
     id: u64,
-    pub name: String,
+    pub device: String,
+    /// The device's label; a rename updates it.
+    name: Mutex<String>,
     token_hash: String,
     out: mpsc::UnboundedSender<String>,
     pending: Mutex<HashMap<u64, oneshot::Sender<Reply>>>,
@@ -53,8 +58,12 @@ pub(crate) struct HostConn {
 }
 
 impl HostConn {
+    pub fn name(&self) -> String {
+        self.name.lock().unwrap().clone()
+    }
+
     fn offline(&self) -> String {
-        offline(&self.name)
+        offline(&self.name())
     }
 
     /// Sends one request and waits for its answer, the socket closing or
@@ -85,7 +94,7 @@ impl HostConn {
                 let _ = self.out.send(cancel.to_string());
                 Err(format!(
                     "{} did not finish within {} s; the call was cancelled",
-                    self.name,
+                    self.name(),
                     timeout.as_secs()
                 ))
             }
@@ -116,13 +125,27 @@ pub(crate) fn offline(name: &str) -> String {
 /// What `/mcp/agent` finds for a host name.
 pub(crate) enum Lookup {
     Online(Arc<HostConn>),
-    Offline,
+    /// A host without a connection, by its name.
+    Offline(String),
     Unknown,
 }
 
-/// The hosts seen since this hub started, by name.
+/// `(device, name)` of every host (devices marked in `tokens.json`).
+fn host_devices(hub: &Hub) -> Vec<(String, String)> {
+    let mut hosts: Vec<(String, String)> = Vec::new();
+    for d in hub.devices() {
+        if let (true, Some(device)) = (d.host, d.device) {
+            if !hosts.iter().any(|(known, _)| *known == device) {
+                hosts.push((device, d.label.trim().to_owned()));
+            }
+        }
+    }
+    hosts
+}
+
+/// The live host connections, by device id.
 pub(crate) struct Hosts {
-    by_name: Mutex<BTreeMap<String, Option<Arc<HostConn>>>>,
+    by_device: Mutex<HashMap<String, Arc<HostConn>>>,
     next_conn: AtomicU64,
     timeout: Mutex<Duration>,
 }
@@ -130,7 +153,7 @@ pub(crate) struct Hosts {
 impl Hosts {
     pub fn new() -> Self {
         Self {
-            by_name: Mutex::new(BTreeMap::new()),
+            by_device: Mutex::new(HashMap::new()),
             next_conn: AtomicU64::new(1),
             timeout: Mutex::new(DEFAULT_CALL_TIMEOUT),
         }
@@ -144,11 +167,18 @@ impl Hosts {
         *self.timeout.lock().unwrap() = timeout;
     }
 
-    /// Registers a connection under `name`, replacing (closing) any other.
-    fn register(&self, name: &str, token: &str, out: mpsc::UnboundedSender<String>) -> Arc<HostConn> {
+    /// Registers `device`'s connection, replacing (closing) any other.
+    fn register(
+        &self,
+        device: &str,
+        name: &str,
+        token: &str,
+        out: mpsc::UnboundedSender<String>,
+    ) -> Arc<HostConn> {
         let conn = Arc::new(HostConn {
             id: self.next_conn.fetch_add(1, Ordering::Relaxed),
-            name: name.to_owned(),
+            device: device.to_owned(),
+            name: Mutex::new(name.to_owned()),
             token_hash: sha256_hex(token.as_bytes()),
             out,
             pending: Mutex::new(HashMap::new()),
@@ -156,66 +186,79 @@ impl Hosts {
             close: CancellationToken::new(),
         });
         let old = self
-            .by_name
+            .by_device
             .lock()
             .unwrap()
-            .insert(name.to_owned(), Some(conn.clone()));
-        if let Some(Some(old)) = old {
+            .insert(device.to_owned(), conn.clone());
+        if let Some(old) = old {
             tracing::info!("host socket: a new connection replaced the old one");
             old.close.cancel();
         }
         conn
     }
 
-    /// Marks the host offline, unless a newer connection replaced this one.
+    /// Drops the connection, unless a newer one replaced it.
     fn unregister(&self, conn: &HostConn) {
-        let mut hosts = self.by_name.lock().unwrap();
-        if let Some(slot) = hosts.get_mut(&conn.name) {
-            if slot.as_ref().is_some_and(|c| c.id == conn.id) {
-                *slot = None;
-            }
+        let mut hosts = self.by_device.lock().unwrap();
+        if hosts.get(&conn.device).is_some_and(|c| c.id == conn.id) {
+            hosts.remove(&conn.device);
         }
+    }
+
+    /// `device`'s live connection.
+    pub fn connection(&self, device: &str) -> Option<Arc<HostConn>> {
+        self.by_device
+            .lock()
+            .unwrap()
+            .get(device)
+            .filter(|conn| !conn.close.is_cancelled())
+            .cloned()
     }
 
     /// The host called `name`: an exact match, else the one host whose name
     /// matches ignoring case.
-    pub fn lookup(&self, name: &str) -> Lookup {
-        let hosts = self.by_name.lock().unwrap();
-        let slot = hosts.get(name).or_else(|| {
+    pub fn lookup(&self, hub: &Hub, name: &str) -> Lookup {
+        let hosts = host_devices(hub);
+        let found = hosts.iter().find(|(_, known)| known == name).or_else(|| {
+            let lower = name.to_lowercase();
             let mut matches = hosts
                 .iter()
-                .filter(|(known, _)| known.to_lowercase() == name.to_lowercase());
+                .filter(|(_, known)| known.to_lowercase() == lower);
             match (matches.next(), matches.next()) {
-                (Some((_, slot)), None) => Some(slot),
+                (Some(found), None) => Some(found),
                 _ => None,
             }
         });
-        match slot {
-            Some(Some(conn)) if !conn.close.is_cancelled() => Lookup::Online(conn.clone()),
-            Some(_) => Lookup::Offline,
+        match found {
+            Some((device, known)) => match self.connection(device) {
+                Some(conn) => Lookup::Online(conn),
+                None => Lookup::Offline(known.clone()),
+            },
             None => Lookup::Unknown,
         }
     }
 
-    /// `(name, online)` for every host seen since start, by name.
-    pub fn list(&self) -> Vec<(String, bool)> {
-        self.by_name
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(name, conn)| {
-                (
-                    name.clone(),
-                    conn.as_ref().is_some_and(|c| !c.close.is_cancelled()),
-                )
-            })
-            .collect()
+    /// `(name, online)` for every host, by name.
+    pub fn list(&self, hub: &Hub) -> Vec<(String, bool)> {
+        let mut hosts: Vec<(String, bool)> = host_devices(hub)
+            .into_iter()
+            .map(|(device, name)| (name, self.connection(&device).is_some()))
+            .collect();
+        hosts.sort();
+        hosts
+    }
+
+    /// A device was renamed: its live connection takes the new name.
+    pub fn renamed(&self, device: &str, name: &str) {
+        if let Some(conn) = self.by_device.lock().unwrap().get(device) {
+            *conn.name.lock().unwrap() = name.to_owned();
+        }
     }
 
     /// Closes the sockets opened with `token` (its device signed out).
     pub fn close_token(&self, token: &str) {
         let hash = sha256_hex(token.as_bytes());
-        for conn in self.by_name.lock().unwrap().values().flatten() {
+        for conn in self.by_device.lock().unwrap().values() {
             if conn.token_hash == hash {
                 conn.close.cancel();
             }
@@ -223,26 +266,24 @@ impl Hosts {
     }
 
     pub fn shutdown(&self) {
-        for conn in self.by_name.lock().unwrap().values().flatten() {
+        for conn in self.by_device.lock().unwrap().values() {
             conn.close.cancel();
         }
     }
 
     /// Live sockets (tests).
     pub fn online(&self) -> usize {
-        self.list().iter().filter(|(_, online)| *online).count()
+        self.by_device
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|conn| !conn.close.is_cancelled())
+            .count()
     }
 }
 
-/// `GET /host/ws`.
-pub(crate) async fn ws(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    upgrade: Result<WebSocketUpgrade, WebSocketUpgradeRejection>,
-) -> Response {
-    if !state.mcp_agent.enabled {
-        return (StatusCode::NOT_FOUND, "the agent gateway is off").into_response();
-    }
+/// The bearer token and `X-Device` of a device request, checked.
+async fn device_auth(state: &AppState, headers: &HeaderMap) -> Result<(String, String), Response> {
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
@@ -255,11 +296,76 @@ pub(crate) async fn ws(
         .unwrap_or("")
         .to_string();
     if token.is_empty() {
-        return (StatusCode::UNAUTHORIZED, "missing token").into_response();
+        return Err((StatusCode::UNAUTHORIZED, "missing token").into_response());
     }
     if let Err(refused) = check(&state.hub, &token, &device).await {
-        return refused.into_response();
+        return Err(refused.into_response());
     }
+    Ok((token, device))
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct RenameBody {
+    name: String,
+}
+
+/// `POST /device/name` `{"name": ...}`: renames the calling device. The
+/// name is trimmed and must be unique among hosts, ignoring case. Answers
+/// `{"name": <name used>}`, or `{"error": ...}` with 400 (invalid) or 409
+/// ("Another computer is already called X"). Takes effect at once for
+/// `/mcp/agent`; the old name stops working.
+pub(crate) async fn rename(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Option<Json<RenameBody>>,
+) -> Response {
+    let (_, device) = match device_auth(&state, &headers).await {
+        Ok(auth) => auth,
+        Err(refused) => return refused,
+    };
+    let Some(Json(body)) = body else {
+        return rename_error(StatusCode::BAD_REQUEST, "expected {\"name\": ...}");
+    };
+    let hub = state.hub.clone();
+    let renamed = {
+        let device = device.clone();
+        tokio::task::spawn_blocking(move || hub.rename_device(&device, &body.name)).await
+    };
+    match renamed {
+        Ok(Ok(name)) => {
+            state.hosts.renamed(&device, &name);
+            tracing::info!("device renamed");
+            Json(json!({ "name": name })).into_response()
+        }
+        Ok(Err(SyncError::Status(status, message))) => rename_error(
+            StatusCode::from_u16(status).unwrap_or(StatusCode::BAD_REQUEST),
+            &message,
+        ),
+        Ok(Err(error)) => {
+            tracing::warn!("device rename failed: {error}");
+            rename_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error")
+        }
+        Err(_) => rename_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error"),
+    }
+}
+
+fn rename_error(status: StatusCode, message: &str) -> Response {
+    (status, Json(json!({ "error": message }))).into_response()
+}
+
+/// `GET /host/ws`.
+pub(crate) async fn ws(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    upgrade: Result<WebSocketUpgrade, WebSocketUpgradeRejection>,
+) -> Response {
+    if !state.mcp_agent.enabled {
+        return (StatusCode::NOT_FOUND, "the agent gateway is off").into_response();
+    }
+    let (token, device) = match device_auth(&state, &headers).await {
+        Ok(auth) => auth,
+        Err(refused) => return refused,
+    };
     let name = state
         .hub
         .devices()
@@ -277,9 +383,18 @@ pub(crate) async fn ws(
         Ok(u) => u,
         Err(r) => return r.into_response(),
     };
+    let hub = state.hub.clone();
+    let marked = {
+        let device = device.clone();
+        tokio::task::spawn_blocking(move || hub.mark_host(&device)).await
+    };
+    if !matches!(marked, Ok(Ok(()))) {
+        tracing::warn!("host socket: could not mark the device as a host");
+        return (StatusCode::INTERNAL_SERVER_ERROR, "could not register the host").into_response();
+    }
     upgrade.on_upgrade(move |socket| async move {
         let (out_tx, out_rx) = mpsc::unbounded_channel::<String>();
-        let conn = state.hosts.register(&name, &token, out_tx);
+        let conn = state.hosts.register(&device, &name, &token, out_tx);
         serve(&state, &conn, &token, &device, socket, out_rx).await;
         conn.close.cancel();
         // Waiting calls see the closed socket and fail as offline.

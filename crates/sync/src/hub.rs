@@ -278,6 +278,17 @@ impl Hub {
         self.tokens.devices()
     }
 
+    /// Marks `device` as a host (it connected to the host relay).
+    pub fn mark_host(&self, device: &str) -> Result<()> {
+        self.tokens.mark_host(device)
+    }
+
+    /// Renames `device`; the name must be unique among hosts, ignoring
+    /// case. Returns the name used.
+    pub fn rename_device(&self, device: &str, name: &str) -> Result<String> {
+        self.tokens.rename(device, name)
+    }
+
     /// Serves on `addr` (for example `100.101.102.103:8787`, or
     /// `127.0.0.1:0` for any free port) until the returned server is
     /// stopped or dropped.

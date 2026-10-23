@@ -166,8 +166,8 @@ async fn close_remote(hosts: &Hosts, session: &Session) {
     let names: Vec<String> = std::mem::take(&mut *session.remote_hosts.lock().unwrap())
         .into_iter()
         .collect();
-    for name in names {
-        if let Lookup::Online(conn) = hosts.lookup(&name) {
+    for device in names {
+        if let Some(conn) = hosts.connection(&device) {
             let params = relay::CloseParams {
                 session: session.relay_id.clone(),
             };
@@ -204,7 +204,7 @@ fn unavailable_host(state: &AppState, host: &str, why: &str) -> String {
     available.extend(
         state
             .hosts
-            .list()
+            .list(&state.hub)
             .into_iter()
             .filter(|(_, online)| *online)
             .map(|(name, _)| name),
@@ -240,9 +240,9 @@ async fn host(state: &AppState, selected: &str) -> Result<Target, String> {
             .map(Target::Hub)
             .map_err(|why| unavailable_host(state, selected, &why));
     }
-    match state.hosts.lookup(selected) {
+    match state.hosts.lookup(&state.hub, selected) {
         Lookup::Online(conn) => Ok(Target::Remote(conn)),
-        Lookup::Offline => Err(hosts::offline(selected)),
+        Lookup::Offline(name) => Err(hosts::offline(&name)),
         Lookup::Unknown => Err(unavailable_host(state, selected, "unknown host")),
     }
 }
@@ -275,7 +275,7 @@ async fn host_definitions(
                 )
                 .await?;
             let listed: relay::ToolsResult = serde_json::from_value(reply)
-                .map_err(|_| format!("{} sent an invalid tool list", conn.name))?;
+                .map_err(|_| format!("{} sent an invalid tool list", conn.name()))?;
             Ok(listed
                 .tools
                 .into_iter()
@@ -743,7 +743,7 @@ async fn run_on(
                 .remote_hosts
                 .lock()
                 .unwrap()
-                .insert(conn.name.clone());
+                .insert(conn.device.clone());
             call_remote(ctx.state, &conn, session, name, arguments, client).await
         }
     })
@@ -803,7 +803,7 @@ async fn locked_call(
                 tool_result(id, Ok(agent.gateway_js_help(args["query"].as_str())))
             }
             Target::Remote(conn) => {
-                tool_result(id, Err(format!("js_help is not offered by {}", conn.name)))
+                tool_result(id, Err(format!("js_help is not offered by {}", conn.name())))
             }
         });
     }
@@ -817,9 +817,9 @@ fn pick_computer(state: &AppState, host: Option<&str>) -> Result<(String, Arc<Ho
     let Some(name) = host.filter(|name| !name.is_empty()) else {
         return Err("Unknown computer (no host given). Call hosts.".into());
     };
-    match state.hosts.lookup(name) {
-        Lookup::Online(conn) => Ok((conn.name.clone(), conn)),
-        Lookup::Offline => Err(hosts::offline(name)),
+    match state.hosts.lookup(&state.hub, name) {
+        Lookup::Online(conn) => Ok((conn.name(), conn)),
+        Lookup::Offline(name) => Err(hosts::offline(&name)),
         Lookup::Unknown => Err(format!("Unknown computer {name}. Call hosts.")),
     }
 }
@@ -879,7 +879,7 @@ async fn any_call(
             let list: Vec<Value> = ctx
                 .state
                 .hosts
-                .list()
+                .list(&ctx.state.hub)
                 .into_iter()
                 .map(|(name, online)| json!({"name":name,"online":online}))
                 .collect();
@@ -1052,5 +1052,5 @@ async fn call_remote(
             state.hosts.call_timeout(),
         )
         .await?;
-    serde_json::from_value(reply).map_err(|_| format!("{} sent an invalid result", conn.name))
+    serde_json::from_value(reply).map_err(|_| format!("{} sent an invalid result", conn.name()))
 }

@@ -365,6 +365,7 @@ fn router(state: Arc<AppState>) -> Router {
         .route("/auth/signout", post(login::signout))
         .route("/agent/ws", get(agent::ws))
         .route("/host/ws", get(hosts::ws))
+        .route("/device/name", post(hosts::rename))
         .route(
             "/agent-tokens",
             get(agent_token_api::list).post(agent_token_api::create),

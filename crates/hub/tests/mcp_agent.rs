@@ -2316,3 +2316,91 @@ async fn agent_and_device_tokens_cannot_drive_any_computer() {
     }
     env.stop().await;
 }
+
+async fn rename_device(env: &Env, token: &str, device: &str, name: &str) -> (StatusCode, Value) {
+    let reply = env
+        .client
+        .post(format!("{}/device/name", env.base))
+        .bearer_auth(token)
+        .header("X-Device", device)
+        .json(&json!({ "name": name }))
+        .send()
+        .await
+        .unwrap();
+    let status = reply.status();
+    (status, reply.json().await.unwrap_or(Value::Null))
+}
+
+#[tokio::test]
+async fn a_renamed_computer_routes_by_its_new_name_and_names_stay_unique_among_hosts() {
+    let env = Env::new().await;
+    let hub = env.server.hub();
+    let (desk_token, _) = hub.login_device("dev-desk", "pc").unwrap();
+    let _desk = FakeHost::connect(&env.base, &desk_token, "dev-desk", computer("pc", vec![])).await;
+    let (laptop_token, _) = hub.login_device("dev-laptop", "laptop").unwrap();
+    let _laptop = FakeHost::connect(
+        &env.base,
+        &laptop_token,
+        "dev-laptop",
+        computer("laptop", vec![]),
+    )
+    .await;
+    wait_online(&env, 2).await;
+    // A sign-in that never ran the relay, and a host that is offline (as
+    // after a hub restart: marked in tokens.json, no connection).
+    hub.login_device("dev-stale", "Desk").unwrap();
+    hub.login_device("dev-office", "Office").unwrap();
+    hub.mark_host("dev-office").unwrap();
+    let token = env.ann();
+    let url = env.url.clone();
+    let session = env.initialize(&token).await;
+
+    // The stale sign-in does not hold "Desk".
+    let (status, body) = rename_device(&env, &desk_token, "dev-desk", "  Desk ").await;
+    assert_eq!((status, &body), (StatusCode::OK, &json!({"name":"Desk"})));
+    let reply = env
+        .call_at(&url, &token, Some(&session), "read", json!({"path":"a","host":"desk"}))
+        .await;
+    assert_eq!(success_text(&reply), "[on Desk]\npc ran read");
+    let reply = env
+        .call_at(&url, &token, Some(&session), "read", json!({"path":"a","host":"pc"}))
+        .await;
+    assert_eq!(tool_error(&reply), "Unknown computer pc. Call hosts.");
+    let locked = format!("{url}?host=Desk");
+    let reply = env
+        .call_at(&locked, &token, Some(&session), "read", json!({"path":"a"}))
+        .await;
+    assert_eq!(success_text(&reply), "pc ran read");
+    let reply = env.call_at(&url, &token, None, "hosts", json!({})).await;
+    let hosts: Value = serde_json::from_str(&success_text(&reply)).unwrap();
+    assert_eq!(
+        hosts,
+        json!([
+            {"name":"Desk","online":true},
+            {"name":"Office","online":false},
+            {"name":"laptop","online":true}
+        ])
+    );
+
+    // Another host's name is refused, ignoring case, offline hosts included.
+    for taken in ["DESK", "office"] {
+        let (status, body) = rename_device(&env, &laptop_token, "dev-laptop", taken).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(
+            body["error"],
+            format!("Another computer is already called {taken}")
+        );
+    }
+    let reply = env
+        .call_at(&url, &token, Some(&session), "read", json!({"path":"a","host":"office"}))
+        .await;
+    assert_eq!(tool_error(&reply), "Office is offline");
+    let (status, _) = rename_device(&env, &laptop_token, "dev-laptop", " ").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = rename_device(&env, "wrong", "dev-laptop", "x").await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let reply = env
+        .call_at(&url, &token, Some(&session), "read", json!({"path":"a","host":"laptop"}))
+        .await;
+    assert_eq!(success_text(&reply), "[on laptop]\nlaptop ran read");
+}
