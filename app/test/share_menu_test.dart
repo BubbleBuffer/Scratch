@@ -1,9 +1,10 @@
-// The page menu's Share item: shown only with a hub sign-in, and it opens the
-// Share popup. Needs the full app and the Rust bridge.
+// The Share entry of the page menu: shown only with a hub sign-in, and
+// Share opens the popup for the page. Runs in the full app, so it needs the
+// Rust bridge (CI runs it).
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/features/share/share_popup.dart';
 
 import 'harness.dart';

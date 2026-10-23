@@ -701,13 +701,13 @@ async fn open_without_a_session_bounces_with_a_sign_in_button() {
         html.contains(&format!("href=\"/auth/web?return=/open/{}\"", f.trip)),
         "{html}"
     );
-    assert!(html.contains("Sign in to view in the browser"));
+    assert!(html.contains("View in browser"));
     assert!(!html.contains("Lisbon") && !html.contains("Plan"));
     // A made-up cookie is no session.
     let (_, _, html) = e
         .get(&format!("/open/{}", f.trip), Some("scratch_session=00ff"))
         .await;
-    assert!(html.contains("Sign in to view in the browser"));
+    assert!(html.contains("View in browser"));
 }
 
 #[tokio::test]
@@ -774,7 +774,7 @@ async fn web_login_sets_a_session_cookie_refuses_others_and_logs_out() {
     assert_eq!(r.headers()[header::LOCATION].to_str().unwrap(), open);
     assert!(set_cookie(&r).unwrap().contains("Max-Age=0"));
     let (_, _, html) = e.get(&open, Some(&cookie)).await;
-    assert!(html.contains("Sign in to view in the browser"), "{html}");
+    assert!(html.contains("View in browser"), "{html}");
 }
 
 fn urlencode(s: &str) -> String {

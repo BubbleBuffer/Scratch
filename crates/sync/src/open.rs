@@ -18,9 +18,9 @@ pub fn bounce_page(page: &str, block: Option<&str>) -> Result<String, &'static s
     bounce_page_with(page, block, "")
 }
 
-/// [`bounce_page`] with `extra`, trusted HTML the caller built, shown under
-/// the link (the standalone hub adds its "Sign in to view in the browser"
-/// button there).
+/// [`bounce_page`] with `extra`, trusted HTML the caller built, shown after
+/// the "Open in Scratch" button (the standalone hub adds its "View in
+/// browser" button there).
 pub fn bounce_page_with(
     page: &str,
     block: Option<&str>,
@@ -59,18 +59,30 @@ fn open_html(target: &str, extra: &str) -> String {
         .replace('>', "\\u003e")
         .replace('&', "\\u0026");
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-<meta name=\"referrer\" content=\"no-referrer\">\n\
-<meta http-equiv=\"refresh\" content=\"0; url={attr}\">\n\
-<title>Opening in Scratch</title>\n\
-<style>body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;\
-font:16px/1.5 system-ui,sans-serif;text-align:center}}main{{padding:16px}}</style>\n\
-</head>\n<body>\n<main>\n<p><a href=\"{attr}\">Open in Scratch</a></p>\n\
-<p>You can close this tab.</p>\n{extra}</main>\n<script>location.replace({js});</script>\n\
-</body>\n</html>\n"
+        "<!doctype html>
+<html lang=\"en\">
+<head>
+<meta charset=\"utf-8\">
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<meta name=\"referrer\" content=\"no-referrer\">
+<meta http-equiv=\"refresh\" content=\"0; url={attr}\">
+<title>Opening in Scratch</title>
+<style>{BOUNCE_STYLE}</style>
+</head>
+<body>
+<main>
+<h1>Open this note</h1>
+<p class=\"actions\"><a class=\"btn primary\" href=\"{attr}\">Open in Scratch</a>{extra}</p>
+</main>
+<script>location.replace({js});</script>
+</body>
+</html>
+"
     )
 }
+
+/// The bounce page's look: the app's colours, light and dark.
+const BOUNCE_STYLE: &str = "body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font:16px/1.5 system-ui,sans-serif;text-align:center;background:#FFFAF1;color:#282A2F}main{padding:16px}h1{font-size:24px;font-weight:640;margin:0 0 20px}.actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:0}.btn{display:inline-block;padding:9px 18px;border-radius:7px 11px 6px 9px;border:1px solid #E4DCCF;color:#282A2F;background:#F3EFE7;font-weight:600;text-decoration:none}.btn.primary{background:#DE945F;border-color:#DE945F;font-weight:700}@media (prefers-color-scheme:dark){body{background:#30333A;color:#F3EFE7}.btn{background:#2A2D33;border-color:#41444C;color:#F3EFE7}.btn.primary{background:#F0A064;border-color:#F0A064;color:#282A2F}}";
 
 fn html_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());

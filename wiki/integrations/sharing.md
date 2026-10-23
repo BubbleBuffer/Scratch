@@ -26,14 +26,14 @@ Routes, config and security for the hub as a whole are in [Hub server](../archit
 - **Inline databases.** An inline database block becomes a plain table: Name plus the schema's columns, at most 200 rows, with "N of M rows" when cut. Rows come from `Vault::query`. A link-to-page block becomes "↳ Title".
 - **Images and files.** These point at the route that serves the page, `/open/<id>/a/<attachment>` or `/s/<token>/a/<attachment>`. Each request passes the same access check as the page, and only attachments the page itself uses (its image and file blocks, plus its cover) are served. Attachments are sent with `X-Content-Type-Options: nosniff` and a sandboxing CSP. Anything that isn't an image is sent as a download.
 - **Links.** A link to another page is a real link only in the signed-in viewer, and only when the target page exists and isn't in the trash. Otherwise it's plain text, as it always is on share pages. External links are kept only for `http`, `https` and `mailto`, and get `rel="noopener noreferrer nofollow"`.
-- **Look.** The page's CSS is inline and uses the app's palette and fonts, light and dark through `prefers-color-scheme`. Pages load nothing from outside.
+- **Look.** The page's CSS is inline and uses the app's palette and fonts, light and dark through `prefers-color-scheme`. Images are capped at the page width and 70% of the window height. Pages load nothing from outside.
 
 ## Web viewer and sign-in
 
 `GET /open/<id>`:
 
 - **With a hub web session:** the rendered page, with "Open in app", "Share" and "Sign out" buttons.
-- **Without one:** the bounce page to `notes://page/<id>` as before, plus a "Sign in to view in the browser" button, which appears only when OIDC is configured. The app's deep links work as before.
+- **Without one:** the bounce page, which still sends the browser to `notes://page/<id>` straight away. It reads "Open this note", with an "Open in Scratch" button and, when OIDC is configured, a "View in browser" button that goes through sign-in. The app's deep links work as before.
 
 The sign-in is `GET /auth/web?return=<path>`. It uses the same OIDC provider, PKCE and callback as the app login (`<public_url>/auth/callback`), so the provider needs no change. `return` must be `/open/<page id>` or `/s/<token>`.
 
@@ -89,9 +89,11 @@ The page menu has **Share** when the app is signed in to a hub, on desktop and p
 - Public / Private, default Private;
 - This version / Live link, default This version;
 - **Create link**, which copies the new URL and shows it;
-- the page's links, each with its kind and age, and Copy and Revoke.
+- the page's links, each with its kind and age, Copy and Revoke ("No links yet." when there are none).
 
-The viewer's Share button opens the same controls in a small HTML dialog, the only script on the viewer.
+The two choices are labelled "Who can view" and "What to share", and only the selected option's explanation shows. A copy is confirmed in place: the button reads "Copied" for two seconds. Revoke asks in the row first ("Revoke this link? It stops working for everyone.", Cancel or Revoke).
+
+The viewer's Share button opens the same controls, with the same behaviour, in a small HTML dialog, the only script on the viewer.
 
 ## Tests
 

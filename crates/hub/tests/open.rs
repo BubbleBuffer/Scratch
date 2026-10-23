@@ -62,7 +62,8 @@ async fn open_route_bounces_vault_ids_and_refuses_the_rest() {
         body.contains(&format!("href=\"notes://page/{PAGE}\">Open in Scratch</a>")),
         "{body}"
     );
-    assert!(body.contains("You can close this tab."), "{body}");
+    assert!(body.contains("<h1>Open this note</h1>"), "{body}");
+    assert!(!body.contains("close this tab"), "{body}");
 
     // A block: the target carries it.
     let r = client

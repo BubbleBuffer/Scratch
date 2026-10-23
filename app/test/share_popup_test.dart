@@ -178,6 +178,8 @@ void main() {
     expect(key('share-visibility-private'), findsOneWidget);
     expect(key('share-kind-snapshot'), findsOneWidget);
     expect(key('share-kind-live'), findsOneWidget);
+    expect(find.text('Who can view'), findsOneWidget);
+    expect(find.text('What to share'), findsOneWidget);
     expect(find.text('Only people signed in to this hub can view.'), findsOneWidget);
     expect(find.text('A copy of the page as it is now.'), findsOneWidget);
     expect(key('share-create'), findsOneWidget);
@@ -207,7 +209,10 @@ void main() {
     expect(hub.created, [(_page, 'public', 'live')]);
     expect(copied, ['https://hub.example.com/s/new1']);
     expect(t.widget<Text>(key('share-url')).data, 'https://hub.example.com/s/new1');
-    expect(find.text('Link copied'), findsOneWidget);
+    expect(find.text('Copied'), findsOneWidget);
+    await t.pump(const Duration(seconds: 3));
+    expect(find.text('Copied'), findsNothing);
+    expect(find.text('Copy'), findsWidgets);
     expect(key('share-row-new1'), findsOneWidget);
     expect(find.text('Public · Live link'), findsOneWidget);
   });
@@ -281,7 +286,16 @@ void main() {
 
     await tapAndSettle(t, key('share-copy-a1'));
     expect(copied, ['https://hub.example.com/s/a1']);
-    expect(find.text('Link copied'), findsOneWidget);
+    expect(
+      find.descendant(of: key('share-row-a1'), matching: find.text('Copied')),
+      findsOneWidget,
+    );
+    await t.pump(const Duration(seconds: 3));
+    expect(find.text('Copied'), findsNothing);
+    expect(
+      find.descendant(of: key('share-row-a1'), matching: find.text('Copy')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Revoke calls the hub and removes the row', (t) async {
@@ -307,10 +321,41 @@ void main() {
     await pumpPopup(t);
 
     await tapAndSettle(t, key('share-revoke-a1'));
+    expect(key('share-confirm-a1'), findsOneWidget);
+    expect(
+      find.text('Revoke this link? It stops working for everyone.'),
+      findsOneWidget,
+    );
+    expect(hub.revoked, isEmpty);
+
+    await tapAndSettle(t, key('share-revoke-confirm-a1'));
 
     expect(hub.revoked, ['a1']);
     expect(key('share-row-a1'), findsNothing);
     expect(key('share-row-a2'), findsOneWidget);
+  });
+
+  testWidgets('Cancel restores the row without calling the hub', (t) async {
+    final now = clockNow().millisecondsSinceEpoch;
+    hub.shares.add(
+      Share(
+        id: 'a1',
+        url: 'https://hub.example.com/s/a1',
+        page: _page,
+        visibility: 'public',
+        kind: 'snapshot',
+        created: now,
+      ),
+    );
+    await pumpPopup(t);
+
+    await tapAndSettle(t, key('share-revoke-a1'));
+    await tapAndSettle(t, key('share-cancel-a1'));
+
+    expect(key('share-confirm-a1'), findsNothing);
+    expect(key('share-row-a1'), findsOneWidget);
+    expect(key('share-revoke-a1'), findsOneWidget);
+    expect(hub.revoked, isEmpty);
   });
 
   testWidgets('an error from create shows an error line and keeps the popup open', (t) async {

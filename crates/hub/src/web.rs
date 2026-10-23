@@ -441,14 +441,6 @@ pub(crate) struct OpenQuery {
     block: Option<String>,
 }
 
-/// The app's colours for the bounce page, light and dark, added with the
-/// sign-in button; the page itself comes from `vault_sync::open`.
-const BOUNCE_STYLE: &str = "<style>body{background:#FFFAF1;color:#282A2F}\
-a{color:#874016}a.signin{display:inline-block;margin-top:8px;padding:8px 16px;\
-border-radius:7px 11px 6px 9px;background:#DE945F;color:#282A2F;font-weight:700;\
-text-decoration:none}@media (prefers-color-scheme:dark){body{background:#30333A;\
-color:#F3EFE7}a{color:#F0A064}a.signin{background:#F0A064;color:#282A2F}}</style>\n";
-
 /// `GET /open/<page id>[?block=<block id>]`.
 pub(crate) async fn open_page(
     State(state): State<Arc<AppState>>,
@@ -461,10 +453,7 @@ pub(crate) async fn open_page(
     }
     if session(&state, &headers).is_none() {
         let extra = if state.web.login {
-            format!(
-                "{BOUNCE_STYLE}<p><a class=\"signin\" href=\"/auth/web?return=/open/{page}\">\
-                 Sign in to view in the browser</a></p>\n"
-            )
+            format!("<a class=\"btn\" href=\"/auth/web?return=/open/{page}\">View in browser</a>")
         } else {
             String::new()
         };

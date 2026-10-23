@@ -41,7 +41,7 @@ article pre{background:var(--card);padding:12px 14px;border-radius:4px;overflow:
 article pre code{color:var(--text);background:none;padding:0;font-size:13.6px;line-height:20.4px}
 article hr{border:0;border-top:1px solid var(--border);margin:1.2em 0}
 article figure{margin:.8em 0}
-article img{max-width:100%;height:auto;border-radius:6px;display:block}
+article img{max-width:100%;max-height:70vh;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block}
 article table,.db table{border-collapse:collapse;font-size:14px;margin:.6em 0}
 article th,article td,.db th,.db td{border:1px solid var(--border);padding:6px 10px;text-align:left;vertical-align:top}
 article th,.db th{font-weight:600;color:var(--muted)}
@@ -62,10 +62,14 @@ dialog .hint{margin:-4px 0 12px;font-size:13px}
 dialog .list-h{font-size:14px;margin:16px 0 6px}
 dialog::backdrop{background:rgba(0,0,0,.3)}
 dialog h2{font:640 20px/1.3 "Bricolage Grotesque",system-ui,sans-serif;margin:0 0 14px}
-.seg{display:flex;border:1px solid var(--line);border-radius:7px 11px 6px 9px;overflow:hidden;margin-bottom:10px}
+.seg{display:flex;border:1px solid var(--border);border-radius:7px 11px 6px 9px;overflow:hidden;margin-bottom:10px}
 .seg label{flex:1;text-align:center;padding:7px 0;font-size:14px;cursor:pointer}
 .seg input{position:absolute;opacity:0;pointer-events:none}
-.seg label:has(input:checked){background:var(--card);font-weight:700}
+.seg label{color:var(--muted)}.seg label:has(input:checked){background:var(--accent);color:#282A2F;font-weight:700}
+.seg label:has(input:focus-visible){outline:2px solid var(--link);outline-offset:-2px}
+dialog .group-h{font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 6px}
+.share-list li.empty{color:var(--muted);border-bottom:0}
+.btn.danger{color:var(--link)}
 .share-url{display:flex;gap:6px;margin:12px 0}
 .share-url input{flex:1;min-width:0;height:34px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);padding:0 8px;font:13px "Fragment Mono",ui-monospace,monospace}
 .share-list{list-style:none;padding:0;margin:0;border-top:1px solid var(--border)}
@@ -183,36 +187,47 @@ const SHARE_DIALOG: &str = r#"<dialog id="share" aria-labelledby="share-h">
 <form method="dialog"><button class="btn small close" aria-label="Close">Close</button></form>
 <h2 id="share-h">Share this note</h2>
 <form id="share-form">
-<div class="seg" role="radiogroup" aria-label="Who can open it">
+<p class="group-h" id="vis-h">Who can view</p>
+<div class="seg" role="radiogroup" aria-labelledby="vis-h">
 <label><input type="radio" name="visibility" value="public">Public</label>
 <label><input type="radio" name="visibility" value="private" checked>Private</label>
 </div>
-<p class="muted hint">Public: anyone with the link. Private: only people signed in to this hub.</p>
-<div class="seg" role="radiogroup" aria-label="What the link shows">
+<p class="muted hint" data-hint="visibility" data-value="public" hidden>Anyone with the link can view.</p>
+<p class="muted hint" data-hint="visibility" data-value="private">Only people signed in to this hub can view.</p>
+<p class="group-h" id="kind-h">What to share</p>
+<div class="seg" role="radiogroup" aria-labelledby="kind-h">
 <label><input type="radio" name="kind" value="snapshot" checked>This version</label>
 <label><input type="radio" name="kind" value="live">Live link</label>
 </div>
-<p class="muted hint">This version: a copy of the page as it is now. Live link: always the latest.</p>
+<p class="muted hint" data-hint="kind" data-value="snapshot">A copy of the page as it is now.</p>
+<p class="muted hint" data-hint="kind" data-value="live" hidden>Always shows the latest version.</p>
 <button class="btn primary" type="submit" style="width:100%">Create link</button>
 </form>
 <div class="share-url" id="share-made" hidden><input id="share-url" readonly aria-label="Link"><button class="btn small" id="share-copy" type="button">Copy</button></div>
 <p class="status" id="share-status" role="status"></p>
 <h3 class="list-h">Links to this page</h3>
-<ul class="share-list" id="share-list"></ul>
+<ul class="share-list" id="share-list"><li class="empty">No links yet.</li></ul>
 </dialog>
 "#;
 
 const SHARE_SCRIPT: &str = r#"
 (function(){
-const page=document.body.dataset.page,dlg=document.getElementById('share'),list=document.getElementById('share-list'),status=document.getElementById('share-status');
+const page=document.body.dataset.page,dlg=document.getElementById('share'),list=document.getElementById('share-list'),status=document.getElementById('share-status'),form=document.getElementById('share-form');
 function say(t){status.textContent=t}
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function btn(text,cls){const b=el('button','btn small'+(cls?' '+cls:''),text);b.type='button';return b}
 async function api(method,path,body){const o={method,credentials:'same-origin',headers:{}};if(body){o.headers['Content-Type']='application/json';o.body=JSON.stringify(body)}const r=await fetch(path,o);if(!r.ok){let e=r.status;try{e=(await r.json()).error||e}catch(_){}throw new Error(e)}return r.status===204?null:r.json()}
 function what(s){return (s.visibility==='public'?'Public':'Private')+' · '+(s.kind==='live'?'Live link':'This version')}
-async function copy(url){try{await navigator.clipboard.writeText(url);say('Link copied')}catch(_){say('Copy the link above')}}
-async function load(){list.textContent='';try{const r=await api('GET','/shares?page='+encodeURIComponent(page));for(const s of r.shares){const li=document.createElement('li'),w=document.createElement('span'),when=document.createElement('span');w.className='what';w.textContent=what(s);when.className='when';when.textContent=new Date(s.created).toLocaleString();w.appendChild(when);const c=document.createElement('button');c.className='btn small';c.type='button';c.textContent='Copy';c.onclick=()=>copy(s.url);const x=document.createElement('button');x.className='btn small';x.type='button';x.textContent='Revoke';x.onclick=async()=>{try{await api('DELETE','/shares/'+encodeURIComponent(s.id));say('Link revoked');load()}catch(e){say('Could not revoke: '+e.message)}};li.append(w,c,x);list.appendChild(li)}}catch(e){say('Could not load links: '+e.message)}}
-document.getElementById('share-open').onclick=()=>{say('');dlg.showModal();load()};
-document.getElementById('share-form').onsubmit=async(ev)=>{ev.preventDefault();const f=new FormData(ev.target);try{const s=await api('POST','/shares',{page,visibility:f.get('visibility'),kind:f.get('kind')});document.getElementById('share-made').hidden=false;const u=document.getElementById('share-url');u.value=s.url;u.select();await copy(s.url);load()}catch(e){say('Could not create the link: '+e.message)}};
-document.getElementById('share-copy').onclick=()=>copy(document.getElementById('share-url').value);
+async function copy(url,b){try{await navigator.clipboard.writeText(url);if(b){b.textContent='Copied';clearTimeout(b._t);b._t=setTimeout(()=>{b.textContent='Copy'},2000)}}catch(_){say('Copy the link above')}}
+function hints(){for(const h of form.querySelectorAll('[data-hint]')){const c=form.querySelector('input[name="'+h.dataset.hint+'"]:checked');h.hidden=!c||c.value!==h.dataset.value}}
+form.addEventListener('change',hints);
+function row(s){const li=el('li');function show(){li.textContent='';const w=el('span','what',what(s));w.appendChild(el('span','when',new Date(s.created).toLocaleString()));const c=btn('Copy');c.onclick=()=>copy(s.url,c);const x=btn('Revoke','danger');x.onclick=ask;li.append(w,c,x)}function ask(){li.textContent='';const q=el('span','what','Revoke this link? It stops working for everyone.');const no=btn('Cancel');no.onclick=show;const yes=btn('Revoke','danger');yes.onclick=async()=>{try{await api('DELETE','/shares/'+encodeURIComponent(s.id));load()}catch(e){say('Could not revoke: '+e.message);show()}};li.append(q,no,yes)}show();return li}
+function empty(){list.textContent='';list.appendChild(el('li','empty','No links yet.'))}
+async function load(){try{const r=await api('GET','/shares?page='+encodeURIComponent(page));list.textContent='';if(!r.shares.length){empty();return}for(const s of r.shares)list.appendChild(row(s))}catch(e){say('Could not load links: '+e.message)}}
+document.getElementById('share-open').onclick=()=>{say('');hints();dlg.showModal();load()};
+const made=document.getElementById('share-copy');
+form.onsubmit=async(ev)=>{ev.preventDefault();const f=new FormData(form);try{const s=await api('POST','/shares',{page,visibility:f.get('visibility'),kind:f.get('kind')});document.getElementById('share-made').hidden=false;const u=document.getElementById('share-url');u.value=s.url;u.select();await copy(s.url,made);load()}catch(e){say('Could not create the link: '+e.message)}};
+made.onclick=()=>copy(document.getElementById('share-url').value,made);
 })();
 "#;
 

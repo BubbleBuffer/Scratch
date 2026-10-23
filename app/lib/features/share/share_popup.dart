@@ -3,15 +3,14 @@
 // page or a live link. A centred panel on desktop, a sheet on phones.
 // Shown only for a document page while this device is signed in to a hub.
 
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../state/app_state.dart';
-import '../../ui/database/widgets.dart' show ChipBtn;
-import '../../ui/toast.dart';
 import '../../ui/ui.dart';
 import '../ai/agent_token_client.dart' show AgentTokenClient;
-import '../settings/controls.dart' show CopyableText;
 import 'share_client.dart';
 
 /// Builds the client for this device, or null when it is not signed in to
@@ -68,6 +67,9 @@ class SharePopup extends StatefulWidget {
   State<SharePopup> createState() => _SharePopupState();
 }
 
+/// Key for the link field made just now; a share's own id keys its row.
+const _createdCopyKey = 'created';
+
 class _SharePopupState extends State<SharePopup> {
   ShareClient? _client;
   bool _started = false;
@@ -82,6 +84,14 @@ class _SharePopupState extends State<SharePopup> {
   /// The link just created, shown in a copyable field until revoked.
   Share? _created;
 
+  /// Which Copy button just copied (_createdCopyKey or a share id). It reads
+  /// "Copied" for two seconds.
+  String? _copiedKey;
+  Timer? _copyTimer;
+
+  /// The share whose row asks "Revoke this link?", waiting for a second press.
+  String? _confirming;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -89,6 +99,12 @@ class _SharePopupState extends State<SharePopup> {
     _started = true;
     _client = (SharePopup.debugClientFor ?? defaultShareClient)(context);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _copyTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -130,7 +146,7 @@ class _SharePopupState extends State<SharePopup> {
         if (links != null) _links = [share, ...links];
       });
       if (_links == null) _load();
-      showToast(context, 'Link copied');
+      _markCopied(_createdCopyKey);
     } on ShareException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -138,15 +154,26 @@ class _SharePopupState extends State<SharePopup> {
     }
   }
 
-  Future<void> _copy(Share s) async {
-    await Clipboard.setData(ClipboardData(text: s.url));
-    if (mounted) showToast(context, 'Link copied');
+  Future<void> _copy(String key, String url) async {
+    await Clipboard.setData(ClipboardData(text: url));
+    if (mounted) _markCopied(key);
+  }
+
+  void _markCopied(String key) {
+    _copyTimer?.cancel();
+    setState(() => _copiedKey = key);
+    _copyTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _copiedKey = null);
+    });
   }
 
   Future<void> _revoke(Share s) async {
     final client = _client;
     if (client == null) return;
-    setState(() => _error = null);
+    setState(() {
+      _error = null;
+      _confirming = null;
+    });
     try {
       await client.revoke(s.id);
       if (!mounted) return;
@@ -159,40 +186,107 @@ class _SharePopupState extends State<SharePopup> {
     }
   }
 
-  Widget _choice(
-    BuildContext context, {
-    required String group,
-    required List<(String, String)> options,
-    required String current,
-    required ValueChanged<String> onPick,
-  }) {
-    final h = context.mobile ? 32.0 : 24.0;
-    return Row(
-      children: [
-        for (final (value, label) in options) ...[
-          ChipBtn(
-            key: ValueKey('share-$group-$value'),
-            label: label,
-            active: current == value,
-            height: h,
-            onTap: () => onPick(value),
-          ),
-          const SizedBox(width: 6),
-        ],
-      ],
-    );
-  }
+  Widget _label(BuildContext context, String text, {Key? key}) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text,
+      key: key,
+      style: tsRaw(12, 16, 500, context.colors.textSecondary),
+    ),
+  );
 
   Widget _hint(BuildContext context, String text) => Padding(
-    padding: const EdgeInsets.only(top: 6, bottom: 12),
+    padding: const EdgeInsets.only(top: 6, bottom: 14),
     child: Text(
       text,
       style: tsRaw(12, 16, 400, context.colors.textSecondary),
     ),
   );
 
+  Widget _segmented(
+    BuildContext context, {
+    required String group,
+    required List<(String, String)> options,
+    required String current,
+    required ValueChanged<String> onPick,
+  }) {
+    final c = context.colors;
+    final h = context.mobile ? 36.0 : 28.0;
+    return Container(
+      height: h,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: c.bgPrimary,
+        borderRadius: BorderRadius.circular(h / 2),
+      ),
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(h / 2),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (value, label) in options)
+            Expanded(
+              child: _SegmentHalf(
+                key: ValueKey('share-$group-$value'),
+                label: label,
+                selected: current == value,
+                onTap: () => onPick(value),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _copyButton(BuildContext context, String key, VoidCallback onTap) =>
+      TextBtn(
+        _copiedKey == key ? 'Copied' : 'Copy',
+        key: ValueKey(
+          key == _createdCopyKey ? 'share-url-copy' : 'share-copy-$key',
+        ),
+        color: context.colors.textSecondary,
+        onTap: onTap,
+      );
+
   Widget _row(BuildContext context, Share s) {
     final c = context.colors;
+    if (_confirming == s.id) {
+      return Padding(
+        key: ValueKey('share-row-${s.id}'),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Revoke this link? It stops working for everyone.',
+              key: ValueKey('share-confirm-${s.id}'),
+              style: tsRaw(14, 20, 400, c.textPrimary),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextBtn(
+                  'Cancel',
+                  key: ValueKey('share-cancel-${s.id}'),
+                  color: c.textSecondary,
+                  onTap: () => setState(() => _confirming = null),
+                ),
+                const SizedBox(width: 8),
+                TextBtn(
+                  'Revoke',
+                  key: ValueKey('share-revoke-confirm-${s.id}'),
+                  color: c.inlineCodeText,
+                  onTap: () => _revoke(s),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
     return Padding(
       key: ValueKey('share-row-${s.id}'),
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -210,18 +304,13 @@ class _SharePopupState extends State<SharePopup> {
               ],
             ),
           ),
-          TextBtn(
-            'Copy',
-            key: ValueKey('share-copy-${s.id}'),
-            color: c.textSecondary,
-            onTap: () => _copy(s),
-          ),
+          _copyButton(context, s.id, () => _copy(s.id, s.url)),
           const SizedBox(width: 8),
           TextBtn(
             'Revoke',
             key: ValueKey('share-revoke-${s.id}'),
             color: c.inlineCodeText,
-            onTap: () => _revoke(s),
+            onTap: () => setState(() => _confirming = s.id),
           ),
         ],
       ),
@@ -247,6 +336,7 @@ class _SharePopupState extends State<SharePopup> {
       );
     }
 
+    final created = _created;
     return SingleChildScrollView(
       key: const ValueKey('share-popup'),
       padding: EdgeInsets.all(pad),
@@ -263,7 +353,12 @@ class _SharePopupState extends State<SharePopup> {
             style: tsRaw(13, 18, 400, c.textSecondary),
           ),
           const SizedBox(height: 16),
-          _choice(
+          _label(
+            context,
+            'Who can view',
+            key: const ValueKey('share-label-visibility'),
+          ),
+          _segmented(
             context,
             group: 'visibility',
             options: const [('public', 'Public'), ('private', 'Private')],
@@ -276,7 +371,12 @@ class _SharePopupState extends State<SharePopup> {
                 ? 'Anyone with the link can view.'
                 : 'Only people signed in to this hub can view.',
           ),
-          _choice(
+          _label(
+            context,
+            'What to share',
+            key: const ValueKey('share-label-kind'),
+          ),
+          _segmented(
             context,
             group: 'kind',
             options: const [('snapshot', 'This version'), ('live', 'Live link')],
@@ -303,9 +403,38 @@ class _SharePopupState extends State<SharePopup> {
               style: tsRaw(12, 16, 400, c.inlineCodeText),
             ),
           ],
-          if (_created != null) ...[
+          if (created != null) ...[
             const SizedBox(height: 12),
-            CopyableText(_created!.url, textKey: const ValueKey('share-url')),
+            Container(
+              padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+              decoration: BoxDecoration(
+                color: c.bgSecondary,
+                borderRadius: Radii.field,
+                border: Border.all(color: c.borderSubtle),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      created.url,
+                      key: const ValueKey('share-url'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ts(
+                        const TypeSpec(13, 19, 400),
+                        c.textPrimary,
+                        mono: true,
+                      ),
+                    ),
+                  ),
+                  _copyButton(
+                    context,
+                    _createdCopyKey,
+                    () => _copy(_createdCopyKey, created.url),
+                  ),
+                ],
+              ),
+            ),
           ],
           const SizedBox(height: 20),
           Text(
@@ -333,6 +462,45 @@ class _SharePopupState extends State<SharePopup> {
           else if (links != null)
             for (final s in links) _row(context, s),
         ],
+      ),
+    );
+  }
+}
+
+/// One half of the two-part segmented control. The selected half is filled
+/// with the accent colour and its text uses the on-accent colour (AA).
+class _SegmentHalf extends StatelessWidget {
+  const _SegmentHalf({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: ColoredBox(
+          color: selected ? c.accent : const Color(0x00000000),
+          child: Center(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: tsRaw(13, 18, 600, selected ? c.onAccent : c.textSecondary),
+            ),
+          ),
+        ),
       ),
     );
   }
