@@ -57,7 +57,7 @@ class _NotesAppState extends State<NotesApp> {
   @override
   void initState() {
     super.initState();
-    registerBuiltins(disabledAddons: _settings.disabledAddons);
+    registerBuiltins();
     _lifecycle = AppLifecycleListener(
       onPause: _flush,
       onHide: _flush,

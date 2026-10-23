@@ -41,10 +41,6 @@ class AppSettings extends ChangeNotifier {
 
   ThemePref theme = ThemePref.system;
 
-  /// Compatibility for the existing shell bootstrap: every compiled-in add-on
-  /// is enabled. Saved disabled lists are ignored and this set cannot change.
-  Set<String> get disabledAddons => const {};
-
   /// The vault folder chosen in settings (null: the default in the data
   /// folder). Takes effect at the next start.
   String? vaultPath;
