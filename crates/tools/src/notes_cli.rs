@@ -211,6 +211,7 @@ pub fn tool_text(result: &Value) -> Result<String> {
 const HELP: &str = "notes [--json] COMMAND\n\
 search QUERY | read TITLE_OR_ID | query DATABASE [--filter JSON] [--sort JSON]\n\
 write TITLE [--parent TITLE_OR_ID] < markdown | append TITLE_OR_ID < markdown\n\
+attach TITLE_OR_ID FILE [--caption TEXT] [--after BLOCK] [--as image|file]  (up to 10 MB)\n\
 memory list [PATH] | search QUERY [--scope PATH] | read PATH | delete PATH | rules\n\
 memory write PATH --description TEXT --type TYPE [--name TEXT] < markdown\n\
 memory update PATH [--new-path PATH] [--description TEXT] [--type TYPE] [--name TEXT] [--append] [< markdown]\n\
@@ -275,6 +276,9 @@ fn parse(args: &[String]) -> Result<Parsed> {
                     | "exclude"
                     | "tools"
                     | "timeout-ms"
+                    | "caption"
+                    | "after"
+                    | "as"
             ) {
                 bail!("unknown option; use notes --help");
             }
@@ -632,6 +636,11 @@ fn execute(p: &Parsed, stdin: Option<&str>, cwd: &Path, config: Config) -> Resul
                 json!({"page":p.words[1], "op":"append", "markdown":stdin_required(stdin)?}),
             )
         }
+        "attach" => {
+            require_words(p, 3)?;
+            allowed(p, &["caption", "after", "as"])?;
+            ("attach_file", attach_args(p, cwd)?)
+        }
         "memory" => memory_command(p, stdin)?,
         "jobs" => jobs_command(p, stdin)?,
         _ => bail!("unknown command; use notes --help"),
@@ -644,6 +653,48 @@ fn execute(p: &Parsed, stdin: Option<&str>, cwd: &Path, config: Config) -> Resul
     } else {
         tool_text(&result)
     }
+}
+
+/// `notes attach PAGE FILE`: the file's bytes go to attach_file as base64
+/// `data`, over the same /mcp call as page writes.
+fn attach_args(p: &Parsed, cwd: &Path) -> Result<Value> {
+    use base64::Engine as _;
+    let file = cwd.join(&p.words[2]);
+    let meta = std::fs::metadata(&file).map_err(|_| anyhow!("cannot read the file"))?;
+    if !meta.is_file() {
+        bail!("not a file");
+    }
+    let cap = crate::attach::MAX_DATA_BYTES;
+    if meta.len() > cap as u64 {
+        bail!(
+            "file is over the {} MB upload cap; attach it by https url with the attach_file tool instead",
+            cap >> 20
+        );
+    }
+    let bytes = std::fs::read(&file).map_err(|_| anyhow!("cannot read the file"))?;
+    if bytes.len() > cap {
+        bail!("file is over the {} MB upload cap", cap >> 20);
+    }
+    let mut a = json!({
+        "page": p.words[1],
+        "data": base64::engine::general_purpose::STANDARD.encode(&bytes),
+    });
+    if let Some(name) = file.file_name() {
+        a["name"] = json!(name.to_string_lossy());
+    }
+    if let Some(caption) = p.options.get("caption") {
+        a["caption"] = json!(caption);
+    }
+    if let Some(after) = p.options.get("after") {
+        a["after_block"] = json!(after);
+    }
+    if let Some(kind) = p.options.get("as") {
+        if !matches!(kind.as_str(), "image" | "file") {
+            bail!("--as must be image or file");
+        }
+        a["as"] = json!(kind);
+    }
+    Ok(a)
 }
 
 /// `notes jobs ...`: the hub's `jobs` tool.

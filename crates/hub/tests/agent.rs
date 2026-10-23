@@ -684,6 +684,7 @@ async fn host_info_reports_the_hubs_base_pack() {
             "read_page",
             "create_page",
             "edit_page",
+            "attach_file",
             "update_task",
             "notes_help",
             "upsert_row",

@@ -40,6 +40,7 @@ When the app writes a page link, it uses the page's title. It uses the id instea
 - `xx` is the first two characters of the attachment id, and `id` is the whole id: 64 lowercase hex digits.
 - A link resolves only when that attachment is already in the vault. If it is not, the link is kept as a link to the written path.
 - An image's width is a block setting, `<!-- width=50 -->`, a percentage from 1 to 99. See `markdown`.
+- To add a new image or file, use `attach_file`: it stores the bytes in the vault and adds the block. Give `page` and one source: `url` (https, up to 25 MB), `data` (base64, up to 10 MB) or `path` (a file on this computer; not on the hub). Optional: `caption`, `name`, `after_block` (else it goes at the end) and `as` (`image` or `file`). An image must be png, jpeg, gif, webp or svg, and an svg with script is refused. The result gives the new block id and its `../.vault/blobs/...` link.
 
 ## Pages that link here
 

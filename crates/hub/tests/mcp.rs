@@ -137,7 +137,7 @@ async fn initialize_and_scoped_tool_lists() {
         .collect();
     assert_eq!(
         listed, LISTED,
-        "tools/list over HTTP is exactly the 16 names, in order"
+        "tools/list over HTTP is exactly the 17 names, in order"
     );
     assert!(
         !listed.contains(&"feedback_list"),
@@ -207,12 +207,13 @@ async fn a_token_lists_and_calls_only_its_tool_set() {
     env.server.stop().await;
 }
 
-/// The 16 listed MCP tools, in serving order.
-const LISTED: [&str; 16] = [
+/// The 17 listed MCP tools, in serving order.
+const LISTED: [&str; 17] = [
     "search_notes",
     "read_page",
     "create_page",
     "edit_page",
+    "attach_file",
     "trash_page",
     "move_page",
     "daily_note",

@@ -24,8 +24,9 @@ use tiny_http::{Header, Method, Request, Response, Server};
 
 use crate::{McpError, McpServer, Result};
 
-/// Largest request body (markdown for a big page fits easily).
-const MAX_BODY: u64 = 8 << 20;
+/// Largest request body: markdown for a big page fits easily, as does an
+/// attach_file call with its largest base64 `data`.
+const MAX_BODY: u64 = (8 << 20) + vault_tools::attach::data_wire_limit() as u64;
 
 #[derive(Debug, Clone, Default)]
 pub struct HttpOptions {

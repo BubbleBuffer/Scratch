@@ -19,7 +19,8 @@ use crate::AppState;
 
 const MAX_BODY: usize = 8 << 20;
 
-// Only archive string values receive the larger allowance. Bound all other
+// Only archive string values (and attach_file's `data`) receive a larger
+// allowance. Bound all other
 // JSON bytes together at the ordinary request limit. Oversized strings are
 // discarded while reading; retaining the surrounding JSON lets the error name
 // its source even when the name occurs after the archive in the request.
@@ -31,11 +32,18 @@ pub(crate) struct ImportBody {
     escaped: bool,
     token: Vec<u8>,
     archive_key: bool,
+    /// The pending key is attach_file's `data`.
+    data_key: bool,
     colon: bool,
     archive: Option<(usize, usize)>,
+    /// The string being read is a `data` value (limit `data_wire_limit`).
+    in_data: bool,
     archive_count: usize,
     oversized: Vec<usize>,
+    /// A `data` value went over its limit and was dropped.
+    pub data_oversized: bool,
     archive_wire_limit: usize,
+    data_wire_limit: usize,
 }
 
 impl ImportBody {
@@ -48,12 +56,16 @@ impl ImportBody {
             escaped: false,
             token: Vec::new(),
             archive_key: false,
+            data_key: false,
             colon: false,
             archive: None,
+            in_data: false,
             archive_count: 0,
             oversized: Vec::new(),
+            data_oversized: false,
             // JSON can escape each ASCII base64 character as six bytes.
             archive_wire_limit: limit.div_ceil(3) * 24,
+            data_wire_limit: vault_tools::attach::data_wire_limit(),
         }
     }
 
@@ -63,10 +75,15 @@ impl ImportBody {
             let mut keep = true;
             if self.in_string {
                 let closing = b == b'"' && !self.escaped;
+                let wire_limit = if self.in_data {
+                    self.data_wire_limit
+                } else {
+                    self.archive_wire_limit
+                };
                 if let Some((start, len)) = &mut self.archive {
                     if !closing {
                         *len = len.saturating_add(1);
-                        if *len > self.archive_wire_limit {
+                        if *len > wire_limit {
                             self.bytes.truncate(*start);
                             keep = false;
                         }
@@ -80,18 +97,23 @@ impl ImportBody {
                 if closing {
                     self.in_string = false;
                     if let Some((_, len)) = self.archive.take() {
-                        if len > self.archive_wire_limit {
+                        if self.in_data {
+                            self.data_oversized |= len > wire_limit;
+                            self.in_data = false;
+                        } else if len > wire_limit {
                             self.oversized.push(self.archive_count - 1);
                         }
                         self.archive_key = false;
+                        self.data_key = false;
                     } else {
                         self.token.pop(); // closing quote
                         let mut quoted = Vec::with_capacity(self.token.len() + 2);
                         quoted.push(b'"');
                         quoted.extend_from_slice(&self.token);
                         quoted.push(b'"');
-                        self.archive_key = serde_json::from_slice::<String>(&quoted)
-                            .is_ok_and(|key| key == "archive_base64");
+                        let key = serde_json::from_slice::<String>(&quoted).ok();
+                        self.archive_key = key.as_deref() == Some("archive_base64");
+                        self.data_key = key.as_deref() == Some("data");
                     }
                     self.colon = false;
                 }
@@ -105,13 +127,18 @@ impl ImportBody {
                     if self.archive_key && self.colon {
                         self.archive = Some((self.bytes.len() + 1, 0));
                         self.archive_count += 1;
+                    } else if self.data_key && self.colon {
+                        self.archive = Some((self.bytes.len() + 1, 0));
+                        self.in_data = true;
                     }
                     self.archive_key = false;
+                    self.data_key = false;
                     self.colon = false;
-                } else if b == b':' && self.archive_key {
+                } else if b == b':' && (self.archive_key || self.data_key) {
                     self.colon = true;
                 } else if !b.is_ascii_whitespace() {
                     self.archive_key = false;
+                    self.data_key = false;
                     self.colon = false;
                 }
             }
@@ -241,8 +268,17 @@ pub(crate) async fn dispatch_vault(
                 vault_tools::import_args(name, &r["params"]["arguments"]).is_some()
             })
     });
+    // attach_file's `data` may exceed MAX_BODY up to its own limit.
+    let attach_call = request.as_ref().is_some_and(|r| {
+        r["method"] == "tools/call"
+            && r["params"]["name"]
+                .as_str()
+                .is_some_and(|name| vault_tools::canonical(name) == "attach_file")
+    });
     drop(request);
-    if input.total > MAX_BODY && !import_call {
+    let attach_limit = MAX_BODY + vault_tools::attach::data_wire_limit();
+    let attach_ok = attach_call && (input.total <= attach_limit || input.data_oversized);
+    if input.total > MAX_BODY && !import_call && !attach_ok {
         mcp_log::log_vault_failure(&calls, mcp_log::Outcome::InvalidArgs, started);
         return (StatusCode::PAYLOAD_TOO_LARGE, "request too large").into_response();
     }
@@ -260,6 +296,12 @@ pub(crate) async fn dispatch_vault(
                     return Err(vault_mcp::McpError(
                         "a device token calls only the jobs tool on /mcp".into(),
                     ));
+                }
+                if vault_tools::canonical(name) == "attach_file" && input.data_oversized {
+                    return Err(vault_mcp::McpError(format!(
+                        "data is over the {} MB cap",
+                        vault_tools::attach::MAX_DATA_BYTES >> 20
+                    )));
                 }
                 if let Some(import) = vault_tools::import_args(name, args) {
                     let args = &import?;
@@ -368,6 +410,30 @@ mod tests {
                 ""
             );
         }
+    }
+
+    #[test]
+    fn attach_data_gets_its_own_allowance() {
+        let fits = "A".repeat(MAX_BODY + 10);
+        let json = format!(
+            r#"{{"method":"tools/call","params":{{"name":"attach_file","arguments":{{"page":"p","data":"{fits}"}}}}}}"#
+        );
+        let mut body = ImportBody::new(3);
+        for chunk in json.as_bytes().chunks(64 << 10) {
+            body.extend(chunk).unwrap();
+        }
+        assert!(!body.data_oversized);
+        let value: Value = serde_json::from_slice(&body.bytes).unwrap();
+        assert_eq!(value["params"]["arguments"]["data"].as_str().unwrap().len(), fits.len());
+
+        let over = "A".repeat(vault_tools::attach::data_wire_limit() + 1);
+        let json = format!(r#"{{"arguments":{{"data":"{over}","page":"p"}}}}"#);
+        let mut body = ImportBody::new(3);
+        body.extend(json.as_bytes()).unwrap();
+        assert!(body.data_oversized);
+        let value: Value = serde_json::from_slice(&body.bytes).unwrap();
+        assert_eq!(value["arguments"]["data"], "");
+        assert_eq!(value["arguments"]["page"], "p");
     }
 
     #[test]

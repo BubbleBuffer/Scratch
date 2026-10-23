@@ -106,6 +106,7 @@ fn assert_host_tool_names(names: &[String], desktop: bool) {
         "read_page",
         "create_page",
         "edit_page",
+        "attach_file",
         "upsert_row",
         "trash_page",
         "move_page",

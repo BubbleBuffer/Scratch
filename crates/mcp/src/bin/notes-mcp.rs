@@ -61,6 +61,8 @@ fn fail(msg: &str) -> ! {
 }
 
 fn main() {
+    // notes-mcp runs on the user's own computer: attach_file may read local paths.
+    vault_tools::allow_local_paths(true);
     let mut args = std::env::args().skip(1).peekable();
     let mut vault = None;
     let mut http: Option<String> = None;

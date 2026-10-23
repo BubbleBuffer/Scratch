@@ -1320,6 +1320,8 @@ pub fn version_includes(a: Vec<u8>, b: Vec<u8>) -> Result<bool, String> {
 #[frb(init)]
 pub fn init_app() {
     flutter_rust_bridge::setup_default_user_utils();
+    // The app runs on the user's own device: attach_file may read local paths.
+    vault_tools::allow_local_paths(true);
 }
 
 /// Calls `rescan_mounts` every 2 seconds until the vault is closed. Holds

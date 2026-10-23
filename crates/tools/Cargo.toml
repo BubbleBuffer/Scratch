@@ -26,7 +26,8 @@ serde = { version = "1", features = ["derive"] }
 anyhow = "1"
 toml = "0.8"
 serde_yaml = "0.9"
-ureq = { version = "3", default-features = false, features = ["rustls"] }
+# Pinned: attach_file uses ureq's unversioned resolver API (no semver guarantee).
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
 url = "2"
 base64 = "0.22"
 tar = "0.4"
