@@ -573,9 +573,13 @@ fn projects_switch_files_and_exec_cwd_per_session_and_persist() {
     let agent = f.open(true, PermissionMode::Auto);
     let home = agent.projects_list().unwrap().remove(0);
     assert_eq!(home.name, "Home");
+    // Stored paths drop canonicalize's Windows verbatim prefix.
     assert_eq!(
         home.path,
-        std::fs::canonicalize(&f.root).unwrap().to_string_lossy()
+        std::fs::canonicalize(&f.root)
+            .unwrap()
+            .to_string_lossy()
+            .trim_start_matches(r"\\?\")
     );
     let project = agent
         .project_add("Other", &second.to_string_lossy())
