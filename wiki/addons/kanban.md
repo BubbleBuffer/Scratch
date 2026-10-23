@@ -1,7 +1,7 @@
 ---
 type: topic
 layer: implementation
-summary: "An optional kanban note with manually collected note cards and a compact embed."
+summary: "A kanban note with manually collected note cards and a compact embed."
 parent: "[[addons/index]]"
 status: current
 ---
@@ -10,7 +10,7 @@ status: current
 
 Kanban is a note type for collecting cards by hand. Each card points to a note of any type; opening the card opens that note. A database's Board view remains a live query. Both use the kit's `BoardRenderer`, while Kanban depends on no other add-on.
 
-`KanbanAddon` is compiled in, optional and enabled by default. Settings → About → Add-ons → Manage can disable it for the next start. Registration does not open a vault or start background work.
+`KanbanAddon` is compiled in and always enabled. Registration does not open a vault or start background work.
 
 ## Data
 

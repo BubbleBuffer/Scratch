@@ -10,6 +10,10 @@ realizes: ["[[architecture/sync-and-storage]]"]
 
 # Sync (state)
 
+Desktop hub startup and address changes retain a visible `SyncStore.hubError` on failure, clear the bound address (`hosting` becomes false), and save "Share this vault" off. A successful retry clears the error. Defaults remain on, listening at `0.0.0.0:47100`.
+
+Pairing address discovery returns no URLs when there is no reachable LAN or mesh interface, or the hub listens only on loopback. A phone must never be offered this computer's loopback address.
+
 Part B of Core: MVP scope (internal wiki), built 2026-09-30. The topology is in [Sync and storage](sync-and-storage.md): one desktop runs the hub; other devices sync with it over Tailscale. Since 2026-10-08 the same hub logic also runs as `notes-hub` on a server behind TLS, with device tokens from an OIDC login ([Hub server](hub.md), decision 0007 (internal wiki)).
 
 ## Crates and modules

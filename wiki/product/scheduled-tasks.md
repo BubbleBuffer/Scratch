@@ -72,7 +72,7 @@ The runner reads `schedule` and writes changed `schedule_status` fields without 
 `app/rust/src/api/vault.rs` exposes vault-owned local scheduling and portable preview through the `app/lib/core/vault.dart` wrappers. `app/rust/src/api/agent.rs` retains hub routing.
 `app/rust/src/api/clock.rs` exposes the device's IANA time-zone name through jiff's system-zone lookup.
 `app/lib/addons/schedule/` shows the schedule page with a status band under the title; hub runners are called through the hub's agent connection, and other desktops are shown from the vault and never called ([schedule add-on](../addons/schedule.md)).
-The vault-open wrappers receive the app-data directory from `app/lib/shell/boot.dart`, preserving the existing scheduler state location. The "Run schedules on this device" setting is registered by the schedule add-on under Settings > Add-ons on desktop; boot starts the local runner when it is on.
+The vault-open wrappers receive the app-data directory from `app/lib/shell/boot.dart`, preserving the existing scheduler state location. "Run schedules on this device" remains a separate desktop setting for Sync and devices. Its flag is saved only after the runner changes successfully; a failure retains the previous value and exposes an error. See the [schedule add-on](../addons/schedule.md) for runner initialization limits.
 A desktop with the runner off publishes no node record; an existing record is marked `available: false`.
 The live-queries lane's generic unsupported card is not yet on this branch; older clients show the existing "Unsupported note type" placeholder.
 

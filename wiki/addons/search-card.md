@@ -1,14 +1,14 @@
 ---
 type: topic
 layer: implementation
-summary: "The optional Search card add-on: the `query` block that shows live results of a query."
+summary: "The Search card add-on: the `query` block that shows live results of a query."
 parent: "[[addons/index]]"
 status: current
 ---
 
 # Search card
 
-`SearchCardAddon` in `app/lib/addons/search_card/api.dart` registers the `query` block kind and its `/` menu entry ("Search query", group Advanced). It has no dependencies. It is optional in `shell/addons.dart`, enabled by default. The card reads the Tasks add-on only through `AddonServices().addonEnabled('tasks')`, so it boots with Tasks off.
+`SearchCardAddon` in `app/lib/addons/search_card/api.dart` registers the `query` block kind and its `/` menu entry ("Search query", group Advanced). It has no dependencies and is always enabled. The card reads the Tasks registration only through `AddonServices().addonEnabled('tasks')`, retaining support for isolated kit tests.
 
 Design and behaviour follow [Dynamic search card UI](../architecture/search-queries.md#dynamic-search-card-ui-approved-2026-10-13) (Form A, block card).
 

@@ -1,14 +1,14 @@
 ---
 type: topic
 layer: implementation
-summary: "Optional desktop and Hub agent chat, its note type and range embeds, shell surfaces, settings and registered search source."
+summary: "Desktop and Hub agent chat, its note type and range embeds, shell surfaces, settings and registered search source."
 parent: "[[addons/index]]"
 status: current
 ---
 
 # Agent
 
-`AgentAddon` in [api.dart](../../app/lib/addons/agent/api.dart) is optional, enabled by default, and has no add-on dependencies. Settings → About → Add-ons → Manage can disable it for the next start. Registration opens no vault, agent, transport or timer.
+`AgentAddon` in [api.dart](../../app/lib/addons/agent/api.dart) is always registered and has no add-on dependencies. "Use the agent" (`agentEnabled`) is the agent's on/off switch. Registration opens no vault, agent, transport or timer.
 
 It registers:
 
@@ -22,6 +22,6 @@ Files: `agent_store.dart` owns the local/Hub client, sessions, stream, lifecycle
 
 The host contract is [addon_services.dart](../../app/lib/services/addon_services.dart): settings and AI-task notification, navigation/page stack, sidebar, sync/login settings, mention UI and marked text styling are explicit transitional surfaces. The add-on imports no old feature, editor or shell implementations directly. Shared UI cards/chips stay in `ui/`. Rust tools and their protocol are unchanged; `AddonContext.agentTools` remains an interface.
 
-When disabled, its type, block, slash item, commands, settings, panel and search source are absent. The agent store refuses to open. Existing `chat_ref` data uses the unknown-block placeholder and the containing page still opens. Grouped search hides unregistered indexed rows. With no registered indexed sources it uses page-only search before ranking and the limit, so cached chat rows cannot crowd out pages.
+The add-on cannot be disabled per device. Generic unknown-block and unregistered-source fallbacks remain available to the kit and isolated registration tests.
 
-`app/test/addons/agent/` checks isolated registration, actual page-to-type embed dispatch, disabled placeholders and refused agent opening. `app/test/addons/search_sources_test.dart` checks a fake source independently of Agent. Existing agent/mobile/outline/reference and grouped-search assertions and golden files remain unchanged. See [Add-ons](../architecture/addons.md) for acceptance results and limits.
+`app/test/addons/agent/` checks isolated registration and actual page-to-type embed dispatch. `app/test/addons/search_sources_test.dart` checks fake sources and unregistered cached rows independently of Agent. Generic unknown-type fallbacks remain covered by the kit tests. See [Add-ons](../architecture/addons.md) for acceptance results and limits.

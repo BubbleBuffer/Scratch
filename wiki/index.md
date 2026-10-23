@@ -16,7 +16,7 @@ Start with the [architecture index](architecture/index.md), then the [data model
 
 <!-- wiki:children -->
 - [Add-on reference](addons/index.md): The compiled-in add-ons, registrations and public APIs.
-- [Kanban](addons/kanban.md): Optional kanban notes with manually collected cards and compact embeds.
+- [Kanban](addons/kanban.md): Kanban notes with manually collected cards and compact embeds.
 - [Architecture](architecture/index.md): How the app works now: data model, folder mounts, sync and storage, add-ons, and the built app, core, sync and hub.
 - [Decisions](decisions/index.md): Decisions that shape what's built, one line each with its date.
 - [Integrations](integrations/index.md): Connections to AI assistants and the agent, and note sharing.

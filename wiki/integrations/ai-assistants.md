@@ -15,7 +15,7 @@ status: current
 
 ## Assistants using the vault (MCP)
 
-- The hub's `POST /mcp` is the primary agent transport. It serves the vault's 16 listed tools on the hub's shared replica, using named, revocable agent tokens, each with a tool set (Read, Write or Everything). [Hub](../architecture/hub.md#agent-tokens-and-mcp-mcp) describes token management, scopes and history attribution. The desktop endpoint is the offline fallback.
+- The hub's `POST /mcp` is the primary agent transport. It serves the vault's 16 listed tools on the hub's shared replica, using named, revocable agent tokens, each with a tool set (Read, Write or Everything). [Hub](../architecture/hub.md#agent-tokens-and-mcp-mcp) describes token management, scopes and history attribution. Standalone desktop stdio is the offline fallback while the app is closed.
 - The separate, opt-in `/mcp/agent` gateway exposes the vault tools and your computers' tools, in one of two modes (see the connector section below). It uses OAuth only; see [Agent gateway connector](#agent-gateway-connector). `/mcp` retains its existing vault tool interface.
 - Page links for the user: `read_page`, `create_page` and `edit_page` results carry a `link:` line (and a `block link:` line for a block), an http address `<base>/open/<id>` (`?block=<id>` for a block). `<base>` is the serving hub's `public_url`, or `http://127.0.0.1:<port>` without one (47100 on the desktop). The Claude app refuses custom-scheme links from chat but opens http ones, so the address bounces to `notes://page/<id>`. The server instructions tell the agent to write `[Title](<link>)` with the `link:` line. See [links](../../docs/notes/links.md) and [app state](../architecture/app-state.md).
 - **Claude:** Claude Code and Claude Desktop can connect locally. Claude on the web and phone uses custom connectors, which need a public HTTPS address.
@@ -171,13 +171,8 @@ Built in the original implementation: an MCP server for the vault, AI tasks run 
 - Memory tools: `memory_read`, `memory_write`, `memory_update` and `memory_delete`, addressed by path (`global/<category>/<memory>`; older `project/[subproject/]memory` paths still resolve) and never by page id. The path is the memory's identifier everywhere; `name` is only a display label. They use ordinary nested databases under `Memory`; see [Agent memory](agent-memory.md#memory-tools-current-2026-10-14) for arguments, schema and path rules.
 - Feedback: `feedback_submit` (summary, optional Markdown details, kind, page_id, tool, error). `feedback_list` (limit and optional kind filter) is callable over MCP but not listed. Use them for unexpected vault failures, user complaints about Scratch/sync/the vault, or an explicit request to report; submit once per issue per session. They share the app's hidden Feedback page; see [Feedback](../architecture/feedback.md#feedback-over-mcp). All 16 listed tools share the same MCP transports.
 - Primary transport: the hub's Streamable HTTP `POST /mcp`, with JSON replies, empty 202 notifications and no sessions or SSE. Agent tokens are separate from device tokens, each limited to its tool set: Read (the 4 read-only listed tools `search_notes`, `read_page`, `memory_read` and `notes_help`; `feedback_list` and the read-only aliases are callable too) Write (all 16 listed tools, including `feedback_submit` and `jobs`) or Everything (every tool the surface serves, including later ones; the same as Write on `/mcp` today), and writes appear in history as `agent:<token-name>`. Revocation is visible without restarting the hub. Every `Origin` header gets 403 unless the Claude connector option is on, which also passes `claude.ai`, `claude.com` and `chatgpt.com`; no CORS headers are sent.
-- Offline fallback: desktop stdio and Streamable HTTP. Desktop HTTP needs `Authorization: Bearer <token>`, binds 127.0.0.1 by default and rejects browser `Origin`s other than localhost unless explicitly allowed. Its token remains `<vault>/.vault/mcp/token` (created on first use; it does not sync).
-- **Decision (2026-10-01): co-running with the app.** The vault has a single owner (`.vault/lock`), so two programs must not open it at once.
-  - While the app runs with "Serve the vault to AI apps" on (Settings > AI), the app serves MCP itself on `127.0.0.1:47101` and writes the address to `.vault/mcp/endpoint.json`. `notes-mcp` over stdio forwards every tool call there.
-  - When the app is not running, `notes-mcp` (stdio) opens the vault for each tool call and closes it again, so the lock is held only during a call. If the app holds the vault but does not serve MCP, the call fails with "turn on Settings > AI > MCP endpoint".
-  - `notes-mcp --http` holds the vault open; it refuses to start while the app has it.
-  - A stale `endpoint.json` (app crashed) is ignored when the address does not answer.
-  - Why: one writer per vault without a second sync peer, no daemon, and stdio clients (Claude desktop, Claude Code) work whether or not the app is open.
+- **Desktop fallback:** `notes-mcp` over stdio opens the vault for each tool call and closes it afterward. When the app holds the vault, the call fails with an instruction to use the hub or close the app.
+- **Decision (2026-10-23):** outside AI apps connect through the hub, which runs inside the desktop app. The separate local HTTP server, its token and its forwarding discovery file are removed. The hub's MCP server and shared tools stay.
 
 ### Connecting AI apps
 
@@ -195,18 +190,12 @@ The `notes` binary in `vault_tools` calls the same hub `/mcp` endpoint. It provi
 
 The desktop examples below are the offline fallback.
 
-Build the binary with `cargo build --release -p vault_mcp` (`target/release/notes-mcp.exe`). It finds the app's vault by itself (`NOTES_VAULT`, else `vaultPath` in the app's `settings.json`, else `%LOCALAPPDATA%\Notes\vault` or `~/.local/share/notes_app/vault`); `--vault DIR` overrides. `notes-mcp --token` prints the HTTP token.
+Build the binary with `cargo build --release -p vault_mcp` (`target/release/notes-mcp.exe`). It finds the app's vault by itself (`NOTES_VAULT`, else `vaultPath` in the app's `settings.json`, else `%LOCALAPPDATA%\Notes\vault` or `~/.local/share/notes_app/vault`); `--vault DIR` overrides.
 
-**Claude Code**, stdio (works with or without the app):
+**Claude Code**, stdio (close the app first):
 
 ```
 claude mcp add notes -- C:\path\to\notes-mcp.exe
-```
-
-or HTTP to the running app (Settings > AI > "Copy Claude Code command" fills in the token):
-
-```
-claude mcp add --transport http notes http://127.0.0.1:47101/mcp --header "Authorization: Bearer <token>"
 ```
 
 A project `.mcp.json` does the same:
@@ -233,7 +222,7 @@ command = "C:\\path\\to\\notes-mcp.exe"
 args = []
 ```
 
-**ChatGPT** (and Claude on the web or phone) needs a public HTTPS address: put a tunnel in front of the app's endpoint, for example `tailscale funnel 47101` or `cloudflared tunnel --url http://127.0.0.1:47101`, and add `https://<tunnel>/mcp` as a connector (ChatGPT: Settings > Connectors, developer mode). Not verified: ChatGPT's connector form offers OAuth or no authentication and may not send a static bearer token, in which case the endpoint answers 401. A tunnel with its own access control (Cloudflare Access) or an OAuth front end is then needed; neither is built.
+**ChatGPT** and Claude on the web or phone connect to the hub's public HTTPS MCP address. See [Hub deployment](../architecture/hub-deploy.md) for hosting and connector authentication.
 
 ### AI tasks
 
@@ -265,5 +254,4 @@ args = []
 ### Limits
 
 - Two desktops with the agent on can both claim a task before they sync; both answers then land in the page.
-- The app stops its MCP endpoint only at exit, not when the vault closes.
 - If the app starts while `notes-mcp` holds the vault for one call, the app opens it as a second instance; calls are short, but this is not prevented.
