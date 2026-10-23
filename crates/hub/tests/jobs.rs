@@ -136,7 +136,13 @@ impl Env {
     }
 
     /// [`Env::rpc`] with an `X-Device` header (a signed-in device).
-    async fn rpc_as(&self, token: &str, device: Option<&str>, method: &str, params: Value) -> Value {
+    async fn rpc_as(
+        &self,
+        token: &str,
+        device: Option<&str>,
+        method: &str,
+        params: Value,
+    ) -> Value {
         let mut request = self.client.post(&self.url).bearer_auth(token);
         if let Some(device) = device {
             request = request.header("X-Device", device);
@@ -236,7 +242,10 @@ impl Env {
             if job["status"] == status {
                 return job;
             }
-            assert!(Instant::now() < deadline, "job never reached {status}: {job}");
+            assert!(
+                Instant::now() < deadline,
+                "job never reached {status}: {job}"
+            );
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
     }
@@ -273,7 +282,10 @@ async fn start_status_result_end_to_end() {
 
     let job = env.create(&env.writer, "Make a page").await;
     let id = job["id"].as_str().unwrap().to_string();
-    assert!(matches!(job["status"].as_str(), Some("queued" | "running")), "{job}");
+    assert!(
+        matches!(job["status"].as_str(), Some("queued" | "running")),
+        "{job}"
+    );
     assert_eq!(job["tools"], "write");
     assert!(job.get("owner").is_none(), "{job}");
 
@@ -284,9 +296,15 @@ async fn start_status_result_end_to_end() {
     assert!(env.page_titled("Made by a job"));
 
     // get returns the same; list shows the caller's job.
-    let got = env.jobs(&env.writer, json!({"action":"get", "job":id})).await.unwrap();
+    let got = env
+        .jobs(&env.writer, json!({"action":"get", "job":id}))
+        .await
+        .unwrap();
     assert_eq!(got["result"], "Made the page.");
-    let list = env.jobs(&env.writer, json!({"action":"list"})).await.unwrap();
+    let list = env
+        .jobs(&env.writer, json!({"action":"list"}))
+        .await
+        .unwrap();
     assert_eq!(list["jobs"].as_array().unwrap().len(), 1);
     assert_eq!(list["jobs"][0]["id"], id.as_str());
 
@@ -306,11 +324,13 @@ async fn start_status_result_end_to_end() {
     // A desktop never claims a job.
     let vault = env.vault().clone();
     let queued = env.create(&env.writer, "Another").await;
-    let claimed = std::thread::spawn(move || vault_mcp::tasks::claim_next(&vault, "desktop").unwrap())
-        .join()
-        .unwrap();
+    let claimed =
+        std::thread::spawn(move || vault_mcp::tasks::claim_next(&vault, "desktop").unwrap())
+            .join()
+            .unwrap();
     assert!(claimed.is_none(), "{claimed:?}");
-    env.finished(&env.writer, queued["id"].as_str().unwrap()).await;
+    env.finished(&env.writer, queued["id"].as_str().unwrap())
+        .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -343,19 +363,28 @@ async fn a_job_cannot_use_tools_outside_its_set() {
 
     // A job can't widen the caller's set.
     let wider = env
-        .jobs(&env.writer, json!({"action":"create", "prompt":"x", "tools":"everything"}))
+        .jobs(
+            &env.writer,
+            json!({"action":"create", "prompt":"x", "tools":"everything"}),
+        )
         .await
         .unwrap_err();
     assert!(wider.contains("wider"), "{wider}");
 
     // Narrowed to Read, the run has no create_page.
     let job = env
-        .jobs(&env.writer, json!({"action":"create", "prompt":"Make a page", "tools":"read"}))
+        .jobs(
+            &env.writer,
+            json!({"action":"create", "prompt":"Make a page", "tools":"read"}),
+        )
         .await
         .unwrap();
     assert_eq!(job["tools"], "read");
     let done = env.finished(&env.writer, job["id"].as_str().unwrap()).await;
-    assert!(matches!(done["status"].as_str(), Some("completed" | "failed")), "{done}");
+    assert!(
+        matches!(done["status"].as_str(), Some("completed" | "failed")),
+        "{done}"
+    );
     assert!(!env.page_titled("Should not exist"));
 
     // The hub runner's set narrows every job: Read there makes a Write
@@ -383,7 +412,9 @@ async fn a_job_never_waits_for_approval() {
     .await;
     let job = env.create(&env.everything, "Use the confirm tool").await;
     assert_eq!(job["tools"], "everything");
-    let done = env.finished(&env.everything, job["id"].as_str().unwrap()).await;
+    let done = env
+        .finished(&env.everything, job["id"].as_str().unwrap())
+        .await;
     assert_eq!(done["status"], "completed", "{done}");
     assert_eq!(done["result"], "Confirmed without asking.");
 }
@@ -397,14 +428,22 @@ async fn only_the_owner_sees_and_cancels_a_job() {
 
     for action in ["get", "wait", "cancel"] {
         let refused = env
-            .jobs(&env.other, json!({"action":action, "job":id, "timeout_ms":0}))
+            .jobs(
+                &env.other,
+                json!({"action":action, "job":id, "timeout_ms":0}),
+            )
             .await
             .unwrap_err();
         assert!(refused.contains("no such job"), "{action}: {refused}");
     }
-    let theirs = env.jobs(&env.other, json!({"action":"list"})).await.unwrap();
+    let theirs = env
+        .jobs(&env.other, json!({"action":"list"}))
+        .await
+        .unwrap();
     assert_eq!(theirs["jobs"].as_array().unwrap().len(), 0);
-    let oauth_like = env.jobs(&env.everything, json!({"action":"get", "job":id})).await;
+    let oauth_like = env
+        .jobs(&env.everything, json!({"action":"get", "job":id}))
+        .await;
     assert!(oauth_like.is_err());
 
     let started = Instant::now();
@@ -431,13 +470,19 @@ async fn only_the_owner_sees_and_cancels_a_job() {
         if job["status"] != "queued" {
             break;
         }
-        assert!(started.elapsed() < Duration::from_secs(30), "never started: {job}");
+        assert!(
+            started.elapsed() < Duration::from_secs(30),
+            "never started: {job}"
+        );
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     let _ = env
         .jobs(&env.writer, json!({"action":"cancel", "job":next_id}))
         .await;
-    let first = env.jobs(&env.writer, json!({"action":"get", "job":id})).await.unwrap();
+    let first = env
+        .jobs(&env.writer, json!({"action":"get", "job":id}))
+        .await
+        .unwrap();
     assert_eq!(first["status"], "cancelled", "{first}");
 }
 
@@ -462,7 +507,10 @@ async fn queue_wait_and_run_limits() {
     }
     tokio::time::sleep(Duration::from_millis(400)).await;
     for id in &queued {
-        let job = env.jobs(&env.writer, json!({"action":"get", "job":id})).await.unwrap();
+        let job = env
+            .jobs(&env.writer, json!({"action":"get", "job":id}))
+            .await
+            .unwrap();
         assert_eq!(job["status"], "queued", "{job}");
     }
     // Four queued per hub, whoever asks.
@@ -477,21 +525,34 @@ async fn queue_wait_and_run_limits() {
     // wait is capped (here at 0.5 s), even when asked for a minute.
     let asked = Instant::now();
     let waited = env
-        .jobs(&env.writer, json!({"action":"wait", "job":first_id, "timeout_ms":60000}))
+        .jobs(
+            &env.writer,
+            json!({"action":"wait", "job":first_id, "timeout_ms":60000}),
+        )
         .await
         .unwrap();
     assert_eq!(waited["status"], "running", "{waited}");
-    assert!(asked.elapsed() < Duration::from_secs(5), "{:?}", asked.elapsed());
+    assert!(
+        asked.elapsed() < Duration::from_secs(5),
+        "{:?}",
+        asked.elapsed()
+    );
 
     // The run is stopped at its time limit and the job fails.
     let ended = env.finished(&env.writer, &first_id).await;
     assert_eq!(ended["status"], "failed", "{ended}");
-    assert!(ended["error"].as_str().unwrap().contains("limit"), "{ended}");
+    assert!(
+        ended["error"].as_str().unwrap().contains("limit"),
+        "{ended}"
+    );
 
     // The queue drains, one at a time.
     for id in &queued {
         let done = env.finished(&env.writer, id).await;
-        assert!(matches!(done["status"].as_str(), Some("completed" | "failed")), "{done}");
+        assert!(
+            matches!(done["status"].as_str(), Some("completed" | "failed")),
+            "{done}"
+        );
     }
 }
 
@@ -509,7 +570,10 @@ async fn ended_jobs_are_trashed_after_the_keep_time() {
 
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
-        match env.jobs(&env.writer, json!({"action":"get", "job":id})).await {
+        match env
+            .jobs(&env.writer, json!({"action":"get", "job":id}))
+            .await
+        {
             Err(e) => {
                 assert!(e.contains("no such job"), "{e}");
                 break;
@@ -541,11 +605,17 @@ async fn a_restart_marks_running_jobs_interrupted() {
     })
     .await;
     let interrupted = env.reaches(&env.writer, &ids.0, "interrupted").await;
-    assert!(interrupted["error"].as_str().unwrap().contains("restarted"), "{interrupted}");
+    assert!(
+        interrupted["error"].as_str().unwrap().contains("restarted"),
+        "{interrupted}"
+    );
     // Not queued again; a queued job still runs.
     let done = env.finished(&env.writer, &ids.1).await;
     assert_eq!(done["status"], "completed", "{done}");
-    let still = env.jobs(&env.writer, json!({"action":"get", "job":ids.0})).await.unwrap();
+    let still = env
+        .jobs(&env.writer, json!({"action":"get", "job":ids.0}))
+        .await
+        .unwrap();
     assert_eq!(still["status"], "interrupted");
 }
 
@@ -592,7 +662,13 @@ async fn a_device_asks_ai_about_a_page_as_a_hub_job() {
     let (page, first) = std::thread::spawn(move || {
         let page = vault.create_page(None, "Trip plan".into()).unwrap();
         let ids = vault
-            .insert_markdown(page.clone(), None, None, true, "First line\n\nSecond line".into())
+            .insert_markdown(
+                page.clone(),
+                None,
+                None,
+                true,
+                "First line\n\nSecond line".into(),
+            )
             .unwrap();
         (page, ids[0].clone())
     })
@@ -659,20 +735,30 @@ async fn a_device_asks_ai_about_a_page_as_a_hub_job() {
     .join()
     .unwrap();
     let job = env
-        .device_jobs("laptop", json!({"action":"create", "prompt":"Again", "page":page}))
+        .device_jobs(
+            "laptop",
+            json!({"action":"create", "prompt":"Again", "page":page}),
+        )
         .await
         .unwrap();
     assert_eq!(job["tools"], "read", "{job}");
-    env.device_finished("laptop", job["id"].as_str().unwrap()).await;
+    env.device_finished("laptop", job["id"].as_str().unwrap())
+        .await;
 
     // after without page, and a missing page, are refused.
     let e = env
-        .device_jobs("laptop", json!({"action":"create", "prompt":"x", "after":first}))
+        .device_jobs(
+            "laptop",
+            json!({"action":"create", "prompt":"x", "after":first}),
+        )
         .await
         .unwrap_err();
     assert!(e.contains("page"), "{e}");
     let e = env
-        .device_jobs("laptop", json!({"action":"create", "prompt":"x", "page":"nope"}))
+        .device_jobs(
+            "laptop",
+            json!({"action":"create", "prompt":"x", "page":"nope"}),
+        )
         .await
         .unwrap_err();
     assert!(e.contains("no such page"), "{e}");
@@ -686,7 +772,10 @@ async fn any_device_cancels_a_device_job_but_agents_do_not_see_it() {
         .join()
         .unwrap();
     let job = env
-        .device_jobs("laptop", json!({"action":"create", "prompt":"Do this task", "page":page}))
+        .device_jobs(
+            "laptop",
+            json!({"action":"create", "prompt":"Do this task", "page":page}),
+        )
         .await
         .unwrap();
     let id = job["id"].as_str().unwrap().to_string();

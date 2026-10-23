@@ -47,7 +47,10 @@ fn jobs_are_rows_that_desktops_never_claim() {
 
     jobs::mark_running(&v, &job.id, "s1").unwrap();
     let running = jobs::get(&v, &job.id).unwrap().unwrap();
-    assert_eq!((running.status.as_str(), running.session.as_str()), ("running", "s1"));
+    assert_eq!(
+        (running.status.as_str(), running.session.as_str()),
+        ("running", "s1")
+    );
     jobs::finish(&v, &job.id, End::Completed("All summarised.".into())).unwrap();
     let done = jobs::get(&v, &job.id).unwrap().unwrap();
     assert_eq!(done.status, "completed");
@@ -88,7 +91,8 @@ fn an_older_tasks_database_gains_the_job_properties() {
         .into_iter()
         .filter(|d| !["node", "owner", "tools", "session", "finished"].contains(&d.key.as_str()))
         .map(|mut d| {
-            d.options.retain(|o| !["cancelled", "interrupted"].contains(&o.id.as_str()));
+            d.options
+                .retain(|o| !["cancelled", "interrupted"].contains(&o.id.as_str()));
             d
         })
         .collect();
@@ -108,5 +112,8 @@ fn an_older_tasks_database_gains_the_job_properties() {
     let status = schema.iter().find(|d| d.key == "status").unwrap();
     assert!(status.options.iter().any(|o| o.id == "interrupted"));
     jobs::finish(&v, &job.id, End::Interrupted).unwrap();
-    assert_eq!(jobs::get(&v, &job.id).unwrap().unwrap().status, "interrupted");
+    assert_eq!(
+        jobs::get(&v, &job.id).unwrap().unwrap().status,
+        "interrupted"
+    );
 }

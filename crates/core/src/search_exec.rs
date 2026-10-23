@@ -402,11 +402,15 @@ fn tag_options(tag: &str, defs: &[PropDef]) -> Vec<(String, Vec<String>)> {
                 && (normalized_key(&d.name) == "tags" || normalized_key(&d.key) == "tags")
         })
         .map(|d| {
-            let ids = d.options.iter().filter_map(|option| {
-                let name = fold(&option.name);
-                (name == tag || name.starts_with(&format!("{tag}/")) || fold(&option.id) == tag)
-                    .then(|| fold(&option.id))
-            }).collect();
+            let ids = d
+                .options
+                .iter()
+                .filter_map(|option| {
+                    let name = fold(&option.name);
+                    (name == tag || name.starts_with(&format!("{tag}/")) || fold(&option.id) == tag)
+                        .then(|| fold(&option.id))
+                })
+                .collect();
             (d.key.clone(), ids)
         })
         .collect()
@@ -538,15 +542,18 @@ fn operator_sql(
             // Path patterns (`in:Work/*`) resolve to their exact pages; the
             // other alternatives keep the subtree path below.
             let raws = crate::search_path::split_raw(&op.value, ',');
-            let (patterns, plain): (Vec<_>, Vec<_>) =
-                raws.iter().partition(|raw| crate::search_path::is_pattern(raw));
+            let (patterns, plain): (Vec<_>, Vec<_>) = raws
+                .iter()
+                .partition(|raw| crate::search_path::is_pattern(raw));
             for raw in &patterns {
                 let pattern = crate::search_path::parse(raw, |t| Some(t.to_string()), None)
                     .map_err(VaultError::Index)?;
                 let ids = serde_json::to_string(&pattern.page_ids(db)?)
                     .map_err(|e| VaultError::Index(e.to_string()))?;
                 let parameter = bind(p, ids);
-                parts.push(format!("p.id IN (SELECT value FROM json_each({parameter}))"));
+                parts.push(format!(
+                    "p.id IN (SELECT value FROM json_each({parameter}))"
+                ));
             }
             let plain_ids = if patterns.is_empty() {
                 page_alternatives(op)
@@ -559,10 +566,12 @@ fn operator_sql(
             for id in plain_ids {
                 if inline {
                     let parameter = bind(p, id);
-                    parts.push(format!("p.id IN (WITH RECURSIVE tree(id) AS (
+                    parts.push(format!(
+                        "p.id IN (WITH RECURSIVE tree(id) AS (
                         SELECT id FROM pages WHERE id = {parameter}
                         UNION SELECT child.id FROM pages child JOIN tree ON child.parent = tree.id)
-                        SELECT id FROM tree)"));
+                        SELECT id FROM tree)"
+                    ));
                     continue;
                 }
                 let tree = subtree(db, cache, &id)?;
@@ -921,7 +930,9 @@ pub(crate) fn decorate(db: &Index, spec: &SearchSpec, hits: &mut [SearchHit]) ->
             // actual matching branch, even when the row stores both keys.
             if op.property && op.key == "status" {
                 if let Some(filter) = &op.filter {
-                    if let Some(values) = status_alias_values(db, filter, &props, &defs, rowid, (created, updated))? {
+                    if let Some(values) =
+                        status_alias_values(db, filter, &props, &defs, rowid, (created, updated))?
+                    {
                         for (key, value) in values {
                             let item = MatchedFilterValue { key, value };
                             if !hit.matched_filters.contains(&item) {
@@ -1214,32 +1225,49 @@ fn status_alias_values(
         let predicate = crate::query::filter_sql(&branch, &mut parameters)?;
         let matches: bool = db.conn.query_row(
             &format!("SELECT EXISTS(SELECT 1 FROM pages p WHERE p.rowid = ?1 AND {predicate})"),
-            rusqlite::params_from_iter(parameters.iter()), |row| row.get(0),
+            rusqlite::params_from_iter(parameters.iter()),
+            |row| row.get(0),
         )?;
         if !matches {
             continue;
         }
-        let mut value = props.get(&key).cloned().unwrap_or_else(|| match key.as_str() {
-            "$created" | "$updated" => PropValue::Date {
-                start_ms: if key == "$created" { timestamps.0 } else { timestamps.1 },
-                end_ms: None, has_time: true,
-            },
-            _ => PropValue::Empty,
-        });
+        let mut value = props
+            .get(&key)
+            .cloned()
+            .unwrap_or_else(|| match key.as_str() {
+                "$created" | "$updated" => PropValue::Date {
+                    start_ms: if key == "$created" {
+                        timestamps.0
+                    } else {
+                        timestamps.1
+                    },
+                    end_ms: None,
+                    has_time: true,
+                },
+                _ => PropValue::Empty,
+            });
         if let PropValue::MultiSelect(ids) = &mut value {
-            let selected: HashSet<_> = conditions.iter().filter_map(|filter| match filter {
-                Filter::Cond(condition) if condition.prop == key => Some(&condition.value),
-                _ => None,
-            }).flat_map(|value| match value {
-                PropValue::Select(id) | PropValue::Status(id) => vec![fold(id)],
-                PropValue::MultiSelect(ids) => ids.iter().map(|id| fold(id)).collect(),
-                _ => Vec::new(),
-            }).collect();
+            let selected: HashSet<_> = conditions
+                .iter()
+                .filter_map(|filter| match filter {
+                    Filter::Cond(condition) if condition.prop == key => Some(&condition.value),
+                    _ => None,
+                })
+                .flat_map(|value| match value {
+                    PropValue::Select(id) | PropValue::Status(id) => vec![fold(id)],
+                    PropValue::MultiSelect(ids) => ids.iter().map(|id| fold(id)).collect(),
+                    _ => Vec::new(),
+                })
+                .collect();
             if !selected.is_empty() {
                 ids.retain(|id| selected.contains(&fold(id)));
             }
         }
-        let label = if value == PropValue::Empty { "none".into() } else { display(&value, defs, &key) };
+        let label = if value == PropValue::Empty {
+            "none".into()
+        } else {
+            display(&value, defs, &key)
+        };
         values.push((key, label));
     }
     Ok(Some(values))

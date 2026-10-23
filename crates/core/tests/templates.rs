@@ -178,7 +178,10 @@ fn database_default_template_is_a_template() {
         .unwrap();
     v.set_default_template(c.clone(), Some(tpl.clone()))
         .unwrap();
-    assert_eq!(ids(&v.list_templates(c.clone()).unwrap()), std::slice::from_ref(&tpl));
+    assert_eq!(
+        ids(&v.list_templates(c.clone()).unwrap()),
+        std::slice::from_ref(&tpl)
+    );
     let row = v.create_page(Some(c.clone()), "Crash".into()).unwrap();
     assert_eq!(texts(&v, &row), ["Steps to reproduce"]);
     // Clearing the default keeps the template out of the rows.

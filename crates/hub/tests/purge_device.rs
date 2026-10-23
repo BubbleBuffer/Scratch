@@ -87,7 +87,10 @@ async fn health_advertises_the_purge_capabilities() {
             .and_then(|v| v.to_str().ok())
             .map(str::to_string)
     };
-    assert_eq!(header(PURGE_CAPABILITY_HEADER).as_deref(), Some(PURGE_CAPABILITY));
+    assert_eq!(
+        header(PURGE_CAPABILITY_HEADER).as_deref(),
+        Some(PURGE_CAPABILITY)
+    );
     assert_eq!(
         header(PURGE_DEVICE_CAPABILITY_HEADER).as_deref(),
         Some(PURGE_DEVICE_CAPABILITY)

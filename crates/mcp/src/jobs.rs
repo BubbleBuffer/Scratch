@@ -250,7 +250,11 @@ pub fn mark_running(v: &Vault, id: &str, session: &str) -> Result<()> {
         "session".into(),
         PropValue::Text(session.into()),
     )?;
-    v.set_property(id.to_string(), "device".into(), PropValue::Text(NODE_HUB.into()))?;
+    v.set_property(
+        id.to_string(),
+        "device".into(),
+        PropValue::Text(NODE_HUB.into()),
+    )?;
     v.set_property(
         id.to_string(),
         "status".into(),

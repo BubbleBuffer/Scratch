@@ -37,7 +37,11 @@ fn main() {
     std::fs::create_dir_all(&data).expect("data dir");
     let backend = Arc::new(Backend::with_seed(data.clone(), pages, big));
     let listener = TcpListener::bind(("127.0.0.1", port)).expect("bind");
-    println!("bridge listening on http://127.0.0.1:{port} data={} dist={}", data.display(), dist.display());
+    println!(
+        "bridge listening on http://127.0.0.1:{port} data={} dist={}",
+        data.display(),
+        dist.display()
+    );
     let dist = Arc::new(dist);
     for stream in listener.incoming().flatten() {
         let b = Arc::clone(&backend);
@@ -75,7 +79,8 @@ fn handle(stream: TcpStream, b: &Backend, dist: &Path) -> std::io::Result<()> {
 
     if method == "POST" {
         if let Some(cmd) = path.strip_prefix("/invoke/") {
-            let args: serde_json::Value = serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null);
+            let args: serde_json::Value =
+                serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null);
             let (status, json) = match b.dispatch(cmd, &args) {
                 Ok(v) => ("200 OK", v),
                 Err(e) => ("500 Internal Server Error", serde_json::Value::String(e)),
@@ -85,16 +90,34 @@ fn handle(stream: TcpStream, b: &Backend, dist: &Path) -> std::io::Result<()> {
         }
     }
     if method != "GET" {
-        return respond(&mut out, "405 Method Not Allowed", "text/plain", b"method not allowed");
+        return respond(
+            &mut out,
+            "405 Method Not Allowed",
+            "text/plain",
+            b"method not allowed",
+        );
     }
-    let clean = path.split('?').next().unwrap_or("/").trim_start_matches('/');
-    let mut file = dist.join(if clean.is_empty() { "index.html" } else { clean });
+    let clean = path
+        .split('?')
+        .next()
+        .unwrap_or("/")
+        .trim_start_matches('/');
+    let mut file = dist.join(if clean.is_empty() {
+        "index.html"
+    } else {
+        clean
+    });
     if clean.contains("..") || !file.is_file() {
         file = dist.join("index.html");
     }
     match std::fs::read(&file) {
         Ok(bytes) => respond(&mut out, "200 OK", mime(&file), &bytes),
-        Err(_) => respond(&mut out, "404 Not Found", "text/plain", b"not found (build the frontend first)"),
+        Err(_) => respond(
+            &mut out,
+            "404 Not Found",
+            "text/plain",
+            b"not found (build the frontend first)",
+        ),
     }
 }
 

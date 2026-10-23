@@ -64,7 +64,8 @@ impl Env {
     }
 
     fn as_device(&self, rb: RequestBuilder) -> RequestBuilder {
-        rb.bearer_auth(&self.device_token).header("X-Device", DEVICE)
+        rb.bearer_auth(&self.device_token)
+            .header("X-Device", DEVICE)
     }
 
     fn get(&self) -> RequestBuilder {
@@ -169,10 +170,18 @@ async fn a_device_lists_creates_and_revokes() {
     assert_eq!(v["expires"], Value::Null);
 
     // Revoke: /mcp refuses it at once, and a second revoke is a 404.
-    let r = env.as_device(env.delete("laptop-claude")).send().await.unwrap();
+    let r = env
+        .as_device(env.delete("laptop-claude"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(r.status(), StatusCode::NO_CONTENT);
     assert_eq!(env.mcp_status(&secret).await, StatusCode::UNAUTHORIZED);
-    let r = env.as_device(env.delete("laptop-claude")).send().await.unwrap();
+    let r = env
+        .as_device(env.delete("laptop-claude"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(r.status(), StatusCode::NOT_FOUND);
     let names: Vec<String> = env.list().await["tokens"]
         .as_array()
@@ -190,8 +199,14 @@ async fn bad_requests_are_refused() {
     for (body, error) in [
         (json!({"name": "Bad Name", "scope": "read"}), "invalid_name"),
         (json!({"name": "ok", "scope": "admin"}), "invalid_scope"),
-        (json!({"name": "ok", "scope": "read", "expires_days": 7}), "invalid_expiry"),
-        (json!({"name": "ok", "scope": "read", "extra": 1}), "invalid_body"),
+        (
+            json!({"name": "ok", "scope": "read", "expires_days": 7}),
+            "invalid_expiry",
+        ),
+        (
+            json!({"name": "ok", "scope": "read", "extra": 1}),
+            "invalid_body",
+        ),
         (json!({"scope": "read"}), "invalid_body"),
     ] {
         let r = env.as_device(env.post(body.clone())).send().await.unwrap();
@@ -218,11 +233,19 @@ async fn only_device_tokens_may_manage_tokens() {
     let body = json!({"name": "sneaky", "scope": "write"});
 
     let attempts = |rb: RequestBuilder| async move { rb.send().await.unwrap().status() };
-    for bearer in [agent_write.as_str(), agent_read.as_str(), jwt, "not-a-token"] {
+    for bearer in [
+        agent_write.as_str(),
+        agent_read.as_str(),
+        jwt,
+        "not-a-token",
+    ] {
         for device in [DEVICE, "agent"] {
             let with = |rb: RequestBuilder| rb.bearer_auth(bearer).header("X-Device", device);
             assert_eq!(attempts(with(env.get())).await, StatusCode::UNAUTHORIZED);
-            assert_eq!(attempts(with(env.post(body.clone()))).await, StatusCode::UNAUTHORIZED);
+            assert_eq!(
+                attempts(with(env.post(body.clone()))).await,
+                StatusCode::UNAUTHORIZED
+            );
             assert_eq!(
                 attempts(with(env.delete("existing-writer"))).await,
                 StatusCode::UNAUTHORIZED

@@ -307,7 +307,10 @@ impl Tokens {
         self.reload(&mut cache)?;
         let mut entries = cache.entries.clone();
         let mut changed = false;
-        for x in entries.iter_mut().filter(|x| x.device.as_deref() == Some(device)) {
+        for x in entries
+            .iter_mut()
+            .filter(|x| x.device.as_deref() == Some(device))
+        {
             changed |= !x.host;
             x.host = true;
         }
@@ -341,7 +344,10 @@ impl Tokens {
         self.reload(&mut cache)?;
         let mut entries = cache.entries.clone();
         if !entries.iter().any(|x| x.device.as_deref() == Some(device)) {
-            return Err(SyncError::Status(404, "this device is not on the hub".into()));
+            return Err(SyncError::Status(
+                404,
+                "this device is not on the hub".into(),
+            ));
         }
         let lower = name.to_lowercase();
         if entries.iter().any(|x| {
@@ -352,7 +358,10 @@ impl Tokens {
                 format!("Another computer is already called {name}"),
             ));
         }
-        for x in entries.iter_mut().filter(|x| x.device.as_deref() == Some(device)) {
+        for x in entries
+            .iter_mut()
+            .filter(|x| x.device.as_deref() == Some(device))
+        {
             x.label = name.clone();
             x.named = true;
         }
@@ -658,9 +667,18 @@ mod tests {
             store.rename("dev-c", "pc"),
             Err(SyncError::Status(409, m)) if m == "Another computer is already called pc"
         ));
-        assert!(matches!(store.rename("dev-c", " "), Err(SyncError::Status(400, _))));
-        assert!(matches!(store.rename("dev-c", "Hub"), Err(SyncError::Status(400, _))));
-        assert!(matches!(store.rename("dev-x", "x"), Err(SyncError::Status(404, _))));
+        assert!(matches!(
+            store.rename("dev-c", " "),
+            Err(SyncError::Status(400, _))
+        ));
+        assert!(matches!(
+            store.rename("dev-c", "Hub"),
+            Err(SyncError::Status(400, _))
+        ));
+        assert!(matches!(
+            store.rename("dev-x", "x"),
+            Err(SyncError::Status(404, _))
+        ));
         // Renaming to its own name in another case is fine.
         assert_eq!(store.rename("dev-b", "pc").unwrap(), "pc");
         // A re-login keeps the user's name and the host mark.

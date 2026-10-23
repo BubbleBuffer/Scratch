@@ -975,7 +975,10 @@ mod tests {
         let mut read_set = raw("2026-10-19T08:00", None);
         read_set["tools"] = json!("read");
         let error = Schedule::parse(read_set).unwrap_err().to_string();
-        assert!(error.contains("read tool set cannot create pages"), "{error}");
+        assert!(
+            error.contains("read tool set cannot create pages"),
+            "{error}"
+        );
         let mut unknown_set = raw("2026-10-19T08:00", None);
         unknown_set["tools"] = json!("admin");
         let error = Schedule::parse(unknown_set).unwrap_err().to_string();

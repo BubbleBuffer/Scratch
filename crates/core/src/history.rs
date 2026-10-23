@@ -83,12 +83,17 @@ pub(crate) fn hot_snapshot(pd: &PageDoc, requested: &Frontiers) -> Result<Vec<u8
     if hot.shallow_since_frontiers() == *requested {
         return Ok(bytes);
     }
-    let root_vv = pd.doc.frontiers_to_vv(requested)
+    let root_vv = pd
+        .doc
+        .frontiers_to_vv(requested)
         .ok_or_else(|| invalid("cold root missing from history"))?;
     let critical = changes(pd).iter().all(|c| {
         let included = root_vv.get(&c.peer).copied().unwrap_or(0);
-        if c.counter + c.len as i32 <= included { return true; }
-        pd.doc.frontiers_to_vv(&Frontiers::from(ID::new(c.peer, c.counter.max(included))))
+        if c.counter + c.len as i32 <= included {
+            return true;
+        }
+        pd.doc
+            .frontiers_to_vv(&Frontiers::from(ID::new(c.peer, c.counter.max(included))))
             .is_some_and(|vv| vv.includes_vv(&root_vv))
     });
     if !critical {
@@ -121,8 +126,11 @@ pub(crate) fn hot_snapshot(pd: &PageDoc, requested: &Frontiers) -> Result<Vec<u8
         let _c = storage_metrics::span("history.verify_compare");
         if composed.oplog_vv() != pd.doc.oplog_vv()
             || composed.oplog_frontiers() != pd.doc.oplog_frontiers()
-            || composed.get_deep_value() != pd.doc.get_deep_value() {
-            return Err(invalid("shallow snapshot changed page state or operation IDs"));
+            || composed.get_deep_value() != pd.doc.get_deep_value()
+        {
+            return Err(invalid(
+                "shallow snapshot changed page state or operation IDs",
+            ));
         }
     }
     #[cfg(feature = "storage-metrics")]

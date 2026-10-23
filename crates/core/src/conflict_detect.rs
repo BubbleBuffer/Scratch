@@ -264,7 +264,7 @@ pub(crate) fn journal_record(
     ];
     let mut conflict = record(&doc.meta().id, scope, sides)?;
     let application = AppliedResolution {
-            undone_at: None,
+        undone_at: None,
         time_ms: conflict.time_ms,
         by: ResolutionBy::Auto {
             rule: JOURNAL_RULE.into(),
@@ -320,7 +320,9 @@ fn journal_content_side(
     other: &VersionVector,
     peers: &HashMap<String, String>,
 ) -> Result<Option<ConflictSide>> {
-    let scope = ConflictScope::Block { block: id.to_owned() };
+    let scope = ConflictScope::Block {
+        block: id.to_owned(),
+    };
     let side = if frame.index.contains_key(id) {
         side(frame, other, &scope, peers, deleted)?
     } else if let Some(prior) = deleted.before_block_deletion_frame(id)? {
@@ -380,7 +382,10 @@ fn own_ops(current: &Block, target: &Block) -> Vec<crate::types::BlockOp> {
     let id = target.id.clone();
     let mut ops = Vec::new();
     if current.kind != target.kind {
-        ops.push(BlockOp::SetKind { id: id.clone(), kind: target.kind.clone() });
+        ops.push(BlockOp::SetKind {
+            id: id.clone(),
+            kind: target.kind.clone(),
+        });
     }
     if current.text != target.text || current.marks != target.marks {
         ops.push(BlockOp::SetText {
@@ -390,16 +395,28 @@ fn own_ops(current: &Block, target: &Block) -> Vec<crate::types::BlockOp> {
         });
     }
     if current.checked != target.checked {
-        ops.push(BlockOp::SetChecked { id: id.clone(), checked: target.checked });
+        ops.push(BlockOp::SetChecked {
+            id: id.clone(),
+            checked: target.checked,
+        });
     }
     if current.target != target.target {
-        ops.push(BlockOp::SetTarget { id: id.clone(), target: target.target.clone() });
+        ops.push(BlockOp::SetTarget {
+            id: id.clone(),
+            target: target.target.clone(),
+        });
     }
     if current.color != target.color {
-        ops.push(BlockOp::SetColor { id: id.clone(), color: target.color.clone() });
+        ops.push(BlockOp::SetColor {
+            id: id.clone(),
+            color: target.color.clone(),
+        });
     }
     if current.width != target.width {
-        ops.push(BlockOp::SetWidth { id, width: target.width });
+        ops.push(BlockOp::SetWidth {
+            id,
+            width: target.width,
+        });
     }
     ops
 }
@@ -429,7 +446,10 @@ fn apply_text_rule(
     let before_state = before_state(doc);
     let ops = own_ops(&current, &target);
     if !ops.is_empty() {
-        fork.set_peer(crate::vault::peer_of(&format!("{TEXT_RULE}:{}", conflict.id)))?;
+        fork.set_peer(crate::vault::peer_of(&format!(
+            "{TEXT_RULE}:{}",
+            conflict.id
+        )))?;
         fork.apply(&ops)?;
         fork.doc.commit_with(
             loro::CommitOptions::new()
@@ -547,18 +567,23 @@ pub(crate) fn detect(
             }
             let original = base[id].block;
             if journal_page || journal_covered.contains(id) {
-                let left = journal_content_side(&local_frame, &mut local_deleted, id,
-                    &remote_vv, &peers)?;
-                let right = journal_content_side(&remote_frame, &mut remote_deleted, id,
-                    local_vv, &peers)?;
+                let left =
+                    journal_content_side(&local_frame, &mut local_deleted, id, &remote_vv, &peers)?;
+                let right =
+                    journal_content_side(&remote_frame, &mut remote_deleted, id, local_vv, &peers)?;
                 if let (Some(left), Some(right)) = (left, right) {
                     let original = own_content(original);
                     let left_content = own_side_content(&left).expect("present side");
                     let right_content = own_side_content(&right).expect("present side");
-                    if left_content != original && right_content != original
-                        && left_content != right_content {
-                        let conflict = record(&page, ConflictScope::Block { block: id.into() },
-                            vec![left, right])?;
+                    if left_content != original
+                        && right_content != original
+                        && left_content != right_content
+                    {
+                        let conflict = record(
+                            &page,
+                            ConflictScope::Block { block: id.into() },
+                            vec![left, right],
+                        )?;
                         if !existing_ids.contains(conflict.id.as_str()) {
                             journal_content.push(conflict);
                         }
@@ -639,7 +664,7 @@ pub(crate) fn detect(
                 anchor,
             )?;
             let application = AppliedResolution {
-            undone_at: None,
+                undone_at: None,
                 time_ms: conflict.time_ms,
                 by: ResolutionBy::Auto {
                     rule: EDIT_RULE.into(),
@@ -870,7 +895,8 @@ mod tests {
     #[test]
     fn independent_detection_converges_on_the_later_sides_text() {
         let mut base = PageDoc::new_page(1, "page", "Page", None, 0).unwrap();
-        base.apply(&[insert(None, None, "root", "Review on Monday")]).unwrap();
+        base.apply(&[insert(None, None, "root", "Review on Monday")])
+            .unwrap();
         commit_at(&base, 10);
         let mut left = branch(&base, 2);
         let mut right = branch(&base, 3);
@@ -878,7 +904,9 @@ mod tests {
         // which the merge deleted, so the rule must also re-insert text.
         left.apply(&[text("root", "Review on Friday")]).unwrap();
         commit_at(&left, 100);
-        right.apply(&[text("root", "RReview on Monday morning")]).unwrap();
+        right
+            .apply(&[text("root", "RReview on Monday morning")])
+            .unwrap();
         commit_at(&right, 200);
         let (mut a, ca, mut b, cb) = detect_both(&left, &right);
         assert_eq!(ca.len(), 1);

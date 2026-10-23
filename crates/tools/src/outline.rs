@@ -293,7 +293,9 @@ impl OutlineStore {
         check_session(session_id)?;
         // Reserve the writer before reading: concurrent live outline updates
         // must wait rather than deadlock while upgrading two shared locks.
-        let tx = self.conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let before = read_chapters(&tx, session_id)?;
         let mut chapters = before.clone().unwrap_or_default();
         change(&mut chapters)?;
@@ -403,7 +405,9 @@ fn span(
     };
     let (start, end) = (anchor(first)?, anchor(last)?);
     if start > end {
-        return Err(OutlineError(format!("{kind} {owner} ends before it starts")));
+        return Err(OutlineError(format!(
+            "{kind} {owner} ends before it starts"
+        )));
     }
     Ok((start, end))
 }
@@ -418,7 +422,11 @@ fn start_of(chapter: &OutlineChapter, positions: &Positions) -> usize {
 fn check_time(what: &str, owner: &str, value: &str) -> Result<()> {
     chrono::DateTime::parse_from_rfc3339(value)
         .map(|_| ())
-        .map_err(|_| OutlineError(format!("{what} of {owner} is not an RFC 3339 time: {value}")))
+        .map_err(|_| {
+            OutlineError(format!(
+                "{what} of {owner} is not an RFC 3339 time: {value}"
+            ))
+        })
 }
 
 /// Checks a chapter's own fields, anchors and times. Its sections are checked by
@@ -497,10 +505,7 @@ fn check_sections(chapter: &OutlineChapter, positions: &Positions) -> Result<()>
 
 /// The sections a chapter keeps, with `incoming` replacing those that have the
 /// same `first_message_id`. Incoming sections that match nothing are added.
-fn merge_sections(
-    kept: Vec<OutlineSection>,
-    incoming: Vec<OutlineSection>,
-) -> Vec<OutlineSection> {
+fn merge_sections(kept: Vec<OutlineSection>, incoming: Vec<OutlineSection>) -> Vec<OutlineSection> {
     let mut sections = kept;
     for section in incoming {
         match sections
@@ -889,13 +894,12 @@ mod tests {
         );
         // The same section again changes nothing.
         let s = section("a-2", "m2", "m2");
-        assert_eq!(
-            store.upsert_section("s", &ids, "m1", s.clone()).unwrap(),
-            2
-        );
+        assert_eq!(store.upsert_section("s", &ids, "m1", s.clone()).unwrap(), 2);
         assert_eq!(store.upsert_section("s", &ids, "m1", s).unwrap(), 2);
         // Closing with the values already stored changes nothing either.
-        let closed = store.close_chapter("s", &ids, "m1", "m3", "2026-10-08T00:05:00Z").unwrap();
+        let closed = store
+            .close_chapter("s", &ids, "m1", "m3", "2026-10-08T00:05:00Z")
+            .unwrap();
         assert_eq!(closed, 3);
         assert_eq!(
             store
@@ -1006,7 +1010,11 @@ mod tests {
             .unwrap_err();
         assert!(err.to_string().contains("outside chapter"), "{err}");
 
-        assert_eq!(store.session("s").unwrap(), before, "refusals write nothing");
+        assert_eq!(
+            store.session("s").unwrap(),
+            before,
+            "refusals write nothing"
+        );
         assert_eq!(store.revision("s").unwrap(), 1);
         drop(store);
         let _ = std::fs::remove_dir_all(&dir);
@@ -1045,7 +1053,11 @@ mod tests {
             .close_chapter("s", &ids, "m1", "m3", "2026-10-08T00:10:00Z")
             .unwrap_err();
         assert!(err.to_string().contains("outside chapter"), "{err}");
-        assert_eq!(store.revision("s").unwrap(), 4, "the refused close changed nothing");
+        assert_eq!(
+            store.revision("s").unwrap(),
+            4,
+            "the refused close changed nothing"
+        );
         drop(store);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1088,7 +1100,10 @@ mod tests {
         let mut foreign = open_chapter("b", "m1", "other-session-msg");
         foreign.id = "b".into();
         let err = store.upsert_chapter("s", &ids, foreign).unwrap_err();
-        assert!(err.to_string().contains("not a message of this session"), "{err}");
+        assert!(
+            err.to_string().contains("not a message of this session"),
+            "{err}"
+        );
 
         // A chapter whose last message comes before its first.
         let err = store
@@ -1100,7 +1115,10 @@ mod tests {
         let err = store
             .upsert_section("s", &ids, "m1", section("x", "m1", "m9"))
             .unwrap_err();
-        assert!(err.to_string().contains("not a message of this session"), "{err}");
+        assert!(
+            err.to_string().contains("not a message of this session"),
+            "{err}"
+        );
 
         assert_eq!(store.session("s").unwrap(), before);
         assert_eq!(store.revision("s").unwrap(), 1);
@@ -1129,7 +1147,10 @@ mod tests {
         assert!(err.to_string().contains("ended_at"), "{err}");
 
         let empty = store.upsert_chapter("", &ids, open_chapter("c", "m1", "m2"));
-        assert!(empty.unwrap_err().to_string().contains("session id is empty"));
+        assert!(empty
+            .unwrap_err()
+            .to_string()
+            .contains("session id is empty"));
         drop(store);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1216,7 +1237,10 @@ mod tests {
             .save_session("s", &[chapter("a", "m1", "m1"), chapter("b", "m2", "m2")])
             .unwrap();
         let read = store.session("s").unwrap().unwrap();
-        assert_eq!(read.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(), ["a", "b"]);
+        assert_eq!(
+            read.iter().map(|c| c.id.as_str()).collect::<Vec<_>>(),
+            ["a", "b"]
+        );
         drop(store);
         let _ = std::fs::remove_dir_all(&dir);
     }

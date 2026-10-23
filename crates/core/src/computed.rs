@@ -315,7 +315,8 @@ impl Index {
         };
         // A task note's indexed status comes from type data. A same-key
         // formula/rollup may not overwrite or delete that projection.
-        let computed: Vec<&PropDef> = schema.iter()
+        let computed: Vec<&PropDef> = schema
+            .iter()
             .filter(|d| is_computed(d.kind) && !(row.is_task && d.key == "status"))
             .collect();
         if computed.is_empty() {

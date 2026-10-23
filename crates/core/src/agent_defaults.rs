@@ -87,7 +87,10 @@ fn tool_sets_in(doc: &PageDoc) -> BTreeMap<String, String> {
 }
 
 fn clean(value: Option<&str>) -> Option<String> {
-    value.map(str::trim).filter(|v| !v.is_empty()).map(str::to_owned)
+    value
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_owned)
 }
 
 pub(crate) fn agent_defaults_in(doc: &PageDoc) -> AgentDefaults {
@@ -95,8 +98,8 @@ pub(crate) fn agent_defaults_in(doc: &PageDoc) -> AgentDefaults {
     let Some(agent) = data.get(ADDON) else {
         return AgentDefaults::default();
     };
-    let runner = clean(agent.get(RUNNER_KEY).and_then(|v| v.as_str()))
-        .filter(|r| check_runner(r).is_ok());
+    let runner =
+        clean(agent.get(RUNNER_KEY).and_then(|v| v.as_str())).filter(|r| check_runner(r).is_ok());
     let mut models = BTreeMap::new();
     if let Some(map) = agent.get(MODELS_KEY).and_then(|v| v.as_object()) {
         for (runner, model) in map {
@@ -298,7 +301,9 @@ mod tests {
     #[test]
     fn unknown_runners_are_rejected() {
         let (_dir, vault) = vault();
-        assert!(vault.set_agent_default_runner(Some("desktop".into())).is_err());
+        assert!(vault
+            .set_agent_default_runner(Some("desktop".into()))
+            .is_err());
         assert!(vault
             .set_agent_default_model("node-1".into(), Some("m".into()))
             .is_err());
@@ -317,7 +322,8 @@ mod tests {
         assert_eq!(got.runner.as_deref(), Some("hub"));
         assert_eq!(got.model_for("hub"), Some("codex/a"));
         assert!(b.conflict_auto_resolve().unwrap());
-        b.set_agent_default_runner(Some("this_device".into())).unwrap();
+        b.set_agent_default_runner(Some("this_device".into()))
+            .unwrap();
         b.set_agent_default_model("hub".into(), Some("codex/b".into()))
             .unwrap();
         sync(&b, &a);
@@ -352,7 +358,8 @@ mod tests {
         let (_t, v) = vault();
         assert!(v.agent_tool_sets().unwrap().is_empty());
         assert_eq!(v.agent_tool_set("hub").unwrap(), "everything");
-        v.set_agent_tool_set("hub".into(), Some("read".into())).unwrap();
+        v.set_agent_tool_set("hub".into(), Some("read".into()))
+            .unwrap();
         v.set_agent_tool_set("this_device".into(), Some("write".into()))
             .unwrap();
         assert_eq!(v.agent_tool_set("hub").unwrap(), "read");

@@ -11,15 +11,15 @@ use loro::{EncodedBlobMode, ExportMode, Frontiers, LoroDoc, ToJson, VersionVecto
 use crate::attach;
 use crate::doc::{PageDoc, PageMeta};
 use crate::error::{invalid, not_found, Result, VaultError};
-#[cfg(feature = "storage-metrics")]
-use crate::storage_metrics;
 use crate::ids::{new_id, now_ms, stamp_ms};
 use crate::index::{ContentRow, Index, MetaRow};
 use crate::order;
+#[cfg(feature = "storage-metrics")]
+use crate::storage_metrics;
 use crate::types::{
-    AppliedResolution, Attachment, AttachmentId, BeforeState, Block, Change,
-    ChangeBatch, Conflict, ConflictId, ConflictResolution, ConflictScope, ConflictSide, ConflictStatus,
-    PageId, PageUpdate, PageVersion, SideState, SyncImport,
+    AppliedResolution, Attachment, AttachmentId, BeforeState, Block, Change, ChangeBatch, Conflict,
+    ConflictId, ConflictResolution, ConflictScope, ConflictSide, ConflictStatus, PageId,
+    PageUpdate, PageVersion, SideState, SyncImport,
 };
 #[cfg(test)]
 use crate::types::{BlockKind, BlockOp, NewBlock};
@@ -123,7 +123,8 @@ pub(crate) fn merge_purge_identity(
         return Ok((Some(new.clone()), incoming.device.clone()));
     };
     let (old_vv, new_vv) = (decode_vv(&old)?, decode_vv(new)?);
-    let (new_covers_old, old_covers_new) = (new_vv.includes_vv(&old_vv), old_vv.includes_vv(&new_vv));
+    let (new_covers_old, old_covers_new) =
+        (new_vv.includes_vv(&old_vv), old_vv.includes_vv(&new_vv));
     Ok(match (new_covers_old, old_covers_new) {
         // The same purge generation.
         (true, true) => (Some(old), selected_device(known, incoming.device.clone())),
@@ -135,7 +136,10 @@ pub(crate) fn merge_purge_identity(
         (false, false) => {
             let mut vv = old_vv;
             vv.merge(&new_vv);
-            (Some(vv.encode()), selected_device(known, incoming.device.clone()))
+            (
+                Some(vv.encode()),
+                selected_device(known, incoming.device.clone()),
+            )
         }
     })
 }
@@ -168,10 +172,16 @@ fn derived_sync_ops(doc: &LoroDoc, start: ID, len: usize) -> bool {
         if containers.is_empty() {
             return false;
         }
-        let adopted = doc
-            .get_change(id)
-            .and_then(|c| c.message)
-            .is_some_and(|m| matches!(m.as_ref(), "sync:adopt-orphan" | "sync:restore-purge" | "sync:conflict-metadata" | "sync:resolve-conflict" | "sync:undo-conflict"));
+        let adopted = doc.get_change(id).and_then(|c| c.message).is_some_and(|m| {
+            matches!(
+                m.as_ref(),
+                "sync:adopt-orphan"
+                    | "sync:restore-purge"
+                    | "sync:conflict-metadata"
+                    | "sync:resolve-conflict"
+                    | "sync:undo-conflict"
+            )
+        });
         containers.iter().all(|container| {
             matches!(container,
             loro::ContainerID::Root { name, .. } if name.as_ref() == "conflicts"
@@ -205,7 +215,11 @@ struct ConflictLifecycle {
 }
 
 fn lifecycle_decision(doc: &PageDoc) -> Option<ConflictLifecycle> {
-    let value = doc.doc.get_map("conflict-lifecycle").get_value().to_json_value();
+    let value = doc
+        .doc
+        .get_map("conflict-lifecycle")
+        .get_value()
+        .to_json_value();
     serde_json::from_str(value.get("state")?.as_str()?).ok()
 }
 
@@ -223,7 +237,9 @@ fn record_lifecycle(
         purging_device,
     };
     let json = serde_json::to_string(&decision).map_err(|e| invalid(e.to_string()))?;
-    doc.doc.get_map("conflict-lifecycle").insert("state", json)?;
+    doc.doc
+        .get_map("conflict-lifecycle")
+        .insert("state", json)?;
     Ok(())
 }
 
@@ -232,9 +248,17 @@ fn imported_only_decisions(doc: &PageDoc, before: &VersionVector) -> bool {
         let start = before.get(peer).copied().unwrap_or(0);
         (start..end).all(|counter| {
             let id = ID::new(*peer, counter);
-            derived_sync_ops(&doc.doc, id, 1) || doc.doc.get_change(id)
-                .and_then(|change| change.message)
-                .is_some_and(|message| matches!(message.as_ref(), "sync:resolve-conflict" | "sync:undo-conflict"))
+            derived_sync_ops(&doc.doc, id, 1)
+                || doc
+                    .doc
+                    .get_change(id)
+                    .and_then(|change| change.message)
+                    .is_some_and(|message| {
+                        matches!(
+                            message.as_ref(),
+                            "sync:resolve-conflict" | "sync:undo-conflict"
+                        )
+                    })
         })
     })
 }
@@ -343,7 +367,10 @@ const LEGACY_FORMAT: u32 = 1;
 /// `Present` or `Deleted` sides, no frontiers, no anchor, id = block id.
 fn conflict_of(page: &str, json: &str) -> Option<Conflict> {
     let value: serde_json::Value = serde_json::from_str(json).ok()?;
-    if value.get("format").is_some_and(|format| format.as_u64() != Some(1)) {
+    if value
+        .get("format")
+        .is_some_and(|format| format.as_u64() != Some(1))
+    {
         let r: ConflictRecord = serde_json::from_value(value).ok()?;
         if r.format != CONFLICT_FORMAT || r.id.is_empty() || !consistent(&r) {
             return None;
@@ -404,9 +431,11 @@ pub(crate) fn read_conflict(page: &str, json: &str) -> Option<Conflict> {
 pub(crate) fn write_conflict(doc: &PageDoc, conflict: &Conflict) -> Result<()> {
     retain_conflict_history(doc)?;
     if conflict.format == LEGACY_FORMAT {
-        let sides: Vec<_> = conflict.sides.iter().map(|side| {
-            serde_json::json!({ "device": side.device, "block": side.block })
-        }).collect();
+        let sides: Vec<_> = conflict
+            .sides
+            .iter()
+            .map(|side| serde_json::json!({ "device": side.device, "block": side.block }))
+            .collect();
         let json = serde_json::json!({ "format": LEGACY_FORMAT,
             "block": conflict.block, "time_ms": conflict.time_ms,
             "sides": sides, "status": conflict.status, "applied": conflict.applied });
@@ -426,13 +455,20 @@ pub(crate) fn write_conflict(doc: &PageDoc, conflict: &Conflict) -> Result<()> {
 }
 
 pub(crate) fn retain_conflict_history(doc: &PageDoc) -> Result<()> {
-    doc.doc.get_map("conflict-history").insert("retained", true)?;
+    doc.doc
+        .get_map("conflict-history")
+        .insert("retained", true)?;
     Ok(())
 }
 
 pub(crate) fn has_conflict_history(doc: &PageDoc) -> bool {
-    doc.doc.get_map("conflict-history").get_value().to_json_value()
-        .get("retained").and_then(serde_json::Value::as_bool) == Some(true)
+    doc.doc
+        .get_map("conflict-history")
+        .get_value()
+        .to_json_value()
+        .get("retained")
+        .and_then(serde_json::Value::as_bool)
+        == Some(true)
 }
 
 /// Format 2 invariants. A side has frontiers unless it is `Purged`, which
@@ -444,9 +480,10 @@ fn consistent(r: &ConflictRecord) -> bool {
         let purged = matches!(s.state, SideState::Purged { .. });
         purged == s.frontiers.is_none()
     });
-    let applied_ok = r.applied.iter().all(|a| {
-        a.before.is_empty() == matches!(a.before_state, Some(BeforeState::Purged { .. }))
-    });
+    let applied_ok = r
+        .applied
+        .iter()
+        .all(|a| a.before.is_empty() == matches!(a.before_state, Some(BeforeState::Purged { .. })));
     let status_ok = match &r.status {
         ConflictStatus::Pending => true,
         ConflictStatus::Resolved(latest) => r.applied.last() == Some(latest),
@@ -551,17 +588,24 @@ impl Inner {
         let day_normalized = st.doc.doc.oplog_vv() != vv;
         let found = if imported_only_decisions(&st.doc, &before_vv) {
             Vec::new()
-        } else { crate::conflict_detect::detect(
-            &mut st.doc, &before_vv, &before_f, &after_vv, &recovered,
-            self.conflict_auto_resolve_cached(),
-        )? };
+        } else {
+            crate::conflict_detect::detect(
+                &mut st.doc,
+                &before_vv,
+                &before_f,
+                &after_vv,
+                &recovered,
+                self.conflict_auto_resolve_cached(),
+            )?
+        };
         let has_records = !found.is_empty();
         st.doc.doc.commit();
         for conflict in found {
             recorded += u32::from(conflict.status == ConflictStatus::Pending);
             write_conflict(&st.doc, &conflict)?;
         }
-        let policy = crate::conflict_policy::apply(&st.doc, self.conflict_auto_resolve_cached(), now_ms())?;
+        let policy =
+            crate::conflict_policy::apply(&st.doc, self.conflict_auto_resolve_cached(), now_ms())?;
         if has_records || day_normalized || policy.changed() {
             st.doc.register_peer(&self.device)?;
             if day_normalized {
@@ -712,8 +756,9 @@ impl Vault {
             // read_history reconstructs an available local cold prefix. An
             // externally supplied shallow snapshot has no such source and
             // retains Loro's existing historical-read limitations.
-            let bytes = self.inner.read_history(page,
-                |doc| doc.doc.export(ExportMode::Snapshot))??;
+            let bytes = self
+                .inner
+                .read_history(page, |doc| doc.doc.export(ExportMode::Snapshot))??;
             let active = PageDoc::from_bytes(&bytes, &[])?;
             match self.inner.read_conflict_archive(page) {
                 Ok(archive) => crate::conflict_archive::merge(page, &active, Some(&archive)),
@@ -743,7 +788,11 @@ impl Vault {
         edit: impl FnOnce(&mut PageDoc) -> Result<T>,
     ) -> Result<T> {
         let _purge = lock(&self.inner.purge_sync);
-        let purge_version = lock(&self.inner.purged).versions.get(page).cloned().flatten();
+        let purge_version = lock(&self.inner.purged)
+            .versions
+            .get(page)
+            .cloned()
+            .flatten();
         let (result, bytes, version) = self.inner.edit_conflict_archive(page, |doc| {
             doc.doc.set_next_commit_message("sync:restore-history");
             let result = edit(doc)?;
@@ -754,7 +803,11 @@ impl Vault {
             doc.doc.commit();
             Ok((result, doc.snapshot()?, doc.doc.oplog_vv().encode()))
         })?;
-        let record = RestoreRecord { page: page.to_owned(), purge_version, version };
+        let record = RestoreRecord {
+            page: page.to_owned(),
+            purge_version,
+            version,
+        };
         self.install_restored_snapshot(record, bytes, true)?;
         Ok(result)
     }
@@ -771,43 +824,60 @@ impl Vault {
         let blob = LoroDoc::decode_import_blob_meta(&update.bytes, true)?;
         // A delta alone may have pending dependencies, so its lifecycle map
         // becomes readable only after merging it with the receiver's history.
-        if !purged && blob.mode == EncodedBlobMode::Snapshot
-            && lifecycle_decision(&incoming).is_none() {
+        if !purged
+            && blob.mode == EncodedBlobMode::Snapshot
+            && lifecycle_decision(&incoming).is_none()
+        {
             return Ok(None);
         }
-        let current = if purged { self.inner.read_conflict_archive(&update.page) }
-            else { self.inner.read(&update.page, |doc| doc.snapshot())
-                .and_then(|bytes| bytes).and_then(|bytes| PageDoc::from_bytes(&bytes, &[])) };
+        let current = if purged {
+            self.inner.read_conflict_archive(&update.page)
+        } else {
+            self.inner
+                .read(&update.page, |doc| doc.snapshot())
+                .and_then(|bytes| bytes)
+                .and_then(|bytes| PageDoc::from_bytes(&bytes, &[]))
+        };
         let mut doc = match current {
             Ok(doc) => doc,
-            Err(crate::error::VaultError::NotFound(_)) if incoming.meta().id == update.page => incoming,
+            Err(crate::error::VaultError::NotFound(_)) if incoming.meta().id == update.page => {
+                incoming
+            }
             Err(crate::error::VaultError::NotFound(_)) => return Ok(None),
             Err(error) => return Err(error),
         };
         if let Err(error) = doc.import_updates(&update.bytes) {
-            if !purged { return Ok(None); }
+            if !purged {
+                return Ok(None);
+            }
             return Err(error);
         }
         if !purged {
             // Probe recent updates against the hot state first. A live or
             // obsolete lifecycle marker belongs to ordinary import and must
             // not make every subsequent delta read the cold prefix.
-            let Some(decision) = lifecycle_decision(&doc) else { return Ok(None); };
-            if !decision.purged
-                || !restore_coverage_includes(&doc, &decode_vv(&decision.version)?) {
+            let Some(decision) = lifecycle_decision(&doc) else {
+                return Ok(None);
+            };
+            if !decision.purged || !restore_coverage_includes(&doc, &decode_vv(&decision.version)?)
+            {
                 return Ok(None);
             }
             if doc.doc.is_shallow() {
-                let bytes = self.inner.read_history(&update.page,
-                    |source| source.full_snapshot())??;
+                let bytes = self
+                    .inner
+                    .read_history(&update.page, |source| source.full_snapshot())??;
                 doc = PageDoc::from_bytes(&bytes, &[])?;
                 doc.import_updates(&update.bytes)?;
             }
         }
         // Ordinary permanent deletion must not start retaining a stale copy.
         // Only conflict-bearing history participates in the archive protocol.
-        if purged && doc.conflicts().is_empty() && !has_conflict_history(&doc)
-            && lifecycle_decision(&doc).is_none() {
+        if purged
+            && doc.conflicts().is_empty()
+            && !has_conflict_history(&doc)
+            && lifecycle_decision(&doc).is_none()
+        {
             return Ok(None);
         }
         crate::conflict_archive::validate(&update.page, &doc)?;
@@ -817,25 +887,45 @@ impl Vault {
                 if decision.purged {
                     self.install_conflict_purge(&update.page, &doc)?;
                 } else if self.inner.is_purged(&update.page) {
-                    let purge_version = lock(&self.inner.purged).versions
-                        .get(&update.page).cloned().flatten();
-                    let record = RestoreRecord { page: update.page.clone(), purge_version,
-                        version: doc.doc.oplog_vv().encode() };
+                    let purge_version = lock(&self.inner.purged)
+                        .versions
+                        .get(&update.page)
+                        .cloned()
+                        .flatten();
+                    let record = RestoreRecord {
+                        page: update.page.clone(),
+                        purge_version,
+                        version: doc.doc.oplog_vv().encode(),
+                    };
                     self.install_restored_snapshot(record, doc.snapshot()?, true)?;
                 } else {
                     return Ok(None);
                 }
-                return Ok(Some(SyncImport { changed: 1, ..SyncImport::default() }));
+                return Ok(Some(SyncImport {
+                    changed: 1,
+                    ..SyncImport::default()
+                }));
             }
         }
         if purged {
-            let coverage = lock(&self.inner.purged).versions.get(&update.page).cloned().flatten();
-            if coverage.as_ref().map(|v| decode_vv(v)
-                .map(|vv| restore_coverage_includes(&doc, &vv))).transpose()?.unwrap_or(false) {
+            let coverage = lock(&self.inner.purged)
+                .versions
+                .get(&update.page)
+                .cloned()
+                .flatten();
+            if coverage
+                .as_ref()
+                .map(|v| decode_vv(v).map(|vv| restore_coverage_includes(&doc, &vv)))
+                .transpose()?
+                .unwrap_or(false)
+            {
                 self.inner.store_conflict_archive(&update.page, &doc)?;
-                lock(&self.inner.db).set_conflicts(&update.page,
-                    &mirror_rows(&update.page, &doc.conflicts()))?;
-                return Ok(Some(SyncImport { skipped: 1, ..SyncImport::default() }));
+                lock(&self.inner.db)
+                    .set_conflicts(&update.page, &mirror_rows(&update.page, &doc.conflicts()))?;
+                return Ok(Some(SyncImport {
+                    skipped: 1,
+                    ..SyncImport::default()
+                }));
             }
         }
         Ok(None)
@@ -870,8 +960,11 @@ impl Vault {
         let since = decode_vv(&since)?;
         if self.inner.is_purged(&page) {
             let doc = self.inner.read_conflict_archive(&page)?;
-            return Ok(if since.is_empty() { doc.doc.export(ExportMode::Snapshot)? }
-                else { doc.doc.export(ExportMode::updates(&since))? });
+            return Ok(if since.is_empty() {
+                doc.doc.export(ExportMode::Snapshot)?
+            } else {
+                doc.doc.export(ExportMode::updates(&since))?
+            });
         }
         let slot = self.inner.slot(&page)?;
         let mut st = {
@@ -909,9 +1002,14 @@ impl Vault {
             st.doc.doc.export(ExportMode::updates(&since))?
         };
         #[cfg(feature = "storage-metrics")]
-        storage_metrics::add_bytes(if since.is_empty() {
-            "loro.export_snapshot"
-        } else { "loro.export_updates" }, bytes.len() as u64);
+        storage_metrics::add_bytes(
+            if since.is_empty() {
+                "loro.export_snapshot"
+            } else {
+                "loro.export_updates"
+            },
+            bytes.len() as u64,
+        );
         Ok(bytes)
     }
 
@@ -1114,9 +1212,22 @@ impl Vault {
         let editing_version = doc.version();
         let content = doc.blocks();
         let peers = doc.peers();
-        let editing_device = doc.doc.oplog_frontiers().iter()
-            .max_by_key(|id| doc.doc.get_change(*id).map(|change| change.timestamp).unwrap_or(0))
-            .map(|id| peers.get(&id.peer.to_string()).cloned().unwrap_or_else(|| id.peer.to_string()))
+        let editing_device = doc
+            .doc
+            .oplog_frontiers()
+            .iter()
+            .max_by_key(|id| {
+                doc.doc
+                    .get_change(*id)
+                    .map(|change| change.timestamp)
+                    .unwrap_or(0)
+            })
+            .map(|id| {
+                peers
+                    .get(&id.peer.to_string())
+                    .cloned()
+                    .unwrap_or_else(|| id.peer.to_string())
+            })
             .unwrap_or_else(|| "unknown".into());
         let time_ms = now_ms();
         // A clone can race with live edits by this device. Restoration uses
@@ -1146,31 +1257,50 @@ impl Vault {
         doc.doc.commit();
         let scope = ConflictScope::Page;
         let sides = vec![
-            ConflictSide::new(editing_device, time_ms, Some(editing_version),
-                SideState::Present { content }, None),
+            ConflictSide::new(
+                editing_device,
+                time_ms,
+                Some(editing_version),
+                SideState::Present { content },
+                None,
+            ),
             // The purging side is the tombstone's device; fieldless records fall back.
-            ConflictSide::new(purge.device.clone().unwrap_or_else(|| "unknown".into()), time_ms, None,
-                SideState::Purged { tombstone_version: purge.version.clone().unwrap_or_default() }, None),
+            ConflictSide::new(
+                purge.device.clone().unwrap_or_else(|| "unknown".into()),
+                time_ms,
+                None,
+                SideState::Purged {
+                    tombstone_version: purge.version.clone().unwrap_or_default(),
+                },
+                None,
+            ),
         ];
         let mut conflict = Conflict {
             page: purge.page.clone(),
             id: crate::conflict_detect::event_id(&scope, &sides)?,
             format: CONFLICT_FORMAT,
-            block: String::new(), time_ms, scope, sides,
-            status: ConflictStatus::Pending, applied: Vec::new(),
+            block: String::new(),
+            time_ms,
+            scope,
+            sides,
+            status: ConflictStatus::Pending,
+            applied: Vec::new(),
         };
         // Causal purge repair already applied the editing side. Legacy
         // restores deliberately remain in Trash and retain their warning.
         if purge.version.is_some() {
             conflict.applied.push(AppliedResolution {
-            undone_at: None,
+                undone_at: None,
                 time_ms,
-                by: crate::types::ResolutionBy::Auto { rule: "edit-beats-delete".into() },
+                by: crate::types::ResolutionBy::Auto {
+                    rule: "edit-beats-delete".into(),
+                },
                 before: Vec::new(),
                 before_state: Some(BeforeState::Purged {
                     tombstone_version: purge.version.clone().unwrap_or_default(),
                 }),
-                fallback: false, restored_ancestors: Vec::new(),
+                fallback: false,
+                restored_ancestors: Vec::new(),
                 // The editing side is sides[0].
                 resolution: Some(ConflictResolution::UseSide(0)),
             });
@@ -1372,8 +1502,9 @@ impl Vault {
         };
         if let Some(Some(v)) = active {
             let explicit_restore = lifecycle_decision(&incoming).is_some_and(|decision| {
-                !decision.purged && decode_vv(&decision.version).is_ok_and(|coverage|
-                    restore_coverage_includes(&incoming, &coverage))
+                !decision.purged
+                    && decode_vv(&decision.version)
+                        .is_ok_and(|coverage| restore_coverage_includes(&incoming, &coverage))
             });
             if !explicit_restore && restore_coverage_includes(&incoming, &decode_vv(&v)?) {
                 return Ok(SyncImport {
@@ -1491,7 +1622,10 @@ impl Vault {
             let _purge = lock(&self.inner.purge_sync);
             let (active, device) = {
                 let p = lock(&self.inner.purged);
-                (p.versions.get(&record.page).cloned().flatten(), p.devices.get(&record.page).cloned())
+                (
+                    p.versions.get(&record.page).cloned().flatten(),
+                    p.devices.get(&record.page).cloned(),
+                )
             };
             let Some(version) = active else {
                 continue;
@@ -1790,7 +1924,8 @@ impl Vault {
     /// Wait for document changes, ignoring index-only notifications for the
     /// entire timeout. An actual edit retains the normal immediate wake.
     pub fn wait_sync_changes(&self, since_seq: u32, timeout_ms: u32) -> ChangeBatch {
-        self.inner.wait_documents(since_seq, Duration::from_millis(timeout_ms as u64))
+        self.inner
+            .wait_documents(since_seq, Duration::from_millis(timeout_ms as u64))
     }
 
     /// Open sync conflicts of one page, or of every page, by page and block.
@@ -1808,9 +1943,16 @@ impl Vault {
     pub fn conflict_log(&self, page: Option<PageId>) -> Result<Vec<Conflict>> {
         self.sweep_conflict_policy()?;
         let rows = lock(&self.inner.db).conflicts(page.as_deref())?;
-        Ok(rows.into_iter().filter_map(|(page, json)| conflict_of(&page, &json))
-            .filter(|conflict| matches!(conflict.status, ConflictStatus::Resolved(_))
-                || conflict.applied.iter().any(|application| application.undone_at.is_some()))
+        Ok(rows
+            .into_iter()
+            .filter_map(|(page, json)| conflict_of(&page, &json))
+            .filter(|conflict| {
+                matches!(conflict.status, ConflictStatus::Resolved(_))
+                    || conflict
+                        .applied
+                        .iter()
+                        .any(|application| application.undone_at.is_some())
+            })
             .collect())
     }
 
@@ -1822,7 +1964,10 @@ impl Vault {
         for page in self.inner.archive_page_ids()? {
             if !active.contains(&page) {
                 let doc = self.inner.read_conflict_archive(&page)?;
-                versions.push(PageVersion { page, version: doc.doc.oplog_vv().encode() });
+                versions.push(PageVersion {
+                    page,
+                    version: doc.doc.oplog_vv().encode(),
+                });
             }
         }
         versions.sort_by(|left, right| left.page.cmp(&right.page));
@@ -1853,41 +1998,65 @@ impl Vault {
         use crate::conflict_resolution::PageAction;
         let _purge = lock(&self.inner.purge_sync);
         let purged = self.inner.is_purged(&page);
-        let purge_version = lock(&self.inner.purged).versions.get(&page).cloned().flatten();
+        let purge_version = lock(&self.inner.purged)
+            .versions
+            .get(&page)
+            .cloned()
+            .flatten();
         let purged_by = lock(&self.inner.purged).devices.get(&page).cloned();
-        let message = if resolution.is_some() { "sync:resolve-conflict" } else { "sync:undo-conflict" };
+        let message = if resolution.is_some() {
+            "sync:resolve-conflict"
+        } else {
+            "sync:undo-conflict"
+        };
         let edit = |doc: &mut PageDoc| -> Result<(PageAction, Vec<u8>, Vec<(String, String)>)> {
             // Reconstruct before reading the record or capturing the undo
             // frontier: the checked cold source can include newer disk edits.
             doc.rehydrate()?;
-            let mut conflict = doc.conflicts().into_iter()
+            let mut conflict = doc
+                .conflicts()
+                .into_iter()
                 .find_map(|(key, json)| (key == id).then(|| conflict_of(&page, &json)).flatten())
                 .ok_or_else(|| not_found("conflict", &id))?;
             doc.doc.set_next_commit_message(message);
-            let action = if let Some(resolution) = &resolution {
-                if conflict.status != ConflictStatus::Pending {
-                    return Err(not_found("pending conflict", &id));
-                }
-                let before_state = (purged && matches!(conflict.scope, ConflictScope::Page)).then(|| BeforeState::Purged {
-                    tombstone_version: purge_version.clone().unwrap_or_default(),
-                });
-                let outcome = crate::conflict_resolution::resolve(doc, &conflict, resolution,
-                    crate::types::ResolutionBy::User, now_ms(), before_state)?;
-                conflict.applied.push(outcome.applied.clone());
-                conflict.status = ConflictStatus::Resolved(outcome.applied);
-                outcome.page_action
-            } else {
-                let outcome = crate::conflict_resolution::undo(doc, &conflict)?;
-                let journal = conflict.applied.iter().any(|application| {
-                    matches!(&application.by, crate::types::ResolutionBy::Auto { rule }
+            let action =
+                if let Some(resolution) = &resolution {
+                    if conflict.status != ConflictStatus::Pending {
+                        return Err(not_found("pending conflict", &id));
+                    }
+                    let before_state = (purged && matches!(conflict.scope, ConflictScope::Page))
+                        .then(|| BeforeState::Purged {
+                            tombstone_version: purge_version.clone().unwrap_or_default(),
+                        });
+                    let outcome = crate::conflict_resolution::resolve(
+                        doc,
+                        &conflict,
+                        resolution,
+                        crate::types::ResolutionBy::User,
+                        now_ms(),
+                        before_state,
+                    )?;
+                    conflict.applied.push(outcome.applied.clone());
+                    conflict.status = ConflictStatus::Resolved(outcome.applied);
+                    outcome.page_action
+                } else {
+                    let outcome = crate::conflict_resolution::undo(doc, &conflict)?;
+                    let journal = conflict.applied.iter().any(|application| {
+                        matches!(&application.by, crate::types::ResolutionBy::Auto { rule }
                         if rule == crate::conflict_detect::JOURNAL_RULE)
-                });
-                let latest = conflict.applied.last_mut().expect("undo checked application");
-                latest.undone_at = Some(now_ms());
-                conflict.status = if journal { ConflictStatus::Resolved(latest.clone()) }
-                    else { ConflictStatus::Pending };
-                outcome.page_action
-            };
+                    });
+                    let latest = conflict
+                        .applied
+                        .last_mut()
+                        .expect("undo checked application");
+                    latest.undone_at = Some(now_ms());
+                    conflict.status = if journal {
+                        ConflictStatus::Resolved(latest.clone())
+                    } else {
+                        ConflictStatus::Pending
+                    };
+                    outcome.page_action
+                };
             write_conflict(doc, &conflict)?;
             doc.doc.set_next_commit_message(message);
             doc.doc.commit();
@@ -1923,14 +2092,20 @@ impl Vault {
         match action {
             PageAction::Purged { .. } => self.install_conflict_purge(&page, &doc)?,
             PageAction::Present | PageAction::Trashed { .. } if purged => {
-                let record = RestoreRecord { page: page.clone(), purge_version,
-                    version: doc.doc.oplog_vv().encode() };
+                let record = RestoreRecord {
+                    page: page.clone(),
+                    purge_version,
+                    version: doc.doc.oplog_vv().encode(),
+                };
                 self.install_restored_snapshot(record, bytes, true)?;
             }
             PageAction::Unchanged if purged => {
                 let device = lifecycle_decision(&doc).and_then(|decision| decision.purging_device);
-                self.inner.add_purge_records(&[PurgeRecord { page: page.clone(),
-                    version: Some(doc.doc.oplog_vv().encode()), device }])?;
+                self.inner.add_purge_records(&[PurgeRecord {
+                    page: page.clone(),
+                    version: Some(doc.doc.oplog_vv().encode()),
+                    device,
+                }])?;
             }
             _ => {
                 let db = lock(&self.inner.db);
@@ -1950,20 +2125,28 @@ impl Vault {
         let mut coverage = doc.doc.oplog_vv();
         // Restoration excludes the old purge branch from the document. An
         // explicit successor still acknowledges that tombstone's coverage.
-        if let Some(previous) = decision.as_ref().and_then(|state| state.purge_version.as_deref()) {
+        if let Some(previous) = decision
+            .as_ref()
+            .and_then(|state| state.purge_version.as_deref())
+        {
             coverage.merge(&decode_vv(previous)?);
         }
         let device = decision.and_then(|decision| decision.purging_device);
-        self.inner.add_purge_records(&[PurgeRecord { page: page.to_owned(),
-            version: Some(coverage.encode()), device }])?;
+        self.inner.add_purge_records(&[PurgeRecord {
+            page: page.to_owned(),
+            version: Some(coverage.encode()),
+            device,
+        }])?;
         let db = lock(&self.inner.db);
         let children = db.child_ids(page)?;
         if db.exists(page)? || self.inner.doc_path(page).exists() {
             let (md, _) = db.md(page)?;
-            self.inner.purge_files(page, md.as_deref(), Some(&coverage))?;
+            self.inner
+                .purge_files(page, md.as_deref(), Some(&coverage))?;
             db.delete(&[page.to_owned()])?;
             self.inner.index_committed(&db, vec![page.to_owned()]);
-            self.inner.emit([Change::PageDeleted(page.to_owned()), Change::TreeChanged]);
+            self.inner
+                .emit([Change::PageDeleted(page.to_owned()), Change::TreeChanged]);
             self.adopt_orphans(&db, &children)?;
         }
         db.set_conflicts(page, &mirror_rows(page, &doc.conflicts()))?;
@@ -2019,9 +2202,17 @@ mod public_resolution_regressions {
     use crate::types::{Anchor, ResolutionBy};
 
     fn insert(id: &str, value: &str) -> BlockOp {
-        BlockOp::Insert { parent: None, after: None,
-            block: NewBlock { id: id.into(), kind: BlockKind::Paragraph,
-                text: value.into(), marks: vec![], checked: false } }
+        BlockOp::Insert {
+            parent: None,
+            after: None,
+            block: NewBlock {
+                id: id.into(),
+                kind: BlockKind::Paragraph,
+                text: value.into(),
+                marks: vec![],
+                checked: false,
+            },
+        }
     }
 
     #[test]
@@ -2030,30 +2221,53 @@ mod public_resolution_regressions {
         {
             let vault = Vault::open(path.to_string_lossy().into_owned()).unwrap();
             let page = vault.create_page(None, "Legacy".into()).unwrap();
-            vault.apply(page.clone(), vec![insert("keep", "Merged"), insert("side", "Merged")]).unwrap();
-            vault.inner.edit(&page, |doc| {
-                for id in ["keep", "side"] {
-                    let block = find_block(&doc.blocks(), id).unwrap();
-                    let mut chosen = block.clone(); chosen.text = "Chosen".into();
-                    let json = serde_json::json!({"block": id, "time_ms": now_ms(),
+            vault
+                .apply(
+                    page.clone(),
+                    vec![insert("keep", "Merged"), insert("side", "Merged")],
+                )
+                .unwrap();
+            vault
+                .inner
+                .edit(&page, |doc| {
+                    for id in ["keep", "side"] {
+                        let block = find_block(&doc.blocks(), id).unwrap();
+                        let mut chosen = block.clone();
+                        chosen.text = "Chosen".into();
+                        let json = serde_json::json!({"block": id, "time_ms": now_ms(),
                         "sides": [{"device": "left", "block": block},
-                            {"device": "right", "block": chosen}]}).to_string();
-                    doc.set_conflict(id, &json)?;
-                }
-                Ok(())
-            }).unwrap();
-            vault.resolve_conflict(page.clone(), "keep".into(), ConflictResolution::Keep).unwrap();
-            vault.resolve_conflict(page.clone(), "side".into(), ConflictResolution::UseSide(1)).unwrap();
+                            {"device": "right", "block": chosen}]})
+                        .to_string();
+                        doc.set_conflict(id, &json)?;
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            vault
+                .resolve_conflict(page.clone(), "keep".into(), ConflictResolution::Keep)
+                .unwrap();
+            vault
+                .resolve_conflict(page.clone(), "side".into(), ConflictResolution::UseSide(1))
+                .unwrap();
             assert_eq!(vault.conflict_log(Some(page.clone())).unwrap().len(), 2);
-            assert_eq!(find_block(&vault.load_page(page).unwrap().blocks, "side").unwrap().text, "Chosen");
+            assert_eq!(
+                find_block(&vault.load_page(page).unwrap().blocks, "side")
+                    .unwrap()
+                    .text,
+                "Chosen"
+            );
             vault.flush().unwrap();
         }
         {
             let vault = Vault::open(path.to_string_lossy().into_owned()).unwrap();
             let records = vault.conflict_log(None).unwrap();
             assert_eq!(records.len(), 2);
-            assert!(records.iter().all(|record| record.format == 1 && !record.undoable()));
-            assert!(records.iter().all(|record| matches!(record.status, ConflictStatus::Resolved(_))));
+            assert!(records
+                .iter()
+                .all(|record| record.format == 1 && !record.undoable()));
+            assert!(records
+                .iter()
+                .all(|record| matches!(record.status, ConflictStatus::Resolved(_))));
         }
         std::fs::remove_dir_all(path).unwrap();
     }
@@ -2064,20 +2278,51 @@ mod public_resolution_regressions {
         {
             let vault = Vault::open(path.to_string_lossy().into_owned()).unwrap();
             let page = vault.create_page(None, "Fallback".into()).unwrap();
-            vault.apply(page.clone(), vec![insert("target", "Chosen")]).unwrap();
-            vault.inner.edit(&page, |doc| {
-                doc.doc.commit();
-                let side = ConflictSide::new("history".into(), now_ms(), Some(doc.version()),
-                    SideState::Present { content: doc.blocks() },
-                    Some(Anchor { parent: Some("never-existed".into()), previous: None }));
-                let conflict = Conflict { page: page.clone(), id: "fallback".into(), format: 2,
-                    block: "target".into(), time_ms: now_ms(),
-                    scope: ConflictScope::Block { block: "target".into() },
-                    sides: vec![side], status: ConflictStatus::Pending, applied: vec![] };
-                doc.apply(&[BlockOp::Delete { id: "target".into() }])?;
-                write_conflict(doc, &conflict)
-            }).unwrap();
-            vault.resolve_conflict(page.clone(), "fallback".into(), ConflictResolution::UseSide(0)).unwrap();
+            vault
+                .apply(page.clone(), vec![insert("target", "Chosen")])
+                .unwrap();
+            vault
+                .inner
+                .edit(&page, |doc| {
+                    doc.doc.commit();
+                    let side = ConflictSide::new(
+                        "history".into(),
+                        now_ms(),
+                        Some(doc.version()),
+                        SideState::Present {
+                            content: doc.blocks(),
+                        },
+                        Some(Anchor {
+                            parent: Some("never-existed".into()),
+                            previous: None,
+                        }),
+                    );
+                    let conflict = Conflict {
+                        page: page.clone(),
+                        id: "fallback".into(),
+                        format: 2,
+                        block: "target".into(),
+                        time_ms: now_ms(),
+                        scope: ConflictScope::Block {
+                            block: "target".into(),
+                        },
+                        sides: vec![side],
+                        status: ConflictStatus::Pending,
+                        applied: vec![],
+                    };
+                    doc.apply(&[BlockOp::Delete {
+                        id: "target".into(),
+                    }])?;
+                    write_conflict(doc, &conflict)
+                })
+                .unwrap();
+            vault
+                .resolve_conflict(
+                    page.clone(),
+                    "fallback".into(),
+                    ConflictResolution::UseSide(0),
+                )
+                .unwrap();
             let log = vault.conflict_log(Some(page.clone())).unwrap();
             assert!(log[0].applied[0].fallback);
             assert_eq!(log[0].applied[0].by, ResolutionBy::User);
@@ -2147,7 +2392,13 @@ mod conflict_format_tests {
                 scope: ConflictScope::Block { block: "b".into() },
                 time_ms: 5,
                 sides: vec![
-                    side("a", SideState::Present { content: vec![block("b", "x", Vec::new())] }, None),
+                    side(
+                        "a",
+                        SideState::Present {
+                            content: vec![block("b", "x", Vec::new())],
+                        },
+                        None,
+                    ),
                     side("b", SideState::Deleted, None),
                 ],
                 status: ConflictStatus::Pending,
@@ -2158,7 +2409,10 @@ mod conflict_format_tests {
                 id: "r-subtree".into(),
                 scope: ConflictScope::Subtree { root: "s".into() },
                 time_ms: 6,
-                sides: vec![side("a", present.clone(), anchor.clone()), side("b", SideState::Deleted, None)],
+                sides: vec![
+                    side("a", present.clone(), anchor.clone()),
+                    side("b", SideState::Deleted, None),
+                ],
                 status: ConflictStatus::Pending,
                 applied: Vec::new(),
             },
@@ -2169,7 +2423,13 @@ mod conflict_format_tests {
                 time_ms: 7,
                 sides: vec![
                     side("a", SideState::Trashed { at: 99 }, None),
-                    side("b", SideState::Purged { tombstone_version: vec![9, 8] }, None),
+                    side(
+                        "b",
+                        SideState::Purged {
+                            tombstone_version: vec![9, 8],
+                        },
+                        None,
+                    ),
                 ],
                 status: ConflictStatus::Pending,
                 applied: Vec::new(),
@@ -2179,7 +2439,10 @@ mod conflict_format_tests {
                 id: "r-resolved".into(),
                 scope: ConflictScope::Page,
                 time_ms: 8,
-                sides: vec![side("a", present, None), side("b", SideState::Deleted, None)],
+                sides: vec![
+                    side("a", present, None),
+                    side("b", SideState::Deleted, None),
+                ],
                 status: ConflictStatus::Resolved(latest.clone()),
                 applied: vec![latest],
             },
@@ -2188,7 +2451,10 @@ mod conflict_format_tests {
                 id: "r-purged".into(),
                 scope: ConflictScope::Block { block: "b".into() },
                 time_ms: 9,
-                sides: vec![side("a", SideState::Deleted, None), side("b", SideState::Deleted, None)],
+                sides: vec![
+                    side("a", SideState::Deleted, None),
+                    side("b", SideState::Deleted, None),
+                ],
                 // Applied while the page was purged: no frontiers, so `before`
                 // is empty and `before_state` says why.
                 status: ConflictStatus::Pending,
@@ -2196,7 +2462,13 @@ mod conflict_format_tests {
                     before_state: Some(BeforeState::Purged {
                         tombstone_version: vec![7],
                     }),
-                    ..applied(10, ResolutionBy::Auto { rule: "journal".into() }, Vec::new())
+                    ..applied(
+                        10,
+                        ResolutionBy::Auto {
+                            rule: "journal".into(),
+                        },
+                        Vec::new(),
+                    )
                 }],
             },
         ]
@@ -2232,7 +2504,10 @@ mod conflict_format_tests {
         let records = variants();
         let block_json = serde_json::to_string(&records[0]).unwrap();
         let block_conflict = conflict_of("p", &block_json).unwrap();
-        assert_eq!(block_conflict.sides[0].block, Some(block("b", "x", Vec::new())));
+        assert_eq!(
+            block_conflict.sides[0].block,
+            Some(block("b", "x", Vec::new()))
+        );
         assert_eq!(block_conflict.sides[1].block, None);
 
         let subtree_json = serde_json::to_string(&records[1]).unwrap();
@@ -2267,7 +2542,9 @@ mod conflict_format_tests {
         assert_eq!(c.sides[0].anchor, None);
         assert_eq!(
             c.sides[0].state,
-            SideState::Present { content: vec![edited.clone()] }
+            SideState::Present {
+                content: vec![edited.clone()]
+            }
         );
         assert_eq!(c.sides[0].block, Some(edited));
         assert_eq!(c.sides[1].device, "dev-b");
@@ -2314,7 +2591,13 @@ mod conflict_format_tests {
             before_state: Some(BeforeState::Trashed { at: 30 }),
             fallback: true,
             restored_ancestors: vec!["a".into(), "b".into()],
-            ..applied(25, ResolutionBy::Auto { rule: "journal".into() }, vec![1, 2])
+            ..applied(
+                25,
+                ResolutionBy::Auto {
+                    rule: "journal".into(),
+                },
+                vec![1, 2],
+            )
         }];
         let back = conflict_of("p", &serde_json::to_string(&pending).unwrap()).unwrap();
         assert_eq!(back.status, ConflictStatus::Pending);
@@ -2332,7 +2615,13 @@ mod conflict_format_tests {
     /// the latest as its status.
     #[test]
     fn resolved_history_keeps_every_application_and_repeats_the_latest() {
-        let first = applied(20, ResolutionBy::Auto { rule: "journal".into() }, vec![1]);
+        let first = applied(
+            20,
+            ResolutionBy::Auto {
+                rule: "journal".into(),
+            },
+            vec![1],
+        );
         let latest = AppliedResolution {
             undone_at: None,
             restored_ancestors: vec!["a".into(), "b".into()],
@@ -2370,7 +2659,7 @@ mod conflict_format_tests {
         assert_eq!(
             c.applied,
             vec![AppliedResolution {
-            undone_at: None,
+                undone_at: None,
                 time_ms: 4,
                 by: ResolutionBy::User,
                 before: vec![1],
@@ -2388,16 +2677,28 @@ mod conflict_format_tests {
             serde_json::from_str(r#"{"time_ms":4,"by":"User","before":[1]}"#).unwrap();
         assert_eq!(old.resolution, None);
         for resolution in [ConflictResolution::Keep, ConflictResolution::UseSide(1)] {
-            let applied = AppliedResolution { resolution: Some(resolution), ..old.clone() };
+            let applied = AppliedResolution {
+                resolution: Some(resolution),
+                ..old.clone()
+            };
             let json = serde_json::to_string(&applied).unwrap();
-            assert_eq!(serde_json::from_str::<AppliedResolution>(&json).unwrap(), applied);
+            assert_eq!(
+                serde_json::from_str::<AppliedResolution>(&json).unwrap(),
+                applied
+            );
         }
 
         let legacy: PurgeRecord = serde_json::from_str(r#"{"page":"p","version":null}"#).unwrap();
         assert_eq!(legacy.device, None);
         let json = serde_json::to_string(&legacy).unwrap();
-        assert!(!json.contains("device"), "fieldless records stay fieldless: {json}");
-        let stamped = PurgeRecord { device: Some("dev-a".into()), ..legacy };
+        assert!(
+            !json.contains("device"),
+            "fieldless records stay fieldless: {json}"
+        );
+        let stamped = PurgeRecord {
+            device: Some("dev-a".into()),
+            ..legacy
+        };
         let json = serde_json::to_string(&stamped).unwrap();
         assert_eq!(serde_json::from_str::<PurgeRecord>(&json).unwrap(), stamped);
     }
@@ -2413,7 +2714,10 @@ mod conflict_format_tests {
         let subtree = serde_json::to_string(&variants()[1]).unwrap();
         let rows = mirror_rows(
             "p",
-            &[("b1".to_string(), legacy), ("r-subtree".to_string(), subtree)],
+            &[
+                ("b1".to_string(), legacy),
+                ("r-subtree".to_string(), subtree),
+            ],
         );
         assert_eq!(rows[0].0, "b1");
         assert_eq!(rows[0].1, "b1");
@@ -2434,7 +2738,11 @@ mod conflict_format_tests {
     }
 
     fn purge(version: Option<Vec<u8>>, device: Option<&str>) -> PurgeRecord {
-        PurgeRecord { page: "p".into(), version, device: device.map(str::to_owned) }
+        PurgeRecord {
+            page: "p".into(),
+            version,
+            device: device.map(str::to_owned),
+        }
     }
 
     #[test]
@@ -2450,7 +2758,10 @@ mod conflict_format_tests {
         assert_eq!(device.as_deref(), Some("b"));
         let (_, device) =
             merge_purge_identity(Some(old), Some("a".into()), &purge(Some(newer), None)).unwrap();
-        assert_eq!(device, None, "a fieldless newer purge must not inherit the old device");
+        assert_eq!(
+            device, None,
+            "a fieldless newer purge must not inherit the old device"
+        );
     }
 
     #[test]
@@ -2490,12 +2801,9 @@ mod conflict_format_tests {
         assert_eq!(version, None);
         assert_eq!(device.as_deref(), Some("a"));
         let causal = coverage(&[(7, 3)]);
-        let (version, device) = merge_purge_identity(
-            None,
-            Some("a".into()),
-            &purge(Some(causal.clone()), None),
-        )
-        .unwrap();
+        let (version, device) =
+            merge_purge_identity(None, Some("a".into()), &purge(Some(causal.clone()), None))
+                .unwrap();
         assert_eq!(version, Some(causal));
         assert_eq!(device, None);
     }
@@ -2513,16 +2821,23 @@ mod conflict_format_tests {
             let merged = decode_vv(&version.unwrap()).unwrap();
             assert!(merged.includes_vv(&decode_vv(&left).unwrap()));
             assert!(merged.includes_vv(&decode_vv(&right).unwrap()));
-            assert_eq!(device.as_deref(), Some("b"), "first {first}, second {second}");
+            assert_eq!(
+                device.as_deref(),
+                Some("b"),
+                "first {first}, second {second}"
+            );
         }
     }
 
     #[test]
     fn a_missing_device_yields_to_a_known_one_and_equal_coverage_selects_the_greater() {
         let (left, right) = (coverage(&[(7, 2)]), coverage(&[(8, 3)]));
-        let (_, device) =
-            merge_purge_identity(Some(left.clone()), Some("a".into()), &purge(Some(right.clone()), None))
-                .unwrap();
+        let (_, device) = merge_purge_identity(
+            Some(left.clone()),
+            Some("a".into()),
+            &purge(Some(right.clone()), None),
+        )
+        .unwrap();
         assert_eq!(device.as_deref(), Some("a"));
         let (_, device) =
             merge_purge_identity(Some(left.clone()), None, &purge(Some(right), Some("b"))).unwrap();
@@ -2534,7 +2849,11 @@ mod conflict_format_tests {
                 &purge(Some(left.clone()), Some(second)),
             )
             .unwrap();
-            assert_eq!(device.as_deref(), Some("b"), "equal coverage, first {first}");
+            assert_eq!(
+                device.as_deref(),
+                Some("b"),
+                "equal coverage, first {first}"
+            );
         }
     }
 
@@ -2545,7 +2864,14 @@ mod conflict_format_tests {
             (coverage(&[(8, 3)]), "dev-a"),
             (coverage(&[(9, 1)]), "dev-b"),
         ];
-        let orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+        let orders = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
         for order in orders {
             let mut state: (Option<Vec<u8>>, Option<String>) = (None, None);
             for i in order {
@@ -2560,7 +2886,10 @@ mod conflict_format_tests {
             assert_eq!(state.1.as_deref(), Some("dev-c"), "order {order:?}");
             let merged = decode_vv(state.0.as_ref().unwrap()).unwrap();
             for (cov, _) in &records {
-                assert!(merged.includes_vv(&decode_vv(cov).unwrap()), "order {order:?}");
+                assert!(
+                    merged.includes_vv(&decode_vv(cov).unwrap()),
+                    "order {order:?}"
+                );
             }
         }
     }
@@ -2575,7 +2904,11 @@ mod conflict_format_tests {
             &purge(Some(left.clone()), Some("b")),
         )
         .unwrap();
-        assert_eq!(device.as_deref(), Some("a"), "stale left does not take over");
+        assert_eq!(
+            device.as_deref(),
+            Some("a"),
+            "stale left does not take over"
+        );
         let (_, device) = merge_purge_identity(
             Some(right),
             Some("b".into()),
@@ -2599,8 +2932,11 @@ mod conflict_format_tests {
         let json = serde_json::to_string(&stamped).unwrap();
         let read: ConflictLifecycle = serde_json::from_str(&json).unwrap();
         assert_eq!(read.purging_device.as_deref(), Some("dev-a"));
-        let fieldless = serde_json::to_string(&ConflictLifecycle { purging_device: None, ..stamped })
-            .unwrap();
+        let fieldless = serde_json::to_string(&ConflictLifecycle {
+            purging_device: None,
+            ..stamped
+        })
+        .unwrap();
         assert!(!fieldless.contains("purging_device"), "{fieldless}");
     }
 }

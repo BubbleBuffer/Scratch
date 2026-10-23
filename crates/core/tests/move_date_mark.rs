@@ -144,7 +144,9 @@ fn moves_selected_date_only_and_survives_reindex_and_reopen() {
         .unwrap();
     assert_ne!(v.page_versions().unwrap(), versions);
     assert_eq!(
-        v.poll_changes(seq).changes.into_iter()
+        v.poll_changes(seq)
+            .changes
+            .into_iter()
             .filter(|change| !matches!(change, Change::IndexCommitted { .. }))
             .collect::<Vec<_>>(),
         vec![Change::PageChanged(page.clone())]
@@ -159,10 +161,14 @@ fn moves_selected_date_only_and_survives_reindex_and_reopen() {
     selected.kind = MarkKind::Date("2026-10-07T12:34:56.789Z".into());
     assert_eq!(after.blocks, expected); // Includes order, children, text and every range.
     v.flush().unwrap();
-    assert!(v.poll_changes(seq).changes.into_iter().any(|change| match change {
-        Change::IndexCommitted { generation, pages } => generation > 0 && pages.contains(&page),
-        _ => false,
-    }));
+    assert!(v
+        .poll_changes(seq)
+        .changes
+        .into_iter()
+        .any(|change| match change {
+            Change::IndexCommitted { generation, pages } => generation > 0 && pages.contains(&page),
+            _ => false,
+        }));
     for items in [queries(&v).0, queries(&v).1] {
         let item = items
             .iter()

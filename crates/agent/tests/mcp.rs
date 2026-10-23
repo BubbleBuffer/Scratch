@@ -131,7 +131,10 @@ fn the_relay_offers_and_runs_a_server_tool_and_reports_the_broken_server() {
     let agent = open(&dir, HostKind::Desktop, vec![], both());
     let names = relay_names(&agent);
     assert!(names.iter().any(|n| n == ECHO), "{names:?}");
-    assert!(!names.iter().any(|n| n.starts_with("mcp__broken__")), "{names:?}");
+    assert!(
+        !names.iter().any(|n| n.starts_with("mcp__broken__")),
+        "{names:?}"
+    );
 
     let result = relay_echo(&agent, "from the hub");
     assert!(!result.is_error, "{result:?}");
@@ -222,8 +225,7 @@ fn an_in_app_run_calls_a_server_tool_after_its_confirm_prompt() {
     let mut seen = Vec::new();
     loop {
         let left = deadline.saturating_duration_since(Instant::now());
-        let Forwarded::Event(event) = rx.recv_timeout(left).expect("event before timeout")
-        else {
+        let Forwarded::Event(event) = rx.recv_timeout(left).expect("event before timeout") else {
             continue;
         };
         if event.session_id != session.id {
@@ -232,7 +234,9 @@ fn an_in_app_run_calls_a_server_tool_after_its_confirm_prompt() {
         match &event.kind {
             EventKind::ApprovalRequested { approval } => {
                 assert_eq!(approval.tool, ECHO);
-                agent.decide_approval(&approval.id, "approve", None).unwrap();
+                agent
+                    .decide_approval(&approval.id, "approve", None)
+                    .unwrap();
             }
             EventKind::RunFinished { .. } => {
                 seen.push(event.kind);
@@ -243,7 +247,8 @@ fn an_in_app_run_calls_a_server_tool_after_its_confirm_prompt() {
         seen.push(event.kind);
     }
     assert!(
-        seen.iter().any(|k| matches!(k, EventKind::ApprovalRequested { .. })),
+        seen.iter()
+            .any(|k| matches!(k, EventKind::ApprovalRequested { .. })),
         "{seen:?}"
     );
     assert!(

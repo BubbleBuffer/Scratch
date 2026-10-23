@@ -1086,7 +1086,10 @@ mod tests {
         assert_eq!(record.status, ConflictStatus::Resolved(latest.clone()));
         assert!(!latest.before.is_empty());
         // The journal applies the editing side, which is side 1.
-        assert_eq!(latest.resolution, Some(crate::types::ConflictResolution::UseSide(1)));
+        assert_eq!(
+            latest.resolution,
+            Some(crate::types::ConflictResolution::UseSide(1))
+        );
         record
     }
 

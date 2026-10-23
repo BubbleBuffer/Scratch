@@ -919,7 +919,10 @@ mod tests {
             restores: vec![restore("r", None, &[1])],
         };
         let bytes = req.encode_with_device(true);
-        assert_eq!(SyncRequestV2::decode_with_device(&bytes, true).unwrap(), req);
+        assert_eq!(
+            SyncRequestV2::decode_with_device(&bytes, true).unwrap(),
+            req
+        );
 
         let resp = SyncResponseV2 {
             response: SyncResponse {

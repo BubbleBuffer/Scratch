@@ -497,7 +497,10 @@ fn ai_task_runs_never_wait_for_approval() {
     assert_eq!(run.text, "All done.");
     let state = agent.session_state(&run.session_id).unwrap();
     assert!(
-        state.messages.iter().any(|m| m.content.contains("confirmed: go")),
+        state
+            .messages
+            .iter()
+            .any(|m| m.content.contains("confirmed: go")),
         "{:?}",
         state.messages
     );

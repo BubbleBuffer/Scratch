@@ -704,7 +704,11 @@ pub struct SyncImport {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConflictScopeKind { Block, Subtree, Page }
+pub enum ConflictScopeKind {
+    Block,
+    Subtree,
+    Page,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConflictScope {
@@ -714,7 +718,12 @@ pub struct ConflictScope {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConflictStateKind { Present, Deleted, Trashed, Purged }
+pub enum ConflictStateKind {
+    Present,
+    Deleted,
+    Trashed,
+    Purged,
+}
 
 /// Complete scoped content, flattened in pre-order with depths, including
 /// every child. Frontiers on the side remain the source of truth.
@@ -746,10 +755,16 @@ pub struct ConflictSide {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConflictStatus { Pending, Resolved }
+pub enum ConflictStatus {
+    Pending,
+    Resolved,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResolutionBy { User, Auto }
+pub enum ResolutionBy {
+    User,
+    Auto,
+}
 
 #[derive(Debug, Clone)]
 pub struct ConflictBeforeState {
@@ -805,7 +820,12 @@ pub struct Resolution {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConflictDiffChange { Unchanged, Modified, Added, Removed }
+pub enum ConflictDiffChange {
+    Unchanged,
+    Modified,
+    Added,
+    Removed,
+}
 
 /// Offsets count UTF-16 code units, matching Dart strings and BMark.
 #[derive(Debug, Clone, PartialEq, Eq)]

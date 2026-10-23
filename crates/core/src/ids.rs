@@ -117,9 +117,7 @@ pub fn node_record_id(device: &str) -> String {
 /// (`new_id`, `schedule_occurrence_id`, `node_record_id`) is a 128-bit value,
 /// so all of them pass. Ids become file names, so anything else is refused.
 pub fn is_page_id(id: &str) -> bool {
-    id.len() == 26
-        && id.as_bytes()[0] <= b'7'
-        && id.bytes().all(|b| ALPHABET.contains(&b))
+    id.len() == 26 && id.as_bytes()[0] <= b'7' && id.bytes().all(|b| ALPHABET.contains(&b))
 }
 
 fn encode_id(mut v: u128) -> String {

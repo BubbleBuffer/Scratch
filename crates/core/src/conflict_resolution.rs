@@ -11,8 +11,8 @@ use crate::conflict_restore::{restore_tagged, undo_restore_tagged, RestoreEffect
 use crate::doc::PageDoc;
 use crate::error::{invalid, Result};
 use crate::types::{
-    AppliedResolution, BeforeState, Block, BlockOp, Conflict, ConflictResolution,
-    ConflictScope, NewBlock, ResolutionBy, SideState,
+    AppliedResolution, BeforeState, Block, BlockOp, Conflict, ConflictResolution, ConflictScope,
+    NewBlock, ResolutionBy, SideState,
 };
 
 /// Lifecycle work the Vault must apply along with the edited document.
@@ -59,8 +59,8 @@ fn historical(doc: &PageDoc, bytes: &[u8]) -> Result<PageDoc> {
     if bytes.is_empty() {
         return Err(invalid("conflict version is missing"));
     }
-    let frontiers = Frontiers::decode(bytes)
-        .map_err(|e| invalid(format!("invalid conflict version: {e}")))?;
+    let frontiers =
+        Frontiers::decode(bytes).map_err(|e| invalid(format!("invalid conflict version: {e}")))?;
     doc.fork_at(&frontiers)
 }
 
@@ -129,8 +129,17 @@ fn undo_subtree_footprint(
     // keeper's content or children outside this historical footprint.
     for id in before_order {
         if seen.contains(&id) && !covered.contains(&id) {
-            add_effect(&mut effect, restore_tagged(doc, before, Some(&id), false, None,
-                Some("sync:undo-conflict"))?);
+            add_effect(
+                &mut effect,
+                restore_tagged(
+                    doc,
+                    before,
+                    Some(&id),
+                    false,
+                    None,
+                    Some("sync:undo-conflict"),
+                )?,
+            );
         }
     }
     Ok(effect)
@@ -150,7 +159,9 @@ pub(crate) fn resolve(
 ) -> Result<ResolutionOutcome> {
     check_page(doc, conflict)?;
     if before_state.is_some() && !matches!(before_state, Some(BeforeState::Purged { .. })) {
-        return Err(invalid("only purge state may override the document before-state"));
+        return Err(invalid(
+            "only purge state may override the document before-state",
+        ));
     }
     if before_state.is_some() && !matches!(conflict.scope, ConflictScope::Page) {
         return Err(invalid("purged before-state requires a page conflict"));
@@ -158,9 +169,8 @@ pub(crate) fn resolve(
     // Commit pending page edits before taking frontiers. In particular a caller
     // may record a conflict immediately after applying the always-on edit rule.
     doc.doc.commit();
-    let before_state = before_state.or_else(|| {
-        doc.meta().trashed.map(|at| BeforeState::Trashed { at })
-    });
+    let before_state =
+        before_state.or_else(|| doc.meta().trashed.map(|at| BeforeState::Trashed { at }));
     let before = if matches!(before_state, Some(BeforeState::Purged { .. })) {
         Vec::new()
     } else {
@@ -169,15 +179,18 @@ pub(crate) fn resolve(
     let (effect, page_action) = match resolution {
         ConflictResolution::Keep => (RestoreEffect::default(), PageAction::Unchanged),
         ConflictResolution::UseSide(index) => {
-            let side = conflict.sides.get(*index as usize)
+            let side = conflict
+                .sides
+                .get(*index as usize)
                 .ok_or_else(|| invalid(format!("no side {index}")))?;
             let (root, include_children) = scope(conflict);
             match (&conflict.scope, &side.state) {
                 (ConflictScope::Page, SideState::Deleted) => {
-                    return Err(invalid("a page conflict side is present, trashed or purged"));
+                    return Err(invalid(
+                        "a page conflict side is present, trashed or purged",
+                    ));
                 }
-                (_, SideState::Trashed { .. } | SideState::Purged { .. })
-                    if root.is_some() => {
+                (_, SideState::Trashed { .. } | SideState::Purged { .. }) if root.is_some() => {
                     return Err(invalid("a block conflict side is present or deleted"));
                 }
                 _ => {}
@@ -185,27 +198,52 @@ pub(crate) fn resolve(
             if let SideState::Purged { tombstone_version } = &side.state {
                 // No page version exists on this side. Never manufacture one
                 // from a purge version vector or discard retained page history.
-                (RestoreEffect::default(), PageAction::Purged {
-                    tombstone_version: tombstone_version.clone(),
-                })
+                (
+                    RestoreEffect::default(),
+                    PageAction::Purged {
+                        tombstone_version: tombstone_version.clone(),
+                    },
+                )
             } else if conflict.format < 2 {
                 if !matches!(conflict.scope, ConflictScope::Block { .. }) {
                     return Err(invalid("legacy conflicts cover one block"));
                 }
-                (restore_legacy(doc, root.expect("block scope"), &side.state, side.anchor.as_ref())?,
-                    PageAction::Unchanged)
+                (
+                    restore_legacy(
+                        doc,
+                        root.expect("block scope"),
+                        &side.state,
+                        side.anchor.as_ref(),
+                    )?,
+                    PageAction::Unchanged,
+                )
             } else {
-                let mut source = historical(doc, side.frontiers.as_deref()
-                    .ok_or_else(|| invalid("conflict side has no historical version"))?)?;
+                let mut source = historical(
+                    doc,
+                    side.frontiers
+                        .as_deref()
+                        .ok_or_else(|| invalid("conflict side has no historical version"))?,
+                )?;
                 if let Some(root) = root {
                     let present = find_block(&source.blocks(), root).is_some();
                     if present != matches!(side.state, SideState::Present { .. }) {
-                        return Err(invalid("conflict side state does not match its historical scope"));
+                        return Err(invalid(
+                            "conflict side state does not match its historical scope",
+                        ));
                     }
                 }
-                let anchor = side.anchor.as_ref().map(|a| (a.parent.as_deref(), a.previous.as_deref()));
-                let effect = restore_tagged(doc, &source, root, include_children, anchor,
-                    Some("sync:resolve-conflict"))?;
+                let anchor = side
+                    .anchor
+                    .as_ref()
+                    .map(|a| (a.parent.as_deref(), a.previous.as_deref()));
+                let effect = restore_tagged(
+                    doc,
+                    &source,
+                    root,
+                    include_children,
+                    anchor,
+                    Some("sync:resolve-conflict"),
+                )?;
                 let action = if root.is_none() {
                     match side.state {
                         SideState::Present { .. } => {
@@ -247,24 +285,37 @@ pub(crate) fn undo(doc: &mut PageDoc, conflict: &Conflict) -> Result<UndoOutcome
     if !conflict.undoable() {
         return Err(invalid("legacy conflicts cannot be undone"));
     }
-    let applied = conflict.applied.last()
+    let applied = conflict
+        .applied
+        .last()
         .ok_or_else(|| invalid("conflict has no applied resolution"))?;
     if let Some(BeforeState::Purged { tombstone_version }) = &applied.before_state {
         if !applied.before.is_empty() || !matches!(conflict.scope, ConflictScope::Page) {
             return Err(invalid("invalid purged resolution before-state"));
         }
         return Ok(UndoOutcome {
-            page_action: PageAction::Purged { tombstone_version: tombstone_version.clone() },
+            page_action: PageAction::Purged {
+                tombstone_version: tombstone_version.clone(),
+            },
             fallback: false,
             restored_ancestors: Vec::new(),
         });
     }
     let mut before = historical(doc, &applied.before)?;
     let (root, include_children) = scope(conflict);
-    let mut effect = undo_restore_tagged(doc, &before, root, include_children,
-        &applied.restored_ancestors, Some("sync:undo-conflict"))?;
+    let mut effect = undo_restore_tagged(
+        doc,
+        &before,
+        root,
+        include_children,
+        &applied.restored_ancestors,
+        Some("sync:undo-conflict"),
+    )?;
     if matches!(conflict.scope, ConflictScope::Subtree { .. }) {
-        add_effect(&mut effect, undo_subtree_footprint(doc, &mut before, conflict)?);
+        add_effect(
+            &mut effect,
+            undo_subtree_footprint(doc, &mut before, conflict)?,
+        );
     }
     let page_action = if root.is_none() {
         match applied.before_state {
@@ -322,26 +373,55 @@ fn restore_legacy(
                     siblings.last().map(|b| b.id.clone())
                 } else {
                     previous.and_then(|id| {
-                        siblings.iter().find(|b| b.id == id).map(|b| b.id.clone())
+                        siblings
+                            .iter()
+                            .find(|b| b.id == id)
+                            .map(|b| b.id.clone())
                             .or_else(|| siblings.last().map(|b| b.id.clone()))
                     })
                 };
                 ops.push(BlockOp::Insert {
-                    parent: if effect.fallback_to_root { None } else { parent.map(str::to_owned) },
+                    parent: if effect.fallback_to_root {
+                        None
+                    } else {
+                        parent.map(str::to_owned)
+                    },
                     after,
                     block: NewBlock {
-                        id: root.into(), kind: block.kind.clone(), text: block.text.clone(),
-                        marks: block.marks.clone(), checked: block.checked,
+                        id: root.into(),
+                        kind: block.kind.clone(),
+                        text: block.text.clone(),
+                        marks: block.marks.clone(),
+                        checked: block.checked,
                     },
                 });
             } else {
-                ops.push(BlockOp::SetKind { id: root.into(), kind: block.kind.clone() });
-                ops.push(BlockOp::SetText { id: root.into(), text: block.text.clone(), marks: block.marks.clone() });
-                ops.push(BlockOp::SetChecked { id: root.into(), checked: block.checked });
+                ops.push(BlockOp::SetKind {
+                    id: root.into(),
+                    kind: block.kind.clone(),
+                });
+                ops.push(BlockOp::SetText {
+                    id: root.into(),
+                    text: block.text.clone(),
+                    marks: block.marks.clone(),
+                });
+                ops.push(BlockOp::SetChecked {
+                    id: root.into(),
+                    checked: block.checked,
+                });
             }
-            ops.push(BlockOp::SetTarget { id: root.into(), target: block.target.clone() });
-            ops.push(BlockOp::SetColor { id: root.into(), color: block.color.clone() });
-            ops.push(BlockOp::SetWidth { id: root.into(), width: block.width });
+            ops.push(BlockOp::SetTarget {
+                id: root.into(),
+                target: block.target.clone(),
+            });
+            ops.push(BlockOp::SetColor {
+                id: root.into(),
+                color: block.color.clone(),
+            });
+            ops.push(BlockOp::SetWidth {
+                id: root.into(),
+                width: block.width,
+            });
         }
     }
     doc.apply(&ops)?;
@@ -358,14 +438,21 @@ mod tests {
             parent: parent.map(str::to_owned),
             after: after.map(str::to_owned),
             block: NewBlock {
-                id: id.into(), kind: BlockKind::Paragraph, text: value.into(),
-                marks: vec![], checked: false,
+                id: id.into(),
+                kind: BlockKind::Paragraph,
+                text: value.into(),
+                marks: vec![],
+                checked: false,
             },
         }
     }
 
     fn text(id: &str, value: &str) -> BlockOp {
-        BlockOp::SetText { id: id.into(), text: value.into(), marks: vec![] }
+        BlockOp::SetText {
+            id: id.into(),
+            text: value.into(),
+            marks: vec![],
+        }
     }
 
     fn nested() -> PageDoc {
@@ -379,7 +466,8 @@ mod tests {
             insert(Some("parent"), None, "target", "Chosen root"),
             insert(Some("target"), None, "first", "First"),
             insert(Some("target"), Some("first"), "second", "Second"),
-        ]).unwrap();
+        ])
+        .unwrap();
         doc
     }
 
@@ -395,21 +483,39 @@ mod tests {
             }
             ConflictScope::Subtree { root } => vec![find_block(&blocks, root).unwrap().clone()],
         };
-        ConflictSide::new("device".into(), 10, Some(doc.version()),
-            SideState::Present { content }, anchor)
+        ConflictSide::new(
+            "device".into(),
+            10,
+            Some(doc.version()),
+            SideState::Present { content },
+            anchor,
+        )
     }
 
     fn conflict(scope: ConflictScope, side: ConflictSide) -> Conflict {
         Conflict {
-            page: "page".into(), id: "conflict".into(), format: 2,
-            block: scope.anchor_id().into(), time_ms: 10, scope,
-            sides: vec![side], status: ConflictStatus::Pending, applied: vec![],
+            page: "page".into(),
+            id: "conflict".into(),
+            format: 2,
+            block: scope.anchor_id().into(),
+            time_ms: 10,
+            scope,
+            sides: vec![side],
+            status: ConflictStatus::Pending,
+            applied: vec![],
         }
     }
 
     fn pick(doc: &mut PageDoc, conflict: &mut Conflict) -> ResolutionOutcome {
-        let outcome = resolve(doc, conflict, &ConflictResolution::UseSide(0),
-            ResolutionBy::User, 20, None).unwrap();
+        let outcome = resolve(
+            doc,
+            conflict,
+            &ConflictResolution::UseSide(0),
+            ResolutionBy::User,
+            20,
+            None,
+        )
+        .unwrap();
         conflict.applied.push(outcome.applied.clone());
         conflict.status = ConflictStatus::Resolved(outcome.applied.clone());
         outcome
@@ -426,46 +532,72 @@ mod tests {
     #[test]
     fn keep_records_user_before_without_reapplying_the_rule() {
         let mut doc = nested();
-        let scope = ConflictScope::Subtree { root: "target".into() };
+        let scope = ConflictScope::Subtree {
+            root: "target".into(),
+        };
         let side = present(&mut doc, &scope, None);
         let mut conflict = conflict(scope, side);
-        doc.apply(&[text("target", "Already applied editing version")]).unwrap();
+        doc.apply(&[text("target", "Already applied editing version")])
+            .unwrap();
         doc.doc.commit();
         let expected_before = doc.version();
         let expected_blocks = doc.blocks();
         let auto = AppliedResolution {
             undone_at: None,
-            time_ms: 15, by: ResolutionBy::Auto { rule: "edit_wins".into() },
-            before: conflict.sides[0].frontiers.clone().unwrap(), before_state: None,
-            fallback: false, restored_ancestors: vec![],
+            time_ms: 15,
+            by: ResolutionBy::Auto {
+                rule: "edit_wins".into(),
+            },
+            before: conflict.sides[0].frontiers.clone().unwrap(),
+            before_state: None,
+            fallback: false,
+            restored_ancestors: vec![],
             resolution: Some(ConflictResolution::UseSide(0)),
         };
         conflict.applied.push(auto.clone());
-        let result = resolve(&mut doc, &conflict, &ConflictResolution::Keep,
-            ResolutionBy::User, 20, None).unwrap();
+        let result = resolve(
+            &mut doc,
+            &conflict,
+            &ConflictResolution::Keep,
+            ResolutionBy::User,
+            20,
+            None,
+        )
+        .unwrap();
         assert_eq!(result.applied.before, expected_before);
         assert_eq!(result.applied.by, ResolutionBy::User);
         assert_eq!(result.applied.time_ms, 20);
         assert_eq!(result.page_action, PageAction::Unchanged);
         assert_eq!(doc.blocks(), expected_blocks);
-        assert_eq!(conflict.applied, vec![auto], "caller retains the automatic application");
+        assert_eq!(
+            conflict.applied,
+            vec![auto],
+            "caller retains the automatic application"
+        );
     }
 
     #[test]
     fn block_pick_uses_history_and_preserves_current_children() {
         let mut doc = nested();
-        let scope = ConflictScope::Block { block: "target".into() };
+        let scope = ConflictScope::Block {
+            block: "target".into(),
+        };
         let mut side = present(&mut doc, &scope, None);
         // Display materialization is deliberately stale; the version wins.
         if let SideState::Present { content } = &mut side.state {
             content[0].text = "Wrong display text".into();
         }
         let mut conflict = conflict(scope, side);
-        doc.apply(&[text("target", "Merged"), text("first", "Current child")]).unwrap();
+        doc.apply(&[text("target", "Merged"), text("first", "Current child")])
+            .unwrap();
         pick(&mut doc, &mut conflict);
         assert_eq!(target(&mut doc).text, "Chosen root");
         assert_eq!(target(&mut doc).children[0].text, "Current child");
-        doc.apply(&[text("right", "Later unrelated edit"), text("first", "Later child")]).unwrap();
+        doc.apply(&[
+            text("right", "Later unrelated edit"),
+            text("first", "Later child"),
+        ])
+        .unwrap();
         undo(&mut doc, &conflict).unwrap();
         assert_eq!(target(&mut doc).text, "Merged");
         assert_eq!(target(&mut doc).children[0].text, "Later child");
@@ -475,19 +607,30 @@ mod tests {
     #[test]
     fn subtree_pick_and_undo_restore_the_complete_scope() {
         let mut doc = nested();
-        let scope = ConflictScope::Subtree { root: "target".into() };
+        let scope = ConflictScope::Subtree {
+            root: "target".into(),
+        };
         let side = present(&mut doc, &scope, None);
         let mut conflict = conflict(scope, side);
         doc.apply(&[
-            text("target", "Before pick"), text("second", "Changed child"),
+            text("target", "Before pick"),
+            text("second", "Changed child"),
             BlockOp::Delete { id: "first".into() },
             insert(Some("target"), Some("second"), "extra", "Extra"),
-        ]).unwrap();
+        ])
+        .unwrap();
         let before_target = target(&mut doc);
         pick(&mut doc, &mut conflict);
         let chosen = target(&mut doc);
         assert_eq!(chosen.text, "Chosen root");
-        assert_eq!(chosen.children.iter().map(|b| b.id.as_str()).collect::<Vec<_>>(), ["first", "second"]);
+        assert_eq!(
+            chosen
+                .children
+                .iter()
+                .map(|b| b.id.as_str())
+                .collect::<Vec<_>>(),
+            ["first", "second"]
+        );
         assert_eq!(chosen.children[1].text, "Second");
         doc.apply(&[text("left", "Unrelated after pick")]).unwrap();
         undo(&mut doc, &conflict).unwrap();
@@ -498,17 +641,34 @@ mod tests {
     #[test]
     fn deleted_side_pick_deletes_scope_and_undo_revives_before_subtree() {
         let mut doc = nested();
-        doc.apply(&[BlockOp::Delete { id: "target".into() }]).unwrap();
+        doc.apply(&[BlockOp::Delete {
+            id: "target".into(),
+        }])
+        .unwrap();
         doc.doc.commit();
-        let side = ConflictSide::new("device".into(), 10, Some(doc.version()),
-            SideState::Deleted, Some(Anchor { parent: Some("parent".into()), previous: None }));
-        let mut conflict = conflict(ConflictScope::Subtree { root: "target".into() }, side);
+        let side = ConflictSide::new(
+            "device".into(),
+            10,
+            Some(doc.version()),
+            SideState::Deleted,
+            Some(Anchor {
+                parent: Some("parent".into()),
+                previous: None,
+            }),
+        );
+        let mut conflict = conflict(
+            ConflictScope::Subtree {
+                root: "target".into(),
+            },
+            side,
+        );
         // An explicit later edit has a new live physical root with the same
         // logical block ID; undo must use the actual before-version identity.
         doc.apply(&[
             insert(Some("parent"), None, "target", "Later root"),
             insert(Some("target"), None, "later-child", "Later child"),
-        ]).unwrap();
+        ])
+        .unwrap();
         let before_target = target(&mut doc);
         pick(&mut doc, &mut conflict);
         assert!(find_block(&doc.blocks(), "target").is_none());
@@ -519,19 +679,40 @@ mod tests {
     #[test]
     fn deleted_parent_pick_restores_chain_in_order_and_undo_removes_it() {
         let mut doc = nested();
-        let scope = ConflictScope::Subtree { root: "target".into() };
-        let side = present(&mut doc, &scope, Some(Anchor { parent: Some("parent".into()), previous: None }));
+        let scope = ConflictScope::Subtree {
+            root: "target".into(),
+        };
+        let side = present(
+            &mut doc,
+            &scope,
+            Some(Anchor {
+                parent: Some("parent".into()),
+                previous: None,
+            }),
+        );
         let mut conflict = conflict(scope, side);
-        doc.apply(&[BlockOp::Delete { id: "grand".into() }]).unwrap();
+        doc.apply(&[BlockOp::Delete { id: "grand".into() }])
+            .unwrap();
         let outcome = pick(&mut doc, &mut conflict);
         assert_eq!(outcome.applied.restored_ancestors, ["grand", "parent"]);
         assert!(!outcome.applied.fallback);
         assert_eq!(root_ids(&mut doc), ["left", "grand", "right"]);
         let blocks = doc.blocks();
-        assert_eq!(blocks[1].children.iter().map(|b| b.id.as_str()).collect::<Vec<_>>(), ["parent"]);
+        assert_eq!(
+            blocks[1]
+                .children
+                .iter()
+                .map(|b| b.id.as_str())
+                .collect::<Vec<_>>(),
+            ["parent"]
+        );
         assert_eq!(blocks[1].children[0].children[0].id, "target");
         assert_eq!(blocks[1].children[0].children[0].children.len(), 2);
-        doc.apply(&[text("right", "Later right"), insert(None, Some("right"), "later", "Later")]).unwrap();
+        doc.apply(&[
+            text("right", "Later right"),
+            insert(None, Some("right"), "later", "Later"),
+        ])
+        .unwrap();
         undo(&mut doc, &conflict).unwrap();
         assert_eq!(root_ids(&mut doc), ["left", "right", "later"]);
         assert_eq!(doc.blocks()[1].text, "Later right");
@@ -540,8 +721,17 @@ mod tests {
     #[test]
     fn unavailable_historical_ancestor_appends_at_root_and_is_logged() {
         let mut doc = nested();
-        let scope = ConflictScope::Subtree { root: "target".into() };
-        let side = present(&mut doc, &scope, Some(Anchor { parent: Some("unknown-parent".into()), previous: None }));
+        let scope = ConflictScope::Subtree {
+            root: "target".into(),
+        };
+        let side = present(
+            &mut doc,
+            &scope,
+            Some(Anchor {
+                parent: Some("unknown-parent".into()),
+                previous: None,
+            }),
+        );
         let mut conflict = conflict(scope, side);
         let result = pick(&mut doc, &mut conflict);
         assert!(result.applied.fallback);
@@ -556,37 +746,80 @@ mod tests {
     #[test]
     fn journal_undo_handles_children_consolidated_under_a_surviving_heading() {
         let mut doc = nested();
-        let scope = ConflictScope::Subtree { root: "target".into() };
+        let scope = ConflictScope::Subtree {
+            root: "target".into(),
+        };
         let side = present(&mut doc, &scope, None);
         let mut conflict = conflict(scope, side);
         // The merge before repair already retained the first child under the
         // keeper, with its current edit; the old section root is absent.
         doc.apply(&[
-            BlockOp::Move { id: "first".into(), parent: Some("grand".into()), after: Some("parent".into()) },
+            BlockOp::Move {
+                id: "first".into(),
+                parent: Some("grand".into()),
+                after: Some("parent".into()),
+            },
             text("first", "Before repair first"),
-            BlockOp::Delete { id: "target".into() },
-        ]).unwrap();
-        let result = resolve(&mut doc, &conflict, &ConflictResolution::UseSide(0),
-            ResolutionBy::Auto { rule: "journal".into() }, 20, None).unwrap();
+            BlockOp::Delete {
+                id: "target".into(),
+            },
+        ])
+        .unwrap();
+        let result = resolve(
+            &mut doc,
+            &conflict,
+            &ConflictResolution::UseSide(0),
+            ResolutionBy::Auto {
+                rule: "journal".into(),
+            },
+            20,
+            None,
+        )
+        .unwrap();
         conflict.applied.push(result.applied);
         // Same-day heading consolidation removes the restored root but keeps
         // both restored children under a surviving heading.
         doc.apply(&[
-            BlockOp::Move { id: "first".into(), parent: Some("grand".into()), after: Some("parent".into()) },
-            BlockOp::Move { id: "second".into(), parent: Some("grand".into()), after: Some("first".into()) },
-            BlockOp::Delete { id: "target".into() },
+            BlockOp::Move {
+                id: "first".into(),
+                parent: Some("grand".into()),
+                after: Some("parent".into()),
+            },
+            BlockOp::Move {
+                id: "second".into(),
+                parent: Some("grand".into()),
+                after: Some("first".into()),
+            },
+            BlockOp::Delete {
+                id: "target".into(),
+            },
             text("grand", "Keep later heading edit"),
-            insert(Some("grand"), Some("second"), "unrelated", "Keep later sibling"),
-        ]).unwrap();
+            insert(
+                Some("grand"),
+                Some("second"),
+                "unrelated",
+                "Keep later sibling",
+            ),
+        ])
+        .unwrap();
         undo(&mut doc, &conflict).unwrap();
         let blocks = doc.blocks();
         assert_eq!(blocks[1].text, "Keep later heading edit");
-        assert_eq!(blocks[1].children.iter().map(|b| b.id.as_str()).collect::<Vec<_>>(),
-            ["hidden", "parent", "first", "unrelated"]);
+        assert_eq!(
+            blocks[1]
+                .children
+                .iter()
+                .map(|b| b.id.as_str())
+                .collect::<Vec<_>>(),
+            ["hidden", "parent", "first", "unrelated"]
+        );
         assert_eq!(blocks[1].children[2].text, "Before repair first");
         assert!(find_block(&blocks, "target").is_none());
         assert!(find_block(&blocks, "second").is_none());
-        assert_eq!(find_block(&blocks, "unrelated").unwrap().text, "Keep later sibling");
+        assert_eq!(
+            find_block(&blocks, "unrelated").unwrap().text,
+            "Keep later sibling"
+        );
     }
 
     #[test]
@@ -599,7 +832,10 @@ mod tests {
         doc.apply(&[text("left", "Trashed content")]).unwrap();
         let result = pick(&mut doc, &mut conflict);
         assert_eq!(result.page_action, PageAction::Present);
-        assert_eq!(result.applied.before_state, Some(BeforeState::Trashed { at: 50 }));
+        assert_eq!(
+            result.applied.before_state,
+            Some(BeforeState::Trashed { at: 50 })
+        );
         assert_eq!(doc.meta().trashed, None);
         assert_eq!(doc.meta().title, "Page");
         assert_eq!(doc.blocks()[0].text, "Left");
@@ -615,7 +851,13 @@ mod tests {
         let mut doc = nested();
         doc.set_meta_i64("trashed", Some(10)).unwrap();
         doc.doc.commit();
-        let side = ConflictSide::new("device".into(), 10, Some(doc.version()), SideState::Trashed { at: 10 }, None);
+        let side = ConflictSide::new(
+            "device".into(),
+            10,
+            Some(doc.version()),
+            SideState::Trashed { at: 10 },
+            None,
+        );
         let mut conflict = conflict(ConflictScope::Page, side);
         doc.set_meta_i64("trashed", None).unwrap();
         doc.set_title("Live title").unwrap();
@@ -623,7 +865,10 @@ mod tests {
         assert_eq!(result.page_action, PageAction::Trashed { at: 10 });
         assert_eq!(doc.meta().title, "Page");
         assert_eq!(doc.meta().trashed, Some(10));
-        assert_eq!(undo(&mut doc, &conflict).unwrap().page_action, PageAction::Present);
+        assert_eq!(
+            undo(&mut doc, &conflict).unwrap().page_action,
+            PageAction::Present
+        );
         assert_eq!(doc.meta().title, "Live title");
         assert_eq!(doc.meta().trashed, None);
     }
@@ -633,28 +878,65 @@ mod tests {
         let mut doc = nested();
         let side = present(&mut doc, &ConflictScope::Page, None);
         let mut conflict = conflict(ConflictScope::Page, side);
-        let purge = BeforeState::Purged { tombstone_version: vec![7, 8] };
-        let result = resolve(&mut doc, &conflict, &ConflictResolution::UseSide(0),
-            ResolutionBy::User, 20, Some(purge.clone())).unwrap();
+        let purge = BeforeState::Purged {
+            tombstone_version: vec![7, 8],
+        };
+        let result = resolve(
+            &mut doc,
+            &conflict,
+            &ConflictResolution::UseSide(0),
+            ResolutionBy::User,
+            20,
+            Some(purge.clone()),
+        )
+        .unwrap();
         assert!(result.applied.before.is_empty());
         assert_eq!(result.applied.before_state, Some(purge));
         conflict.applied.push(result.applied);
         let before_blocks = doc.blocks();
         let undone = undo(&mut doc, &conflict).unwrap();
-        assert_eq!(undone.page_action, PageAction::Purged { tombstone_version: vec![7, 8] });
-        assert_eq!(doc.blocks(), before_blocks, "vault owns actual purge transport");
+        assert_eq!(
+            undone.page_action,
+            PageAction::Purged {
+                tombstone_version: vec![7, 8]
+            }
+        );
+        assert_eq!(
+            doc.blocks(),
+            before_blocks,
+            "vault owns actual purge transport"
+        );
     }
 
     #[test]
     fn purged_side_returns_lifecycle_action_without_reconstructing_a_version() {
         let mut doc = nested();
-        let side = ConflictSide::new("device".into(), 10, None,
-            SideState::Purged { tombstone_version: vec![1, 2] }, None);
+        let side = ConflictSide::new(
+            "device".into(),
+            10,
+            None,
+            SideState::Purged {
+                tombstone_version: vec![1, 2],
+            },
+            None,
+        );
         let conflict = conflict(ConflictScope::Page, side);
         let before_blocks = doc.blocks();
-        let result = resolve(&mut doc, &conflict, &ConflictResolution::UseSide(0),
-            ResolutionBy::User, 20, None).unwrap();
-        assert_eq!(result.page_action, PageAction::Purged { tombstone_version: vec![1, 2] });
+        let result = resolve(
+            &mut doc,
+            &conflict,
+            &ConflictResolution::UseSide(0),
+            ResolutionBy::User,
+            20,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            result.page_action,
+            PageAction::Purged {
+                tombstone_version: vec![1, 2]
+            }
+        );
         assert!(!result.applied.before.is_empty());
         assert_eq!(doc.blocks(), before_blocks);
     }
@@ -662,12 +944,17 @@ mod tests {
     #[test]
     fn legacy_materialized_block_is_restored_but_cannot_be_undone() {
         let mut doc = nested();
-        let scope = ConflictScope::Block { block: "target".into() };
+        let scope = ConflictScope::Block {
+            block: "target".into(),
+        };
         let mut side = present(&mut doc, &scope, None);
         side.frontiers = None;
         let mut conflict = conflict(scope, side);
         conflict.format = 1;
-        doc.apply(&[BlockOp::Delete { id: "target".into() }]).unwrap();
+        doc.apply(&[BlockOp::Delete {
+            id: "target".into(),
+        }])
+        .unwrap();
         pick(&mut doc, &mut conflict);
         assert_eq!(root_ids(&mut doc), ["left", "grand", "right", "target"]);
         assert_eq!(target(&mut doc).text, "Chosen root");
@@ -678,15 +965,31 @@ mod tests {
     #[test]
     fn invalid_pick_does_not_change_page_content() {
         let mut doc = nested();
-        let scope = ConflictScope::Block { block: "target".into() };
+        let scope = ConflictScope::Block {
+            block: "target".into(),
+        };
         let mut side = present(&mut doc, &scope, None);
         side.frontiers = None;
         let conflict = conflict(scope, side);
         let before_blocks = doc.blocks();
-        assert!(resolve(&mut doc, &conflict, &ConflictResolution::UseSide(0),
-            ResolutionBy::User, 20, None).is_err());
-        assert!(resolve(&mut doc, &conflict, &ConflictResolution::UseSide(1),
-            ResolutionBy::User, 20, None).is_err());
+        assert!(resolve(
+            &mut doc,
+            &conflict,
+            &ConflictResolution::UseSide(0),
+            ResolutionBy::User,
+            20,
+            None
+        )
+        .is_err());
+        assert!(resolve(
+            &mut doc,
+            &conflict,
+            &ConflictResolution::UseSide(1),
+            ResolutionBy::User,
+            20,
+            None
+        )
+        .is_err());
         assert_eq!(doc.blocks(), before_blocks);
     }
 }

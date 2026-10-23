@@ -8,7 +8,8 @@ use std::collections::{HashMap, HashSet};
 
 use loro::event::DiffBatch;
 use loro::{
-    Container, ContainerID, ContainerTrait, LoroTree, LoroValue, TreeID, TreeNode, TreeParentId, ValueOrContainer,
+    Container, ContainerID, ContainerTrait, LoroTree, LoroValue, TreeID, TreeNode, TreeParentId,
+    ValueOrContainer,
 };
 
 use crate::doc::PageDoc;
@@ -156,7 +157,9 @@ fn restore_content(
     } else {
         None
     };
-    if let Some(message) = message { doc.doc.set_next_commit_message(message); }
+    if let Some(message) = message {
+        doc.doc.set_next_commit_message(message);
+    }
     doc.doc.commit();
     let source_tree = source.doc.get_tree("blocks");
     let mut allowed = block_containers(&source_tree, nodes);
@@ -232,7 +235,9 @@ pub(crate) fn restore_tagged(
     if doc.meta().id != source.meta().id {
         return Err(invalid("conflict source belongs to another page"));
     }
-    if let Some(message) = message { doc.doc.set_next_commit_message(message); }
+    if let Some(message) = message {
+        doc.doc.set_next_commit_message(message);
+    }
     doc.doc.commit();
     let tree = doc.doc.get_tree("blocks");
     let source_tree = source.doc.get_tree("blocks");
@@ -416,7 +421,14 @@ pub(crate) fn undo_restore(
     include_children: bool,
     introduced_ancestors: &[String],
 ) -> Result<RestoreEffect> {
-    undo_restore_tagged(doc, before, root, include_children, introduced_ancestors, None)
+    undo_restore_tagged(
+        doc,
+        before,
+        root,
+        include_children,
+        introduced_ancestors,
+        None,
+    )
 }
 
 pub(crate) fn undo_restore_tagged(

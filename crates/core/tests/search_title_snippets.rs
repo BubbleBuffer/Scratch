@@ -115,7 +115,10 @@ fn page_search_keeps_the_snippet_when_chat_titles_crowd_the_limit() {
     v.flush().unwrap();
 
     let hits = v.search_pages("budget".into(), 100).unwrap();
-    assert_eq!(hits.iter().map(|h| h.id.as_str()).collect::<Vec<_>>(), [budget.as_str()]);
+    assert_eq!(
+        hits.iter().map(|h| h.id.as_str()).collect::<Vec<_>>(),
+        [budget.as_str()]
+    );
     assert_eq!(hits[0].source, "vault");
     assert_eq!(hits[0].snippet, "Some text about budget.");
 }

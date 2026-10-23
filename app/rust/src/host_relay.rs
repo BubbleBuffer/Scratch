@@ -335,7 +335,11 @@ fn receive(shared: &Arc<Shared>, text: &str, out: &mpsc::UnboundedSender<String>
     if frame.get("id").is_none() {
         if frame["method"] == h::method::CANCEL {
             if let Ok(params) = serde_json::from_value::<h::CancelParams>(frame["params"].clone()) {
-                if let Some(cancel) = shared.running.lock().unwrap().remove(&params.id.to_string())
+                if let Some(cancel) = shared
+                    .running
+                    .lock()
+                    .unwrap()
+                    .remove(&params.id.to_string())
                 {
                     cancel.cancel();
                 }
@@ -517,19 +521,31 @@ mod tests {
             sessions: Mutex::new(HashMap::new()),
             running: Mutex::new(HashMap::new()),
         };
-        let tools = dispatch(&shared, &w::Request::new(1, h::method::TOOLS, json!({"session":"s1"})));
+        let tools = dispatch(
+            &shared,
+            &w::Request::new(1, h::method::TOOLS, json!({"session":"s1"})),
+        );
         assert_eq!(tools.result.unwrap()["tools"][0]["name"], "read");
         let first = dispatch(&shared, &call(2, "s1", "read"));
         assert_eq!(first.result.unwrap()["content"], "ran read");
         dispatch(&shared, &call(3, "s1", "edit"));
         dispatch(&shared, &call(4, "s2", "read"));
-        let listed = dispatch(&shared, &w::Request::new(5, h::method::TOOLS, json!({"session":"s1"})));
+        let listed = dispatch(
+            &shared,
+            &w::Request::new(5, h::method::TOOLS, json!({"session":"s1"})),
+        );
         assert!(listed.error.is_none());
-        let closed = dispatch(&shared, &w::Request::new(6, h::method::CLOSE, json!({"session":"s1"})));
+        let closed = dispatch(
+            &shared,
+            &w::Request::new(6, h::method::CLOSE, json!({"session":"s1"})),
+        );
         assert_eq!(closed.result, Some(Value::Null));
         let unknown = dispatch(&shared, &w::Request::new(7, "steer", json!({})));
         assert_eq!(unknown.error.unwrap().code, w::code::METHOD_NOT_FOUND);
-        let bad = dispatch(&shared, &w::Request::new(8, h::method::CALL, json!({"session":1})));
+        let bad = dispatch(
+            &shared,
+            &w::Request::new(8, h::method::CALL, json!({"session":1})),
+        );
         assert_eq!(bad.error.unwrap().code, w::code::INVALID_PARAMS);
         assert_eq!(
             *fake.log.lock().unwrap(),
@@ -555,7 +571,8 @@ mod tests {
             .enable_all()
             .build()
             .unwrap();
-        let data = std::env::temp_dir().join(format!("notes_bridge_relay_{}", vault_core::new_id()));
+        let data =
+            std::env::temp_dir().join(format!("notes_bridge_relay_{}", vault_core::new_id()));
         let (server, url) = runtime.block_on(async {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let url = format!("http://{}", listener.local_addr().unwrap());
@@ -583,7 +600,11 @@ mod tests {
         let wait = |want: usize| {
             let deadline = Instant::now() + Duration::from_secs(10);
             while server.hosts_online() != want {
-                assert!(Instant::now() < deadline, "hosts online: {}", server.hosts_online());
+                assert!(
+                    Instant::now() < deadline,
+                    "hosts online: {}",
+                    server.hosts_online()
+                );
                 std::thread::sleep(Duration::from_millis(20));
             }
         };
@@ -666,7 +687,9 @@ mod tests {
             assert!(Instant::now() < deadline);
             std::thread::sleep(Duration::from_millis(5));
         }
-        let runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
         let (out, _rx) = mpsc::unbounded_channel();
         runtime.block_on(async {
             receive(

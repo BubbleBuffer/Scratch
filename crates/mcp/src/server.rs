@@ -14,8 +14,8 @@ use serde_json::{json, Value};
 use vault_core::Vault;
 
 use crate::tools;
-use vault_tools::ToolSet;
 use crate::Result;
+use vault_tools::ToolSet;
 
 /// Protocol versions this server speaks, newest first. `initialize`
 /// answers with the client's version when it is one of these.

@@ -108,7 +108,9 @@ impl Vault {
         }
         let db = lock(&self.inner.db);
         if db.exists(NODES_PAGE)? {
-            return Err(invalid("node records page has lost its role or is in trash"));
+            return Err(invalid(
+                "node records page has lost its role or is in trash",
+            ));
         }
         let doc = PageDoc::new_page(
             self.inner.actor_peer(),

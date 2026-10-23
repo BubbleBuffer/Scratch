@@ -571,7 +571,10 @@ pub struct HitKey {
 
 impl From<&SearchHit> for HitKey {
     fn from(hit: &SearchHit) -> Self {
-        Self { source: hit.source.clone(), id: hit.id.clone() }
+        Self {
+            source: hit.source.clone(),
+            id: hit.id.clone(),
+        }
     }
 }
 
@@ -1231,7 +1234,9 @@ pub enum BeforeState {
 pub enum ResolutionBy {
     User,
     /// Applied by the named automatic rule.
-    Auto { rule: String },
+    Auto {
+        rule: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

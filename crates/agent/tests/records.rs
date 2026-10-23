@@ -69,12 +69,7 @@ fn nested_activity_diff_same_run_merge_and_guarded_undo() {
             .iter()
             .map(|a| a.name.as_str())
             .collect::<Vec<_>>(),
-        vec![
-            "search_notes",
-            "read_page",
-            "edit_page",
-            "edit_page"
-        ]
+        vec!["search_notes", "read_page", "edit_page", "edit_page"]
     );
     assert_eq!(state.activity[0].summary, "Searched notes “garden”");
     assert_eq!(state.activity[1].summary, "Read Garden plan");
@@ -128,7 +123,9 @@ fn created_page_undo_trashes_and_metadata_edits_guard_later_changes() {
     let page = serde_json::to_string(&id).unwrap();
     f.script(
         &session.id,
-        &format!("await tools.edit_page({{page:{page},op:'set_props',title:'Renamed',icon:'🌱'}});"),
+        &format!(
+            "await tools.edit_page({{page:{page},op:'set_props',title:'Renamed',icon:'🌱'}});"
+        ),
     );
     let edit = f
         .agent
@@ -273,8 +270,23 @@ fn send_context_is_model_visible_and_transcript_text_is_clean() {
         assert!(info.tools.iter().any(|name| name == tool), "missing {tool}");
     }
     // Old names (hidden aliases included) are not registered in the in-app agent.
-    for old in ["tasks", "overdue", "set_done", "reschedule", "replace_blocks", "update_page", "append_blocks", "list_pages", "agenda", "query_database", "memory_search"] {
-        assert!(!info.tools.iter().any(|name| name == old), "old name {old} registered");
+    for old in [
+        "tasks",
+        "overdue",
+        "set_done",
+        "reschedule",
+        "replace_blocks",
+        "update_page",
+        "append_blocks",
+        "list_pages",
+        "agenda",
+        "query_database",
+        "memory_search",
+    ] {
+        assert!(
+            !info.tools.iter().any(|name| name == old),
+            "old name {old} registered"
+        );
     }
     assert_eq!(
         info.permission_mode,
@@ -462,8 +474,14 @@ fn move_page_is_recorded_and_undo_puts_the_page_back() {
     let f = Fixture::new();
     let alpha = f.page("Alpha", "a");
     let parent = f.page("Parent", "p");
-    let kid1 = f.vault.create_page(Some(parent.clone()), "Kid one".into()).unwrap();
-    let kid2 = f.vault.create_page(Some(parent.clone()), "Kid two".into()).unwrap();
+    let kid1 = f
+        .vault
+        .create_page(Some(parent.clone()), "Kid one".into())
+        .unwrap();
+    let kid2 = f
+        .vault
+        .create_page(Some(parent.clone()), "Kid two".into())
+        .unwrap();
     let session = f.agent.create_session("Move one").unwrap();
     let (kid2_json, alpha_json) = (
         serde_json::to_string(&kid2).unwrap(),
@@ -492,10 +510,14 @@ fn moved_pages_undo_back_to_original_parent_and_order() {
     let f = Fixture::new();
     let parent = f.page("Parent", "p");
     for title in ["Kid one", "Kid two", "Kid three"] {
-        f.vault.create_page(Some(parent.clone()), title.into()).unwrap();
+        f.vault
+            .create_page(Some(parent.clone()), title.into())
+            .unwrap();
     }
     let other = f.page("Other", "o");
-    f.vault.create_page(Some(other.clone()), "Other kid".into()).unwrap();
+    f.vault
+        .create_page(Some(other.clone()), "Other kid".into())
+        .unwrap();
     let session = f.agent.create_session("Move two").unwrap();
     // Moved in this order by title, so the call order differs from the original order.
     f.script(
@@ -526,8 +548,14 @@ fn move_to_top_level_undo_places_page_first_when_old_sibling_moved_away() {
     let f = Fixture::new();
     let alpha = f.page("Alpha", "a");
     let parent = f.page("Parent", "p");
-    let kid1 = f.vault.create_page(Some(parent.clone()), "Kid one".into()).unwrap();
-    let kid2 = f.vault.create_page(Some(parent.clone()), "Kid two".into()).unwrap();
+    let kid1 = f
+        .vault
+        .create_page(Some(parent.clone()), "Kid one".into())
+        .unwrap();
+    let kid2 = f
+        .vault
+        .create_page(Some(parent.clone()), "Kid two".into())
+        .unwrap();
     let session = f.agent.create_session("Move top").unwrap();
     let (kid1_json, kid2_json, alpha_json) = (
         serde_json::to_string(&kid1).unwrap(),
@@ -559,8 +587,14 @@ fn move_to_top_level_undo_places_page_first_when_old_sibling_moved_away() {
 fn move_undo_reports_a_trashed_former_parent_and_moves_nothing() {
     let f = Fixture::new();
     let parent = f.page("Parent", "p");
-    let kid1 = f.vault.create_page(Some(parent.clone()), "Kid one".into()).unwrap();
-    let kid2 = f.vault.create_page(Some(parent.clone()), "Kid two".into()).unwrap();
+    let kid1 = f
+        .vault
+        .create_page(Some(parent.clone()), "Kid one".into())
+        .unwrap();
+    let kid2 = f
+        .vault
+        .create_page(Some(parent.clone()), "Kid two".into())
+        .unwrap();
     let session = f.agent.create_session("Move trashed").unwrap();
     f.script(
         &session.id,

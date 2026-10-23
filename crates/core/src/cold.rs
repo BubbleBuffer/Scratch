@@ -158,7 +158,10 @@ pub(crate) fn write_prepared(root: &Path, id: &str, bytes: &[u8]) -> Result<()> 
 /// Publish an already synced hot stage with the same rename protocol as cold.
 pub(crate) fn publish_hot(from: &Path, to: &Path) -> Result<()> {
     rename_over(from, to)?;
-    sync_dir(to.parent().ok_or_else(|| invalid("hot path has no directory"))?)
+    sync_dir(
+        to.parent()
+            .ok_or_else(|| invalid("hot path has no directory"))?,
+    )
 }
 
 /// Trains the vault's dictionary once, when `DICT_SAMPLES` plain cold files

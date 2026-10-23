@@ -116,7 +116,9 @@ fn ms(t: Instant) -> f64 {
 
 fn env_num(name: &str, default: i64) -> i64 {
     match std::env::var(name) {
-        Ok(v) => v.parse().unwrap_or_else(|_| panic!("{name} must be a number")),
+        Ok(v) => v
+            .parse()
+            .unwrap_or_else(|_| panic!("{name} must be a number")),
         Err(_) => default,
     }
 }
@@ -131,20 +133,30 @@ fn sibling(path: &Path, suffix: &str) -> PathBuf {
 }
 
 fn bytes_in(dir: &Path, suffix: &str) -> u64 {
-    fs::read_dir(dir).into_iter().flatten().filter_map(|e| e.ok())
+    fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
         .filter(|e| e.file_name().to_string_lossy().ends_with(suffix))
-        .map(|e| e.metadata().unwrap().len()).sum()
+        .map(|e| e.metadata().unwrap().len())
+        .sum()
 }
 
 fn files_in(dir: &Path, suffix: &str) -> usize {
-    fs::read_dir(dir).into_iter().flatten().filter_map(|e| e.ok())
+    fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
         .filter(|e| e.file_name().to_string_lossy().ends_with(suffix))
         .count()
 }
 
 /// Ids of the snapshots in a docs directory, sorted.
 fn page_ids(docs: &Path) -> Vec<PageId> {
-    let mut ids: Vec<PageId> = fs::read_dir(docs).into_iter().flatten().filter_map(|e| e.ok())
+    let mut ids: Vec<PageId> = fs::read_dir(docs)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
         .filter_map(|e| {
             let name = e.file_name().to_string_lossy().into_owned();
             name.strip_suffix(".loro").map(str::to_owned)
@@ -222,10 +234,15 @@ fn canon_frontiers(f: &Frontiers) -> Vec<(u64, i32)> {
 fn head_digest(pd: &mut PageDoc) -> String {
     let blocks = pd.blocks();
     let meta: BTreeMap<String, String> = match pd.doc.get_map("page").get_value() {
-        LoroValue::Map(m) => m.iter().map(|(k, v)| (k.clone(), format!("{v:?}"))).collect(),
+        LoroValue::Map(m) => m
+            .iter()
+            .map(|(k, v)| (k.clone(), format!("{v:?}")))
+            .collect(),
         _ => BTreeMap::new(),
     };
-    let mut props: Vec<(String, String)> = pd.props().into_iter()
+    let mut props: Vec<(String, String)> = pd
+        .props()
+        .into_iter()
         .map(|p| (p.key, format!("{:?}", p.value)))
         .collect();
     props.sort();
@@ -234,9 +251,15 @@ fn head_digest(pd: &mut PageDoc) -> String {
 
 /// Version vector, frontiers and head digest of a page, read from its history.
 fn head_state(v: &Vault, page: &PageId) -> (Vec<(u64, i32)>, Vec<(u64, i32)>, String) {
-    v.inner.read_history(page, |d| {
-        (canon_vv(&d.doc.oplog_vv()), canon_frontiers(&d.doc.oplog_frontiers()), head_digest(d))
-    }).unwrap()
+    v.inner
+        .read_history(page, |d| {
+            (
+                canon_vv(&d.doc.oplog_vv()),
+                canon_frontiers(&d.doc.oplog_frontiers()),
+                head_digest(d),
+            )
+        })
+        .unwrap()
 }
 
 /// One digest for everything the cold pass must preserve for a page.
@@ -249,7 +272,13 @@ fn page_digest(v: &Vault, page: &PageId) -> String {
 /// Encoded bytes of the history before `cutoff` (the cold rule's measure).
 fn eligible_estimate(doc: &PageDoc, cutoff: i64) -> usize {
     match crate::history::cutoff_root(doc, cutoff).unwrap() {
-        Some(root) => doc.fork_at(&root).unwrap().doc.export(ExportMode::all_updates()).unwrap().len(),
+        Some(root) => doc
+            .fork_at(&root)
+            .unwrap()
+            .doc
+            .export(ExportMode::all_updates())
+            .unwrap()
+            .len(),
         None => 0,
     }
 }
@@ -271,7 +300,9 @@ fn split_pieces(text: &str, k: usize) -> Vec<String> {
     let words: Vec<&str> = text.split_inclusive(' ').collect();
     let k = k.min(words.len()).max(1);
     let per = words.len().div_ceil(k);
-    (1..=k).map(|g| words[..(g * per).min(words.len())].concat()).collect()
+    (1..=k)
+        .map(|g| words[..(g * per).min(words.len())].concat())
+        .collect()
 }
 
 /// A seed block in pre-order, with its parent and previous sibling.
@@ -322,13 +353,26 @@ struct Step {
 /// rewritten with about `volume` characters of vocabulary, then restored to the seed
 /// text and marks, so the final head is the seed head. Text changes are raw
 /// replacements; apply only builds structure and sets marks.
-fn plan(blocks: &[Block], props: &[(String, PropValue)], seed: u64, volume: usize, big: bool) -> (Vec<Step>, usize) {
+fn plan(
+    blocks: &[Block],
+    props: &[(String, PropValue)],
+    seed: u64,
+    volume: usize,
+    big: bool,
+) -> (Vec<Step>, usize) {
     let mut rng = Rng::new(seed);
     let batch = if big { BIG_BATCH } else { BUILD_BATCH };
     let mut flat = Vec::new();
     flatten(blocks, None, &mut flat);
-    let pieces: Vec<Vec<String>> = flat.iter()
-        .map(|f| if f.text.is_empty() { Vec::new() } else { split_pieces(&f.text, 1 + rng.below(3) as usize) })
+    let pieces: Vec<Vec<String>> = flat
+        .iter()
+        .map(|f| {
+            if f.text.is_empty() {
+                Vec::new()
+            } else {
+                split_pieces(&f.text, 1 + rng.below(3) as usize)
+            }
+        })
         .collect();
     let texty: Vec<usize> = (0..flat.len())
         .filter(|&i| !pieces[i].is_empty() && flat[i].kind != BlockKind::Embed)
@@ -356,19 +400,31 @@ fn plan(blocks: &[Block], props: &[(String, PropValue)], seed: u64, volume: usiz
                 },
             });
             if let Some(t) = &f.target {
-                step.ops.push(BlockOp::SetTarget { id: f.id.clone(), target: Some(t.clone()) });
+                step.ops.push(BlockOp::SetTarget {
+                    id: f.id.clone(),
+                    target: Some(t.clone()),
+                });
             }
             if let Some(c) = &f.color {
-                step.ops.push(BlockOp::SetColor { id: f.id.clone(), color: Some(c.clone()) });
+                step.ops.push(BlockOp::SetColor {
+                    id: f.id.clone(),
+                    color: Some(c.clone()),
+                });
             }
             if let Some(w) = f.width {
-                step.ops.push(BlockOp::SetWidth { id: f.id.clone(), width: Some(w) });
+                step.ops.push(BlockOp::SetWidth {
+                    id: f.id.clone(),
+                    width: Some(w),
+                });
             }
         }
         steps.push(step);
     }
     if steps.is_empty() {
-        steps.push(Step { props: props.to_vec(), ..Step::default() });
+        steps.push(Step {
+            props: props.to_vec(),
+            ..Step::default()
+        });
     }
 
     // Appends: each later piece grows the text (marks come back with the restore).
@@ -377,7 +433,10 @@ fn plan(blocks: &[Block], props: &[(String, PropValue)], seed: u64, volume: usiz
         let idx: Vec<usize> = (0..flat.len()).filter(|&i| pieces[i].len() > j).collect();
         for chunk in idx.chunks(batch) {
             steps.push(Step {
-                raw: chunk.iter().map(|&i| (flat[i].id.clone(), pieces[i][j].clone())).collect(),
+                raw: chunk
+                    .iter()
+                    .map(|&i| (flat[i].id.clone(), pieces[i][j].clone()))
+                    .collect(),
                 ..Step::default()
             });
         }
@@ -385,7 +444,10 @@ fn plan(blocks: &[Block], props: &[(String, PropValue)], seed: u64, volume: usiz
 
     // Rewrites: random text blocks get vocabulary text. Half the rounds add a fresh
     // paragraph after the first top-level block; the next round deletes it.
-    let anchor = flat.iter().find(|f| f.parent.is_none()).map(|f| f.id.clone());
+    let anchor = flat
+        .iter()
+        .find(|f| f.parent.is_none())
+        .map(|f| f.id.clone());
     let mut pending: Option<String> = None;
     if !texty.is_empty() {
         for _ in 0..REWRITE_ROUNDS {
@@ -422,20 +484,30 @@ fn plan(blocks: &[Block], props: &[(String, PropValue)], seed: u64, volume: usiz
     let mut restore: Vec<Step> = Vec::new();
     for chunk in texty.chunks(batch) {
         restore.push(Step {
-            raw: chunk.iter().map(|&i| (flat[i].id.clone(), flat[i].text.clone())).collect(),
+            raw: chunk
+                .iter()
+                .map(|&i| (flat[i].id.clone(), flat[i].text.clone()))
+                .collect(),
             // Apply only sets marks, so a block without marks needs no call.
-            ops: chunk.iter().filter(|&&i| !flat[i].marks.is_empty()).map(|&i| BlockOp::SetText {
-                id: flat[i].id.clone(),
-                text: flat[i].text.clone(),
-                marks: flat[i].marks.clone(),
-            }).collect(),
+            ops: chunk
+                .iter()
+                .filter(|&&i| !flat[i].marks.is_empty())
+                .map(|&i| BlockOp::SetText {
+                    id: flat[i].id.clone(),
+                    text: flat[i].text.clone(),
+                    marks: flat[i].marks.clone(),
+                })
+                .collect(),
             ..Step::default()
         });
     }
     if let Some(p) = pending.take() {
         match restore.first_mut() {
             Some(s) => s.ops.insert(0, BlockOp::Delete { id: p }),
-            None => restore.push(Step { ops: vec![BlockOp::Delete { id: p }], ..Step::default() }),
+            None => restore.push(Step {
+                ops: vec![BlockOp::Delete { id: p }],
+                ..Step::default()
+            }),
         }
     }
     steps.extend(restore);
@@ -445,24 +517,44 @@ fn plan(blocks: &[Block], props: &[(String, PropValue)], seed: u64, volume: usiz
     if !texty.is_empty() {
         let i = texty[rng.below(texty.len() as u64) as usize];
         let id = flat[i].id.clone();
-        steps.push(Step { raw: vec![(id.clone(), vocab(&mut rng, 200))], ..Step::default() });
+        steps.push(Step {
+            raw: vec![(id.clone(), vocab(&mut rng, 200))],
+            ..Step::default()
+        });
         let ops = if flat[i].marks.is_empty() {
             Vec::new()
         } else {
-            vec![BlockOp::SetText { id: id.clone(), text: flat[i].text.clone(), marks: flat[i].marks.clone() }]
+            vec![BlockOp::SetText {
+                id: id.clone(),
+                text: flat[i].text.clone(),
+                marks: flat[i].marks.clone(),
+            }]
         };
-        steps.push(Step { raw: vec![(id, flat[i].text.clone())], ops, ..Step::default() });
+        steps.push(Step {
+            raw: vec![(id, flat[i].text.clone())],
+            ops,
+            ..Step::default()
+        });
     }
     (steps, old)
 }
 
 /// Commit times for `n` old steps, strictly increasing between `t0` and `old_end`.
 fn old_times(t0: i64, old_end: i64, n: usize) -> Vec<i64> {
-    (1..=n as i64).map(|i| t0 + i * (old_end - t0) / (n as i64 + 1)).collect()
+    (1..=n as i64)
+        .map(|i| t0 + i * (old_end - t0) / (n as i64 + 1))
+        .collect()
 }
 
 /// Runs steps as commits at `times`; the device switches with 20% per commit.
-fn run_steps(pd: &mut PageDoc, steps: &[Step], times: &[i64], seed: u64, tag: u64, dev: &mut usize) {
+fn run_steps(
+    pd: &mut PageDoc,
+    steps: &[Step],
+    times: &[i64],
+    seed: u64,
+    tag: u64,
+    dev: &mut usize,
+) {
     for (i, (s, &t)) in steps.iter().zip(times).enumerate() {
         if Rng::new(seed ^ tag ^ (i as u64).wrapping_mul(0x9E37_79B9)).below(100) < 20 {
             *dev = 1 - *dev;
@@ -509,7 +601,9 @@ fn replace_texts(doc: &LoroDoc, raw: &[(String, String)]) {
     }
     let texts = block_texts(doc);
     for (id, text) in raw {
-        let t = texts.get(id).unwrap_or_else(|| panic!("block {id} has no text"));
+        let t = texts
+            .get(id)
+            .unwrap_or_else(|| panic!("block {id} has no text"));
         let len = t.len_unicode();
         if len > 0 {
             t.delete(0, len).unwrap();
@@ -546,10 +640,18 @@ struct Replayed {
 /// Replays one seed head into a history spread over `window_s` seconds before the
 /// anchor. The old part is rebuilt with more text until its eligible estimate reaches
 /// TARGET_ELIGIBLE (at most MAX_ATTEMPTS). Panics if the final head is not the seed head.
-fn replay_page(src: &mut PageDoc, id: &str, seed: u64, big: bool, anchor_s: i64, window_s: i64) -> Replayed {
+fn replay_page(
+    src: &mut PageDoc,
+    id: &str,
+    seed: u64,
+    big: bool,
+    anchor_s: i64,
+    window_s: i64,
+) -> Replayed {
     let want = head_digest(src);
     let blocks = src.blocks();
-    let props: Vec<(String, PropValue)> = src.props().into_iter().map(|p| (p.key, p.value)).collect();
+    let props: Vec<(String, PropValue)> =
+        src.props().into_iter().map(|p| (p.key, p.value)).collect();
     let meta: Vec<(String, LoroValue)> = match src.doc.get_map("page").get_value() {
         LoroValue::Map(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
         other => panic!("page {id}: meta is not a map: {other:?}"),
@@ -564,7 +666,14 @@ fn replay_page(src: &mut PageDoc, id: &str, seed: u64, big: bool, anchor_s: i64,
         let (steps, old) = plan(&blocks, &props, seed, volume, big);
         let mut pd = creation(&meta, t0);
         let mut dev = 0usize;
-        run_steps(&mut pd, &steps[..old], &old_times(t0, old_end, old), seed, 0x5eed, &mut dev);
+        run_steps(
+            &mut pd,
+            &steps[..old],
+            &old_times(t0, old_end, old),
+            seed,
+            0x5eed,
+            &mut dev,
+        );
         let est = pd.doc.export(ExportMode::all_updates()).unwrap().len();
         if est >= TARGET_ELIGIBLE || attempts >= MAX_ATTEMPTS {
             break (pd, est, steps, old, dev);
@@ -572,10 +681,26 @@ fn replay_page(src: &mut PageDoc, id: &str, seed: u64, big: bool, anchor_s: i64,
         volume = (volume * TARGET_ELIGIBLE / est.max(1) * 5 / 4 + 1).min(MAX_VOLUME);
     };
     let recent_steps = &steps[old..];
-    run_steps(&mut pd, recent_steps, &recent[..recent_steps.len()], seed, 0xbeef, &mut dev);
-    assert_eq!(head_digest(&mut pd), want, "page {id}: replayed head differs from the seed head");
+    run_steps(
+        &mut pd,
+        recent_steps,
+        &recent[..recent_steps.len()],
+        seed,
+        0xbeef,
+        &mut dev,
+    );
+    assert_eq!(
+        head_digest(&mut pd),
+        want,
+        "page {id}: replayed head differs from the seed head"
+    );
     let edit_block = blocks.first().map(|b| b.id.clone()).unwrap_or_default();
-    Replayed { bytes: pd.snapshot().unwrap(), est, attempts, edit_block }
+    Replayed {
+        bytes: pd.snapshot().unwrap(),
+        est,
+        attempts,
+        edit_block,
+    }
 }
 
 struct Outcome {
@@ -587,18 +712,40 @@ struct Outcome {
 }
 
 /// Replays one seed snapshot and writes the new one into `docs`.
-fn replay_file(seed_docs: &Path, docs: &Path, id: &str, seed: u64, anchor_s: i64, window_s: i64) -> Outcome {
+fn replay_file(
+    seed_docs: &Path,
+    docs: &Path,
+    id: &str,
+    seed: u64,
+    anchor_s: i64,
+    window_s: i64,
+) -> Outcome {
     let bytes = fs::read(seed_docs.join(format!("{id}.loro"))).unwrap();
     let mut src = PageDoc::from_bytes(&bytes, &[]).unwrap();
     let big = src.meta().title == seed::BIG_PAGE_TITLE;
     let r = replay_page(&mut src, id, seed, big, anchor_s, window_s);
     fs::write(docs.join(format!("{id}.loro")), &r.bytes).unwrap();
-    Outcome { id: id.to_owned(), big, est: r.est, attempts: r.attempts, edit_block: r.edit_block }
+    Outcome {
+        id: id.to_owned(),
+        big,
+        est: r.est,
+        attempts: r.attempts,
+        edit_block: r.edit_block,
+    }
 }
 
 /// Replays all seed pages on up to 8 threads; the outcomes stay in page order.
-fn replay_all(seed_docs: &Path, docs: &Path, ids: &[PageId], anchor_s: i64, window_s: i64) -> Vec<Outcome> {
-    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8);
+fn replay_all(
+    seed_docs: &Path,
+    docs: &Path,
+    ids: &[PageId],
+    anchor_s: i64,
+    window_s: i64,
+) -> Vec<Outcome> {
+    let threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .clamp(1, 8);
     let chunk = ids.len().div_ceil(threads).max(1);
     std::thread::scope(|s| {
         let handles: Vec<_> = (0..ids.len())
@@ -607,19 +754,28 @@ fn replay_all(seed_docs: &Path, docs: &Path, ids: &[PageId], anchor_s: i64, wind
                 let (ids, seed_docs, docs) = (ids, seed_docs, docs);
                 s.spawn(move || {
                     (start..(start + chunk).min(ids.len()))
-                        .map(|i| replay_file(seed_docs, docs, &ids[i], i as u64 + 1, anchor_s, window_s))
+                        .map(|i| {
+                            replay_file(seed_docs, docs, &ids[i], i as u64 + 1, anchor_s, window_s)
+                        })
                         .collect::<Vec<Outcome>>()
                 })
             })
             .collect();
-        handles.into_iter().flat_map(|h| h.join().expect("replay thread")).collect()
+        handles
+            .into_iter()
+            .flat_map(|h| h.join().expect("replay thread"))
+            .collect()
     })
 }
 
 /// The check record for one page: its version list and a version halfway back.
 fn sample_for(v: &Vault, id: &str, big: bool, edit_block: &str) -> Sample {
     let versions = v.list_versions(id.to_owned()).unwrap();
-    let old = versions.get(versions.len() / 2).expect("history").id.clone();
+    let old = versions
+        .get(versions.len() / 2)
+        .expect("history")
+        .id
+        .clone();
     let view = v.load_page_at(id.to_owned(), old.clone()).unwrap();
     Sample {
         page: id.to_owned(),
@@ -634,10 +790,18 @@ fn sample_for(v: &Vault, id: &str, big: bool, edit_block: &str) -> Sample {
 
 /// Candidates for the cold check: up to CANDIDATES ordinary pages spread over `normal`,
 /// plus the big page.
-fn pick_candidates(v: &Vault, normal: &[(PageId, String)], big: Option<(PageId, String)>) -> Vec<Sample> {
+fn pick_candidates(
+    v: &Vault,
+    normal: &[(PageId, String)],
+    big: Option<(PageId, String)>,
+) -> Vec<Sample> {
     let stride = (normal.len() / CANDIDATES).max(1);
-    let mut out: Vec<Sample> = normal.iter().step_by(stride).take(CANDIDATES)
-        .map(|(id, edit)| sample_for(v, id, false, edit)).collect();
+    let mut out: Vec<Sample> = normal
+        .iter()
+        .step_by(stride)
+        .take(CANDIDATES)
+        .map(|(id, edit)| sample_for(v, id, false, edit))
+        .collect();
     if let Some((id, edit)) = big {
         out.push(sample_for(v, &id, true, &edit));
     }
@@ -649,7 +813,10 @@ fn generate(path: &Path) {
     let big_blocks = env_num("COLD_BENCH_BIG", 2_000) as u32;
     let days = env_num("COLD_BENCH_DAYS", 180);
     let anchor_s = env_num("COLD_BENCH_ANCHOR_S", crate::ids::now_ms() / 1000);
-    assert!(days > OLD_END_DAYS + 10, "COLD_BENCH_DAYS must leave room after day {OLD_END_DAYS}");
+    assert!(
+        days > OLD_END_DAYS + 10,
+        "COLD_BENCH_DAYS must leave room after day {OLD_END_DAYS}"
+    );
     assert_empty(path);
     let docs = path.join(".vault/docs");
     fs::create_dir_all(&docs).unwrap();
@@ -658,22 +825,37 @@ fn generate(path: &Path) {
     // The seed is an earlier seed::generate output (COLD_BENCH_SEED_SOURCE: only read,
     // never opened for writing, written or deleted), or a fresh one in the sibling
     // <root>.seed, which is ours and is removed after.
-    let source = std::env::var("COLD_BENCH_SEED_SOURCE").ok().map(PathBuf::from);
+    let source = std::env::var("COLD_BENCH_SEED_SOURCE")
+        .ok()
+        .map(PathBuf::from);
     let seed_dir = sibling(path, ".seed");
     let seed_docs = match &source {
         Some(src) => {
             assert_ne!(src, path, "COLD_BENCH_SEED_SOURCE must not be the root");
-            assert!(src.join(".vault/docs").is_dir(), "{} has no .vault/docs", src.display());
+            assert!(
+                src.join(".vault/docs").is_dir(),
+                "{} has no .vault/docs",
+                src.display()
+            );
             src.join(".vault/docs")
         }
         None => {
-            assert!(!seed_dir.exists(), "{} exists; remove it first", seed_dir.display());
-            seed::generate(seed_dir.to_string_lossy().into_owned(), pages, big_blocks).expect("seed::generate");
+            assert!(
+                !seed_dir.exists(),
+                "{} exists; remove it first",
+                seed_dir.display()
+            );
+            seed::generate(seed_dir.to_string_lossy().into_owned(), pages, big_blocks)
+                .expect("seed::generate");
             seed_dir.join(".vault/docs")
         }
     };
     let ids = page_ids(&seed_docs);
-    assert_eq!(ids.len(), pages as usize + 1, "seed should write {pages} pages plus the big page");
+    assert_eq!(
+        ids.len(),
+        pages as usize + 1,
+        "seed should write {pages} pages plus the big page"
+    );
 
     let t = Instant::now();
     let outcomes = replay_all(&seed_docs, &docs, &ids, anchor_s, days * DAY_S);
@@ -702,16 +884,23 @@ fn generate(path: &Path) {
     let retried = outcomes.iter().filter(|o| o.attempts > 1).count();
     let big_est = outcomes.iter().find(|o| o.big).map(|o| o.est).unwrap_or(0);
 
-    let normal: Vec<(PageId, String)> = outcomes.iter()
+    let normal: Vec<(PageId, String)> = outcomes
+        .iter()
         .filter(|o| !o.big && o.est >= MIN_ELIGIBLE)
         .map(|o| (o.id.clone(), o.edit_block.clone()))
         .collect();
-    let big = outcomes.iter().find(|o| o.big).map(|o| (o.id.clone(), o.edit_block.clone()));
+    let big = outcomes
+        .iter()
+        .find(|o| o.big)
+        .map(|o| (o.id.clone(), o.edit_block.clone()));
     let candidates = pick_candidates(&v, &normal, big);
     drop(v);
 
     let seed_label = match &source {
-        Some(src) => format!("COLD_BENCH_SEED_SOURCE {} (read only; its page and block IDs are kept)", src.display()),
+        Some(src) => format!(
+            "COLD_BENCH_SEED_SOURCE {} (read only; its page and block IDs are kept)",
+            src.display()
+        ),
         None => "seed::generate (random IDs: page and block IDs differ per run)".to_owned(),
     };
     let manifest = serde_json::json!({
@@ -742,9 +931,19 @@ fn generate(path: &Path) {
 
 /// Copies the real vault into the root and records what the cold pass should do.
 fn prepare(path: &Path) {
-    let source = PathBuf::from(std::env::var("COLD_BENCH_SOURCE").expect("COLD_BENCH_SOURCE: the real vault to copy"));
-    assert!(source.join(".vault/docs").is_dir(), "{} is not a vault", source.display());
-    assert_eq!(files_in(&source.join(".vault/cold"), ".cold"), 0, "the source already has cold files; refusing to copy it");
+    let source = PathBuf::from(
+        std::env::var("COLD_BENCH_SOURCE").expect("COLD_BENCH_SOURCE: the real vault to copy"),
+    );
+    assert!(
+        source.join(".vault/docs").is_dir(),
+        "{} is not a vault",
+        source.display()
+    );
+    assert_eq!(
+        files_in(&source.join(".vault/cold"), ".cold"),
+        0,
+        "the source already has cold files; refusing to copy it"
+    );
     assert_empty(path);
     let links = copy_dir(&source, path).expect("copy the real vault");
     fs::write(path.join(".vault/cold-policy.json"), IDLE_OFF).unwrap();
@@ -776,15 +975,24 @@ fn prepare(path: &Path) {
     for id in &ids {
         digests.insert(id.clone(), page_digest(&v, id));
         let mut doc = v.inner.read_doc(id).unwrap();
-        let edit = doc.blocks().first().map(|b| b.id.clone()).unwrap_or_default();
-        if !edit.is_empty() && (in_trash(&v, id) || eligible_estimate(&doc, cutoff) >= MIN_ELIGIBLE) {
+        let edit = doc
+            .blocks()
+            .first()
+            .map(|b| b.id.clone())
+            .unwrap_or_default();
+        if !edit.is_empty() && (in_trash(&v, id) || eligible_estimate(&doc, cutoff) >= MIN_ELIGIBLE)
+        {
             cands.push((id.clone(), edit, file_len(&docs.join(format!("{id}.loro")))));
         }
     }
     assert!(!cands.is_empty(), "no page is predicted to become cold");
-    let big = cands.iter().max_by_key(|c| c.2).map(|c| (c.0.clone(), c.1.clone()));
+    let big = cands
+        .iter()
+        .max_by_key(|c| c.2)
+        .map(|c| (c.0.clone(), c.1.clone()));
     let big_id = big.as_ref().map(|b| b.0.clone());
-    let normal: Vec<(PageId, String)> = cands.iter()
+    let normal: Vec<(PageId, String)> = cands
+        .iter()
         .filter(|c| Some(&c.0) != big_id.as_ref())
         .map(|c| (c.0.clone(), c.1.clone()))
         .collect();
@@ -822,9 +1030,15 @@ fn cold(path: &Path) {
     let generated = manifest["kind"] == "generated";
     fs::write(path.join(".vault/cold-policy.json"), IDLE_OFF).unwrap();
     let pages = page_ids(&docs);
-    assert_eq!(pages.len(), before.len(), "page count differs from bench-digests.json");
-    let hot_before: BTreeMap<PageId, u64> = pages.iter()
-        .map(|id| (id.clone(), file_len(&docs.join(format!("{id}.loro"))))).collect();
+    assert_eq!(
+        pages.len(),
+        before.len(),
+        "page count differs from bench-digests.json"
+    );
+    let hot_before: BTreeMap<PageId, u64> = pages
+        .iter()
+        .map(|id| (id.clone(), file_len(&docs.join(format!("{id}.loro")))))
+        .collect();
 
     let v = open(&root);
     v.flush().unwrap();
@@ -836,7 +1050,8 @@ fn cold(path: &Path) {
     let mut ops_behind: Vec<u64> = Vec::new();
     let mut secs_behind: Vec<i64> = Vec::new();
     let mut cutoff_gaps: Vec<i64> = Vec::new();
-    let (mut plain_cold_bytes, mut encoded_cold_bytes, mut dictionary_cold_files) = (0u64, 0u64, 0usize);
+    let (mut plain_cold_bytes, mut encoded_cold_bytes, mut dictionary_cold_files) =
+        (0u64, 0u64, 0usize);
     let no_dictionary = path.join("dictionary-comparison-without-vault");
     assert!(!no_dictionary.exists());
     for id in &pages {
@@ -848,7 +1063,9 @@ fn cold(path: &Path) {
             crate::history::cutoff_root(&doc, cutoff).unwrap()
         };
         let t = Instant::now();
-        let did = v.with_db(|db| v.inner.cold_page(db, id, &policy, at_ms)).unwrap();
+        let did = v
+            .with_db(|db| v.inner.cold_page(db, id, &policy, at_ms))
+            .unwrap();
         pass_ms += ms(t);
         if !did {
             continue;
@@ -860,19 +1077,38 @@ fn cold(path: &Path) {
         plain_cold_bytes += cold::prepare(&no_dictionary, &part).unwrap().len() as u64;
         dictionary_cold_files += (fs::read(cold::path(path, id)).unwrap()[5] == 1) as usize;
         let act: BTreeMap<u64, i32> = canon_vv(&part.root.vv).into_iter().collect();
-        let req_vv = doc.doc.frontiers_to_vv(&requested).expect("requested root is in the page");
+        let req_vv = doc
+            .doc
+            .frontiers_to_vv(&requested)
+            .expect("requested root is in the page");
         // Changes in the requested root that the cold root does not cover.
-        let behind: u64 = canon_vv(&req_vv).into_iter()
+        let behind: u64 = canon_vv(&req_vv)
+            .into_iter()
             .map(|(p, c)| (c - act.get(&p).copied().unwrap_or(0)).max(0) as u64)
             .sum();
         ops_behind.push(behind);
-        let latest = |f: &Frontiers| f.iter()
-            .map(|op| doc.doc.get_change(ID::new(op.peer, op.counter)).unwrap().timestamp)
-            .max().unwrap_or(0);
+        let latest = |f: &Frontiers| {
+            f.iter()
+                .map(|op| {
+                    doc.doc
+                        .get_change(ID::new(op.peer, op.counter))
+                        .unwrap()
+                        .timestamp
+                })
+                .max()
+                .unwrap_or(0)
+        };
         secs_behind.push(latest(&requested) - latest(&part.root.frontiers));
-        cutoff_gaps.extend(part.root.frontiers.iter().map(|op|
-            cutoff - doc.doc.get_change(ID::new(op.peer, op.counter)).unwrap().timestamp));
-        retreated += (canon_frontiers(&requested) != canon_frontiers(&part.root.frontiers)) as usize;
+        cutoff_gaps.extend(part.root.frontiers.iter().map(|op| {
+            cutoff
+                - doc
+                    .doc
+                    .get_change(ID::new(op.peer, op.counter))
+                    .unwrap()
+                    .timestamp
+        }));
+        retreated +=
+            (canon_frontiers(&requested) != canon_frontiers(&part.root.frontiers)) as usize;
         // The vault trains its dictionary after a pass that moved pages. The harness
         // runs pages one by one, so it asks after each moved page until one exists.
         if files_in(&dicts, ".dict") == 0 {
@@ -881,14 +1117,25 @@ fn cold(path: &Path) {
     }
     drop(v);
 
-    println!("COLD_BENCH compression encoded_prefix_bytes={encoded_cold_bytes} \
+    println!(
+        "COLD_BENCH compression encoded_prefix_bytes={encoded_cold_bytes} \
         cold_without_dictionary_bytes={plain_cold_bytes} cold_with_dictionary_bytes={} \
-        dictionary_cold_files={dictionary_cold_files}", bytes_in(&cold_dir, ".cold"));
+        dictionary_cold_files={dictionary_cold_files}",
+        bytes_in(&cold_dir, ".cold")
+    );
 
-    let moved_cands: Vec<&Sample> = candidates.iter().filter(|c| moved.contains(&c.page)).collect();
+    let moved_cands: Vec<&Sample> = candidates
+        .iter()
+        .filter(|c| moved.contains(&c.page))
+        .collect();
     let normal_moved: Vec<&Sample> = moved_cands.iter().copied().filter(|c| !c.big).collect();
     let stride = (normal_moved.len() / SAMPLES).max(1);
-    let mut samples: Vec<Sample> = normal_moved.iter().step_by(stride).take(SAMPLES).map(|c| (*c).clone()).collect();
+    let mut samples: Vec<Sample> = normal_moved
+        .iter()
+        .step_by(stride)
+        .take(SAMPLES)
+        .map(|c| (*c).clone())
+        .collect();
     if let Some(b) = moved_cands.iter().find(|c| c.big) {
         samples.push((*b).clone());
     }
@@ -907,7 +1154,8 @@ fn cold(path: &Path) {
     if let Some(b) = candidates.iter().find(|c| c.big) {
         println!(
             "COLD_BENCH big page={} moved={} hot_before={} hot_after={} cold_file={}",
-            b.page, moved.contains(&b.page),
+            b.page,
+            moved.contains(&b.page),
             hot_before.get(&b.page).copied().unwrap_or(0),
             file_len(&docs.join(format!("{}.loro", b.page))),
             file_len(&cold_dir.join(format!("{}.cold", b.page))),
@@ -917,14 +1165,17 @@ fn cold(path: &Path) {
     // Every page must match its digest; every candidate's version list and old view too.
     let v = open(&root);
     let t = Instant::now();
-    let mismatched: Vec<&PageId> = pages.iter()
+    let mismatched: Vec<&PageId> = pages
+        .iter()
         .filter(|id| page_digest(&v, id) != before[id.as_str()])
         .collect();
     let (mut versions_bad, mut old_bad) = (0usize, 0usize);
     for c in &candidates {
         let versions = v.list_versions(c.page.clone()).unwrap();
         versions_bad += (digest(&versions) != c.versions_sha256) as usize;
-        let view = v.load_page_at(c.page.clone(), c.old_version.clone()).unwrap();
+        let view = v
+            .load_page_at(c.page.clone(), c.old_version.clone())
+            .unwrap();
         old_bad += (digest(&view) != c.old_view_sha256) as usize;
     }
     let check_ms = ms(t);
@@ -947,10 +1198,23 @@ fn cold(path: &Path) {
     assert_eq!(old_bad, 0, "cold pass changed an old version");
     assert!(!samples.is_empty(), "no candidate page became cold");
     if generated {
-        assert!(moved.len() * 2 > pages.len(), "most pages should have eligible cold history");
-        assert!(files_in(&cold_dir, ".cold") >= 20, "fewer than 20 cold files");
-        assert_eq!(files_in(&dicts, ".dict"), 1, "expected one trained dictionary");
-        assert!(samples.iter().any(|s| s.big), "the big page did not become cold");
+        assert!(
+            moved.len() * 2 > pages.len(),
+            "most pages should have eligible cold history"
+        );
+        assert!(
+            files_in(&cold_dir, ".cold") >= 20,
+            "fewer than 20 cold files"
+        );
+        assert_eq!(
+            files_in(&dicts, ".dict"),
+            1,
+            "expected one trained dictionary"
+        );
+        assert!(
+            samples.iter().any(|s| s.big),
+            "the big page did not become cold"
+        );
     }
 }
 

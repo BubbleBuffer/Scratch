@@ -572,7 +572,13 @@ mod tests {
         assert!(bad.validate().unwrap_err().contains("required together"));
         bad.android_sha256_certs = vec![FP.into()];
         bad.validate().unwrap();
-        for package in ["notes", "de..notes", "1de.notes", "de.bubble-buffer", "de.notes."] {
+        for package in [
+            "notes",
+            "de..notes",
+            "1de.notes",
+            "de.bubble-buffer",
+            "de.notes.",
+        ] {
             bad.android_package = package.into();
             assert!(
                 bad.validate().unwrap_err().contains("android_package"),
@@ -580,7 +586,10 @@ mod tests {
             );
         }
         bad.android_package = "de.bubblebuffer.notes".into();
-        for cert in ["91:B6", "91B6FA298D52AFE823FED0D7745356E76AA6888E72CE9B16045D94E392E58659"] {
+        for cert in [
+            "91:B6",
+            "91B6FA298D52AFE823FED0D7745356E76AA6888E72CE9B16045D94E392E58659",
+        ] {
             bad.android_sha256_certs = vec![cert.into()];
             assert!(bad.validate().unwrap_err().contains("SHA-256"), "{cert}");
         }

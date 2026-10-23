@@ -62,9 +62,17 @@ impl SearchMetadata {
         let mut genuine_status = properties.contains_key("status");
         let values = db
             .conn
-            .prepare_cached("SELECT DISTINCT x.key, x.json, p.page_type = 'task'
-                FROM props x JOIN pages p ON p.rowid = x.page ORDER BY x.key, p.page_type = 'task'")?
-            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, bool>(2)?)))?
+            .prepare_cached(
+                "SELECT DISTINCT x.key, x.json, p.page_type = 'task'
+                FROM props x JOIN pages p ON p.rowid = x.page ORDER BY x.key, p.page_type = 'task'",
+            )?
+            .query_map([], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, bool>(2)?,
+                ))
+            })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         for (key, json, task) in values {
             genuine_status |= key == "status" && !task;
@@ -99,20 +107,24 @@ impl SearchMetadata {
         // Task status is a stable searchable field even before the vault has
         // any task pages. Preserve existing database/property kinds and their
         // option IDs when they share this key.
-        let status = properties.entry("status".into()).or_insert_with(|| PropDef {
-            key: "status".into(),
-            name: "status".into(),
-            kind: PropKind::Status,
-            options: Vec::new(),
-            config: String::new(),
-        });
+        let status = properties
+            .entry("status".into())
+            .or_insert_with(|| PropDef {
+                key: "status".into(),
+                name: "status".into(),
+                kind: PropKind::Status,
+                options: Vec::new(),
+                config: String::new(),
+            });
         if !genuine_status {
             status.config = TASK_STATUS_CATALOG_CONFIG.into();
         }
         for value in ["todo", "doing", "done"] {
             if !status.options.iter().any(|option| option.id == value) {
                 status.options.push(SelectOption {
-                    id: value.into(), name: value.into(), color: String::new(),
+                    id: value.into(),
+                    name: value.into(),
+                    color: String::new(),
                 });
             }
         }
@@ -261,8 +273,8 @@ impl Vault {
                 });
             let builtin = !typed.starts_with('"');
             let normalized_key = normalized(&key);
-            let builtin_key = builtin
-                && crate::search_ops::keyed_operator(&normalized_key).is_some();
+            let builtin_key =
+                builtin && crate::search_ops::keyed_operator(&normalized_key).is_some();
             let fixed = crate::search_ops::keyed_operator(&normalized_key)
                 .filter(|_| builtin)
                 .map(|op| op.completions)
@@ -327,7 +339,11 @@ impl Vault {
                     }
                 }
             } else if builtin && normalized_key == "type" {
-                for kind in [crate::types::PAGE_TYPE_DOCUMENT, crate::types::PAGE_TYPE_DATABASE, "chat"] {
+                for kind in [
+                    crate::types::PAGE_TYPE_DOCUMENT,
+                    crate::types::PAGE_TYPE_DATABASE,
+                    "chat",
+                ] {
                     if kind.starts_with(&prefix) {
                         push(kind.into(), kind.into(), value_start, None);
                     }
@@ -352,10 +368,16 @@ impl Vault {
                         .collect()
                 } else if builtin_key {
                     Vec::new()
-                } else if builtin && normalized_key == "status"
-                    && def.is_some_and(is_task_status_catalog) {
-                    metadata.properties.iter()
-                        .filter(|d| normalized(&d.key) == "status" || normalized(&d.name) == "status")
+                } else if builtin
+                    && normalized_key == "status"
+                    && def.is_some_and(is_task_status_catalog)
+                {
+                    metadata
+                        .properties
+                        .iter()
+                        .filter(|d| {
+                            normalized(&d.key) == "status" || normalized(&d.name) == "status"
+                        })
                         .collect()
                 } else {
                     def.into_iter().collect()

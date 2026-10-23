@@ -279,9 +279,9 @@ fn os_deadline_starts_after_local_queue_ends() {
         x = Some(spawn_flusher(inner.clone(), events_x.dispatch()));
     }
     let w_outcome = w_rx.recv_timeout(FLUSH_LOCK_TIMEOUT + Duration::from_secs(10));
-    let x_outcome = x.as_ref().map(|(rx, _)| {
-        rx.recv_timeout(2 * FLUSH_LOCK_TIMEOUT + Duration::from_secs(10))
-    });
+    let x_outcome = x
+        .as_ref()
+        .map(|(rx, _)| rx.recv_timeout(2 * FLUSH_LOCK_TIMEOUT + Duration::from_secs(10)));
     drop(holder);
     w.join().expect("W panicked");
     if let Some((_, x)) = x {

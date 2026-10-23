@@ -308,8 +308,7 @@ impl AgentTokens {
         let Some(e) = entries.iter_mut().find(|e| e.name == name) else {
             return Ok(());
         };
-        if e
-            .last_used
+        if e.last_used
             .is_some_and(|t| now.saturating_sub(t) < LAST_USED_EVERY_MS)
         {
             return Ok(());
@@ -877,10 +876,7 @@ mod tests {
 
         // Move the expiry into the past, as time passing would.
         let text = fs::read_to_string(root.file()).unwrap();
-        let text = text.replace(
-            &format!("\"expires\": {expires}"),
-            "\"expires\": 1000",
-        );
+        let text = text.replace(&format!("\"expires\": {expires}"), "\"expires\": 1000");
         assert!(text.contains("\"expires\": 1000"));
         fs::write(root.file(), text).unwrap();
         assert!(store.authenticate(&token).unwrap().is_none());
@@ -910,9 +906,10 @@ mod tests {
 
         // A use a minute after the recorded one is written.
         let stale = first - LAST_USED_EVERY_MS;
-        let text = String::from_utf8(bytes)
-            .unwrap()
-            .replace(&format!("\"last_used\": {first}"), &format!("\"last_used\": {stale}"));
+        let text = String::from_utf8(bytes).unwrap().replace(
+            &format!("\"last_used\": {first}"),
+            &format!("\"last_used\": {stale}"),
+        );
         fs::write(root.file(), text).unwrap();
         store.authenticate(&token).unwrap().unwrap();
         let second = store.list().unwrap()[0].last_used.unwrap();

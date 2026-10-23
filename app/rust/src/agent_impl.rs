@@ -713,7 +713,10 @@ mod desktop {
             })
         }
 
-        pub(crate) fn schedule_state(&self, _page_id: String) -> Result<AgentScheduleState, String> {
+        pub(crate) fn schedule_state(
+            &self,
+            _page_id: String,
+        ) -> Result<AgentScheduleState, String> {
             Err(SCHEDULES_IN_VAULT.into())
         }
 
@@ -733,7 +736,10 @@ mod desktop {
             Err(SCHEDULES_IN_VAULT.into())
         }
 
-        pub(crate) fn schedule_run_now(&self, _page_id: String) -> Result<AgentScheduleRun, String> {
+        pub(crate) fn schedule_run_now(
+            &self,
+            _page_id: String,
+        ) -> Result<AgentScheduleRun, String> {
             Err(SCHEDULES_IN_VAULT.into())
         }
 
@@ -755,11 +761,8 @@ mod desktop {
                 .join(format!("notes_bridge_relay_host_{}", vault_core::new_id()));
             let files = root.join("files");
             std::fs::create_dir_all(&files).unwrap();
-            let vault = NotesVault::open(
-                root.join("vault").to_string_lossy().into_owned(),
-                None,
-            )
-            .unwrap();
+            let vault =
+                NotesVault::open(root.join("vault").to_string_lossy().into_owned(), None).unwrap();
             let agent = Local::open(
                 &vault,
                 root.join("state").to_string_lossy().into_owned(),
@@ -775,9 +778,17 @@ mod desktop {
             )
             .unwrap();
             let host = agent.relay_host();
-            let names: Vec<String> = host.tools(None).unwrap().into_iter().map(|t| t.name).collect();
+            let names: Vec<String> = host
+                .tools(None)
+                .unwrap()
+                .into_iter()
+                .map(|t| t.name)
+                .collect();
             for tool in ["read", "write", "edit", "exec"] {
-                assert!(names.iter().any(|n| n == tool), "{tool} missing from {names:?}");
+                assert!(
+                    names.iter().any(|n| n == tool),
+                    "{tool} missing from {names:?}"
+                );
             }
             let session = host.open_session().unwrap();
             let target = files.join("from-hub.txt");
@@ -786,7 +797,10 @@ mod desktop {
                     &session,
                     "write",
                     serde_json::json!({"path": "from-hub.txt", "content": "hello"}),
-                    notes_agent_wire::host::Caller { id: "oauth:test".into(), name: None },
+                    notes_agent_wire::host::Caller {
+                        id: "oauth:test".into(),
+                        name: None,
+                    },
                     vault_agent::bubblepaw_core::CancellationToken::new(),
                 )
                 .unwrap();
@@ -841,11 +855,8 @@ mod desktop {
                 vault_core::new_id()
             ));
             let data = root.join("state");
-            let vault = NotesVault::open(
-                root.join("vault").to_string_lossy().into_owned(),
-                None,
-            )
-            .unwrap();
+            let vault =
+                NotesVault::open(root.join("vault").to_string_lossy().into_owned(), None).unwrap();
             let agent = Local::open(
                 &vault,
                 data.to_string_lossy().into_owned(),

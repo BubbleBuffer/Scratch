@@ -56,7 +56,9 @@ pub fn ai_create_task(
     after: Option<String>,
     runner: String,
 ) -> Result<AiTask, String> {
-    tasks::create(&vault.inner, &prompt, &page, after.as_deref(), &runner).map(task).map_err(err)
+    tasks::create(&vault.inner, &prompt, &page, after.as_deref(), &runner)
+        .map(task)
+        .map_err(err)
 }
 
 /// [`ai_create_task`] pinned to this device: only this device claims it
@@ -68,7 +70,9 @@ pub fn ai_create_task_here(
     after: Option<String>,
 ) -> Result<AiTask, String> {
     let v = &vault.inner;
-    tasks::create_on(v, &prompt, &page, after.as_deref(), "", &v.device_id()).map(task).map_err(err)
+    tasks::create_on(v, &prompt, &page, after.as_deref(), "", &v.device_id())
+        .map(task)
+        .map_err(err)
 }
 
 /// Cancels a desktop task that hasn't ended: it is never claimed, and a
@@ -80,7 +84,11 @@ pub fn ai_cancel_task(vault: &NotesVault, id: String) -> Result<bool, String> {
 
 /// The newest tasks first.
 pub fn ai_list_tasks(vault: &NotesVault, limit: u32) -> Result<Vec<AiTask>, String> {
-    Ok(tasks::list(&vault.inner, limit).map_err(err)?.into_iter().map(task).collect())
+    Ok(tasks::list(&vault.inner, limit)
+        .map_err(err)?
+        .into_iter()
+        .map(task)
+        .collect())
 }
 
 pub fn ai_get_task(vault: &NotesVault, id: String) -> Result<AiTask, String> {
@@ -110,7 +118,12 @@ pub fn ai_retry_task(vault: &NotesVault, id: String) -> Result<(), String> {
 
 /// Writes the result back: on success `text` (markdown) replaces the
 /// placeholder; on failure `text` is the error.
-pub fn ai_finish_task(vault: &NotesVault, id: String, ok: bool, text: String) -> Result<(), String> {
+pub fn ai_finish_task(
+    vault: &NotesVault,
+    id: String,
+    ok: bool,
+    text: String,
+) -> Result<(), String> {
     let r = if ok { Ok(text) } else { Err(text) };
     tasks::finish(&vault.inner, &id, r).map_err(err)
 }

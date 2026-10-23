@@ -626,11 +626,7 @@ pub(crate) fn render_blocks(
                 };
                 let fence = if query {
                     // A query can itself contain literal fences.
-                    let longest = b.text
-                        .split(|c| c != '`')
-                        .map(str::len)
-                        .max()
-                        .unwrap_or(0);
+                    let longest = b.text.split(|c| c != '`').map(str::len).max().unwrap_or(0);
                     "`".repeat(3.max(longest + 1))
                 } else if b.text.contains("```") || info.contains('`') {
                     "~~~~".into()
@@ -656,7 +652,10 @@ pub(crate) fn render_blocks(
                 (String::new(), String::new())
             }
         };
-        if !matches!(b.kind, BlockKind::Code | BlockKind::Query | BlockKind::Table) {
+        if !matches!(
+            b.kind,
+            BlockKind::Code | BlockKind::Query | BlockKind::Table
+        ) {
             let generic = matches!(
                 b.kind,
                 BlockKind::ChatRef | BlockKind::Unknown(_) | BlockKind::Embed
@@ -907,10 +906,7 @@ pub(crate) fn render_inline_with(
     }
     fn order(k: &MarkKind) -> u8 {
         match k {
-            MarkKind::Link(_)
-            | MarkKind::PageLink(_)
-            | MarkKind::Date(_)
-            | MarkKind::Query(_) => 0,
+            MarkKind::Link(_) | MarkKind::PageLink(_) | MarkKind::Date(_) | MarkKind::Query(_) => 0,
             MarkKind::Color(_) => 1,
             MarkKind::Bold => 2,
             MarkKind::Italic => 3,
@@ -1004,11 +1000,13 @@ pub(crate) fn render_inline_with(
         let mut active: Vec<usize> = (0..written.len())
             .filter(|&i| written[i].start <= s && written[i].end >= e)
             .collect();
-        active.sort_by_key(|&i| (
-            !matches!(written[i].kind, MarkKind::Query(_)),
-            order(&written[i].kind),
-            i,
-        ));
+        active.sort_by_key(|&i| {
+            (
+                !matches!(written[i].kind, MarkKind::Query(_)),
+                order(&written[i].kind),
+                i,
+            )
+        });
         // Only one link (web or page) can be open: nested links do not exist.
         let mut seen_link = false;
         active.retain(|&i| {

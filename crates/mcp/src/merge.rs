@@ -83,13 +83,20 @@ pub fn parse(v: &Vault, answer: &str) -> MergeProposal {
     let (text, marks) = match blocks.len() {
         0 => (String::new(), vec![]),
         1 => (blocks[0].text.clone(), blocks[0].marks.clone()),
-        _ => (blocks
+        _ => (
+            blocks
                 .iter()
                 .map(|b| b.text.as_str())
                 .collect::<Vec<_>>()
-                .join("\n"), vec![]),
+                .join("\n"),
+            vec![],
+        ),
     };
-    MergeProposal { text, marks, blocks }
+    MergeProposal {
+        text,
+        marks,
+        blocks,
+    }
 }
 
 #[cfg(test)]
@@ -98,7 +105,9 @@ mod tests {
     use std::path::PathBuf;
     struct Temp(PathBuf);
     impl Drop for Temp {
-        fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
     }
     fn vault() -> (Temp, Vault) {
         let path = std::env::temp_dir().join(format!("conflict_merge_{}", vault_core::new_id()));
@@ -121,6 +130,9 @@ mod tests {
         assert_eq!(proposal.text, "Parent");
         assert_eq!(proposal.marks.len(), 1);
         assert_eq!(proposal.blocks[0].children[0].text, "Child");
-        assert_eq!(proposal.blocks[0].children[0].children[0].text, "Grandchild");
+        assert_eq!(
+            proposal.blocks[0].children[0].children[0].text,
+            "Grandchild"
+        );
     }
 }

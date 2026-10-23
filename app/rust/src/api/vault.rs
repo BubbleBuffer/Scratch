@@ -65,7 +65,10 @@ pub struct LiveQueryUpdate {
 }
 
 fn live_hit_key_from(key: vault_core::HitKey) -> HitKey {
-    HitKey { source: key.source, id: key.id }
+    HitKey {
+        source: key.source,
+        id: key.id,
+    }
 }
 
 fn live_query_update_from(handle: u64, update: vault_core::LiveQueryUpdate) -> LiveQueryUpdate {
@@ -75,9 +78,14 @@ fn live_query_update_from(handle: u64, update: vault_core::LiveQueryUpdate) -> L
         initial: update.initial,
         added: update.added.into_iter().map(hit_from).collect(),
         removed: update.removed.into_iter().map(live_hit_key_from).collect(),
-        moved: update.moved.into_iter().map(|(key, new_index)| HitMove {
-            key: live_hit_key_from(key), new_index,
-        }).collect(),
+        moved: update
+            .moved
+            .into_iter()
+            .map(|(key, new_index)| HitMove {
+                key: live_hit_key_from(key),
+                new_index,
+            })
+            .collect(),
         changed: update.changed.into_iter().map(hit_from).collect(),
         total: update.total_bounded,
     }
@@ -91,15 +99,32 @@ mod live_query_conversion_tests {
     fn legacy_polling_ignores_index_only_writes_and_preserves_page_events() {
         struct TempRoot(std::path::PathBuf);
         impl Drop for TempRoot {
-            fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
         }
-        let root = TempRoot(std::env::temp_dir().join(format!("notes_bridge_live_{}", vault_core::new_id())));
-        let vault = NotesVault { inner: Arc::new(Vault::open(root.0.to_string_lossy().into_owned()).unwrap()), runner: LocalRunner::Unconfigured };
+        let root = TempRoot(
+            std::env::temp_dir().join(format!("notes_bridge_live_{}", vault_core::new_id())),
+        );
+        let vault = NotesVault {
+            inner: Arc::new(Vault::open(root.0.to_string_lossy().into_owned()).unwrap()),
+            runner: LocalRunner::Unconfigured,
+        };
         let before = vault.poll_changes(0);
-        vault.inner.upsert_search_row("chat".into(), vault_core::ExternalSearchRow {
-            id: "external".into(), title: "Chat".into(), body: "summary".into(),
-            page_type: "chat".into(), target: None, updated_ms: 1,
-        }).unwrap();
+        vault
+            .inner
+            .upsert_search_row(
+                "chat".into(),
+                vault_core::ExternalSearchRow {
+                    id: "external".into(),
+                    title: "Chat".into(),
+                    body: "summary".into(),
+                    page_type: "chat".into(),
+                    target: None,
+                    updated_ms: 1,
+                },
+            )
+            .unwrap();
         let after = vault.poll_changes(before.seq);
         assert_eq!(after.seq, before.seq);
         assert!(after.changes.is_empty() && !after.reset);
@@ -109,26 +134,45 @@ mod live_query_conversion_tests {
         let page = vault.inner.create_page(None, "Page".into()).unwrap();
         let after = vault.poll_changes(before.seq);
         assert!(after.seq > before.seq);
-        assert!(after.changes.iter().any(|change| change.kind == ChangeKind::PageCreated && change.page.as_ref() == Some(&page)));
-        assert!(after.changes.iter().all(|change| change.kind != ChangeKind::IndexCommitted));
+        assert!(after
+            .changes
+            .iter()
+            .any(|change| change.kind == ChangeKind::PageCreated
+                && change.page.as_ref() == Some(&page)));
+        assert!(after
+            .changes
+            .iter()
+            .all(|change| change.kind != ChangeKind::IndexCommitted));
     }
 
     #[test]
     fn source_local_keys_and_commit_metadata_cross_the_bridge() {
-        let key = vault_core::HitKey { source: "chat".into(), id: "same".into() };
-        let update = live_query_update_from(42, vault_core::LiveQueryUpdate {
-            generation: 7,
-            initial: false,
-            added: vec![],
-            removed: vec![key.clone()],
-            moved: vec![(key, 3)],
-            changed: vec![],
-            total_bounded: 201,
-        });
+        let key = vault_core::HitKey {
+            source: "chat".into(),
+            id: "same".into(),
+        };
+        let update = live_query_update_from(
+            42,
+            vault_core::LiveQueryUpdate {
+                generation: 7,
+                initial: false,
+                added: vec![],
+                removed: vec![key.clone()],
+                moved: vec![(key, 3)],
+                changed: vec![],
+                total_bounded: 201,
+            },
+        );
         assert_eq!(update.handle, 42);
         assert_eq!(update.generation, 7);
         assert_eq!(update.total, 201);
-        assert_eq!(update.removed[0], HitKey { source: "chat".into(), id: "same".into() });
+        assert_eq!(
+            update.removed[0],
+            HitKey {
+                source: "chat".into(),
+                id: "same".into()
+            }
+        );
         assert_eq!(update.moved[0].key, update.removed[0]);
         assert_eq!(update.moved[0].new_index, 3);
 
@@ -136,7 +180,8 @@ mod live_query_conversion_tests {
             seq: 1,
             reset: false,
             changes: vec![vault_core::Change::IndexCommitted {
-                generation: 7, pages: vec!["same".into()],
+                generation: 7,
+                pages: vec!["same".into()],
             }],
         });
         assert_eq!(batch.changes[0].kind, ChangeKind::IndexCommitted);
@@ -168,47 +213,68 @@ mod date_mark_tests {
                 let _ = std::fs::remove_dir_all(&self.0);
             }
         }
-        let root = TempRoot(std::env::temp_dir().join(format!(
-            "notes_bridge_date_mark_{}",
-            vc::new_id()
-        )));
+        let root =
+            TempRoot(std::env::temp_dir().join(format!("notes_bridge_date_mark_{}", vc::new_id())));
         let vault = NotesVault {
             inner: Arc::new(Vault::open(root.0.to_string_lossy().into_owned()).unwrap()),
             runner: LocalRunner::Unconfigured,
         };
         let page = vault.inner.create_page(None, "Plan".into()).unwrap();
-        vault.inner.apply(page.clone(), vec![vc::BlockOp::Insert {
-            parent: None,
-            after: None,
-            block: vc::NewBlock {
-                id: "todo".into(),
-                kind: vc::BlockKind::Todo,
-                text: "🐱 @date".into(),
-                marks: vec![vc::Mark {
-                    start: 2,
-                    end: 7,
-                    kind: vc::MarkKind::Date("2026-10-06T09:30Z".into()),
+        vault
+            .inner
+            .apply(
+                page.clone(),
+                vec![vc::BlockOp::Insert {
+                    parent: None,
+                    after: None,
+                    block: vc::NewBlock {
+                        id: "todo".into(),
+                        kind: vc::BlockKind::Todo,
+                        text: "🐱 @date".into(),
+                        marks: vec![vc::Mark {
+                            start: 2,
+                            end: 7,
+                            kind: vc::MarkKind::Date("2026-10-06T09:30Z".into()),
+                        }],
+                        checked: false,
+                    },
                 }],
-                checked: false,
-            },
-        }]).unwrap();
+            )
+            .unwrap();
         vault.inner.flush().unwrap();
         let day = 1_791_244_800_000;
         let day_ms = 86_400_000;
-        let item = vault.calendar_items(day, day + day_ms, day, day + day_ms)
-            .unwrap().into_iter().find(|item| item.block.as_deref() == Some("todo")).unwrap();
+        let item = vault
+            .calendar_items(day, day + day_ms, day, day + day_ms)
+            .unwrap()
+            .into_iter()
+            .find(|item| item.block.as_deref() == Some("todo"))
+            .unwrap();
         let reference = item.date_mark.unwrap();
         // Ordinary BMark offsets are UTF-16. This opaque token stays in the
         // core's scalar units even when non-BMP text precedes the mark.
         assert_eq!((reference.start, reference.end), (2, 7));
-        vault.move_date_mark(page.clone(), "todo".into(), reference.clone(), day + day_ms).unwrap();
+        vault
+            .move_date_mark(page.clone(), "todo".into(), reference.clone(), day + day_ms)
+            .unwrap();
         vault.inner.flush().unwrap();
         let before = vault.inner.load_page(page.clone()).unwrap().blocks;
-        let error = vault.move_date_mark(page.clone(), "todo".into(), reference, day + 2 * day_ms).unwrap_err();
+        let error = vault
+            .move_date_mark(page.clone(), "todo".into(), reference, day + 2 * day_ms)
+            .unwrap_err();
         assert!(error.contains("stale date mark reference"), "{error}");
         assert_eq!(vault.inner.load_page(page).unwrap().blocks, before);
-        let item = vault.calendar_items(day + day_ms, day + 2 * day_ms, day + day_ms, day + 2 * day_ms)
-            .unwrap().into_iter().find(|item| item.block.as_deref() == Some("todo")).unwrap();
+        let item = vault
+            .calendar_items(
+                day + day_ms,
+                day + 2 * day_ms,
+                day + day_ms,
+                day + 2 * day_ms,
+            )
+            .unwrap()
+            .into_iter()
+            .find(|item| item.block.as_deref() == Some("todo"))
+            .unwrap();
         assert_eq!(item.date_mark.unwrap().iso, "2026-10-07T09:30Z");
     }
 }
@@ -225,7 +291,11 @@ impl NotesVault {
     /// it, the vault has no local runner. Neither depends on an agent.
     pub fn open(root: String, data_dir: Option<String>) -> Result<NotesVault, String> {
         let inner = Arc::new(Vault::open(root).map_err(err)?);
-        if cfg!(any(target_os = "windows", target_os = "linux", target_os = "macos")) {
+        if cfg!(any(
+            target_os = "windows",
+            target_os = "linux",
+            target_os = "macos"
+        )) {
             poll_mounts(Arc::downgrade(&inner));
         }
         let runner = LocalRunner::open(inner.clone(), data_dir);
@@ -250,7 +320,9 @@ impl NotesVault {
         std::fs::read_dir(dir)
             .map(|d| {
                 d.filter(|e| {
-                    e.as_ref().map(|e| e.file_name().to_string_lossy().ends_with(".loro")).unwrap_or(false)
+                    e.as_ref()
+                        .map(|e| e.file_name().to_string_lossy().ends_with(".loro"))
+                        .unwrap_or(false)
                 })
                 .count() as u32
             })
@@ -324,14 +396,27 @@ impl NotesVault {
     }
 
     /// Pages by last update (newest first); `parent` None = all pages.
-    pub fn list_pages(&self, parent: Option<String>, offset: u32, limit: u32) -> Result<Vec<PageRow>, String> {
-        Ok(rows(self.inner.list_pages(parent, offset, limit).map_err(err)?))
+    pub fn list_pages(
+        &self,
+        parent: Option<String>,
+        offset: u32,
+        limit: u32,
+    ) -> Result<Vec<PageRow>, String> {
+        Ok(rows(
+            self.inner.list_pages(parent, offset, limit).map_err(err)?,
+        ))
     }
 
     /// Page-only search for existing page pickers and inline home search.
     /// `search_adaptive` and `search_spec` include external sources.
     pub fn search(&self, query: String, limit: u32) -> Result<Vec<Hit>, String> {
-        Ok(self.inner.search_pages(query, limit).map_err(err)?.into_iter().map(hit_from).collect())
+        Ok(self
+            .inner
+            .search_pages(query, limit)
+            .map_err(err)?
+            .into_iter()
+            .map(hit_from)
+            .collect())
     }
 
     /// Adds or replaces a row of an external search source. Its id is local
@@ -355,7 +440,10 @@ impl NotesVault {
 
     /// Exact external-note metadata lookup; works even if its add-on is off.
     pub fn find_indexed_note(&self, id: String) -> Result<Option<Hit>, String> {
-        self.inner.find_indexed_note(id).map(|hit| hit.map(hit_from)).map_err(err)
+        self.inner
+            .find_indexed_note(id)
+            .map(|hit| hit.map(hit_from))
+            .map_err(err)
     }
 
     /// Adaptive typing search, including status even when no titles match.
@@ -386,9 +474,16 @@ impl NotesVault {
     }
 
     /// Runs a spec (from `parse_search`, or edited chips) with paging.
-    pub fn search_spec(&self, spec: SearchSpec, limit: u32, offset: u32) -> Result<SearchSpecResults, String> {
+    pub fn search_spec(
+        &self,
+        spec: SearchSpec,
+        limit: u32,
+        offset: u32,
+    ) -> Result<SearchSpecResults, String> {
         let spec = spec_to(spec)?;
-        Ok(search_results_from(self.inner.search_spec(spec, limit, offset).map_err(err)?))
+        Ok(search_results_from(
+            self.inner.search_spec(spec, limit, offset).map_err(err)?,
+        ))
     }
 
     /// Streams the initial snapshot and subsequent nonempty query diffs.
@@ -404,9 +499,12 @@ impl NotesVault {
         // The vault registry owns the sink. There is no forwarding thread,
         // pending bridge call or strong Vault reference to keep an idle
         // subscription alive after its vault is disposed.
-        self.inner.watch_query_with(spec, limit, move |handle, update| {
-            sink.add(live_query_update_from(handle, update)).is_ok()
-        }).map(|_| ()).map_err(err)
+        self.inner
+            .watch_query_with(spec, limit, move |handle, update| {
+                sink.add(live_query_update_from(handle, update)).is_ok()
+            })
+            .map(|_| ())
+            .map_err(err)
     }
 
     /// Removes a registration and finishes its stream, including while idle.
@@ -414,8 +512,15 @@ impl NotesVault {
         self.inner.unwatch_query(handle);
     }
 
-    pub fn create_page(&self, parent: Option<String>, title: String, page_type: Option<String>) -> Result<String, String> {
-        self.inner.create_page_with_type(parent, title, page_type).map_err(err)
+    pub fn create_page(
+        &self,
+        parent: Option<String>,
+        title: String,
+        page_type: Option<String>,
+    ) -> Result<String, String> {
+        self.inner
+            .create_page_with_type(parent, title, page_type)
+            .map_err(err)
     }
 
     pub fn set_page_type(&self, page: String, page_type: String) -> Result<(), String> {
@@ -447,26 +552,65 @@ impl NotesVault {
         self.inner.export_markdown(page).map_err(err)
     }
 
-    pub fn type_data_set(&self, page: String, addon: String, path: Vec<String>, json_value: String) -> Result<(), String> {
-        self.inner.type_data_set(page, addon, path, json_value).map_err(err)
+    pub fn type_data_set(
+        &self,
+        page: String,
+        addon: String,
+        path: Vec<String>,
+        json_value: String,
+    ) -> Result<(), String> {
+        self.inner
+            .type_data_set(page, addon, path, json_value)
+            .map_err(err)
     }
 
-    pub fn type_data_delete(&self, page: String, addon: String, path: Vec<String>) -> Result<(), String> {
+    pub fn type_data_delete(
+        &self,
+        page: String,
+        addon: String,
+        path: Vec<String>,
+    ) -> Result<(), String> {
         self.inner.type_data_delete(page, addon, path).map_err(err)
     }
 
     /// Inserts at `index`, or appends when it is absent.
-    pub fn type_data_list_insert(&self, page: String, addon: String, path: Vec<String>, index: Option<u32>, json_value: String) -> Result<(), String> {
-        self.inner.type_data_list_insert(page, addon, path, index, json_value).map_err(err)
+    pub fn type_data_list_insert(
+        &self,
+        page: String,
+        addon: String,
+        path: Vec<String>,
+        index: Option<u32>,
+        json_value: String,
+    ) -> Result<(), String> {
+        self.inner
+            .type_data_list_insert(page, addon, path, index, json_value)
+            .map_err(err)
     }
 
-    pub fn type_data_list_delete(&self, page: String, addon: String, path: Vec<String>, item: TypeDataListItem) -> Result<(), String> {
-        self.inner.type_data_list_delete(page, addon, path, type_data_list_item(item)?).map_err(err)
+    pub fn type_data_list_delete(
+        &self,
+        page: String,
+        addon: String,
+        path: Vec<String>,
+        item: TypeDataListItem,
+    ) -> Result<(), String> {
+        self.inner
+            .type_data_list_delete(page, addon, path, type_data_list_item(item)?)
+            .map_err(err)
     }
 
     /// A move is a delete followed by an insert at the resulting list index.
-    pub fn type_data_list_move(&self, page: String, addon: String, path: Vec<String>, item: TypeDataListItem, to_index: u32) -> Result<(), String> {
-        self.inner.type_data_list_move(page, addon, path, type_data_list_item(item)?, to_index).map_err(err)
+    pub fn type_data_list_move(
+        &self,
+        page: String,
+        addon: String,
+        path: Vec<String>,
+        item: TypeDataListItem,
+        to_index: u32,
+    ) -> Result<(), String> {
+        self.inner
+            .type_data_list_move(page, addon, path, type_data_list_item(item)?, to_index)
+            .map_err(err)
     }
 
     pub fn rename_page(&self, id: String, title: String) -> Result<(), String> {
@@ -488,7 +632,10 @@ impl NotesVault {
 
     /// One transaction: all ops or none.
     pub fn apply(&self, page_id: String, ops: Vec<BOp>) -> Result<(), String> {
-        let ops = ops.into_iter().map(block_op).collect::<Result<Vec<_>, _>>()?;
+        let ops = ops
+            .into_iter()
+            .map(block_op)
+            .collect::<Result<Vec<_>, _>>()?;
         self.inner.apply(page_id, ops).map_err(err)
     }
 
@@ -504,11 +651,25 @@ impl NotesVault {
     // --------------------------------------------------------- page tree
 
     /// Children of `parent` (None = top level) in sibling order.
-    pub fn list_children(&self, parent: Option<String>, offset: u32, limit: u32) -> Result<Vec<PageRow>, String> {
-        Ok(rows(self.inner.list_children(parent, offset, limit).map_err(err)?))
+    pub fn list_children(
+        &self,
+        parent: Option<String>,
+        offset: u32,
+        limit: u32,
+    ) -> Result<Vec<PageRow>, String> {
+        Ok(rows(
+            self.inner
+                .list_children(parent, offset, limit)
+                .map_err(err)?,
+        ))
     }
 
-    pub fn move_page(&self, id: String, new_parent: Option<String>, after: Option<String>) -> Result<(), String> {
+    pub fn move_page(
+        &self,
+        id: String,
+        new_parent: Option<String>,
+        after: Option<String>,
+    ) -> Result<(), String> {
         self.inner.move_page(id, new_parent, after).map_err(err)
     }
 
@@ -526,7 +687,10 @@ impl NotesVault {
             .list_trash()
             .map_err(err)?
             .into_iter()
-            .map(|t| TrashedPage { page: page_row(t.page), trashed_ms: t.trashed_ms })
+            .map(|t| TrashedPage {
+                page: page_row(t.page),
+                trashed_ms: t.trashed_ms,
+            })
             .collect())
     }
 
@@ -695,12 +859,10 @@ impl NotesVault {
             .collect())
     }
 
-    pub fn overdue_count(
-        &self,
-        timed_before_ms: i64,
-        day_before_ms: i64,
-    ) -> Result<u32, String> {
-        self.inner.overdue_count(timed_before_ms, day_before_ms).map_err(err)
+    pub fn overdue_count(&self, timed_before_ms: i64, day_before_ms: i64) -> Result<u32, String> {
+        self.inner
+            .overdue_count(timed_before_ms, day_before_ms)
+            .map_err(err)
     }
 
     pub fn set_agenda_done(
@@ -733,7 +895,9 @@ impl NotesVault {
 
     /// Links a task under the day's Tasks toggle, returning whether added.
     pub fn link_task_to_day(&self, day_ms: i64, task_page_id: String) -> Result<bool, String> {
-        self.inner.link_task_to_day(day_ms, task_page_id).map_err(err)
+        self.inner
+            .link_task_to_day(day_ms, task_page_id)
+            .map_err(err)
     }
 
     /// Appends a timestamped child line to the day's top-level Log toggle.
@@ -749,7 +913,9 @@ impl NotesVault {
     // ----------------------------------------- properties and collections
 
     pub fn set_property(&self, page: String, key: String, value: PropValue) -> Result<(), String> {
-        self.inner.set_property(page, key, value_to(value)).map_err(err)
+        self.inner
+            .set_property(page, key, value_to(value))
+            .map_err(err)
     }
 
     pub fn remove_property(&self, page: String, key: String) -> Result<(), String> {
@@ -761,16 +927,38 @@ impl NotesVault {
     }
 
     pub fn get_schema(&self, collection: String) -> Result<Vec<PropDef>, String> {
-        Ok(self.inner.get_schema(collection).map_err(err)?.into_iter().map(prop_def_from).collect())
+        Ok(self
+            .inner
+            .get_schema(collection)
+            .map_err(err)?
+            .into_iter()
+            .map(prop_def_from)
+            .collect())
     }
 
-    pub fn set_schema(&self, collection: String, schema: Vec<PropDef>) -> Result<Vec<PropDef>, String> {
+    pub fn set_schema(
+        &self,
+        collection: String,
+        schema: Vec<PropDef>,
+    ) -> Result<Vec<PropDef>, String> {
         let schema = schema.into_iter().map(prop_def_to).collect();
-        Ok(self.inner.set_schema(collection, schema).map_err(err)?.into_iter().map(prop_def_from).collect())
+        Ok(self
+            .inner
+            .set_schema(collection, schema)
+            .map_err(err)?
+            .into_iter()
+            .map(prop_def_from)
+            .collect())
     }
 
     pub fn list_views(&self, collection: String) -> Result<Vec<ViewDef>, String> {
-        Ok(self.inner.list_views(collection).map_err(err)?.into_iter().map(view_from).collect())
+        Ok(self
+            .inner
+            .list_views(collection)
+            .map_err(err)?
+            .into_iter()
+            .map(view_from)
+            .collect())
     }
 
     pub fn add_view(&self, collection: String, view: ViewDef) -> Result<String, String> {
@@ -778,7 +966,9 @@ impl NotesVault {
     }
 
     pub fn update_view(&self, collection: String, view: ViewDef) -> Result<(), String> {
-        self.inner.update_view(collection, view_to(view)?).map_err(err)
+        self.inner
+            .update_view(collection, view_to(view)?)
+            .map_err(err)
     }
 
     pub fn delete_view(&self, collection: String, view_id: String) -> Result<(), String> {
@@ -786,11 +976,19 @@ impl NotesVault {
     }
 
     pub fn move_view(&self, collection: String, view_id: String, index: u32) -> Result<(), String> {
-        self.inner.move_view(collection, view_id, index).map_err(err)
+        self.inner
+            .move_view(collection, view_id, index)
+            .map_err(err)
     }
 
-    pub fn set_default_template(&self, collection: String, template: Option<String>) -> Result<(), String> {
-        self.inner.set_default_template(collection, template).map_err(err)
+    pub fn set_default_template(
+        &self,
+        collection: String,
+        template: Option<String>,
+    ) -> Result<(), String> {
+        self.inner
+            .set_default_template(collection, template)
+            .map_err(err)
     }
 
     pub fn default_template(&self, collection: String) -> Result<Option<String>, String> {
@@ -809,8 +1007,15 @@ impl NotesVault {
     }
 
     /// A child of `parent` from its template `template` (`None`: empty).
-    pub fn create_page_from(&self, parent: String, title: String, template: Option<String>) -> Result<String, String> {
-        self.inner.create_page_from(parent, title, template).map_err(err)
+    pub fn create_page_from(
+        &self,
+        parent: String,
+        title: String,
+        template: Option<String>,
+    ) -> Result<String, String> {
+        self.inner
+            .create_page_from(parent, title, template)
+            .map_err(err)
     }
 
     pub fn set_template(&self, page: String, is_template: bool) -> Result<(), String> {
@@ -827,14 +1032,24 @@ impl NotesVault {
     /// The folders of this device mounted as pages (desktop only).
     #[frb(sync)]
     pub fn list_mounts(&self) -> Vec<MountInfo> {
-        self.inner.list_mounts().into_iter().map(|m| MountInfo { page: m.page, folder: m.folder }).collect()
+        self.inner
+            .list_mounts()
+            .into_iter()
+            .map(|m| MountInfo {
+                page: m.page,
+                folder: m.folder,
+            })
+            .collect()
     }
 
     /// Mounts the absolute path `folder` as a new page under `parent`
     /// (`None`: top level); its `.md` files become the page's children.
     pub fn add_mount(&self, folder: String, parent: Option<String>) -> Result<MountInfo, String> {
         let m = self.inner.add_mount(folder, parent).map_err(err)?;
-        Ok(MountInfo { page: m.page, folder: m.folder })
+        Ok(MountInfo {
+            page: m.page,
+            folder: m.folder,
+        })
     }
 
     /// Unmounts; the pages stay, the folder's files are left alone.
@@ -853,7 +1068,9 @@ impl NotesVault {
     /// Calendar categories and database visibility. The first call creates
     /// the default calendars, so it is a write.
     pub fn list_calendars(&self) -> Result<CalendarSettings, String> {
-        Ok(calendar_settings_from(self.inner.list_calendars().map_err(err)?))
+        Ok(calendar_settings_from(
+            self.inner.list_calendars().map_err(err)?,
+        ))
     }
 
     /// Adds a calendar at the end of the list and returns its id.
@@ -870,7 +1087,9 @@ impl NotesVault {
     }
 
     pub fn update_calendar(&self, calendar: CalendarCategory) -> Result<(), String> {
-        self.inner.update_calendar(calendar_category_to(calendar)).map_err(err)
+        self.inner
+            .update_calendar(calendar_category_to(calendar))
+            .map_err(err)
     }
 
     pub fn delete_calendar(&self, id: String) -> Result<(), String> {
@@ -904,9 +1123,18 @@ impl NotesVault {
     ) -> Result<QueryResult, String> {
         let r = self
             .inner
-            .query(scope, opt_filter_to(filter)?, sorts_to(sorts), offset, limit)
+            .query(
+                scope,
+                opt_filter_to(filter)?,
+                sorts_to(sorts),
+                offset,
+                limit,
+            )
             .map_err(err)?;
-        Ok(QueryResult { rows: rows(r.rows), total: r.total })
+        Ok(QueryResult {
+            rows: rows(r.rows),
+            total: r.total,
+        })
     }
 
     pub fn query_groups(
@@ -961,7 +1189,12 @@ impl NotesVault {
 
     pub fn attachment_info(&self, id: String) -> Result<AttachmentInfo, String> {
         let a = self.inner.attachment_info(id).map_err(err)?;
-        Ok(AttachmentInfo { id: a.id, name: a.name, mime: a.mime, size: a.size })
+        Ok(AttachmentInfo {
+            id: a.id,
+            name: a.name,
+            mime: a.mime,
+            size: a.size,
+        })
     }
 
     pub fn gc_attachments(&self) -> Result<u32, String> {
@@ -985,7 +1218,10 @@ impl NotesVault {
     }
 
     pub fn load_page_at(&self, page: String, version: String) -> Result<PageData, String> {
-        Ok(page_data(self.inner.load_page_at(page, version).map_err(err)?, 0))
+        Ok(page_data(
+            self.inner.load_page_at(page, version).map_err(err)?,
+            0,
+        ))
     }
 
     pub fn restore_version(&self, page: String, version: String) -> Result<(), String> {
@@ -1006,7 +1242,11 @@ impl NotesVault {
 
     // ------------------------------------------------------------ import
 
-    pub fn import_markdown(&self, dir: String, parent: Option<String>) -> Result<ImportReport, String> {
+    pub fn import_markdown(
+        &self,
+        dir: String,
+        parent: Option<String>,
+    ) -> Result<ImportReport, String> {
         let r = self.inner.import_markdown(dir, parent).map_err(err)?;
         Ok(ImportReport {
             pages: r.pages,
@@ -1029,7 +1269,10 @@ impl NotesVault {
             .page_versions()
             .map_err(err)?
             .into_iter()
-            .map(|v| PageVersion { page: v.page, version: v.version })
+            .map(|v| PageVersion {
+                page: v.page,
+                version: v.version,
+            })
             .collect())
     }
 
@@ -1038,15 +1281,22 @@ impl NotesVault {
     }
 
     pub fn import_updates(&self, page: String, bytes: Vec<u8>) -> Result<SyncImport, String> {
-        Ok(sync_import(self.inner.import_updates(page, bytes).map_err(err)?))
+        Ok(sync_import(
+            self.inner.import_updates(page, bytes).map_err(err)?,
+        ))
     }
 
     pub fn import_updates_batch(&self, updates: Vec<PageUpdate>) -> Result<SyncImport, String> {
         let u = updates
             .into_iter()
-            .map(|u| vault_core::PageUpdate { page: u.page, bytes: u.bytes })
+            .map(|u| vault_core::PageUpdate {
+                page: u.page,
+                bytes: u.bytes,
+            })
             .collect();
-        Ok(sync_import(self.inner.import_updates_batch(u).map_err(err)?))
+        Ok(sync_import(
+            self.inner.import_updates_batch(u).map_err(err)?,
+        ))
     }
 
     pub fn purged_pages(&self) -> Vec<String> {
@@ -1060,7 +1310,13 @@ impl NotesVault {
     /// Pending conflicts, including rule-applied entries awaiting confirmation.
     pub fn conflicts(&self, page: Option<String>) -> Result<Vec<Conflict>, String> {
         let device = self.inner.device_id();
-        Ok(self.inner.list_conflicts(page).map_err(err)?.into_iter().map(|c| conflict(c, &device)).collect())
+        Ok(self
+            .inner
+            .list_conflicts(page)
+            .map_err(err)?
+            .into_iter()
+            .map(|c| conflict(c, &device))
+            .collect())
     }
 
     /// Compatibility alias for pending conflicts.
@@ -1071,11 +1327,24 @@ impl NotesVault {
     /// Resolution log, including undone applications on reopened pending entries.
     pub fn conflict_log(&self, page: Option<String>) -> Result<Vec<Conflict>, String> {
         let device = self.inner.device_id();
-        Ok(self.inner.conflict_log(page).map_err(err)?.into_iter().map(|c| conflict(c, &device)).collect())
+        Ok(self
+            .inner
+            .conflict_log(page)
+            .map_err(err)?
+            .into_iter()
+            .map(|c| conflict(c, &device))
+            .collect())
     }
 
-    pub fn resolve_conflict(&self, page: String, id: String, resolution: Resolution) -> Result<(), String> {
-        self.inner.resolve_conflict(page, id, resolution_to(resolution)).map_err(err)
+    pub fn resolve_conflict(
+        &self,
+        page: String,
+        id: String,
+        resolution: Resolution,
+    ) -> Result<(), String> {
+        self.inner
+            .resolve_conflict(page, id, resolution_to(resolution))
+            .map_err(err)
     }
 
     /// Restore the scope before its latest resolution. Ordinary entries return
@@ -1086,7 +1355,9 @@ impl NotesVault {
     }
 
     pub fn conflict_diff(&self, page: String, id: String) -> Result<ConflictDiff, String> {
-        Ok(conflict_diff(self.inner.conflict_diff(page, id).map_err(err)?))
+        Ok(conflict_diff(
+            self.inner.conflict_diff(page, id).map_err(err)?,
+        ))
     }
 
     pub fn conflict_auto_resolve(&self) -> Result<bool, String> {
@@ -1118,7 +1389,9 @@ impl NotesVault {
         runner: String,
         model: Option<String>,
     ) -> Result<(), String> {
-        self.inner.set_agent_default_model(runner, model).map_err(err)
+        self.inner
+            .set_agent_default_model(runner, model)
+            .map_err(err)
     }
 
     /// The tool set a runner's agent gets: read, write or everything
@@ -1138,7 +1411,11 @@ impl NotesVault {
         self.inner
             .seed_agent_defaults(vault_core::AgentDefaults {
                 runner: seed.runner,
-                models: seed.models.into_iter().map(|m| (m.runner, m.model)).collect(),
+                models: seed
+                    .models
+                    .into_iter()
+                    .map(|m| (m.runner, m.model))
+                    .collect(),
             })
             .map_err(err)
     }
@@ -1176,7 +1453,11 @@ mod conflict_tests {
     }
 
     fn edit(id: &str, text: &str) -> vc::BlockOp {
-        vc::BlockOp::SetText { id: id.into(), text: text.into(), marks: vec![] }
+        vc::BlockOp::SetText {
+            id: id.into(),
+            text: text.into(),
+            marks: vec![],
+        }
     }
 
     #[test]
@@ -1185,37 +1466,99 @@ mod conflict_tests {
         let editor_root = TempRoot::new();
         let purger = NotesVault::open(purger_root.0.to_string_lossy().into_owned(), None).unwrap();
         let editor = NotesVault::open(editor_root.0.to_string_lossy().into_owned(), None).unwrap();
-        let page = purger.create_page(None, "Purge conflict".into(), None).unwrap();
-        purger.inner.apply(page.clone(), vec![vc::BlockOp::Insert {
-            parent: None, after: None,
-            block: vc::NewBlock {
-                id: "target".into(), kind: vc::BlockKind::Paragraph,
-                text: "Original".into(), marks: vec![], checked: false,
-            },
-        }]).unwrap();
-        editor.import_updates(page.clone(), purger.export_updates(page.clone(), vec![]).unwrap()).unwrap();
+        let page = purger
+            .create_page(None, "Purge conflict".into(), None)
+            .unwrap();
+        purger
+            .inner
+            .apply(
+                page.clone(),
+                vec![vc::BlockOp::Insert {
+                    parent: None,
+                    after: None,
+                    block: vc::NewBlock {
+                        id: "target".into(),
+                        kind: vc::BlockKind::Paragraph,
+                        text: "Original".into(),
+                        marks: vec![],
+                        checked: false,
+                    },
+                }],
+            )
+            .unwrap();
+        editor
+            .import_updates(
+                page.clone(),
+                purger.export_updates(page.clone(), vec![]).unwrap(),
+            )
+            .unwrap();
         purger.inner.delete_page(page.clone()).unwrap();
         purger.inner.purge_page(page.clone()).unwrap();
-        editor.inner.apply(page.clone(), vec![edit("target", "Offline edit")]).unwrap();
-        editor.inner.import_purge_records(purger.inner.purge_records()).unwrap();
-        purger.import_updates(page.clone(), editor.export_updates(page.clone(), vec![]).unwrap()).unwrap();
+        editor
+            .inner
+            .apply(page.clone(), vec![edit("target", "Offline edit")])
+            .unwrap();
+        editor
+            .inner
+            .import_purge_records(purger.inner.purge_records())
+            .unwrap();
+        purger
+            .import_updates(
+                page.clone(),
+                editor.export_updates(page.clone(), vec![]).unwrap(),
+            )
+            .unwrap();
 
         for (replica, local) in [(&purger, true), (&editor, false)] {
             let conflicts = replica.conflicts(Some(page.clone())).unwrap();
-            let conflict = conflicts.iter().find(|entry| entry.scope.kind == ConflictScopeKind::Page).unwrap();
-            let side = conflict.sides.iter().find(|side| side.state.kind == ConflictStateKind::Purged).unwrap();
+            let conflict = conflicts
+                .iter()
+                .find(|entry| entry.scope.kind == ConflictScopeKind::Page)
+                .unwrap();
+            let side = conflict
+                .sides
+                .iter()
+                .find(|side| side.state.kind == ConflictStateKind::Purged)
+                .unwrap();
             assert_eq!(side.device, purger.inner.device_id());
             assert_eq!(side.local, local);
-            let choice = conflict.applied.last().unwrap().resolution.as_ref().unwrap();
+            let choice = conflict
+                .applied
+                .last()
+                .unwrap()
+                .resolution
+                .as_ref()
+                .unwrap();
             assert_eq!(choice.kind, ResolutionKind::UseSide);
-            assert_eq!(conflict.sides[choice.side as usize].state.kind, ConflictStateKind::Present);
+            assert_eq!(
+                conflict.sides[choice.side as usize].state.kind,
+                ConflictStateKind::Present
+            );
         }
         let conflict = purger.conflicts(Some(page.clone())).unwrap().remove(0);
-        purger.resolve_conflict(page.clone(), conflict.id.clone(),
-            Resolution { kind: ResolutionKind::Keep, side: 0 }).unwrap();
+        purger
+            .resolve_conflict(
+                page.clone(),
+                conflict.id.clone(),
+                Resolution {
+                    kind: ResolutionKind::Keep,
+                    side: 0,
+                },
+            )
+            .unwrap();
         let log = purger.conflict_log(Some(page)).unwrap();
         let resolved = log.iter().find(|entry| entry.id == conflict.id).unwrap();
-        assert_eq!(resolved.applied.last().unwrap().resolution.as_ref().unwrap().kind, ResolutionKind::Keep);
+        assert_eq!(
+            resolved
+                .applied
+                .last()
+                .unwrap()
+                .resolution
+                .as_ref()
+                .unwrap()
+                .kind,
+            ResolutionKind::Keep
+        );
     }
 
     #[test]
@@ -1226,50 +1569,127 @@ mod conflict_tests {
         let local = NotesVault::open(local_root.0.to_string_lossy().into_owned(), None).unwrap();
         let cloud = NotesVault::open(cloud_root.0.to_string_lossy().into_owned(), None).unwrap();
         let page = local.create_page(None, "Conflict".into(), None).unwrap();
-        local.inner.apply(page.clone(), vec![
-            vc::BlockOp::Insert {
-                parent: None, after: None,
-                block: vc::NewBlock {
-                    id: "target".into(), kind: vc::BlockKind::Paragraph,
-                    text: "Original".into(), marks: vec![], checked: false,
-                },
-            },
-            vc::BlockOp::Insert {
-                parent: None, after: Some("target".into()),
-                block: vc::NewBlock {
-                    id: "unrelated".into(), kind: vc::BlockKind::Paragraph,
-                    text: "Unrelated".into(), marks: vec![], checked: false,
-                },
-            },
-        ]).unwrap();
-        cloud.import_updates(page.clone(), local.export_updates(page.clone(), vec![]).unwrap()).unwrap();
-        local.inner.apply(page.clone(), vec![edit("target", "Local")]).unwrap();
-        cloud.inner.apply(page.clone(), vec![edit("target", "Cloud")]).unwrap();
-        local.import_updates(page.clone(), cloud.export_updates(page.clone(), vec![]).unwrap()).unwrap();
-        let conflict = local.conflicts(Some(page.clone())).unwrap().into_iter()
+        local
+            .inner
+            .apply(
+                page.clone(),
+                vec![
+                    vc::BlockOp::Insert {
+                        parent: None,
+                        after: None,
+                        block: vc::NewBlock {
+                            id: "target".into(),
+                            kind: vc::BlockKind::Paragraph,
+                            text: "Original".into(),
+                            marks: vec![],
+                            checked: false,
+                        },
+                    },
+                    vc::BlockOp::Insert {
+                        parent: None,
+                        after: Some("target".into()),
+                        block: vc::NewBlock {
+                            id: "unrelated".into(),
+                            kind: vc::BlockKind::Paragraph,
+                            text: "Unrelated".into(),
+                            marks: vec![],
+                            checked: false,
+                        },
+                    },
+                ],
+            )
+            .unwrap();
+        cloud
+            .import_updates(
+                page.clone(),
+                local.export_updates(page.clone(), vec![]).unwrap(),
+            )
+            .unwrap();
+        local
+            .inner
+            .apply(page.clone(), vec![edit("target", "Local")])
+            .unwrap();
+        cloud
+            .inner
+            .apply(page.clone(), vec![edit("target", "Cloud")])
+            .unwrap();
+        local
+            .import_updates(
+                page.clone(),
+                cloud.export_updates(page.clone(), vec![]).unwrap(),
+            )
+            .unwrap();
+        let conflict = local
+            .conflicts(Some(page.clone()))
+            .unwrap()
+            .into_iter()
             .find(|entry| entry.scope.kind == ConflictScopeKind::Block && entry.block == "target")
             .expect("concurrent edits cross the pending bridge API");
-        let side = conflict.sides.iter().position(|side| {
-            side.block.as_ref().is_some_and(|block| block.text == "Cloud")
-        }).unwrap();
+        let side = conflict
+            .sides
+            .iter()
+            .position(|side| {
+                side.block
+                    .as_ref()
+                    .is_some_and(|block| block.text == "Cloud")
+            })
+            .unwrap();
         let before = local.inner.load_page(page.clone()).unwrap().blocks[0].clone();
-        local.resolve_conflict(page.clone(), conflict.id.clone(),
-            Resolution { kind: ResolutionKind::UseSide, side: side as u32 }).unwrap();
-        assert!(local.conflicts(Some(page.clone())).unwrap().iter().all(|entry| entry.id != conflict.id));
-        let resolved = local.conflict_log(Some(page.clone())).unwrap().into_iter()
-            .find(|entry| entry.id == conflict.id).expect("resolution crosses the log bridge API");
+        local
+            .resolve_conflict(
+                page.clone(),
+                conflict.id.clone(),
+                Resolution {
+                    kind: ResolutionKind::UseSide,
+                    side: side as u32,
+                },
+            )
+            .unwrap();
+        assert!(local
+            .conflicts(Some(page.clone()))
+            .unwrap()
+            .iter()
+            .all(|entry| entry.id != conflict.id));
+        let resolved = local
+            .conflict_log(Some(page.clone()))
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.id == conflict.id)
+            .expect("resolution crosses the log bridge API");
         assert_eq!(resolved.status, ConflictStatus::Resolved);
         assert!(resolved.undoable);
-        let choice = resolved.applied.last().unwrap().resolution.as_ref().unwrap();
+        let choice = resolved
+            .applied
+            .last()
+            .unwrap()
+            .resolution
+            .as_ref()
+            .unwrap();
         assert_eq!(choice.kind, ResolutionKind::UseSide);
         assert_eq!(choice.side, side as u32);
         assert_eq!(resolved.applied.last().unwrap().undone_at, None);
-        local.inner.apply(page.clone(), vec![edit("unrelated", "Later unrelated edit")]).unwrap();
-        local.undo_conflict(page.clone(), conflict.id.clone()).unwrap();
-        let pending = local.conflicts(Some(page.clone())).unwrap().into_iter()
-            .find(|entry| entry.id == conflict.id).expect("ordinary undo reopens pending review");
-        let logged = local.conflict_log(Some(page.clone())).unwrap().into_iter()
-            .find(|entry| entry.id == conflict.id).expect("ordinary undo also keeps the log entry");
+        local
+            .inner
+            .apply(
+                page.clone(),
+                vec![edit("unrelated", "Later unrelated edit")],
+            )
+            .unwrap();
+        local
+            .undo_conflict(page.clone(), conflict.id.clone())
+            .unwrap();
+        let pending = local
+            .conflicts(Some(page.clone()))
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.id == conflict.id)
+            .expect("ordinary undo reopens pending review");
+        let logged = local
+            .conflict_log(Some(page.clone()))
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.id == conflict.id)
+            .expect("ordinary undo also keeps the log entry");
         assert_eq!(pending.status, ConflictStatus::Pending);
         assert_eq!(logged.status, ConflictStatus::Pending);
         assert!(!pending.undoable);
@@ -1282,7 +1702,10 @@ mod conflict_tests {
         let restored = local.inner.load_page(page.clone()).unwrap();
         assert_eq!(restored.blocks[0], before);
         assert_eq!(restored.blocks[1].text, "Later unrelated edit");
-        assert!(local.undo_conflict(page, conflict.id).is_err(), "the consumed application cannot be undone twice");
+        assert!(
+            local.undo_conflict(page, conflict.id).is_err(),
+            "the consumed application cannot be undone twice"
+        );
     }
 }
 
@@ -1325,11 +1748,13 @@ pub fn init_app() {
 /// Calls `rescan_mounts` every 2 seconds until the vault is closed. Holds
 /// the vault only while a rescan runs (none without mounts).
 fn poll_mounts(vault: std::sync::Weak<Vault>) {
-    let _ = std::thread::Builder::new().name("vault-mounts".into()).spawn(move || loop {
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        let Some(v) = vault.upgrade() else { return };
-        if !v.list_mounts().is_empty() {
-            let _ = v.rescan_mounts();
-        }
-    });
+    let _ = std::thread::Builder::new()
+        .name("vault-mounts".into())
+        .spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            let Some(v) = vault.upgrade() else { return };
+            if !v.list_mounts().is_empty() {
+                let _ = v.rescan_mounts();
+            }
+        });
 }

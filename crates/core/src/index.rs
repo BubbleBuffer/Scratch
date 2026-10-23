@@ -385,14 +385,14 @@ impl Index {
     /// Live pages, excluding system collections and the Feedback subtree.
     /// Template counting retains its existing behavior.
     pub fn page_count(&self) -> Result<u32> {
-        Ok(self
-            .conn
-            .query_row(
-                &format!("SELECT count(*) FROM pages p WHERE in_trash = 0 AND role IS NOT 'calendars'
-                 AND role IS NOT 'nodes' AND {NOT_FEEDBACK}"),
-                [],
-                |r| r.get::<_, i64>(0),
-            )? as u32)
+        Ok(self.conn.query_row(
+            &format!(
+                "SELECT count(*) FROM pages p WHERE in_trash = 0 AND role IS NOT 'calendars'
+                 AND role IS NOT 'nodes' AND {NOT_FEEDBACK}"
+            ),
+            [],
+            |r| r.get::<_, i64>(0),
+        )? as u32)
     }
 
     /// Whether the page exists (in the trash or not).
@@ -440,7 +440,9 @@ impl Index {
             .prepare_cached("SELECT title FROM pages WHERE id = ?1")?
             .query_row([id], |r| r.get(0))
             .optional()?;
-        if page.is_some() { return Ok(page); }
+        if page.is_some() {
+            return Ok(page);
+        }
         Ok(self.find_indexed_note(id)?.map(|hit| hit.title))
     }
 
@@ -452,13 +454,23 @@ impl Index {
              FROM search_external WHERE id = ?1 ORDER BY source LIMIT 2",
         )?;
         let mut rows = stmt.query([id])?;
-        let Some(row) = rows.next()? else { return Ok(None) };
-        let hit = SearchHit {
-            source: row.get(0)?, id: row.get(1)?, title: row.get(2)?,
-            snippet: row.get(3)?, page_type: row.get(4)?, target: row.get(5)?,
-            fuzzy: false, corrected: None, matched_filters: Vec::new(),
+        let Some(row) = rows.next()? else {
+            return Ok(None);
         };
-        if rows.next()?.is_some() { return Ok(None); }
+        let hit = SearchHit {
+            source: row.get(0)?,
+            id: row.get(1)?,
+            title: row.get(2)?,
+            snippet: row.get(3)?,
+            page_type: row.get(4)?,
+            target: row.get(5)?,
+            fuzzy: false,
+            corrected: None,
+            matched_filters: Vec::new(),
+        };
+        if rows.next()?.is_some() {
+            return Ok(None);
+        }
         Ok(Some(hit))
     }
 
@@ -725,7 +737,11 @@ impl Index {
     /// Whether a committed vault page can now enter this query. The registry
     /// separately checks the previous hits for removals/changes. This is a
     /// conservative eligibility probe: no ranking, snippets, or full search.
-    pub(crate) fn search_spec_matches_ids(&self, spec: &SearchSpec, ids: &[PageId]) -> Result<bool> {
+    pub(crate) fn search_spec_matches_ids(
+        &self,
+        spec: &SearchSpec,
+        ids: &[PageId],
+    ) -> Result<bool> {
         if ids.is_empty() {
             return Ok(false);
         }
@@ -747,7 +763,11 @@ impl Index {
         if !positive.is_empty() && fts.is_none() {
             return Ok(false);
         }
-        let query = positive.iter().map(|term| term.value.as_str()).collect::<Vec<_>>().join(" ");
+        let query = positive
+            .iter()
+            .map(|term| term.value.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
         let words = fuzzy::query_words(&query);
         // Parameter one is the only typed rarray binding. Resolve stable page
         // ids to numeric rowids inside the same SQL statement/read snapshot.
@@ -756,8 +776,11 @@ impl Index {
         let predicate = crate::search_exec::probe_predicate(self, spec, &mut parameters)?;
         let exact = if let Some(fts) = fts {
             parameters.push(Value::Text(fts));
-            format!("p.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?{}
-                AND +rowid IN (SELECT rowid FROM committed))", parameters.len())
+            format!(
+                "p.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?{}
+                AND +rowid IN (SELECT rowid FROM committed))",
+                parameters.len()
+            )
         } else {
             "1".to_string()
         };
@@ -772,8 +795,10 @@ impl Index {
              FROM search_rows p
              WHERE p.rowid IN (SELECT rowid FROM committed) AND {predicate}"
         );
-        let mut bindings: Vec<&dyn rusqlite::ToSql> = parameters.iter()
-            .map(|value| value as &dyn rusqlite::ToSql).collect();
+        let mut bindings: Vec<&dyn rusqlite::ToSql> = parameters
+            .iter()
+            .map(|value| value as &dyn rusqlite::ToSql)
+            .collect();
         bindings[0] = &array;
         let mut statement = self.conn.prepare_cached(&sql)?;
         let mut rows = statement.query(bindings.as_slice())?;
@@ -2113,9 +2138,11 @@ impl Index {
         });
         // Task-note status owns this indexed key on task pages. Preserve the
         // source property itself and all properties of non-task pages.
-        for p in props.iter()
+        for p in props
+            .iter()
             .filter(|p| task_status.is_none() || p.key != "status")
-            .chain(projected_status.iter()) {
+            .chain(projected_status.iter())
+        {
             if p.value == PropValue::Empty {
                 continue;
             }
@@ -2523,9 +2550,9 @@ fn probe_text_matches(query: &str, words: &[String], title: String, body: &str) 
     let titles = [fuzzy::TitleEntry::new(String::new(), title, 0)];
     // Missing-word flags depend on the whole corpus. Allow every word to use
     // edits here: this can wake an extra query but cannot hide a fuzzy title.
-    if !fuzzy::title_hits_scoped(
-        &titles, query, words, &HashSet::new(), 1, true, None, false,
-    ).is_empty() {
+    if !fuzzy::title_hits_scoped(&titles, query, words, &HashSet::new(), 1, true, None, false)
+        .is_empty()
+    {
         return true;
     }
     text_words.extend(fuzzy::query_words(body));
@@ -2539,10 +2566,15 @@ fn probe_text_matches(query: &str, words: &[String], title: String, body: &str) 
     if !body.is_ascii() || !titles[0].title.is_ascii() {
         return true;
     }
-    let vocabulary = fuzzy::WordIndex::build(text_words.into_iter().map(|word| (word, 1)).collect());
+    let vocabulary =
+        fuzzy::WordIndex::build(text_words.into_iter().map(|word| (word, 1)).collect());
     let mut scratch = Scratch::default();
     words.iter().enumerate().all(|(i, word)| {
-        if vocabulary.words.iter().any(|(term, _)| term.starts_with(word)) {
+        if vocabulary
+            .words
+            .iter()
+            .any(|(term, _)| term.starts_with(word))
+        {
             return true;
         }
         let chars: Vec<_> = word.chars().collect();
@@ -2643,22 +2675,36 @@ mod conflict_mirror_tests {
         {
             let vault = crate::Vault::open(root.to_string_lossy().into_owned()).unwrap();
             page = vault.create_page(None, "Existing vault".into()).unwrap();
-            vault.inner.edit(&page, |doc| doc.set_conflict("b1", legacy)).unwrap();
+            vault
+                .inner
+                .edit(&page, |doc| doc.set_conflict("b1", legacy))
+                .unwrap();
             vault.flush().unwrap();
         }
         {
             let (index, _) = Index::open(&root.join(".vault/index.sqlite")).unwrap();
-            index.conn.execute_batch(
-                "DROP TABLE conflicts;
+            index
+                .conn
+                .execute_batch(
+                    "DROP TABLE conflicts;
                  CREATE TABLE conflicts(page TEXT NOT NULL, block TEXT NOT NULL, json TEXT NOT NULL,
-                   PRIMARY KEY(page, block)) WITHOUT ROWID;"
-            ).unwrap();
-            index.conn.execute("INSERT INTO conflicts(page, block, json) VALUES (?1, 'b1', ?2)",
-                params![page, legacy]).unwrap();
+                   PRIMARY KEY(page, block)) WITHOUT ROWID;",
+                )
+                .unwrap();
+            index
+                .conn
+                .execute(
+                    "INSERT INTO conflicts(page, block, json) VALUES (?1, 'b1', ?2)",
+                    params![page, legacy],
+                )
+                .unwrap();
         }
         {
             let vault = crate::Vault::open(root.to_string_lossy().into_owned()).unwrap();
-            assert_eq!(vault.load_page(page.clone()).unwrap().title, "Existing vault");
+            assert_eq!(
+                vault.load_page(page.clone()).unwrap().title,
+                "Existing vault"
+            );
             let records = vault.list_conflicts(Some(page)).unwrap();
             assert_eq!(records.len(), 1);
             assert_eq!(records[0].id, "b1");
@@ -2792,10 +2838,12 @@ mod search_tests {
     fn commit_probe_checks_only_requested_pages_and_keeps_hard_terms() {
         let index = fixture(3, 1);
         let probe = |query: &str, ids: &[&str]| {
-            index.search_spec_matches_ids(
-                &crate::search_query::parse_search(query).spec,
-                &ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-            ).unwrap()
+            index
+                .search_spec_matches_ids(
+                    &crate::search_query::parse_search(query).spec,
+                    &ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
+                )
+                .unwrap()
         };
         assert!(probe("garden", &["page-1"]));
         assert!(!probe("garden", &["page-2", "page-3"]));
@@ -2808,50 +2856,123 @@ mod search_tests {
         assert!(probe("-singularrare", &["page-2"]));
         assert!(probe("ard", &["page-1"])); // title substring, not an FTS prefix
         assert!(probe("gadr", &["page-1"])); // fuzzy title
-        index.conn.execute("UPDATE pages SET in_trash = 1 WHERE rowid = 1", []).unwrap();
+        index
+            .conn
+            .execute("UPDATE pages SET in_trash = 1 WHERE rowid = 1", [])
+            .unwrap();
         assert!(!probe("garden", &["page-1"]));
     }
 
     #[test]
     fn commit_probe_keeps_body_corrections_and_mixed_title_body_words() {
         let index = fixture(2, 1);
-        index.conn.execute("UPDATE pages SET title = 'Zebra', title_fold = 'zebra' WHERE rowid = 1", []).unwrap();
-        index.conn.execute("UPDATE fts SET title = 'Zebra', body = 'garden' WHERE rowid = 1", []).unwrap();
+        index
+            .conn
+            .execute(
+                "UPDATE pages SET title = 'Zebra', title_fold = 'zebra' WHERE rowid = 1",
+                [],
+            )
+            .unwrap();
+        index
+            .conn
+            .execute(
+                "UPDATE fts SET title = 'Zebra', body = 'garden' WHERE rowid = 1",
+                [],
+            )
+            .unwrap();
         for query in ["gardne", "zebra gardne"] {
             let spec = crate::search_query::parse_search(query).spec;
-            assert!(!index.search_spec(&spec, 10, 0, false).unwrap().hits.is_empty());
-            assert!(index.search_spec_matches_ids(&spec, &["page-1".into()]).unwrap());
-            assert!(!index.search_spec_matches_ids(&spec, &["page-2".into()]).unwrap());
+            assert!(!index
+                .search_spec(&spec, 10, 0, false)
+                .unwrap()
+                .hits
+                .is_empty());
+            assert!(index
+                .search_spec_matches_ids(&spec, &["page-1".into()])
+                .unwrap());
+            assert!(!index
+                .search_spec_matches_ids(&spec, &["page-2".into()])
+                .unwrap());
         }
     }
 
     #[test]
     fn commit_probe_reuses_typed_filters_subtrees_and_schema_tag_aliases() {
         let index = fixture(3, 1);
-        index.conn.execute("UPDATE pages SET parent = 'page-1' WHERE rowid = 2", []).unwrap();
-        let defs = vec![PropDef {
-            key: "labels".into(), name: "Tags".into(), kind: crate::types::PropKind::MultiSelect,
-            options: vec![crate::types::SelectOption {
-                id: "option-work".into(), name: "Work/Meetings".into(), color: String::new(),
-            }], config: String::new(),
-        }, PropDef {
-            key: "born".into(), name: "Born".into(), kind: crate::types::PropKind::CreatedTime,
-            options: Vec::new(), config: String::new(),
-        }];
+        index
+            .conn
+            .execute("UPDATE pages SET parent = 'page-1' WHERE rowid = 2", [])
+            .unwrap();
+        let defs = vec![
+            PropDef {
+                key: "labels".into(),
+                name: "Tags".into(),
+                kind: crate::types::PropKind::MultiSelect,
+                options: vec![crate::types::SelectOption {
+                    id: "option-work".into(),
+                    name: "Work/Meetings".into(),
+                    color: String::new(),
+                }],
+                config: String::new(),
+            },
+            PropDef {
+                key: "born".into(),
+                name: "Born".into(),
+                kind: crate::types::PropKind::CreatedTime,
+                options: Vec::new(),
+                config: String::new(),
+            },
+        ];
         let schema = serde_json::to_string(&defs).unwrap();
-        index.conn.execute("UPDATE pages SET schema = ?1 WHERE rowid = 1", [schema]).unwrap();
-        let tags = serde_json::to_string(&PropValue::MultiSelect(vec!["option-work".into()])).unwrap();
-        index.conn.execute("INSERT INTO props(page, key, json) VALUES (2, 'labels', ?1)", [tags]).unwrap();
-        let context = crate::search_query::SearchContext::local(defs, vec![crate::search_query::SearchPage {
-            id: "page-1".into(), title: "Garden manual 1".into(), updated_ms: 1,
-        }], 0);
-        let queries = ["tag:work", "-tag:work", "in:[[page-1]]", "-in:[[page-1]]", "has:born", "-has:born", "title:notes", "type:document", "created:2026"];
+        index
+            .conn
+            .execute("UPDATE pages SET schema = ?1 WHERE rowid = 1", [schema])
+            .unwrap();
+        let tags =
+            serde_json::to_string(&PropValue::MultiSelect(vec!["option-work".into()])).unwrap();
+        index
+            .conn
+            .execute(
+                "INSERT INTO props(page, key, json) VALUES (2, 'labels', ?1)",
+                [tags],
+            )
+            .unwrap();
+        let context = crate::search_query::SearchContext::local(
+            defs,
+            vec![crate::search_query::SearchPage {
+                id: "page-1".into(),
+                title: "Garden manual 1".into(),
+                updated_ms: 1,
+            }],
+            0,
+        );
+        let queries = [
+            "tag:work",
+            "-tag:work",
+            "in:[[page-1]]",
+            "-in:[[page-1]]",
+            "has:born",
+            "-has:born",
+            "title:notes",
+            "type:document",
+            "created:2026",
+        ];
         for query in queries {
             let spec = crate::search_query::parse_search_with_context(query, &context).spec;
             assert!(spec.warnings.is_empty(), "{query}: {:?}", spec.warnings);
-            let expected: HashSet<_> = index.search_spec(&spec, 100, 0, false).unwrap().hits.into_iter().map(|hit| hit.id).collect();
+            let expected: HashSet<_> = index
+                .search_spec(&spec, 100, 0, false)
+                .unwrap()
+                .hits
+                .into_iter()
+                .map(|hit| hit.id)
+                .collect();
             for id in ["page-1", "page-2", "page-3"] {
-                assert_eq!(index.search_spec_matches_ids(&spec, &[id.into()]).unwrap(), expected.contains(id), "{query}: {id}");
+                assert_eq!(
+                    index.search_spec_matches_ids(&spec, &[id.into()]).unwrap(),
+                    expected.contains(id),
+                    "{query}: {id}"
+                );
             }
         }
     }

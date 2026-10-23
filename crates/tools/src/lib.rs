@@ -10,8 +10,8 @@ pub mod help;
 mod memory;
 pub mod notes_cli;
 pub mod notes_setup;
-pub mod outline;
 mod organize;
+pub mod outline;
 pub mod props;
 mod query;
 mod tool_sets;
@@ -326,12 +326,7 @@ mod tests {
 
         assert_eq!(
             read_only,
-            BTreeSet::from([
-                "search_notes",
-                "read_page",
-                "memory_read",
-                "notes_help",
-            ])
+            BTreeSet::from(["search_notes", "read_page", "memory_read", "notes_help",])
         );
         assert_eq!(
             destructive,

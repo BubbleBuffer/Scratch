@@ -70,7 +70,10 @@ impl Backend {
     }
 
     pub fn vault(&self) -> Result<Arc<Vault>, String> {
-        self.vault.get().cloned().ok_or_else(|| "vault not open".to_string())
+        self.vault
+            .get()
+            .cloned()
+            .ok_or_else(|| "vault not open".to_string())
     }
 
     pub fn is_open(&self) -> bool {
@@ -99,8 +102,12 @@ impl Backend {
             }
             std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
             let t = Instant::now();
-            seed::generate(dir.to_string_lossy().into_owned(), self.pages, self.big_blocks)
-                .map_err(String::from)?;
+            seed::generate(
+                dir.to_string_lossy().into_owned(),
+                self.pages,
+                self.big_blocks,
+            )
+            .map_err(String::from)?;
             std::fs::write(dir.join(SEED_MARKER), b"ok").map_err(|e| e.to_string())?;
             seed_ms = t.elapsed().as_millis() as u64;
             seeded = true;
@@ -118,7 +125,12 @@ impl Backend {
             std::fs::write(dir.join(SHOWCASE_MARKER), b"ok").map_err(|e| e.to_string())?;
         }
         let count = v.page_count().map_err(String::from)?;
-        Ok(OpenInfo { count, seeded, seed_ms, open_ms })
+        Ok(OpenInfo {
+            count,
+            seeded,
+            seed_ms,
+            open_ms,
+        })
     }
 
     /// One measurement line, with the `BAKEOFF` prefix: logcat on Android,
@@ -152,16 +164,26 @@ impl Backend {
     /// names and argument names as the Tauri commands). Blocking.
     pub fn dispatch(&self, cmd: &str, args: &Value) -> Result<Value, String> {
         let s = |k: &str| -> Result<String, String> {
-            args.get(k).and_then(Value::as_str).map(str::to_string).ok_or_else(|| format!("missing {k}"))
+            args.get(k)
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .ok_or_else(|| format!("missing {k}"))
         };
         let n = |k: &str| -> Result<u32, String> {
-            args.get(k).and_then(Value::as_u64).map(|x| x as u32).ok_or_else(|| format!("missing {k}"))
+            args.get(k)
+                .and_then(Value::as_u64)
+                .map(|x| x as u32)
+                .ok_or_else(|| format!("missing {k}"))
         };
         match cmd {
             "vault_status" => js(self.status()),
             "open_vault" => js(self.open()?),
             "page_count" => Ok(json!(to(self.vault()?.page_count())?)),
-            "list_pages" => js(to(self.vault()?.list_pages(None, n("offset")?, n("limit")?))?),
+            "list_pages" => js(to(self.vault()?.list_pages(
+                None,
+                n("offset")?,
+                n("limit")?,
+            ))?),
             "search" => js(to(self.vault()?.search(s("query")?, n("limit")?))?),
             "create_page" => Ok(json!(to(self.vault()?.create_page(None, s("title")?))?)),
             "rename_page" => {
@@ -170,8 +192,9 @@ impl Backend {
             }
             "load_page" => js(to(self.vault()?.load_page(s("id")?))?),
             "apply" => {
-                let ops: Vec<BlockOp> = serde_json::from_value(args.get("ops").cloned().unwrap_or(Value::Null))
-                    .map_err(|e| e.to_string())?;
+                let ops: Vec<BlockOp> =
+                    serde_json::from_value(args.get("ops").cloned().unwrap_or(Value::Null))
+                        .map_err(|e| e.to_string())?;
                 to(self.vault()?.apply(s("id")?, ops))?;
                 Ok(Value::Null)
             }
@@ -202,12 +225,20 @@ fn js<T: Serialize>(v: T) -> Result<Value, String> {
 /// inline styles and a nested list, all through `vault.apply`.
 fn create_showcase(v: &Vault) -> Result<(), String> {
     use BlockKind::*;
-    let id = v.create_page(None, SHOWCASE_TITLE.to_string()).map_err(String::from)?;
+    let id = v
+        .create_page(None, SHOWCASE_TITLE.to_string())
+        .map_err(String::from)?;
     let mut ops = Vec::new();
     let mut last_top: Option<String> = None;
     let mut n = 0;
     // (kind, text, marks, checked, children)
-    type Spec = (BlockKind, &'static str, Vec<(&'static str, MarkKind)>, bool, Vec<(BlockKind, &'static str, bool)>);
+    type Spec = (
+        BlockKind,
+        &'static str,
+        Vec<(&'static str, MarkKind)>,
+        bool,
+        Vec<(BlockKind, &'static str, bool)>,
+    );
     let link = || MarkKind::Link("https://example.com".to_string());
     let specs: Vec<Spec> = vec![
         (Paragraph, "This page has one block of every kind the prototype supports. Text can be bold, italic, struck through, inline code or a link, and styles can combine.",
@@ -239,13 +270,23 @@ fn create_showcase(v: &Vault) -> Result<(), String> {
             .map(|(sub, kind)| {
                 let at = text.find(sub).expect("showcase mark text");
                 let start = text[..at].chars().count() as u32;
-                Mark { start, end: start + sub.chars().count() as u32, kind }
+                Mark {
+                    start,
+                    end: start + sub.chars().count() as u32,
+                    kind,
+                }
             })
             .collect();
         ops.push(BlockOp::Insert {
             parent: None,
             after: last_top.clone(),
-            block: NewBlock { id: bid.clone(), kind, text: text.to_string(), marks, checked },
+            block: NewBlock {
+                id: bid.clone(),
+                kind,
+                text: text.to_string(),
+                marks,
+                checked,
+            },
         });
         let mut last_child: Option<String> = None;
         for (ck, ct, cc) in children {
@@ -254,7 +295,13 @@ fn create_showcase(v: &Vault) -> Result<(), String> {
             ops.push(BlockOp::Insert {
                 parent: Some(bid.clone()),
                 after: last_child.clone(),
-                block: NewBlock { id: cid.clone(), kind: ck, text: ct.to_string(), marks: vec![], checked: cc },
+                block: NewBlock {
+                    id: cid.clone(),
+                    kind: ck,
+                    text: ct.to_string(),
+                    marks: vec![],
+                    checked: cc,
+                },
             });
             last_child = Some(cid);
         }
@@ -275,7 +322,9 @@ mod android_log {
     pub fn write(line: &str) {
         const INFO: c_int = 4;
         let tag = CString::new("BAKEOFF").unwrap();
-        let Ok(text) = CString::new(line.replace('\0', "")) else { return };
+        let Ok(text) = CString::new(line.replace('\0', "")) else {
+            return;
+        };
         unsafe {
             __android_log_write(INFO, tag.as_ptr(), text.as_ptr());
         }

@@ -1403,16 +1403,30 @@ fn history_versions_load_and_restore() {
 
 #[test]
 fn change_feed_reports_changes_in_sequence() {
-    let document_changes = |batch: &ChangeBatch| batch.changes.iter()
-        .filter(|change| !matches!(change, Change::IndexCommitted { .. }))
-        .cloned().collect::<Vec<_>>();
+    let document_changes = |batch: &ChangeBatch| {
+        batch
+            .changes
+            .iter()
+            .filter(|change| !matches!(change, Change::IndexCommitted { .. }))
+            .cloned()
+            .collect::<Vec<_>>()
+    };
     let committed = |batch: &ChangeBatch, page: &str| {
-        let commits = batch.changes.iter().filter_map(|change| match change {
-            Change::IndexCommitted { generation, pages } => Some((*generation, pages)),
-            _ => None,
-        }).collect::<Vec<_>>();
-        assert!(!commits.is_empty(), "successful index writes publish their commit");
-        assert!(commits.iter().all(|(generation, pages)| *generation > 0 && pages.len() == 1 && pages[0] == page));
+        let commits = batch
+            .changes
+            .iter()
+            .filter_map(|change| match change {
+                Change::IndexCommitted { generation, pages } => Some((*generation, pages)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            !commits.is_empty(),
+            "successful index writes publish their commit"
+        );
+        assert!(commits
+            .iter()
+            .all(|(generation, pages)| *generation > 0 && pages.len() == 1 && pages[0] == page));
         assert!(commits.windows(2).all(|pair| pair[0].0 < pair[1].0));
     };
     let t = TempDir::new("feed");

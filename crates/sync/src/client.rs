@@ -205,7 +205,9 @@ impl Http {
         let url = format!("{}{}", self.url, path);
         let auth = format!("Bearer {}", self.token);
         let compressed = match body {
-            Some(b) if zstd.compress => measure!("client.request.zstd_compress", encoding::compress(b)?),
+            Some(b) if zstd.compress => {
+                measure!("client.request.zstd_compress", encoding::compress(b)?)
+            }
             _ => None,
         };
         let wire: &[u8] = compressed.as_deref().or(body).unwrap_or(&[]);
@@ -213,38 +215,41 @@ impl Http {
         count_bytes!("client.request.raw_bytes", body.map_or(0, |b| b.len()));
         count_bytes!("client.request.wire_bytes", up);
         let generation = self.trust.generation();
-        let resp = measure!("client.http.send", match method {
-            "GET" => self
-                .agent
-                .get(&url)
-                .header("Authorization", &auth)
-                .header(DEVICE_HEADER, &self.device)
-                .call(),
-            m => {
-                let mut rb = if m == "PUT" {
-                    self.agent.put(&url)
-                } else {
-                    self.agent.post(&url)
-                };
-                rb = rb
+        let resp = measure!(
+            "client.http.send",
+            match method {
+                "GET" => self
+                    .agent
+                    .get(&url)
                     .header("Authorization", &auth)
                     .header(DEVICE_HEADER, &self.device)
-                    .header("Content-Type", "application/octet-stream");
-                if zstd.advertise {
-                    rb = rb.header(CAPABILITY_HEADER, ZSTD_CAPABILITY);
+                    .call(),
+                m => {
+                    let mut rb = if m == "PUT" {
+                        self.agent.put(&url)
+                    } else {
+                        self.agent.post(&url)
+                    };
+                    rb = rb
+                        .header("Authorization", &auth)
+                        .header(DEVICE_HEADER, &self.device)
+                        .header("Content-Type", "application/octet-stream");
+                    if zstd.advertise {
+                        rb = rb.header(CAPABILITY_HEADER, ZSTD_CAPABILITY);
+                    }
+                    if purge_device {
+                        rb = rb.header(PURGE_DEVICE_CAPABILITY_HEADER, PURGE_DEVICE_CAPABILITY);
+                    }
+                    if compressed.is_some() {
+                        rb = rb.header("Content-Encoding", "zstd");
+                    }
+                    if let Some(n) = name {
+                        rb = rb.header(NAME_HEADER, pct_encode(n));
+                    }
+                    rb.send(wire)
                 }
-                if purge_device {
-                    rb = rb.header(PURGE_DEVICE_CAPABILITY_HEADER, PURGE_DEVICE_CAPABILITY);
-                }
-                if compressed.is_some() {
-                    rb = rb.header("Content-Encoding", "zstd");
-                }
-                if let Some(n) = name {
-                    rb = rb.header(NAME_HEADER, pct_encode(n));
-                }
-                rb.send(wire)
             }
-        });
+        );
         let mut resp = match resp {
             Ok(r) => r,
             // The handshake met an unpinned certificate with an unknown issuer.
@@ -286,7 +291,10 @@ impl Http {
         let down = raw.len() as u64;
         count_bytes!("client.response.wire_bytes", down);
         let body = if answer.zstd {
-            measure!("client.response.zstd_decompress", encoding::decompress(&raw, MAX_BODY)?)
+            measure!(
+                "client.response.zstd_decompress",
+                encoding::decompress(&raw, MAX_BODY)?
+            )
         } else {
             raw
         };
@@ -494,21 +502,26 @@ impl SyncClient {
                 budget: self.budget,
             };
             let before_restores = v.restore_records();
-            let body = measure!("client.request.encode", if st.purge_v2 {
-                let mut request = req.clone();
-                request.purged.clear();
-                let purged_now: HashSet<_> = v.purged_pages().into_iter().collect();
-                SyncRequestV2 {
-                    request,
-                    purges: v.purge_records(),
-                    restores: before_restores.iter()
-                        .filter(|record| !purged_now.contains(&record.page))
-                        .cloned().collect(),
+            let body = measure!(
+                "client.request.encode",
+                if st.purge_v2 {
+                    let mut request = req.clone();
+                    request.purged.clear();
+                    let purged_now: HashSet<_> = v.purged_pages().into_iter().collect();
+                    SyncRequestV2 {
+                        request,
+                        purges: v.purge_records(),
+                        restores: before_restores
+                            .iter()
+                            .filter(|record| !purged_now.contains(&record.page))
+                            .cloned()
+                            .collect(),
+                    }
+                    .encode_with_device(st.purge_device)
+                } else {
+                    req.encode()
                 }
-                .encode_with_device(st.purge_device)
-            } else {
-                req.encode()
-            });
+            );
             let zstd = Zstd {
                 advertise: true,
                 compress: st.zstd,
@@ -524,12 +537,15 @@ impl SyncClient {
             report.bytes_up += reply.up;
             report.bytes_down += reply.down;
             st.zstd = reply.confirmed;
-            let (mut resp, purge_records, restore_records) = measure!("client.response.decode", if st.purge_v2 {
-                let reply = SyncResponseV2::decode_with_device(&reply.body, st.purge_device)?;
-                (reply.response, reply.purges, reply.restores)
-            } else {
-                (SyncResponse::decode(&reply.body)?, Vec::new(), Vec::new())
-            });
+            let (mut resp, purge_records, restore_records) = measure!(
+                "client.response.decode",
+                if st.purge_v2 {
+                    let reply = SyncResponseV2::decode_with_device(&reply.body, st.purge_device)?;
+                    (reply.response, reply.purges, reply.restores)
+                } else {
+                    (SyncResponse::decode(&reply.body)?, Vec::new(), Vec::new())
+                }
+            );
             if resp.reset {
                 return Ok(false);
             }
@@ -710,8 +726,10 @@ impl SyncClient {
                 .vault
                 .restore_records()
                 .into_iter()
-                .filter(|record| !purged.contains(&record.page)
-                    && updates.iter().any(|(page, _)| page == &record.page))
+                .filter(|record| {
+                    !purged.contains(&record.page)
+                        && updates.iter().any(|(page, _)| page == &record.page)
+                })
                 .collect();
             PushRequestV2 {
                 request: PushRequest { updates },
@@ -726,7 +744,9 @@ impl SyncClient {
             compress,
         };
         // `/push` carries no purge records, so it has no device layout.
-        let r = self.http.call("POST", "/push", Some(&body), None, zstd, false)?;
+        let r = self
+            .http
+            .call("POST", "/push", Some(&body), None, zstd, false)?;
         report.bytes_up += r.up;
         report.bytes_down += r.down;
         PushResponse::decode(&r.body)?;
@@ -757,9 +777,14 @@ impl SyncClient {
         if self.vault.attachment_path(id.to_string()).is_ok() {
             return Ok(());
         }
-        let r = self
-            .http
-            .call("GET", &format!("/blobs/{id}"), None, None, Zstd::default(), false)?;
+        let r = self.http.call(
+            "GET",
+            &format!("/blobs/{id}"),
+            None,
+            None,
+            Zstd::default(),
+            false,
+        )?;
         self.vault
             .store_attachment(id.to_string(), r.name.unwrap_or_default(), r.body)?;
         Ok(())

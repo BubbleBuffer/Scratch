@@ -303,7 +303,8 @@ pub(crate) fn big_page_ops(count: u32, seed: u64) -> Vec<BlockOp> {
                     BlockKind::Heading1,
                     BlockKind::Heading2,
                     BlockKind::Heading3,
-                ][(made / 40 % 3) as usize].clone();
+                ][(made / 40 % 3) as usize]
+                    .clone();
                 (
                     k,
                     format!("Section {} — {}", made / 40 + 1, capitalize(rng.word())),

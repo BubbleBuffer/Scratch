@@ -66,7 +66,10 @@ fn migration_adds_the_search_projection_and_keeps_external_rows() {
         .unwrap();
     v.flush().unwrap();
     let before = keys(&v.search("budget".into(), 50).unwrap());
-    assert_eq!(before, [key("vault", &doc), key(CHAT, "c1")].into_iter().collect());
+    assert_eq!(
+        before,
+        [key("vault", &doc), key(CHAT, "c1")].into_iter().collect()
+    );
     drop(v);
 
     // An index from before the projection: no table and no triggers.
@@ -117,7 +120,9 @@ fn broad_external_titles_fill_the_limit_and_pages_still_match() {
 
     let broad = v.search("budget".into(), 10).unwrap();
     assert_eq!(broad.len(), 10, "the limit is filled by external titles");
-    assert!(broad.iter().all(|h| h.title.to_lowercase().contains("budget")));
+    assert!(broad
+        .iter()
+        .all(|h| h.title.to_lowercase().contains("budget")));
 
     let narrow = keys(&v.search("budget plan".into(), 10).unwrap());
     assert!(narrow.contains(&key("vault", &plan)), "{narrow:?}");
@@ -131,17 +136,32 @@ fn reserved_and_malformed_identities_are_rejected_without_writes() {
     let sources = ["vault".to_string(), String::new(), format!("a{sep}b")];
     for source in sources {
         let upsert = v.upsert_search_row(source.clone(), row("c1", "Budget", CHAT, 1));
-        assert!(matches!(upsert, Err(VaultError::Invalid(_))), "{source:?}: {upsert:?}");
+        assert!(
+            matches!(upsert, Err(VaultError::Invalid(_))),
+            "{source:?}: {upsert:?}"
+        );
         let delete = v.delete_search_row(source.clone(), "c1".into());
-        assert!(matches!(delete, Err(VaultError::Invalid(_))), "{source:?}: {delete:?}");
+        assert!(
+            matches!(delete, Err(VaultError::Invalid(_))),
+            "{source:?}: {delete:?}"
+        );
         let clear = v.clear_search_source(source.clone());
-        assert!(matches!(clear, Err(VaultError::Invalid(_))), "{source:?}: {clear:?}");
+        assert!(
+            matches!(clear, Err(VaultError::Invalid(_))),
+            "{source:?}: {clear:?}"
+        );
     }
     for id in [String::new(), format!("c{sep}1")] {
         let upsert = v.upsert_search_row(CHAT.into(), row(&id, "Budget", CHAT, 1));
-        assert!(matches!(upsert, Err(VaultError::Invalid(_))), "{id:?}: {upsert:?}");
+        assert!(
+            matches!(upsert, Err(VaultError::Invalid(_))),
+            "{id:?}: {upsert:?}"
+        );
         let delete = v.delete_search_row(CHAT.into(), id.clone());
-        assert!(matches!(delete, Err(VaultError::Invalid(_))), "{id:?}: {delete:?}");
+        assert!(
+            matches!(delete, Err(VaultError::Invalid(_))),
+            "{id:?}: {delete:?}"
+        );
     }
 
     page(&v, "Budget plan");
@@ -183,7 +203,9 @@ fn page_only_search_never_returns_external_rows_even_when_they_outnumber_the_lim
     let pages = v.search_pages("budget".into(), 5).unwrap();
     assert_eq!(
         keys(&pages),
-        [key("vault", &plan), key("vault", &board)].into_iter().collect(),
+        [key("vault", &plan), key("vault", &board)]
+            .into_iter()
+            .collect(),
         "{pages:?}"
     );
     let board_hit = pages.iter().find(|h| h.id == board).unwrap();
@@ -198,8 +220,15 @@ fn page_only_search_never_returns_external_rows_even_when_they_outnumber_the_lim
 
     // Filters pass through the same scope: no chat or external document
     // can be a page result, and a page type still selects its pages.
-    assert!(v.search_pages("type:chat budget".into(), 5).unwrap().is_empty());
-    assert!(v.search_pages("type:document budget".into(), 5).unwrap().iter().all(|h| h.source == "vault"));
+    assert!(v
+        .search_pages("type:chat budget".into(), 5)
+        .unwrap()
+        .is_empty());
+    assert!(v
+        .search_pages("type:document budget".into(), 5)
+        .unwrap()
+        .iter()
+        .all(|h| h.source == "vault"));
     let kanban = v.search_pages("type:kanban budget".into(), 5).unwrap();
     assert_eq!(keys(&kanban), [key("vault", &board)].into_iter().collect());
 }
@@ -209,7 +238,8 @@ fn schema_rebuild_preserves_external_rows_and_restores_projection_maintenance() 
     let t = TempVault::new("schema_rebuild");
     let v = t.open();
     let doc = page(&v, "Budget plan");
-    v.upsert_search_row(CHAT.into(), row("c1", "Budget chat", CHAT, 5)).unwrap();
+    v.upsert_search_row(CHAT.into(), row("c1", "Budget chat", CHAT, 5))
+        .unwrap();
     v.flush().unwrap();
     drop(v);
     let conn = rusqlite::Connection::open(t.index()).unwrap();
@@ -221,8 +251,15 @@ fn schema_rebuild_preserves_external_rows_and_restores_projection_maintenance() 
     v.rename_page(doc.clone(), "Renewed plan".into()).unwrap();
     let added = page(&v, "Renewed second plan");
     let hits = v.search("type:document".into(), 50).unwrap();
-    assert!(hits.iter().any(|h| h.id == doc && h.title == "Renewed plan"), "{hits:?}");
-    assert!(hits.iter().any(|h| h.id == added), "new pages enter the rebuilt projection: {hits:?}");
+    assert!(
+        hits.iter()
+            .any(|h| h.id == doc && h.title == "Renewed plan"),
+        "{hits:?}"
+    );
+    assert!(
+        hits.iter().any(|h| h.id == added),
+        "new pages enter the rebuilt projection: {hits:?}"
+    );
     v.delete_search_row(CHAT.into(), "c1".into()).unwrap();
     assert!(!keys(&v.search("budget".into(), 50).unwrap()).contains(&key(CHAT, "c1")));
 }
@@ -231,7 +268,8 @@ fn schema_rebuild_preserves_external_rows_and_restores_projection_maintenance() 
 fn external_title_filters_fold_unicode_like_vault_titles() {
     let t = TempVault::new("unicode");
     let v = t.open();
-    v.upsert_search_row(CHAT.into(), row("c1", "Überprüfung", CHAT, 5)).unwrap();
+    v.upsert_search_row(CHAT.into(), row("c1", "Überprüfung", CHAT, 5))
+        .unwrap();
     let hits = v.search("title:über".into(), 50).unwrap();
     assert_eq!(keys(&hits), [key(CHAT, "c1")].into_iter().collect());
 }

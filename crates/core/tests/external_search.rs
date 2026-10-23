@@ -90,16 +90,29 @@ fn external_rows_carry_source_type_and_opaque_target() {
     let t = TempVault::new();
     let v = t.open();
     let doc = page(&v, "Budget", "quarterly numbers");
-    let mut chat = row("c1", "Chats / Budget / Chapter 1", "summary of the budget talk", CHAT, 1);
+    let mut chat = row(
+        "c1",
+        "Chats / Budget / Chapter 1",
+        "summary of the budget talk",
+        CHAT,
+        1,
+    );
     chat.target = Some(TARGET.into());
     v.upsert_search_row(CHAT.into(), chat).unwrap();
 
     let hits = search(&v, "budget");
-    let ext = hits.iter().find(|h| h.source == CHAT).expect("chat row found");
+    let ext = hits
+        .iter()
+        .find(|h| h.source == CHAT)
+        .expect("chat row found");
     assert_eq!(ext.id, "c1", "the id is the source's local id");
     assert_eq!(ext.title, "Chats / Budget / Chapter 1");
     assert_eq!(ext.page_type, CHAT);
-    assert_eq!(ext.target.as_deref(), Some(TARGET), "target comes back unchanged");
+    assert_eq!(
+        ext.target.as_deref(),
+        Some(TARGET),
+        "target comes back unchanged"
+    );
 
     let vault_hit = hits.iter().find(|h| h.id == doc).expect("page found");
     assert_eq!(vault_hit.source, "vault");
@@ -119,9 +132,15 @@ fn external_rows_survive_reindex_and_reopen() {
         assert!(found(&v, "budget").contains(&key(CHAT, "c1")));
     }
     let v = t.open();
-    assert!(found(&v, "budget").contains(&key(CHAT, "c1")), "after reopen");
+    assert!(
+        found(&v, "budget").contains(&key(CHAT, "c1")),
+        "after reopen"
+    );
     v.reindex().unwrap();
-    assert!(found(&v, "budget").contains(&key(CHAT, "c1")), "after a second reindex");
+    assert!(
+        found(&v, "budget").contains(&key(CHAT, "c1")),
+        "after a second reindex"
+    );
 }
 
 #[test]
@@ -135,8 +154,16 @@ fn external_title_ranks_with_page_titles_ahead_of_body_matches() {
     v.flush().unwrap();
 
     let hits = search(&v, "zebra");
-    assert_eq!(hits.len(), 2, "both the body match and the title match: {hits:?}");
-    assert_eq!(key(&hits[0].source, &hits[0].id), key(CHAT, "c1"), "title match first");
+    assert_eq!(
+        hits.len(),
+        2,
+        "both the body match and the title match: {hits:?}"
+    );
+    assert_eq!(
+        key(&hits[0].source, &hits[0].id),
+        key(CHAT, "c1"),
+        "title match first"
+    );
     assert_eq!(hits[1].source, "vault");
 }
 
@@ -147,7 +174,13 @@ fn external_text_is_corrected_like_page_text() {
     page(&v, "Garden plan", "");
     v.upsert_search_row(
         CHAT.into(),
-        row("c1", "Quarterly review", "migration checklist for the warehouse", CHAT, 1),
+        row(
+            "c1",
+            "Quarterly review",
+            "migration checklist for the warehouse",
+            CHAT,
+            1,
+        ),
     )
     .unwrap();
 
@@ -184,7 +217,8 @@ fn external_rows_update_and_delete_by_source_and_local_id() {
     v.delete_search_row(CHAT.into(), "c1".into()).unwrap();
     assert!(found(&v, "new").is_empty(), "deleted row is gone");
     v.delete_search_row(CHAT.into(), "c1".into()).unwrap();
-    v.delete_search_row(CHAT.into(), "never-existed".into()).unwrap();
+    v.delete_search_row(CHAT.into(), "never-existed".into())
+        .unwrap();
 }
 
 #[test]
@@ -201,9 +235,15 @@ fn clearing_a_source_removes_only_its_rows() {
     let got = found(&v, "budget");
     assert!(!got.contains(&key(CHAT, "c1")), "cleared source is gone");
     assert!(got.contains(&key(NOTES, "n1")), "other source stays");
-    assert!(got.contains(&key("vault", &found_page_id(&v))), "pages stay");
+    assert!(
+        got.contains(&key("vault", &found_page_id(&v))),
+        "pages stay"
+    );
     v.reindex().unwrap();
-    assert!(found(&v, "budget").contains(&key(NOTES, "n1")), "reindex keeps other sources");
+    assert!(
+        found(&v, "budget").contains(&key(NOTES, "n1")),
+        "reindex keeps other sources"
+    );
 }
 
 fn found_page_id(v: &Vault) -> String {
@@ -233,8 +273,15 @@ fn external_rows_are_not_pages() {
     assert!(v.load_page("c1".into()).is_err(), "not loadable as a page");
     assert!(v.rename_page("c1".into(), "Renamed".into()).is_err());
     assert!(v.delete_page("c1".into()).is_err());
-    assert_eq!(v.page_count().unwrap(), pages_before, "page count unchanged");
-    assert!(found(&v, "budget").contains(&key(CHAT, "c1")), "still searchable");
+    assert_eq!(
+        v.page_count().unwrap(),
+        pages_before,
+        "page count unchanged"
+    );
+    assert!(
+        found(&v, "budget").contains(&key(CHAT, "c1")),
+        "still searchable"
+    );
 }
 
 #[test]
@@ -251,7 +298,10 @@ fn an_external_id_equal_to_a_page_id_stays_a_separate_identity() {
 
     v.delete_search_row(CHAT.into(), doc.clone()).unwrap();
     assert!(v.load_page(doc.clone()).is_ok(), "the page is untouched");
-    assert_eq!(found(&v, "shared"), [key("vault", &doc)].into_iter().collect());
+    assert_eq!(
+        found(&v, "shared"),
+        [key("vault", &doc)].into_iter().collect()
+    );
 }
 
 #[test]
@@ -298,14 +348,21 @@ fn type_filter_selects_pages_and_external_rows_by_type() {
         "repeated keys mean all of"
     );
     let not_chat = found(&v, "budget -type:chat");
-    assert!(!not_chat.iter().any(|(s, _)| s == CHAT), "negation: {not_chat:?}");
+    assert!(
+        !not_chat.iter().any(|(s, _)| s == CHAT),
+        "negation: {not_chat:?}"
+    );
     assert!(not_chat.contains(&key(NOTES, "n1")));
     assert_eq!(
         found(&v, "type:chat chat two"),
         [chat_two].into_iter().collect(),
         "text and a type filter together"
     );
-    assert_eq!(found(&v, "type:memo").len(), 1, "any type string is filterable");
+    assert_eq!(
+        found(&v, "type:memo").len(),
+        1,
+        "any type string is filterable"
+    );
 }
 
 #[test]
@@ -362,7 +419,8 @@ fn in_title_resolves_to_the_stored_page_id() {
         .collect();
     assert_eq!(before, expected, "the page subtree, no external row");
 
-    v.rename_page(projects.clone(), "Renamed projects".into()).unwrap();
+    v.rename_page(projects.clone(), "Renamed projects".into())
+        .unwrap();
     let after = keys(&v.search_spec(stored, 100, 0).unwrap().hits);
     assert_eq!(after, expected, "the stored id survives the rename");
 }

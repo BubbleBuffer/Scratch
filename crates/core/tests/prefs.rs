@@ -65,7 +65,10 @@ fn prefs_default_set_and_survive_reopen() {
         cover_position: Some(1001),
         ..PagePrefs::default()
     };
-    assert!(matches!(v.set_page_prefs(id, bad), Err(VaultError::Invalid(_))));
+    assert!(matches!(
+        v.set_page_prefs(id, bad),
+        Err(VaultError::Invalid(_))
+    ));
     assert!(matches!(
         v.set_page_prefs(new_id(), prefs()),
         Err(VaultError::NotFound(_))

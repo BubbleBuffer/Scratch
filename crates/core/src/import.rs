@@ -15,7 +15,7 @@ use crate::doc::PageDoc;
 use crate::error::Result;
 use crate::ids::{new_id, now_ms};
 use crate::index::{fold, Index};
-use crate::markdown::{self, RenderCtx, ROLE_KEY, ROLES, RESERVED_KEYS};
+use crate::markdown::{self, RenderCtx, RESERVED_KEYS, ROLES, ROLE_KEY};
 use crate::mdparse::{parse_blocks, parse_iso, Resolver, Yaml};
 use crate::order;
 use crate::type_data::{fm_type_data, meta_type_data, split_frontmatter, MARKDOWN_KEY};
@@ -1192,7 +1192,9 @@ impl Vault {
         let data_changed = meta_type_data(&meta.type_data) != Value::Object(wanted_data.clone());
         let tree_changed =
             meta.parent.as_deref() != parent || meta.order != key || meta.title != title;
-        let role_changed = role.as_deref().is_some_and(|r| meta.role.as_deref() != Some(r));
+        let role_changed = role
+            .as_deref()
+            .is_some_and(|r| meta.role.as_deref() != Some(r));
         let changed = !ops.is_empty()
             || tree_changed
             || meta.icon != icon

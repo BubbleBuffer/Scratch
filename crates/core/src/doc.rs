@@ -220,7 +220,10 @@ impl PageDoc {
             #[cfg(feature = "storage-metrics")]
             let _b = storage_metrics::span("loro.import_batch");
             #[cfg(feature = "storage-metrics")]
-            storage_metrics::add_bytes("loro.import_batch", updates.iter().map(|b| b.len() as u64).sum());
+            storage_metrics::add_bytes(
+                "loro.import_batch",
+                updates.iter().map(|b| b.len() as u64).sum(),
+            );
             doc.import_batch(updates)?;
         }
         Ok(PageDoc::setup(doc))
@@ -275,8 +278,10 @@ impl PageDoc {
         self.ids_ready = false;
         self.ids.clear();
         self.rev.clear();
-        if matches!(imported, Err(loro::LoroError::ImportUpdatesThatDependsOnOutdatedVersion))
-            && self.cold.is_some()
+        if matches!(
+            imported,
+            Err(loro::LoroError::ImportUpdatesThatDependsOnOutdatedVersion)
+        ) && self.cold.is_some()
         {
             // Rebuild includes any ops already applied by the failed import.
             // Replaying the batch is idempotent by original operation ID.
@@ -418,13 +423,27 @@ impl PageDoc {
     pub(crate) fn needs_cold_export(&self, since: &loro::VersionVector) -> bool {
         let root = if self.doc.is_shallow() {
             Some(self.doc.shallow_since_frontiers())
-        } else { self.cold.as_ref().map(|cold| cold.root.clone()) };
-        root.is_some_and(|root| self.doc.frontiers_to_vv(&root)
-            .is_none_or(|vv| !since.includes_vv(&vv)))
+        } else {
+            self.cold.as_ref().map(|cold| cold.root.clone())
+        };
+        root.is_some_and(|root| {
+            self.doc
+                .frontiers_to_vv(&root)
+                .is_none_or(|vv| !since.includes_vv(&vv))
+        })
     }
 
-    pub(crate) fn retain_cold_root(&mut self, vault: &std::path::Path, page: &str, root: loro::Frontiers) {
-        self.cold = Some(ColdSource { vault: vault.to_owned(), page: page.to_owned(), root });
+    pub(crate) fn retain_cold_root(
+        &mut self,
+        vault: &std::path::Path,
+        page: &str,
+        root: loro::Frontiers,
+    ) {
+        self.cold = Some(ColdSource {
+            vault: vault.to_owned(),
+            page: page.to_owned(),
+            root,
+        });
     }
 
     pub(crate) fn materialize_roots_in(&self, target: &LoroDoc) {
@@ -447,24 +466,38 @@ impl PageDoc {
             let _d = storage_metrics::span("loro.deep_value");
             self.doc.get_deep_value()
         };
-        let LoroValue::Map(roots) = &value else { return value; };
-        LoroValue::Map(roots.iter().filter(|(_, v)| match v {
-            LoroValue::Map(m) => !m.is_empty(),
-            LoroValue::List(l) => !l.is_empty(),
-            LoroValue::String(s) => !s.is_empty(),
-            _ => true,
-        }).map(|(name, v)| (name.clone(), v.clone())).collect())
+        let LoroValue::Map(roots) = &value else {
+            return value;
+        };
+        LoroValue::Map(
+            roots
+                .iter()
+                .filter(|(_, v)| match v {
+                    LoroValue::Map(m) => !m.is_empty(),
+                    LoroValue::List(l) => !l.is_empty(),
+                    LoroValue::String(s) => !s.is_empty(),
+                    _ => true,
+                })
+                .map(|(name, v)| (name.clone(), v.clone()))
+                .collect(),
+        )
     }
 
     fn full_copy(&self) -> Result<PageDoc> {
-        let cold = self.cold.as_ref().ok_or_else(|| invalid("missing cold history"))?;
+        let cold = self
+            .cold
+            .as_ref()
+            .ok_or_else(|| invalid("missing cold history"))?;
         crate::vault::with_cold_read_lock(&cold.vault, || self.full_copy_locked())
     }
 
     fn full_copy_locked(&self) -> Result<PageDoc> {
         #[cfg(feature = "storage-metrics")]
         let _t = storage_metrics::span("full_copy.total");
-        let cold = self.cold.as_ref().ok_or_else(|| invalid("missing cold history"))?;
+        let cold = self
+            .cold
+            .as_ref()
+            .ok_or_else(|| invalid("missing cold history"))?;
         let part = crate::vault::cold::read(&cold.vault, &cold.page)?;
         let hot = {
             #[cfg(feature = "storage-metrics")]
@@ -911,13 +944,13 @@ impl PageDoc {
         }
         // Check the final tree so a replacement can turn a parent into a
         // query before deleting or moving its former children in this batch.
-        check_parents.retain(|id| {
-            sim.exists(id) && sim.kind_of(id) == Some(BlockKind::Query)
-        });
+        check_parents.retain(|id| sim.exists(id) && sim.kind_of(id) == Some(BlockKind::Query));
         if !check_parents.is_empty()
             && self.ids.keys().chain(sim.added.iter()).any(|child| {
                 sim.exists(child)
-                    && sim.parent_of(child).is_some_and(|p| check_parents.contains(&p))
+                    && sim
+                        .parent_of(child)
+                        .is_some_and(|p| check_parents.contains(&p))
             })
         {
             return Err(invalid("a query block cannot have children"));

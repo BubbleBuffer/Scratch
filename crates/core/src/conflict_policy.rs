@@ -73,7 +73,9 @@ pub(crate) fn apply(doc: &PageDoc, enabled: bool, now_ms: i64) -> Result<PolicyE
                 effect.trimmed += 1;
             }
         } else if let Some(expired_undo) = record.applied.iter().rposition(|applied| {
-            applied.undone_at.is_some_and(|undone_at| undone_at <= cutoff)
+            applied
+                .undone_at
+                .is_some_and(|undone_at| undone_at <= cutoff)
         }) {
             // Never reveal a consumed older auto application as the latest
             // application: a later sweep would otherwise dismiss this entry.
@@ -320,7 +322,10 @@ mod tests {
 
             assert_eq!(apply(&doc, enabled, 201).unwrap().resolved, 1);
             let stored = records(&doc).pop().unwrap();
-            assert_eq!(stored.status, ConflictStatus::Resolved(entry.applied[0].clone()));
+            assert_eq!(
+                stored.status,
+                ConflictStatus::Resolved(entry.applied[0].clone())
+            );
             assert_eq!(stored.applied, entry.applied);
         }
     }
@@ -330,31 +335,81 @@ mod tests {
         let doc = page();
         let now = 3 * CONFLICT_LOG_RETENTION_MS;
         let boundary = now - CONFLICT_LOG_RETENTION_MS;
-        let mut expired = record(&doc, "expired-undo", 10, Some("edit-beats-delete"), false, false);
+        let mut expired = record(
+            &doc,
+            "expired-undo",
+            10,
+            Some("edit-beats-delete"),
+            false,
+            false,
+        );
         let mut consumed = expired.applied[0].clone();
         consumed.time_ms = 20;
         consumed.undone_at = Some(boundary);
         expired.applied.push(consumed);
-        let mut fresh = record(&doc, "fresh-undo", 10, Some("edit-beats-delete"), false, false);
+        let mut fresh = record(
+            &doc,
+            "fresh-undo",
+            10,
+            Some("edit-beats-delete"),
+            false,
+            false,
+        );
         fresh.applied[0].undone_at = Some(boundary + 1);
-        let untouched = record(&doc, "awaiting-ok", 10, Some("edit-beats-delete"), false, false);
+        let untouched = record(
+            &doc,
+            "awaiting-ok",
+            10,
+            Some("edit-beats-delete"),
+            false,
+            false,
+        );
         for entry in [&expired, &fresh, &untouched] {
             crate::sync::write_conflict(&doc, entry).unwrap();
         }
 
         assert_eq!(apply(&doc, false, now).unwrap().trimmed, 1);
         let entries = records(&doc);
-        let expired = entries.iter().find(|entry| entry.id == "expired-undo").unwrap();
+        let expired = entries
+            .iter()
+            .find(|entry| entry.id == "expired-undo")
+            .unwrap();
         assert_eq!(expired.status, ConflictStatus::Pending);
         assert!(expired.applied.is_empty());
-        assert_eq!(entries.iter().find(|entry| entry.id == "fresh-undo").unwrap(), &fresh);
-        assert_eq!(entries.iter().find(|entry| entry.id == "awaiting-ok").unwrap(), &untouched);
+        assert_eq!(
+            entries
+                .iter()
+                .find(|entry| entry.id == "fresh-undo")
+                .unwrap(),
+            &fresh
+        );
+        assert_eq!(
+            entries
+                .iter()
+                .find(|entry| entry.id == "awaiting-ok")
+                .unwrap(),
+            &untouched
+        );
 
         // Turning the switch on can dismiss awaiting OK, but neither undo.
         assert_eq!(apply(&doc, true, now).unwrap().resolved, 1);
         let entries = records(&doc);
-        assert_eq!(entries.iter().find(|entry| entry.id == "expired-undo").unwrap().status, ConflictStatus::Pending);
-        assert_eq!(entries.iter().find(|entry| entry.id == "fresh-undo").unwrap().status, ConflictStatus::Pending);
+        assert_eq!(
+            entries
+                .iter()
+                .find(|entry| entry.id == "expired-undo")
+                .unwrap()
+                .status,
+            ConflictStatus::Pending
+        );
+        assert_eq!(
+            entries
+                .iter()
+                .find(|entry| entry.id == "fresh-undo")
+                .unwrap()
+                .status,
+            ConflictStatus::Pending
+        );
     }
 
     #[test]
@@ -384,10 +439,18 @@ mod tests {
             entry.format = format;
             crate::sync::write_conflict(&doc, &entry).unwrap();
             // Simulate a record written before the durable marker existed.
-            doc.doc.get_map("conflict-history").delete("retained").unwrap();
+            doc.doc
+                .get_map("conflict-history")
+                .delete("retained")
+                .unwrap();
             assert!(!crate::sync::has_conflict_history(&doc));
 
-            assert_eq!(apply(&doc, false, CONFLICT_LOG_RETENTION_MS).unwrap().trimmed, 1);
+            assert_eq!(
+                apply(&doc, false, CONFLICT_LOG_RETENTION_MS)
+                    .unwrap()
+                    .trimmed,
+                1
+            );
             assert!(doc.conflicts().is_empty());
             assert!(crate::sync::has_conflict_history(&doc));
             let synced = PageDoc::from_bytes(&doc.snapshot().unwrap(), &[]).unwrap();

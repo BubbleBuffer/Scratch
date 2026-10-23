@@ -64,7 +64,12 @@ pub(crate) fn marks_from(text: &str, marks: Vec<vc::Mark>) -> Vec<BMark> {
                 vc::MarkKind::Color(c) => (BMarkKind::Color, c),
                 vc::MarkKind::Date(d) => (BMarkKind::Date, d),
             };
-            BMark { start: at(m.start), end: at(m.end), kind, url }
+            BMark {
+                start: at(m.start),
+                end: at(m.end),
+                kind,
+                url,
+            }
         })
         .collect()
 }
@@ -99,7 +104,11 @@ pub(crate) fn marks_to(text: &str, marks: &[BMark]) -> Vec<vc::Mark> {
                 BMarkKind::Color => vc::MarkKind::Color(m.url.clone()),
                 BMarkKind::Date => vc::MarkKind::Date(m.url.clone()),
             };
-            Some(vc::Mark { start: s, end: e, kind })
+            Some(vc::Mark {
+                start: s,
+                end: e,
+                kind,
+            })
         })
         .collect()
 }
@@ -275,11 +284,18 @@ pub(crate) fn calendar_category_to(c: CalendarCategory) -> vc::CalendarCategory 
 
 pub(crate) fn calendar_settings_from(s: vc::CalendarSettings) -> CalendarSettings {
     CalendarSettings {
-        calendars: s.calendars.into_iter().map(calendar_category_from).collect(),
+        calendars: s
+            .calendars
+            .into_iter()
+            .map(calendar_category_from)
+            .collect(),
         databases: s
             .databases
             .into_iter()
-            .map(|d| CalendarDatabase { id: d.id, show_in_calendar: d.show_in_calendar })
+            .map(|d| CalendarDatabase {
+                id: d.id,
+                show_in_calendar: d.show_in_calendar,
+            })
             .collect(),
     }
 }
@@ -318,16 +334,39 @@ pub(crate) fn block_op(o: BOp) -> Result<vc::BlockOp, String> {
             }
         }
         OpKind::Delete => vc::BlockOp::Delete { id: o.id },
-        OpKind::Move => vc::BlockOp::Move { id: o.id, parent: o.parent, after: o.after },
+        OpKind::Move => vc::BlockOp::Move {
+            id: o.id,
+            parent: o.parent,
+            after: o.after,
+        },
         OpKind::SetText => {
             let marks = marks_to(&o.text, &o.marks);
-            vc::BlockOp::SetText { id: o.id, text: o.text, marks }
+            vc::BlockOp::SetText {
+                id: o.id,
+                text: o.text,
+                marks,
+            }
         }
-        OpKind::SetKind => vc::BlockOp::SetKind { id: o.id, kind: kind_parse(&o.kind)? },
-        OpKind::SetChecked => vc::BlockOp::SetChecked { id: o.id, checked: o.checked },
-        OpKind::SetTarget => vc::BlockOp::SetTarget { id: o.id, target: o.target },
-        OpKind::SetColor => vc::BlockOp::SetColor { id: o.id, color: o.color },
-        OpKind::SetWidth => vc::BlockOp::SetWidth { id: o.id, width: o.width },
+        OpKind::SetKind => vc::BlockOp::SetKind {
+            id: o.id,
+            kind: kind_parse(&o.kind)?,
+        },
+        OpKind::SetChecked => vc::BlockOp::SetChecked {
+            id: o.id,
+            checked: o.checked,
+        },
+        OpKind::SetTarget => vc::BlockOp::SetTarget {
+            id: o.id,
+            target: o.target,
+        },
+        OpKind::SetColor => vc::BlockOp::SetColor {
+            id: o.id,
+            color: o.color,
+        },
+        OpKind::SetWidth => vc::BlockOp::SetWidth {
+            id: o.id,
+            width: o.width,
+        },
     })
 }
 
@@ -394,19 +433,56 @@ pub(crate) fn value_from(v: vc::PropValue) -> PropValue {
     use vc::PropValue as V;
     match v {
         V::Empty => blank(ValueKind::Empty),
-        V::Text(t) => PropValue { text: t, ..blank(ValueKind::Text) },
-        V::Number(n) => PropValue { number: n, ..blank(ValueKind::Number) },
-        V::Date { start_ms, end_ms, has_time } => {
-            PropValue { start_ms, end_ms, has_time, ..blank(ValueKind::Date) }
-        }
-        V::Checkbox(c) => PropValue { checked: c, ..blank(ValueKind::Checkbox) },
-        V::Select(s) => PropValue { text: s, ..blank(ValueKind::Select) },
-        V::MultiSelect(ids) => PropValue { ids, ..blank(ValueKind::MultiSelect) },
-        V::Status(s) => PropValue { text: s, ..blank(ValueKind::Status) },
-        V::Relation(ids) => PropValue { ids, ..blank(ValueKind::Relation) },
-        V::Url(u) => PropValue { text: u, ..blank(ValueKind::Url) },
-        V::Files(ids) => PropValue { ids, ..blank(ValueKind::Files) },
-        V::Error(e) => PropValue { text: e, ..blank(ValueKind::Error) },
+        V::Text(t) => PropValue {
+            text: t,
+            ..blank(ValueKind::Text)
+        },
+        V::Number(n) => PropValue {
+            number: n,
+            ..blank(ValueKind::Number)
+        },
+        V::Date {
+            start_ms,
+            end_ms,
+            has_time,
+        } => PropValue {
+            start_ms,
+            end_ms,
+            has_time,
+            ..blank(ValueKind::Date)
+        },
+        V::Checkbox(c) => PropValue {
+            checked: c,
+            ..blank(ValueKind::Checkbox)
+        },
+        V::Select(s) => PropValue {
+            text: s,
+            ..blank(ValueKind::Select)
+        },
+        V::MultiSelect(ids) => PropValue {
+            ids,
+            ..blank(ValueKind::MultiSelect)
+        },
+        V::Status(s) => PropValue {
+            text: s,
+            ..blank(ValueKind::Status)
+        },
+        V::Relation(ids) => PropValue {
+            ids,
+            ..blank(ValueKind::Relation)
+        },
+        V::Url(u) => PropValue {
+            text: u,
+            ..blank(ValueKind::Url)
+        },
+        V::Files(ids) => PropValue {
+            ids,
+            ..blank(ValueKind::Files)
+        },
+        V::Error(e) => PropValue {
+            text: e,
+            ..blank(ValueKind::Error)
+        },
     }
 }
 
@@ -416,7 +492,11 @@ pub(crate) fn value_to(v: PropValue) -> vc::PropValue {
         ValueKind::Empty => V::Empty,
         ValueKind::Text => V::Text(v.text),
         ValueKind::Number => V::Number(v.number),
-        ValueKind::Date => V::Date { start_ms: v.start_ms, end_ms: v.end_ms, has_time: v.has_time },
+        ValueKind::Date => V::Date {
+            start_ms: v.start_ms,
+            end_ms: v.end_ms,
+            has_time: v.has_time,
+        },
         ValueKind::Checkbox => V::Checkbox(v.checked),
         ValueKind::Select => V::Select(v.text),
         ValueKind::MultiSelect => V::MultiSelect(v.ids),
@@ -429,7 +509,10 @@ pub(crate) fn value_to(v: PropValue) -> vc::PropValue {
 }
 
 pub(crate) fn property(p: vc::Property) -> Property {
-    Property { key: p.key, value: value_from(p.value) }
+    Property {
+        key: p.key,
+        value: value_from(p.value),
+    }
 }
 
 pub(crate) fn prop_def_from(d: vc::PropDef) -> PropDef {
@@ -440,7 +523,11 @@ pub(crate) fn prop_def_from(d: vc::PropDef) -> PropDef {
         options: d
             .options
             .into_iter()
-            .map(|o| SelectOption { id: o.id, name: o.name, color: o.color })
+            .map(|o| SelectOption {
+                id: o.id,
+                name: o.name,
+                color: o.color,
+            })
             .collect(),
         config: d.config,
     }
@@ -454,7 +541,11 @@ pub(crate) fn prop_def_to(d: PropDef) -> vc::PropDef {
         options: d
             .options
             .into_iter()
-            .map(|o| vc::SelectOption { id: o.id, name: o.name, color: o.color })
+            .map(|o| vc::SelectOption {
+                id: o.id,
+                name: o.name,
+                color: o.color,
+            })
             .collect(),
         config: d.config,
     }
@@ -498,8 +589,24 @@ macro_rules! op_map {
 }
 
 op_map!(
-    Is, IsNot, Contains, NotContains, StartsWith, EndsWith, IsEmpty, IsNotEmpty, Greater,
-    GreaterOrEqual, Less, LessOrEqual, Before, After, OnOrBefore, OnOrAfter, WithinRange, Checked,
+    Is,
+    IsNot,
+    Contains,
+    NotContains,
+    StartsWith,
+    EndsWith,
+    IsEmpty,
+    IsNotEmpty,
+    Greater,
+    GreaterOrEqual,
+    Less,
+    LessOrEqual,
+    Before,
+    After,
+    OnOrBefore,
+    OnOrAfter,
+    WithinRange,
+    Checked,
     Unchecked
 );
 
@@ -518,19 +625,29 @@ pub(crate) fn filter_from(f: vc::Filter) -> Filter {
         vc::Filter::Cond(c) => Filter {
             kind: FilterKind::Cond,
             children: Vec::new(),
-            cond: Some(Condition { prop: c.prop, op: op_from(c.op), value: value_from(c.value) }),
+            cond: Some(Condition {
+                prop: c.prop,
+                op: op_from(c.op),
+                value: value_from(c.value),
+            }),
         },
     }
 }
 
 pub(crate) fn filter_to(f: Filter) -> Result<vc::Filter, String> {
     Ok(match f.kind {
-        FilterKind::And => {
-            vc::Filter::And(f.children.into_iter().map(filter_to).collect::<Result<_, _>>()?)
-        }
-        FilterKind::Or => {
-            vc::Filter::Or(f.children.into_iter().map(filter_to).collect::<Result<_, _>>()?)
-        }
+        FilterKind::And => vc::Filter::And(
+            f.children
+                .into_iter()
+                .map(filter_to)
+                .collect::<Result<_, _>>()?,
+        ),
+        FilterKind::Or => vc::Filter::Or(
+            f.children
+                .into_iter()
+                .map(filter_to)
+                .collect::<Result<_, _>>()?,
+        ),
         FilterKind::Cond => {
             let c = f.cond.ok_or("a Cond filter needs a condition")?;
             vc::Filter::Cond(vc::Condition {
@@ -726,7 +843,12 @@ fn token_kind_from(k: vc::TokenKind) -> TokenKind {
 }
 
 pub(crate) fn sorts_to(s: Vec<SortSpec>) -> Vec<vc::Sort> {
-    s.into_iter().map(|s| vc::Sort { prop: s.prop, descending: s.descending }).collect()
+    s.into_iter()
+        .map(|s| vc::Sort {
+            prop: s.prop,
+            descending: s.descending,
+        })
+        .collect()
 }
 
 pub(crate) fn view_from(v: vc::ViewDef) -> ViewDef {
@@ -738,7 +860,10 @@ pub(crate) fn view_from(v: vc::ViewDef) -> ViewDef {
         sorts: v
             .sorts
             .into_iter()
-            .map(|s| SortSpec { prop: s.prop, descending: s.descending })
+            .map(|s| SortSpec {
+                prop: s.prop,
+                descending: s.descending,
+            })
             .collect(),
         group_by: v.group_by,
         date_prop: v.date_prop,
@@ -764,7 +889,12 @@ pub(crate) fn view_to(v: ViewDef) -> Result<vc::ViewDef, String> {
 }
 
 pub(crate) fn group(g: vc::Group) -> GroupRow {
-    GroupRow { value: value_from(g.value), label: g.label, color: g.color, count: g.count }
+    GroupRow {
+        value: value_from(g.value),
+        label: g.label,
+        color: g.color,
+        count: g.count,
+    }
 }
 
 pub(crate) fn range_entry(e: vc::RangeEntry) -> RangeEntry {
@@ -792,24 +922,44 @@ pub(crate) fn change_batch(b: vc::ChangeBatch) -> ChangeBatch {
                     vc::Change::PageCreated(p) => (ChangeKind::PageCreated, Some(p), None, vec![]),
                     vc::Change::PageDeleted(p) => (ChangeKind::PageDeleted, Some(p), None, vec![]),
                     vc::Change::TreeChanged => (ChangeKind::TreeChanged, None, None, vec![]),
-                    vc::Change::IndexCommitted { generation, pages } =>
-                        (ChangeKind::IndexCommitted, None, Some(generation), pages),
+                    vc::Change::IndexCommitted { generation, pages } => {
+                        (ChangeKind::IndexCommitted, None, Some(generation), pages)
+                    }
                 };
-                Change { kind, page, generation, pages }
+                Change {
+                    kind,
+                    page,
+                    generation,
+                    pages,
+                }
             })
             .collect(),
     }
 }
 
 pub(crate) fn sync_import(s: vc::SyncImport) -> SyncImport {
-    SyncImport { created: s.created, changed: s.changed, conflicts: s.conflicts, skipped: s.skipped }
+    SyncImport {
+        created: s.created,
+        changed: s.changed,
+        conflicts: s.conflicts,
+        skipped: s.skipped,
+    }
 }
 
 pub(crate) fn conflict_scope(scope: vc::ConflictScope) -> ConflictScope {
     match scope {
-        vc::ConflictScope::Block { block } => ConflictScope { kind: ConflictScopeKind::Block, block: Some(block) },
-        vc::ConflictScope::Subtree { root } => ConflictScope { kind: ConflictScopeKind::Subtree, block: Some(root) },
-        vc::ConflictScope::Page => ConflictScope { kind: ConflictScopeKind::Page, block: None },
+        vc::ConflictScope::Block { block } => ConflictScope {
+            kind: ConflictScopeKind::Block,
+            block: Some(block),
+        },
+        vc::ConflictScope::Subtree { root } => ConflictScope {
+            kind: ConflictScopeKind::Subtree,
+            block: Some(root),
+        },
+        vc::ConflictScope::Page => ConflictScope {
+            kind: ConflictScopeKind::Page,
+            block: None,
+        },
     }
 }
 
@@ -822,9 +972,16 @@ pub(crate) fn conflict_state(state: vc::SideState) -> ConflictSideState {
         }
         vc::SideState::Deleted => (ConflictStateKind::Deleted, None, None),
         vc::SideState::Trashed { at } => (ConflictStateKind::Trashed, Some(at), None),
-        vc::SideState::Purged { tombstone_version } => (ConflictStateKind::Purged, None, Some(tombstone_version)),
+        vc::SideState::Purged { tombstone_version } => {
+            (ConflictStateKind::Purged, None, Some(tombstone_version))
+        }
     };
-    ConflictSideState { kind, content, trashed_ms, tombstone_version }
+    ConflictSideState {
+        kind,
+        content,
+        trashed_ms,
+        tombstone_version,
+    }
 }
 
 fn applied_resolution(applied: vc::AppliedResolution) -> AppliedResolution {
@@ -834,18 +991,34 @@ fn applied_resolution(applied: vc::AppliedResolution) -> AppliedResolution {
     };
     let before_state = applied.before_state.map(|state| match state {
         vc::BeforeState::Trashed { at } => ConflictBeforeState {
-            kind: ConflictStateKind::Trashed, trashed_ms: Some(at), tombstone_version: None,
+            kind: ConflictStateKind::Trashed,
+            trashed_ms: Some(at),
+            tombstone_version: None,
         },
         vc::BeforeState::Purged { tombstone_version } => ConflictBeforeState {
-            kind: ConflictStateKind::Purged, trashed_ms: None, tombstone_version: Some(tombstone_version),
+            kind: ConflictStateKind::Purged,
+            trashed_ms: None,
+            tombstone_version: Some(tombstone_version),
         },
     });
     AppliedResolution {
-        time_ms: applied.time_ms, undone_at: applied.undone_at, by, rule, before: applied.before, before_state,
-        fallback: applied.fallback, restored_ancestors: applied.restored_ancestors,
+        time_ms: applied.time_ms,
+        undone_at: applied.undone_at,
+        by,
+        rule,
+        before: applied.before,
+        before_state,
+        fallback: applied.fallback,
+        restored_ancestors: applied.restored_ancestors,
         resolution: applied.resolution.map(|choice| match choice {
-            vc::ConflictResolution::Keep => Resolution { kind: ResolutionKind::Keep, side: 0 },
-            vc::ConflictResolution::UseSide(side) => Resolution { kind: ResolutionKind::UseSide, side },
+            vc::ConflictResolution::Keep => Resolution {
+                kind: ResolutionKind::Keep,
+                side: 0,
+            },
+            vc::ConflictResolution::UseSide(side) => Resolution {
+                kind: ResolutionKind::UseSide,
+                side,
+            },
         }),
     }
 }
@@ -871,14 +1044,21 @@ pub(crate) fn conflict(c: vc::Conflict, device: &str) -> Conflict {
             .into_iter()
             .map(|s| {
                 let state = conflict_state(s.state);
-                let block = if block_scope { state.content.first().cloned() } else { None };
+                let block = if block_scope {
+                    state.content.first().cloned()
+                } else {
+                    None
+                };
                 ConflictSide {
                     local: s.device == device,
                     device: s.device,
                     time_ms: s.time_ms,
                     frontiers: s.frontiers,
                     state,
-                    anchor: s.anchor.map(|a| ConflictAnchor { parent: a.parent, previous: a.previous }),
+                    anchor: s.anchor.map(|a| ConflictAnchor {
+                        parent: a.parent,
+                        previous: a.previous,
+                    }),
                     block,
                 }
             })
@@ -907,11 +1087,19 @@ fn flatten_diff(blocks: Vec<vc::ConflictDiffBlock>, depth: u32, out: &mut Vec<Co
         let offsets = utf16_offsets(&b.block.text);
         let last = *offsets.last().unwrap_or(&0);
         let at = |i: u32| offsets.get(i as usize).copied().unwrap_or(last);
-        let spans = b.spans.into_iter().map(|span| ConflictDiffSpan {
-            start: at(span.start), end: at(span.end), change: diff_change(span.change),
-        }).collect();
+        let spans = b
+            .spans
+            .into_iter()
+            .map(|span| ConflictDiffSpan {
+                start: at(span.start),
+                end: at(span.end),
+                change: diff_change(span.change),
+            })
+            .collect();
         out.push(ConflictDiffBlock {
-            block: flat_block(b.block, depth).0, change: diff_change(b.change), spans,
+            block: flat_block(b.block, depth).0,
+            change: diff_change(b.change),
+            spans,
         });
         flatten_diff(b.children, depth + 1, out);
     }
@@ -920,11 +1108,20 @@ fn flatten_diff(blocks: Vec<vc::ConflictDiffBlock>, depth: u32, out: &mut Vec<Co
 pub(crate) fn conflict_diff(diff: vc::ConflictDiff) -> ConflictDiff {
     ConflictDiff {
         scope: conflict_scope(diff.scope),
-        sides: diff.sides.into_iter().map(|side| {
-            let mut blocks = Vec::new();
-            flatten_diff(side.blocks, 0, &mut blocks);
-            ConflictDiffSide { device: side.device, local: side.local, state: conflict_state(side.state), blocks }
-        }).collect(),
+        sides: diff
+            .sides
+            .into_iter()
+            .map(|side| {
+                let mut blocks = Vec::new();
+                flatten_diff(side.blocks, 0, &mut blocks);
+                ConflictDiffSide {
+                    device: side.device,
+                    local: side.local,
+                    state: conflict_state(side.state),
+                    blocks,
+                }
+            })
+            .collect(),
     }
 }
 
@@ -959,36 +1156,80 @@ mod tests {
 
     fn conflict_block(id: &str, text: &str, children: Vec<vc::Block>) -> vc::Block {
         vc::Block {
-            id: id.into(), kind: vc::BlockKind::Paragraph, text: text.into(), marks: vec![],
-            checked: false, target: None, color: None, width: None, children,
+            id: id.into(),
+            kind: vc::BlockKind::Paragraph,
+            text: text.into(),
+            marks: vec![],
+            checked: false,
+            target: None,
+            color: None,
+            width: None,
+            children,
         }
     }
 
     #[test]
     fn conflict_bridge_preserves_scoped_tree_versions_and_resolution_history() {
         let applied = vc::AppliedResolution {
-            time_ms: 20, by: vc::ResolutionBy::Auto { rule: "delete_edit".into() },
+            time_ms: 20,
+            by: vc::ResolutionBy::Auto {
+                rule: "delete_edit".into(),
+            },
             resolution: Some(vc::ConflictResolution::UseSide(0)),
             undone_at: None,
             before: vec![],
-            before_state: Some(vc::BeforeState::Purged { tombstone_version: vec![9, 8] }),
-            fallback: true, restored_ancestors: vec!["parent".into()],
+            before_state: Some(vc::BeforeState::Purged {
+                tombstone_version: vec![9, 8],
+            }),
+            fallback: true,
+            restored_ancestors: vec!["parent".into()],
         };
         let core = vc::Conflict {
-            id: "record".into(), format: 2, page: "page".into(), block: "root".into(), time_ms: 10,
-            scope: vc::ConflictScope::Subtree { root: "root".into() },
+            id: "record".into(),
+            format: 2,
+            page: "page".into(),
+            block: "root".into(),
+            time_ms: 10,
+            scope: vc::ConflictScope::Subtree {
+                root: "root".into(),
+            },
             sides: vec![
-                vc::ConflictSide::new("here".into(), 11, Some(vec![1, 2]),
-                    vc::SideState::Present { content: vec![conflict_block("root", "root", vec![
-                        conflict_block("child", "child", vec![conflict_block("leaf", "leaf", vec![])])
-                    ])] },
-                    Some(vc::Anchor { parent: Some("parent".into()), previous: Some("previous".into()) })),
-                vc::ConflictSide::new("there".into(), 12, Some(vec![3]), vc::SideState::Deleted, None),
+                vc::ConflictSide::new(
+                    "here".into(),
+                    11,
+                    Some(vec![1, 2]),
+                    vc::SideState::Present {
+                        content: vec![conflict_block(
+                            "root",
+                            "root",
+                            vec![conflict_block(
+                                "child",
+                                "child",
+                                vec![conflict_block("leaf", "leaf", vec![])],
+                            )],
+                        )],
+                    },
+                    Some(vc::Anchor {
+                        parent: Some("parent".into()),
+                        previous: Some("previous".into()),
+                    }),
+                ),
+                vc::ConflictSide::new(
+                    "there".into(),
+                    12,
+                    Some(vec![3]),
+                    vc::SideState::Deleted,
+                    None,
+                ),
             ],
-            status: vc::ConflictStatus::Resolved(applied.clone()), applied: vec![applied],
+            status: vc::ConflictStatus::Resolved(applied.clone()),
+            applied: vec![applied],
         };
         let bridge = conflict(core, "here");
-        assert_eq!((&bridge.id[..], bridge.format, bridge.scope.kind), ("record", 2, ConflictScopeKind::Subtree));
+        assert_eq!(
+            (&bridge.id[..], bridge.format, bridge.scope.kind),
+            ("record", 2, ConflictScopeKind::Subtree)
+        );
         assert_eq!(bridge.status, ConflictStatus::Resolved);
         assert!(bridge.undoable);
         let side = &bridge.sides[0];
@@ -996,16 +1237,31 @@ mod tests {
         assert!(!bridge.sides[1].local);
         assert_eq!(side.time_ms, 11);
         assert_eq!(side.frontiers.as_deref(), Some(&[1, 2][..]));
-        assert_eq!(side.state.content.iter().map(|b| (&b.id[..], b.depth)).collect::<Vec<_>>(),
-            vec![("root", 0), ("child", 1), ("leaf", 2)]);
-        assert!(side.block.is_none(), "legacy block overlay must not hide a subtree's children");
-        assert_eq!(side.anchor.as_ref().unwrap().previous.as_deref(), Some("previous"));
+        assert_eq!(
+            side.state
+                .content
+                .iter()
+                .map(|b| (&b.id[..], b.depth))
+                .collect::<Vec<_>>(),
+            vec![("root", 0), ("child", 1), ("leaf", 2)]
+        );
+        assert!(
+            side.block.is_none(),
+            "legacy block overlay must not hide a subtree's children"
+        );
+        assert_eq!(
+            side.anchor.as_ref().unwrap().previous.as_deref(),
+            Some("previous")
+        );
         assert_eq!(bridge.sides[1].state.kind, ConflictStateKind::Deleted);
         let applied = &bridge.applied[0];
         assert_eq!(applied.undone_at, None);
         assert_eq!(applied.by, ResolutionBy::Auto);
         assert_eq!(applied.rule.as_deref(), Some("delete_edit"));
-        assert_eq!(applied.resolution.as_ref().unwrap().kind, ResolutionKind::UseSide);
+        assert_eq!(
+            applied.resolution.as_ref().unwrap().kind,
+            ResolutionKind::UseSide
+        );
         assert_eq!(applied.resolution.as_ref().unwrap().side, 0);
         assert!(applied.fallback);
         assert_eq!(applied.restored_ancestors, vec!["parent"]);
@@ -1017,18 +1273,36 @@ mod tests {
     #[test]
     fn conflict_bridge_preserves_undone_history_on_a_reopened_entry() {
         let applied = vc::AppliedResolution {
-            time_ms: 20, undone_at: Some(30), by: vc::ResolutionBy::User,
+            time_ms: 20,
+            undone_at: Some(30),
+            by: vc::ResolutionBy::User,
             resolution: None,
-            before: vec![1], before_state: None,
-            fallback: false, restored_ancestors: vec![],
+            before: vec![1],
+            before_state: None,
+            fallback: false,
+            restored_ancestors: vec![],
         };
-        let bridge = conflict(vc::Conflict {
-            id: "record".into(), format: 2, page: "page".into(), block: "block".into(), time_ms: 10,
-            scope: vc::ConflictScope::Block { block: "block".into() },
-            sides: vec![], status: vc::ConflictStatus::Pending, applied: vec![applied],
-        }, "here");
+        let bridge = conflict(
+            vc::Conflict {
+                id: "record".into(),
+                format: 2,
+                page: "page".into(),
+                block: "block".into(),
+                time_ms: 10,
+                scope: vc::ConflictScope::Block {
+                    block: "block".into(),
+                },
+                sides: vec![],
+                status: vc::ConflictStatus::Pending,
+                applied: vec![applied],
+            },
+            "here",
+        );
         assert_eq!(bridge.status, ConflictStatus::Pending);
-        assert!(!bridge.undoable, "an already consumed application cannot be undone again");
+        assert!(
+            !bridge.undoable,
+            "an already consumed application cannot be undone again"
+        );
         assert_eq!(bridge.applied[0].undone_at, Some(30));
         assert_eq!(bridge.applied[0].before, vec![1]);
         assert!(bridge.applied[0].resolution.is_none());
@@ -1037,18 +1311,37 @@ mod tests {
     #[test]
     fn conflict_bridge_keeps_legacy_block_display_and_trash_purge_states() {
         let core = vc::Conflict {
-            id: "block".into(), format: 1, page: "page".into(), block: "block".into(), time_ms: 0,
-            scope: vc::ConflictScope::Block { block: "block".into() },
-            sides: vec![vc::ConflictSide::new("here".into(), 0, None,
-                vc::SideState::Present { content: vec![conflict_block("block", "old", vec![])] }, None)],
-            status: vc::ConflictStatus::Pending, applied: vec![],
+            id: "block".into(),
+            format: 1,
+            page: "page".into(),
+            block: "block".into(),
+            time_ms: 0,
+            scope: vc::ConflictScope::Block {
+                block: "block".into(),
+            },
+            sides: vec![vc::ConflictSide::new(
+                "here".into(),
+                0,
+                None,
+                vc::SideState::Present {
+                    content: vec![conflict_block("block", "old", vec![])],
+                },
+                None,
+            )],
+            status: vc::ConflictStatus::Pending,
+            applied: vec![],
         };
         let bridge = conflict(core, "here");
         assert!(!bridge.undoable);
         assert_eq!(bridge.sides[0].block.as_ref().unwrap().text, "old");
         let trash = conflict_state(vc::SideState::Trashed { at: 123 });
-        assert_eq!((trash.kind, trash.trashed_ms), (ConflictStateKind::Trashed, Some(123)));
-        let purge = conflict_state(vc::SideState::Purged { tombstone_version: vec![7] });
+        assert_eq!(
+            (trash.kind, trash.trashed_ms),
+            (ConflictStateKind::Trashed, Some(123))
+        );
+        let purge = conflict_state(vc::SideState::Purged {
+            tombstone_version: vec![7],
+        });
         assert_eq!(purge.kind, ConflictStateKind::Purged);
         assert_eq!(purge.tombstone_version, Some(vec![7]));
     }
@@ -1056,18 +1349,40 @@ mod tests {
     #[test]
     fn conflict_diff_bridge_preserves_hierarchy_and_converts_unicode_spans_to_utf16() {
         let mut out = vec![];
-        flatten_diff(vec![vc::ConflictDiffBlock {
-            block: conflict_block("root", "a😀b", vec![]), change: vc::ConflictDiffChange::Modified,
-            spans: vec![vc::ConflictDiffSpan { start: 1, end: 2, change: vc::ConflictDiffChange::Added }],
-            children: vec![vc::ConflictDiffBlock {
-                block: conflict_block("child", "child", vec![]), change: vc::ConflictDiffChange::Removed,
-                spans: vec![], children: vec![],
+        flatten_diff(
+            vec![vc::ConflictDiffBlock {
+                block: conflict_block("root", "a😀b", vec![]),
+                change: vc::ConflictDiffChange::Modified,
+                spans: vec![vc::ConflictDiffSpan {
+                    start: 1,
+                    end: 2,
+                    change: vc::ConflictDiffChange::Added,
+                }],
+                children: vec![vc::ConflictDiffBlock {
+                    block: conflict_block("child", "child", vec![]),
+                    change: vc::ConflictDiffChange::Removed,
+                    spans: vec![],
+                    children: vec![],
+                }],
             }],
-        }], 0, &mut out);
-        assert_eq!(out.iter().map(|b| (&b.block.id[..], b.block.depth)).collect::<Vec<_>>(),
-            vec![("root", 0), ("child", 1)]);
+            0,
+            &mut out,
+        );
+        assert_eq!(
+            out.iter()
+                .map(|b| (&b.block.id[..], b.block.depth))
+                .collect::<Vec<_>>(),
+            vec![("root", 0), ("child", 1)]
+        );
         assert_eq!(out[0].change, ConflictDiffChange::Modified);
-        assert_eq!(out[0].spans, vec![ConflictDiffSpan { start: 1, end: 3, change: ConflictDiffChange::Added }]);
+        assert_eq!(
+            out[0].spans,
+            vec![ConflictDiffSpan {
+                start: 1,
+                end: 3,
+                change: ConflictDiffChange::Added
+            }]
+        );
         assert_eq!(out[1].change, ConflictDiffChange::Removed);
     }
 
@@ -1117,7 +1432,11 @@ mod tests {
     #[test]
     fn marks_round_trip_through_utf16() {
         let text = "a😀b bold";
-        let vc_marks = vec![vc::Mark { start: 2, end: 3, kind: vc::MarkKind::Bold }];
+        let vc_marks = vec![vc::Mark {
+            start: 2,
+            end: 3,
+            kind: vc::MarkKind::Bold,
+        }];
         let b = marks_from(text, vc_marks.clone());
         assert_eq!((b[0].start, b[0].end), (3, 4));
         assert_eq!(marks_to(text, &b), vc_marks);
@@ -1151,7 +1470,10 @@ mod tests {
                 show_in_calendar: true,
                 show_in_today: false,
             }],
-            databases: vec![vc::CalendarDatabase { id: "db-1".into(), show_in_calendar: false }],
+            databases: vec![vc::CalendarDatabase {
+                id: "db-1".into(),
+                show_in_calendar: false,
+            }],
         };
         let bridge = calendar_settings_from(core);
         assert_eq!(
@@ -1166,9 +1488,15 @@ mod tests {
         );
         assert_eq!(
             bridge.databases,
-            vec![CalendarDatabase { id: "db-1".into(), show_in_calendar: false }]
+            vec![CalendarDatabase {
+                id: "db-1".into(),
+                show_in_calendar: false
+            }]
         );
-        assert_eq!(calendar_category_to(bridge.calendars[0].clone()).name, "Work");
+        assert_eq!(
+            calendar_category_to(bridge.calendars[0].clone()).name,
+            "Work"
+        );
     }
 
     #[test]

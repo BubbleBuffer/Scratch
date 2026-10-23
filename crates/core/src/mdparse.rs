@@ -883,7 +883,8 @@ impl Parser<'_, '_> {
                 let l = self.lines[self.i];
                 self.i += 1;
                 let closing = strip_indent(l, usize::MAX);
-                let close_run = closing.bytes()
+                let close_run = closing
+                    .bytes()
                     .take_while(|&c| c == f.as_bytes()[0])
                     .count();
                 if closing.starts_with(f)
@@ -894,7 +895,11 @@ impl Parser<'_, '_> {
                 }
                 text.push(strip_indent(l, ind).trim_end_matches('\r'));
             }
-            let kind = if query { BlockKind::Query } else { BlockKind::Code };
+            let kind = if query {
+                BlockKind::Query
+            } else {
+                BlockKind::Code
+            };
             let mut b = PBlock::new(kind, &text.join("\n"));
             b.literal = true;
             b.target = (!query && !info.is_empty()).then(|| info.to_string());
@@ -1614,7 +1619,9 @@ fn inline_tag(chars: &[char], i: usize) -> Option<(MarkKind, usize, usize, usize
                 end += close.len();
             } else if starts_at(chars, end, "<span")
                 && close.as_slice() == ['<', '/', 's', 'p', 'a', 'n', '>']
-                && chars.get(end + 5).is_some_and(|c| c.is_whitespace() || *c == '>')
+                && chars
+                    .get(end + 5)
+                    .is_some_and(|c| c.is_whitespace() || *c == '>')
             {
                 depth += 1;
                 end += 5;
@@ -1638,7 +1645,8 @@ fn inline_tag(chars: &[char], i: usize) -> Option<(MarkKind, usize, usize, usize
     }
     if let Some((v, a, b, n)) = valued("<span data-query=\"", "</span>") {
         // Decode ampersands last, keeping literal entity-looking query text.
-        let spec = v.replace("&quot;", "\"")
+        let spec = v
+            .replace("&quot;", "\"")
             .replace("&lt;", "<")
             .replace("&gt;", ">")
             .replace("&#10;", "\n")

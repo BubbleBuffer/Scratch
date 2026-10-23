@@ -73,19 +73,32 @@ fn open_route_bounces_vault_ids_without_a_token() {
     let r = get(&hub, &format!("/open/{PAGE}"));
     assert_eq!(r.status, 200);
     assert_eq!(r.content_type, "text/html; charset=utf-8");
-    assert!(r.headers.contains(&("Cache-Control".into(), "no-store".into())));
+    assert!(r
+        .headers
+        .contains(&("Cache-Control".into(), "no-store".into())));
     let body = String::from_utf8(r.body).unwrap();
     assert!(body.contains("<title>Opening in Scratch</title>"), "{body}");
-    assert!(body.contains(&format!("location.replace(\"notes://page/{PAGE}\")")), "{body}");
-    assert!(body.contains(&format!("content=\"0; url=notes://page/{PAGE}\"")), "{body}");
-    assert!(body.contains(&format!("href=\"notes://page/{PAGE}\">Open in Scratch</a>")), "{body}");
+    assert!(
+        body.contains(&format!("location.replace(\"notes://page/{PAGE}\")")),
+        "{body}"
+    );
+    assert!(
+        body.contains(&format!("content=\"0; url=notes://page/{PAGE}\"")),
+        "{body}"
+    );
+    assert!(
+        body.contains(&format!("href=\"notes://page/{PAGE}\">Open in Scratch</a>")),
+        "{body}"
+    );
 
     // A block: the target carries it.
     let r = get(&hub, &format!("/open/{PAGE}?block={BLOCK}"));
     assert_eq!(r.status, 200);
     let body = String::from_utf8(r.body).unwrap();
     assert!(
-        body.contains(&format!("location.replace(\"notes://page/{PAGE}?block={BLOCK}\")")),
+        body.contains(&format!(
+            "location.replace(\"notes://page/{PAGE}?block={BLOCK}\")"
+        )),
         "{body}"
     );
 
@@ -108,7 +121,11 @@ fn open_route_is_served_over_http() {
     let addr = server.addr();
     let raw = |target: &str| -> String {
         let mut s = TcpStream::connect(addr).unwrap();
-        write!(s, "GET {target} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n").unwrap();
+        write!(
+            s,
+            "GET {target} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+        )
+        .unwrap();
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         out
@@ -116,8 +133,15 @@ fn open_route_is_served_over_http() {
 
     let ok = raw(&format!("/open/{PAGE}?block={BLOCK}"));
     assert!(ok.starts_with("HTTP/1.1 200"), "{ok}");
-    assert!(ok.to_ascii_lowercase().contains("content-type: text/html; charset=utf-8"), "{ok}");
-    assert!(ok.contains(&format!("notes://page/{PAGE}?block={BLOCK}")), "{ok}");
+    assert!(
+        ok.to_ascii_lowercase()
+            .contains("content-type: text/html; charset=utf-8"),
+        "{ok}"
+    );
+    assert!(
+        ok.contains(&format!("notes://page/{PAGE}?block={BLOCK}")),
+        "{ok}"
+    );
 
     let bad = raw(&format!("/open/{PAGE}?block=x"));
     assert!(bad.starts_with("HTTP/1.1 400"), "{bad}");

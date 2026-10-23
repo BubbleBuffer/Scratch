@@ -7,9 +7,7 @@
 use std::path::PathBuf;
 use std::slice::Iter;
 
-use notes_hub::agent_tokens::{
-    AgentScope, AgentTokens, DEFAULT_EXPIRY_DAYS, EXPIRY_CHOICES_DAYS,
-};
+use notes_hub::agent_tokens::{AgentScope, AgentTokens, DEFAULT_EXPIRY_DAYS, EXPIRY_CHOICES_DAYS};
 use notes_hub::{open_hub, Config};
 
 const USAGE: &str = "usage:

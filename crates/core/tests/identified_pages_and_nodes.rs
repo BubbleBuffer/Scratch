@@ -64,7 +64,10 @@ fn texts(page: &Page) -> Vec<&str> {
 /// Removes the stored document and log files of one page, to make its
 /// template unreadable while the index still lists it.
 fn forget_page_files(t: &TempVault, id: &str) {
-    for dir in [t.0.join(".vault").join("docs"), t.0.join(".vault").join("logs")] {
+    for dir in [
+        t.0.join(".vault").join("docs"),
+        t.0.join(".vault").join("logs"),
+    ] {
         for entry in fs::read_dir(&dir).unwrap() {
             let entry = entry.unwrap();
             if entry.file_name().to_string_lossy().contains(id) {
@@ -173,12 +176,7 @@ fn unreadable_template_is_an_error_and_creates_nothing() {
 
     let v = t.open();
     assert!(v
-        .create_page_from_identified(
-            id.clone(),
-            parent.clone(),
-            "Week 42".into(),
-            Some(template),
-        )
+        .create_page_from_identified(id.clone(), parent.clone(), "Week 42".into(), Some(template),)
         .is_err());
     assert!(v.load_page(id.clone()).is_err());
     assert!(v
@@ -219,12 +217,7 @@ fn repeated_identified_call_returns_false_and_changes_nothing() {
     let children = v.list_children(Some(parent.clone()), 0, 100).unwrap().len();
     for (title, with_template) in [("Other title", None), ("Third", Some(template))] {
         let (got, created) = v
-            .create_page_from_identified(
-                id.clone(),
-                parent.clone(),
-                title.into(),
-                with_template,
-            )
+            .create_page_from_identified(id.clone(), parent.clone(), title.into(), with_template)
             .unwrap();
         assert_eq!((got.as_str(), created), (id.as_str(), false));
     }
@@ -342,12 +335,18 @@ fn node_records_are_deterministic_under_the_hidden_nodes_page() {
         .iter()
         .all(|p| p.id != id && p.id != nodes));
     let listed = v.list_children(Some(nodes.clone()), 0, 100).unwrap();
-    assert!(listed.iter().any(|p| p.id == id), "record lists under Nodes");
+    assert!(
+        listed.iter().any(|p| p.id == id),
+        "record lists under Nodes"
+    );
     assert_eq!(v.page_count().unwrap(), visible + 1);
     v.flush().unwrap();
 
     let hits = v.search("Hub".into(), 10).unwrap();
-    assert!(hits.iter().any(|h| h.title == "Hub notes"), "control page is found");
+    assert!(
+        hits.iter().any(|h| h.title == "Hub notes"),
+        "control page is found"
+    );
     assert!(hits.iter().any(|h| h.id == id), "record is found by search");
     assert!(v
         .search("Nodes".into(), 10)
@@ -357,7 +356,10 @@ fn node_records_are_deterministic_under_the_hidden_nodes_page() {
 
     // The runner picker queries node records by type.
     let typed = v.search("type:node".into(), 10).unwrap();
-    assert!(typed.iter().any(|h| h.id == id), "type:node finds the record");
+    assert!(
+        typed.iter().any(|h| h.id == id),
+        "type:node finds the record"
+    );
     assert!(typed.iter().all(|h| h.id != nodes));
 
     // A rewrite updates the same page: the title, the fields that changed, and
@@ -366,20 +368,18 @@ fn node_records_are_deterministic_under_the_hidden_nodes_page() {
         "device_id": device, "name": "Hub renamed", "kind": "hub", "available": false,
     })
     .to_string();
-    assert_eq!(v.write_node_record(device.into(), renamed.clone()).unwrap(), id);
+    assert_eq!(
+        v.write_node_record(device.into(), renamed.clone()).unwrap(),
+        id
+    );
     assert_eq!(v.load_page(id.clone()).unwrap().title, "Hub renamed");
     let data: Value = serde_json::from_str(&v.type_data_all(id.clone()).unwrap()).unwrap();
     assert_eq!(data["node"]["available"], json!(false));
     assert!(data["node"].get("tools").is_none());
 
     // Add-on data on the record that the scheduler does not own is kept.
-    v.type_data_set(
-        id.clone(),
-        "probe".into(),
-        vec!["k".into()],
-        "1".into(),
-    )
-    .unwrap();
+    v.type_data_set(id.clone(), "probe".into(), vec!["k".into()], "1".into())
+        .unwrap();
     assert_eq!(v.write_node_record(device.into(), renamed).unwrap(), id);
     let data: Value = serde_json::from_str(&v.type_data_all(id.clone()).unwrap()).unwrap();
     assert_eq!(data["probe"]["k"], json!(1));
@@ -392,9 +392,14 @@ fn node_records_are_deterministic_under_the_hidden_nodes_page() {
             json!({"device_id": device, "name": "x"}).to_string(),
         )
         .is_err());
-    assert!(v
-        .write_node_record(device.into(), json!({"device": device, "name": "x"}).to_string())
-        .is_err(), "the field is device_id, not device");
+    assert!(
+        v.write_node_record(
+            device.into(),
+            json!({"device": device, "name": "x"}).to_string()
+        )
+        .is_err(),
+        "the field is device_id, not device"
+    );
     assert!(v
         .write_node_record(device.into(), json!({"device_id": device}).to_string())
         .is_err());
@@ -411,7 +416,10 @@ fn deleted_node_record_is_written_again_and_a_purged_one_is_refused() {
     let id = v.write_node_record(device.into(), json.clone()).unwrap();
 
     v.delete_page(id.clone()).unwrap();
-    assert_eq!(v.write_node_record(device.into(), json.clone()).unwrap(), id);
+    assert_eq!(
+        v.write_node_record(device.into(), json.clone()).unwrap(),
+        id
+    );
     assert!(!v.load_page(id.clone()).unwrap().in_trash);
 
     v.delete_page(id.clone()).unwrap();
@@ -424,7 +432,10 @@ fn schedule_and_node_ids_are_stable_and_separate() {
     let a = schedule_occurrence_id("schedule-1", UTC);
     assert_eq!(a.len(), 26);
     assert_eq!(a, schedule_occurrence_id("schedule-1", UTC));
-    assert_ne!(a, schedule_occurrence_id("schedule-1", "2026-10-26T08:00:00Z"));
+    assert_ne!(
+        a,
+        schedule_occurrence_id("schedule-1", "2026-10-26T08:00:00Z")
+    );
     assert_ne!(a, schedule_occurrence_id("schedule-2", UTC));
 
     let n = node_record_id("schedule-1");

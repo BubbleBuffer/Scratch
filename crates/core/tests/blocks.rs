@@ -69,7 +69,11 @@ fn build(v: &Vault) -> PageId {
         vec![
             ins(None, None, nb("t", BlockKind::Toggle, "Details")),
             ins(Some("t"), None, nb("t1", BlockKind::Paragraph, "hidden")),
-            ins(None, Some("t"), nb("h", BlockKind::ToggleHeading2, "Section")),
+            ins(
+                None,
+                Some("t"),
+                nb("h", BlockKind::ToggleHeading2, "Section"),
+            ),
             ins(Some("h"), None, nb("h1", BlockKind::Bulleted, "inside")),
             ins(None, Some("h"), nb("c", BlockKind::Callout, "Note this")),
             BlockOp::SetTarget {
@@ -98,13 +102,17 @@ fn build(v: &Vault) -> PageId {
 }
 
 /// (id, kind, text, target, color, depth) of one block.
-type Shape = (String, BlockKind, String, Option<String>, Option<String>, usize);
+type Shape = (
+    String,
+    BlockKind,
+    String,
+    Option<String>,
+    Option<String>,
+    usize,
+);
 
 fn shape(b: &[Block]) -> Vec<Shape> {
-    fn walk(
-        b: &[Block],
-        out: &mut Vec<Shape>,
-    ) {
+    fn walk(b: &[Block], out: &mut Vec<Shape>) {
         for x in b {
             out.push((
                 x.id.clone(),
@@ -246,7 +254,10 @@ fn markdown_round_trips_new_kinds() {
     assert_eq!(page.blocks[0].color.as_deref(), Some("gray"));
     assert_eq!(page.blocks[0].children[0].text, "child");
     assert_eq!(page.blocks[1].target.as_deref(), Some("⚠️"));
-    assert_eq!(page.blocks[3].text, "A <!-- comment --> stays <!-- as text -->");
+    assert_eq!(
+        page.blocks[3].text,
+        "A <!-- comment --> stays <!-- as text -->"
+    );
 }
 
 #[test]

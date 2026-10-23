@@ -269,11 +269,7 @@ pub async fn start_with(
         hosts: hosts::Hosts::new(),
         scheduler,
         schedule_runner: std::sync::Mutex::new(schedule_runner),
-        jobs: jobs::Jobs::new(
-            hub_vault,
-            config.job_limits.clone(),
-            config.agent.enabled,
-        ),
+        jobs: jobs::Jobs::new(hub_vault, config.job_limits.clone(), config.agent.enabled),
         web,
     });
     tokio::spawn(jobs::run_worker(state.clone()));

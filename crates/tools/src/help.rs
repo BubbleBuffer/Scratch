@@ -139,9 +139,8 @@ pub(crate) fn notes_help(a: &Value) -> Result<String> {
 }
 
 fn contents() -> String {
-    let mut out = String::from(
-        "# Scratch notes help\n\nCall notes_help with one of these topics:\n\n",
-    );
+    let mut out =
+        String::from("# Scratch notes help\n\nCall notes_help with one of these topics:\n\n");
     for t in TOPICS {
         out.push_str(&format!("- `{}`: {}\n", t.id, t.summary));
     }
@@ -150,7 +149,9 @@ fn contents() -> String {
 
 /// `name(required, optional?)` and the description of every listed tool.
 fn tool_list() -> String {
-    let mut out = String::from("# Tools\n\nGenerated from the tool registry. Arguments marked ? are optional.\n");
+    let mut out = String::from(
+        "# Tools\n\nGenerated from the tool registry. Arguments marked ? are optional.\n",
+    );
     for t in crate::definitions() {
         let schema = t.input_schema();
         let required: Vec<&str> = schema["required"]
@@ -252,7 +253,9 @@ mod tests {
             if let Some(start) = text.find(&open) {
                 assert!(found.is_none(), "section {name} appears twice ({id})");
                 let rest = &text[start + open.len()..];
-                let end = rest.find("<!-- /check -->").unwrap_or_else(|| panic!("section {name} in {id} is not closed"));
+                let end = rest
+                    .find("<!-- /check -->")
+                    .unwrap_or_else(|| panic!("section {name} in {id} is not closed"));
                 let items: BTreeSet<String> = rest[..end]
                     .lines()
                     .filter_map(|l| l.trim().strip_prefix("- `"))
@@ -268,26 +271,41 @@ mod tests {
     fn assert_same(doc: BTreeSet<String>, code: BTreeSet<String>, what: &str) {
         let missing: Vec<_> = code.difference(&doc).collect();
         let unknown: Vec<_> = doc.difference(&code).collect();
-        assert!(missing.is_empty(), "{what} missing from docs/notes: {missing:?}");
-        assert!(unknown.is_empty(), "docs/notes name {what} that do not exist: {unknown:?}");
+        assert!(
+            missing.is_empty(),
+            "{what} missing from docs/notes: {missing:?}"
+        );
+        assert!(
+            unknown.is_empty(),
+            "docs/notes name {what} that do not exist: {unknown:?}"
+        );
     }
 
     #[test]
     fn block_types_match_the_core() {
-        let code = BlockKind::BUILTINS.iter().map(|k| k.as_str().to_string()).collect();
+        let code = BlockKind::BUILTINS
+            .iter()
+            .map(|k| k.as_str().to_string())
+            .collect();
         assert_same(section("block-types"), code, "block types");
     }
 
     #[test]
     fn property_types_match_the_core() {
-        let code: BTreeSet<String> = PROP_KINDS.iter().map(|k| prop_type_id(*k).to_string()).collect();
+        let code: BTreeSet<String> = PROP_KINDS
+            .iter()
+            .map(|k| prop_type_id(*k).to_string())
+            .collect();
         assert_eq!(code.len(), PROP_KINDS.len(), "duplicate property type id");
         assert_same(section("property-types"), code, "property types");
     }
 
     #[test]
     fn system_roles_match_the_core() {
-        let code = vault_core::PAGE_ROLES.iter().map(|r| r.to_string()).collect();
+        let code = vault_core::PAGE_ROLES
+            .iter()
+            .map(|r| r.to_string())
+            .collect();
         assert_same(section("system-roles"), code, "system roles");
     }
 
@@ -302,7 +320,9 @@ mod tests {
                 parts.len() > 1
                     && w.starts_with(|c: char| c.is_ascii_lowercase())
                     && parts.iter().all(|p| {
-                        !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+                        !p.is_empty()
+                            && p.chars()
+                                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
                     })
             })
             .map(String::from)
@@ -326,21 +346,45 @@ mod tests {
 
     /// Snake_case words the docs may use that are not tools or arguments.
     const OTHER_WORDS: &[&str] = &[
-        "chat_ref", "multi_select", "created_time", "updated_time", "is_template",
-        "is_not", "not_contains", "starts_with", "ends_with", "is_empty", "is_not_empty",
-        "on_or_before", "on_or_after", "link_to_page", "page_id", "set_body", "set_props",
+        "chat_ref",
+        "multi_select",
+        "created_time",
+        "updated_time",
+        "is_template",
+        "is_not",
+        "not_contains",
+        "starts_with",
+        "ends_with",
+        "is_empty",
+        "is_not_empty",
+        "on_or_before",
+        "on_or_after",
+        "link_to_page",
+        "page_id",
+        "set_body",
+        "set_props",
         // Agenda output/source names and the app's completion-view API.
-        "page_title", "task_note", "done_since",
+        "page_title",
+        "task_note",
+        "done_since",
         // The hub setting that sets the base of page links (docs/notes/links.md).
         "public_url",
         // Hub settings for Android App Links (docs/notes/links.md).
-        "android_package", "android_sha256_certs",
+        "android_package",
+        "android_sha256_certs",
     ];
 
     #[test]
     fn every_tool_is_documented_and_docs_name_only_real_tools() {
-        let listed: BTreeSet<String> = crate::definitions().iter().map(|t| t.name.to_string()).collect();
-        let all_docs: String = docs().iter().map(|(_, t)| *t).collect::<Vec<_>>().join("\n");
+        let listed: BTreeSet<String> = crate::definitions()
+            .iter()
+            .map(|t| t.name.to_string())
+            .collect();
+        let all_docs: String = docs()
+            .iter()
+            .map(|(_, t)| *t)
+            .collect::<Vec<_>>()
+            .join("\n");
         let words = snake_words(&all_docs);
         let ticked: BTreeSet<&str> = all_docs
             .split('`')
@@ -348,11 +392,25 @@ mod tests {
             .step_by(2)
             .map(|w| w.trim_end_matches("()").trim_end_matches('?'))
             .collect();
-        let missing: Vec<_> = listed.iter().filter(|n| !ticked.contains(n.as_str())).collect();
-        assert!(missing.is_empty(), "tools missing from docs/notes: {missing:?}");
+        let missing: Vec<_> = listed
+            .iter()
+            .filter(|n| !ticked.contains(n.as_str()))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "tools missing from docs/notes: {missing:?}"
+        );
 
-        let old: Vec<_> = crate::aliases().iter().map(|a| a.name).chain(crate::hidden().iter().map(|t| t.name)).filter(|n| words.contains(*n)).collect();
-        assert!(old.is_empty(), "docs/notes name old or unlisted tools: {old:?}");
+        let old: Vec<_> = crate::aliases()
+            .iter()
+            .map(|a| a.name)
+            .chain(crate::hidden().iter().map(|t| t.name))
+            .filter(|n| words.contains(*n))
+            .collect();
+        assert!(
+            old.is_empty(),
+            "docs/notes name old or unlisted tools: {old:?}"
+        );
 
         let mut known = listed.clone();
         for t in crate::definitions() {
@@ -375,7 +433,10 @@ mod tests {
         for t in crate::definitions() {
             assert!(text.contains(&format!("## {}(", t.name)), "{}", t.name);
         }
-        assert!(text.contains("## edit_page(page, ") && text.contains("op?"), "{text}");
+        assert!(
+            text.contains("## edit_page(page, ") && text.contains("op?"),
+            "{text}"
+        );
         for a in crate::aliases() {
             assert!(!text.contains(&format!("## {}(", a.name)), "{}", a.name);
         }
@@ -398,18 +459,29 @@ mod tests {
     }
 
     /// Repo files that carry the generated operator table.
-    const OPERATOR_DOCS: &[&str] = &["docs/notes/search.md", "wiki/architecture/search-queries.md"];
+    const OPERATOR_DOCS: &[&str] = &[
+        "docs/notes/search.md",
+        "wiki/architecture/search-queries.md",
+    ];
     const OPEN: &str = "<!-- generated: operators -->";
     const CLOSE: &str = "<!-- /generated -->";
 
     fn repo_file(rel: &str) -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(rel)
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(rel)
     }
 
     /// The text between the generated-section markers, and its byte range.
     fn generated(text: &str, rel: &str) -> (usize, usize) {
-        let start = text.find(OPEN).unwrap_or_else(|| panic!("{rel} has no {OPEN} marker")) + OPEN.len();
-        let end = start + text[start..].find(CLOSE).unwrap_or_else(|| panic!("{rel}: {OPEN} is not closed"));
+        let start = text
+            .find(OPEN)
+            .unwrap_or_else(|| panic!("{rel} has no {OPEN} marker"))
+            + OPEN.len();
+        let end = start
+            + text[start..]
+                .find(CLOSE)
+                .unwrap_or_else(|| panic!("{rel}: {OPEN} is not closed"));
         (start, end)
     }
 
@@ -431,7 +503,9 @@ mod tests {
                 std::fs::write(&path, fresh).unwrap();
                 continue;
             }
-            panic!("{rel}: the generated operator table is stale; rerun with UPDATE_GENERATED_DOCS=1");
+            panic!(
+                "{rel}: the generated operator table is stale; rerun with UPDATE_GENERATED_DOCS=1"
+            );
         }
     }
 
@@ -445,18 +519,29 @@ mod tests {
         for word in text.split('`').skip(1).step_by(2) {
             for part in word.split_whitespace() {
                 let part = part.trim_start_matches('-');
-                let Some((key, _)) = part.split_once(':') else { continue };
+                let Some((key, _)) = part.split_once(':') else {
+                    continue;
+                };
                 if key.is_empty() || !key.chars().all(|c| c.is_ascii_lowercase()) {
                     continue;
                 }
-                if vault_core::search_ops::keyed_operator(key).is_none() && !NOT_OPERATORS.contains(&key) {
+                if vault_core::search_ops::keyed_operator(key).is_none()
+                    && !NOT_OPERATORS.contains(&key)
+                {
                     unknown.push(part.to_string());
                 }
             }
         }
-        assert!(unknown.is_empty(), "docs/notes/search.md names unknown operators: {unknown:?}");
+        assert!(
+            unknown.is_empty(),
+            "docs/notes/search.md names unknown operators: {unknown:?}"
+        );
         for op in vault_core::search_ops::OPERATORS {
-            assert!(text.contains(&format!("`{}", op.name)), "operator {} is not in docs/notes/search.md", op.name);
+            assert!(
+                text.contains(&format!("`{}", op.name)),
+                "operator {} is not in docs/notes/search.md",
+                op.name
+            );
         }
     }
 
@@ -464,7 +549,11 @@ mod tests {
     fn search_description_is_short_and_points_to_the_reference() {
         let d = crate::get("search_notes").unwrap().description;
         println!("search_notes description: {} bytes", d.len());
-        assert!(d.len() < 2500, "search_notes description is {} bytes", d.len());
+        assert!(
+            d.len() < 2500,
+            "search_notes description is {} bytes",
+            d.len()
+        );
         assert!(d.contains("notes_help topic query"), "{d}");
         for op in vault_core::search_ops::OPERATORS {
             assert!(d.contains(op.name), "description lacks {}", op.name);

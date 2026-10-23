@@ -390,7 +390,11 @@ pub(crate) async fn ws(
     };
     if !matches!(marked, Ok(Ok(()))) {
         tracing::warn!("host socket: could not mark the device as a host");
-        return (StatusCode::INTERNAL_SERVER_ERROR, "could not register the host").into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "could not register the host",
+        )
+            .into_response();
     }
     upgrade.on_upgrade(move |socket| async move {
         let (out_tx, out_rx) = mpsc::unbounded_channel::<String>();
@@ -414,7 +418,8 @@ async fn serve(
     let (mut tx, mut rx) = socket.split();
     let close = conn.close.clone();
     let writer = async {
-        let mut ping = tokio::time::interval_at(tokio::time::Instant::now() + PING_EVERY, PING_EVERY);
+        let mut ping =
+            tokio::time::interval_at(tokio::time::Instant::now() + PING_EVERY, PING_EVERY);
         loop {
             let frame = tokio::select! {
                 biased;

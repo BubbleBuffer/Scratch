@@ -1220,17 +1220,27 @@ async fn jobs_commands_reach_the_hubs_jobs_tool() {
     let listed: serde_json::Value = serde_json::from_str(listed.trim()).unwrap_or_default();
     assert_eq!(listed["jobs"], serde_json::json!([]), "{listed}");
     let missing = env
-        .cli_at(&["jobs", "wait", "nope", "--timeout-ms", "0"], None, &env.data.0)
+        .cli_at(
+            &["jobs", "wait", "nope", "--timeout-ms", "0"],
+            None,
+            &env.data.0,
+        )
         .await
         .unwrap_err();
-    assert!(format!("{missing:#}").contains("no such job"), "{missing:#}");
+    assert!(
+        format!("{missing:#}").contains("no such job"),
+        "{missing:#}"
+    );
     for bad in [
         vec!["jobs"],
         vec!["jobs", "get"],
         vec!["jobs", "create", "x", "--tools", "all"],
         vec!["jobs", "list", "--tools", "read"],
     ] {
-        assert!(env.cli_at(&bad, None, &env.data.0).await.is_err(), "{bad:?}");
+        assert!(
+            env.cli_at(&bad, None, &env.data.0).await.is_err(),
+            "{bad:?}"
+        );
     }
     env.server.stop().await;
 }

@@ -246,7 +246,8 @@ impl SearchSpec {
                 parts.push(format!("{prefix}undated"));
                 continue;
             }
-            let status_alias = op.key == "status" && op.filter.as_ref().is_some_and(status_has_alias);
+            let status_alias =
+                op.key == "status" && op.filter.as_ref().is_some_and(status_has_alias);
             let key = if op.property && !status_alias {
                 format!("\"{}\"", escape(&op.key))
             } else {
@@ -273,7 +274,6 @@ impl SearchSpec {
 }
 
 // ------------------------------------------------------------------ parser
-
 
 /// Named periods that `bounds` knows. Each is a whole local period.
 const NAMED_DATES: [&str; 8] = [
@@ -410,9 +410,9 @@ impl<'a, Z: TimeZone> Parser<'a, Z> {
         let unshadowed = |key: &str| find_prop(properties, key).is_none();
         self.has_is = keys.iter().any(|k| k == "is" && unshadowed(k));
         self.item_mode = self.has_is
-            || keys.iter().any(|k| {
-                matches!(k.as_str(), "done" | "assignee" | "calendar") && unshadowed(k)
-            });
+            || keys
+                .iter()
+                .any(|k| matches!(k.as_str(), "done" | "assignee" | "calendar") && unshadowed(k));
         for (start, end) in words {
             self.word(query, start, end);
         }
@@ -504,8 +504,10 @@ impl<'a, Z: TimeZone> Parser<'a, Z> {
         if let Some(problem) = quoting_problem(value, matches!(target, Target::Builtin("in"))) {
             return self.fail(at, format!("{key}: {problem}"));
         }
-        let built = if !quoted_key && norm_key == "status"
-            && find_prop(&ctx.properties, "status").is_some_and(is_task_status_catalog) {
+        let built = if !quoted_key
+            && norm_key == "status"
+            && find_prop(&ctx.properties, "status").is_some_and(is_task_status_catalog)
+        {
             self.status_op(value)
         } else {
             match target {
@@ -526,9 +528,12 @@ impl<'a, Z: TimeZone> Parser<'a, Z> {
         let mut single_value = None;
         let mut future = false;
         let mut first_error = None;
-        for def in self.ctx.properties.iter().filter(|def| {
-            normalize(&def.key) == "status" || normalize(&def.name) == "status"
-        }) {
+        for def in self
+            .ctx
+            .properties
+            .iter()
+            .filter(|def| normalize(&def.key) == "status" || normalize(&def.name) == "status")
+        {
             match self.property_op(def, value) {
                 Ok(built) => {
                     if let Some(filter) = built.filter {
@@ -537,7 +542,9 @@ impl<'a, Z: TimeZone> Parser<'a, Z> {
                         future |= built.future;
                     }
                 }
-                Err(error) => { first_error.get_or_insert(error); }
+                Err(error) => {
+                    first_error.get_or_insert(error);
+                }
             }
         }
         if filters.is_empty() {
@@ -548,7 +555,8 @@ impl<'a, Z: TimeZone> Parser<'a, Z> {
         } else {
             encode_alternatives(&alternatives(value))
         };
-        let empty = matches!(alternatives(value).as_slice(), [only] if only.eq_ignore_ascii_case("none"));
+        let empty =
+            matches!(alternatives(value).as_slice(), [only] if only.eq_ignore_ascii_case("none"));
         let filter = if empty && filters.len() > 1 {
             // A shared field is empty only when every alias is absent.
             Filter::And(filters)
@@ -857,17 +865,33 @@ impl<'a, Z: TimeZone> Parser<'a, Z> {
         // unrelated numeric/date/etc. schema must not turn those literals
         // into ignored error tokens; its other values keep their own parser.
         if key == "status"
-            && !matches!(def.kind, PropKind::Text | PropKind::Email | PropKind::Phone
-                | PropKind::Url | PropKind::Select | PropKind::Status)
-            && texts.iter().any(|text| matches!(text.to_ascii_lowercase().as_str(), "todo" | "doing" | "done"))
+            && !matches!(
+                def.kind,
+                PropKind::Text
+                    | PropKind::Email
+                    | PropKind::Phone
+                    | PropKind::Url
+                    | PropKind::Select
+                    | PropKind::Status
+            )
+            && texts.iter().any(|text| {
+                matches!(
+                    text.to_ascii_lowercase().as_str(),
+                    "todo" | "doing" | "done"
+                )
+            })
         {
             let (filter, future) = self.combine_alts(&texts, |parser, text| {
                 let state = text.to_ascii_lowercase();
                 if matches!(state.as_str(), "todo" | "doing" | "done") {
                     Ok((cond(key, FilterOp::Is, PropValue::Status(state)), false))
                 } else {
-                    let ordinary = parser.property_op(def, &encode_alternatives(&[text.to_owned()]))?;
-                    Ok((ordinary.filter.expect("property operator has a filter"), ordinary.future))
+                    let ordinary =
+                        parser.property_op(def, &encode_alternatives(&[text.to_owned()]))?;
+                    Ok((
+                        ordinary.filter.expect("property operator has a filter"),
+                        ordinary.future,
+                    ))
                 }
             })?;
             return Ok(Built::filtered(key, canonical, filter, true, future));
@@ -1157,9 +1181,14 @@ impl<'a, Z: TimeZone> Parser<'a, Z> {
         let mut first_id = None;
         for (i, raw) in crate::search_path::split_raw(value, ',').iter().enumerate() {
             let text = alternatives(raw).pop().unwrap_or_default();
-            let exact = self.ctx.pages.iter().any(|p| p.id == text || p.title.eq_ignore_ascii_case(&text));
+            let exact = self
+                .ctx
+                .pages
+                .iter()
+                .any(|p| p.id == text || p.title.eq_ignore_ascii_case(&text));
             if !exact && crate::search_path::is_pattern(raw) {
-                let parsed = crate::search_path::parse(raw, |t| self.resolve_page(t), memory_root());
+                let parsed =
+                    crate::search_path::parse(raw, |t| self.resolve_page(t), memory_root());
                 match parsed {
                     Ok(pattern) => {
                         parts.push(pattern.canonical());

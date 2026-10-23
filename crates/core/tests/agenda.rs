@@ -1499,14 +1499,7 @@ fn foreground_properties_and_pending_writer_keep_agenda_in_sync() {
                 let state = ["todo", "doing", "done"][(round + i) % 3];
                 v.set_property(p.clone(), "status".into(), PropValue::Status(state.into()))
                     .unwrap();
-                date(
-                    v,
-                    p,
-                    "date",
-                    DAY + (round % 2) as i64 * DAY_MS,
-                    None,
-                    false,
-                );
+                date(v, p, "date", DAY + (round % 2) as i64 * DAY_MS, None, false);
             }
             done.recv().unwrap().unwrap();
         }
@@ -1723,9 +1716,7 @@ fn stale_dated_todo_completion_rejects_removed_date_but_tool_source_can_complete
     )
     .unwrap();
 
-    assert!(v
-        .set_agenda_done(stale.page, stale.block, true)
-        .is_err());
+    assert!(v.set_agenda_done(stale.page, stale.block, true).is_err());
     assert!(!v.load_page(page.clone()).unwrap().blocks[0].checked);
     assert!(all(&v).is_empty());
 
@@ -1743,7 +1734,11 @@ fn legacy_task_note_mutations_require_dates_and_keep_database_row_precedence() {
     let t = TempVault::new();
     let v = t.open();
     let note = v.create_page(None, "Task note".into()).unwrap();
-    task_fields(&v, &note, serde_json::json!({"date":"2026-10-06", "status":"doing"}));
+    task_fields(
+        &v,
+        &note,
+        serde_json::json!({"date":"2026-10-06", "status":"doing"}),
+    );
     assert_eq!(item(&v, &note, None).start_ms, DAY);
     task_fields(&v, &note, serde_json::json!({"date":null}));
     assert!(v.set_agenda_done(note.clone(), None, true).is_err());
@@ -1767,7 +1762,10 @@ fn legacy_task_note_mutations_require_dates_and_keep_database_row_precedence() {
     v.set_agenda_done(page.clone(), None, true).unwrap();
     v.reschedule_agenda(page.clone(), None, DAY + DAY_MS, false)
         .unwrap();
-    assert_eq!(property(&v, &page, "status"), PropValue::Status("done".into()));
+    assert_eq!(
+        property(&v, &page, "status"),
+        PropValue::Status("done".into())
+    );
     assert_eq!(
         property(&v, &page, "date"),
         PropValue::Date {
@@ -2007,9 +2005,15 @@ fn tool_agenda_is_read_only_and_keeps_calendar_source_and_today_eligibility() {
     assert_eq!(v.find_by_role("calendars".into()).unwrap(), None);
     assert_eq!(v.page_count().unwrap(), 0);
 
-    let hidden = v.create_calendar("Hidden".into(), "sky".into(), false, false).unwrap();
+    let hidden = v
+        .create_calendar("Hidden".into(), "sky".into(), false, false)
+        .unwrap();
     let note = v.create_page(None, "Hidden dated task".into()).unwrap();
-    task_fields(&v, &note, serde_json::json!({"date":"2026-10-06", "calendar":hidden}));
+    task_fields(
+        &v,
+        &note,
+        serde_json::json!({"date":"2026-10-06", "calendar":hidden}),
+    );
     let db = tasks(&v);
     let row_page = row(&v, &db, "Off row", DAY);
     settings(&v, &db, AgendaRole::Off, None);
@@ -2023,17 +2027,37 @@ fn tool_agenda_is_read_only_and_keeps_calendar_source_and_today_eligibility() {
     v.flush().unwrap();
 
     let entries = v.query_agenda().unwrap();
-    assert!(entries.iter().all(|entry| entry.item.page != template && entry.item.page != trashed));
-    assert!(!entries.iter().any(|entry| entry.item.page == daily && entry.source == "row"));
-    assert!(entries.iter().any(|entry| entry.item.page == daily && entry.source == "todo"));
-    let hidden_note = entries.iter().find(|entry| entry.item.page == note).unwrap();
+    assert!(entries
+        .iter()
+        .all(|entry| entry.item.page != template && entry.item.page != trashed));
+    assert!(!entries
+        .iter()
+        .any(|entry| entry.item.page == daily && entry.source == "row"));
+    assert!(entries
+        .iter()
+        .any(|entry| entry.item.page == daily && entry.source == "todo"));
+    let hidden_note = entries
+        .iter()
+        .find(|entry| entry.item.page == note)
+        .unwrap();
     assert_eq!(hidden_note.calendar_name.as_deref(), Some("Hidden"));
     assert!(hidden_note.today_eligible);
-    assert!(!entries.iter().find(|entry| entry.item.page == row_page).unwrap().today_eligible);
+    assert!(
+        !entries
+            .iter()
+            .find(|entry| entry.item.page == row_page)
+            .unwrap()
+            .today_eligible
+    );
     // System settings are not task notes, including in the derived cache.
     let system = v.find_by_role("calendars".into()).unwrap().unwrap();
     assert!(!entries.iter().any(|entry| entry.item.page == system));
-    assert_eq!(t.sql(&format!("SELECT count(*) FROM agenda a JOIN pages p ON p.rowid=a.page WHERE p.id='{system}'"))[0][0], Value::Integer(0));
+    assert_eq!(
+        t.sql(&format!(
+            "SELECT count(*) FROM agenda a JOIN pages p ON p.rowid=a.page WHERE p.id='{system}'"
+        ))[0][0],
+        Value::Integer(0)
+    );
 }
 
 #[test]
@@ -2043,15 +2067,22 @@ fn bare_task_pages_are_undated_notes_without_persisting_default_metadata() {
     let cleared;
     {
         let v = t.open();
-        bare = v.create_page_with_type(None, "Bare task".into(), Some("task".into())).unwrap();
-        cleared = v.create_page_with_type(None, "Cleared task".into(), Some("task".into())).unwrap();
+        bare = v
+            .create_page_with_type(None, "Bare task".into(), Some("task".into()))
+            .unwrap();
+        cleared = v
+            .create_page_with_type(None, "Cleared task".into(), Some("task".into()))
+            .unwrap();
         task_fields(&v, &cleared, serde_json::json!({"status":"doing"}));
-        v.type_data_delete(cleared.clone(), "tasks".into(), vec!["status".into()]).unwrap();
+        v.type_data_delete(cleared.clone(), "tasks".into(), vec!["status".into()])
+            .unwrap();
         let ordinary = v.create_page(None, "Empty document".into()).unwrap();
         v.flush().unwrap();
         let entries = v.query_agenda().unwrap();
         for page in [&bare, &cleared] {
-            let entry = entries.iter().find(|entry| &entry.item.page == page)
+            let entry = entries
+                .iter()
+                .find(|entry| &entry.item.page == page)
                 .unwrap_or_else(|| panic!("missing task note for {page}"));
             assert_eq!(entry.source, "task_note");
             assert_eq!(entry.date_ms, None);
@@ -2062,21 +2093,35 @@ fn bare_task_pages_are_undated_notes_without_persisting_default_metadata() {
         }
         assert!(!entries.iter().any(|entry| entry.item.page == ordinary));
         assert!(all(&v).is_empty());
-        assert!(v.calendar_items(0, DAY + DAY_MS, 0, DAY + DAY_MS).unwrap().is_empty());
-        assert!(v.overdue(DAY + DAY_MS, DAY + DAY_MS, 100).unwrap().is_empty());
-        assert!(v.done_since(DAY + DAY_MS, DAY + DAY_MS, 0, 100).unwrap().is_empty());
+        assert!(v
+            .calendar_items(0, DAY + DAY_MS, 0, DAY + DAY_MS)
+            .unwrap()
+            .is_empty());
+        assert!(v
+            .overdue(DAY + DAY_MS, DAY + DAY_MS, 100)
+            .unwrap()
+            .is_empty());
+        assert!(v
+            .done_since(DAY + DAY_MS, DAY + DAY_MS, 0, 100)
+            .unwrap()
+            .is_empty());
         v.reindex().unwrap();
         assert_eq!(v.query_agenda().unwrap().len(), 2);
         v.flush().unwrap();
     }
     let v = t.open();
     assert_eq!(v.query_agenda().unwrap().len(), 2);
-    v.set_agenda_source_done(bare.clone(), None, "task_note".into(), true).unwrap();
-    v.reschedule_agenda_source(bare.clone(), None, "task_note".into(), DAY, false).unwrap();
+    v.set_agenda_source_done(bare.clone(), None, "task_note".into(), true)
+        .unwrap();
+    v.reschedule_agenda_source(bare.clone(), None, "task_note".into(), DAY, false)
+        .unwrap();
     v.set_page_type(cleared.clone(), "document".into()).unwrap();
     v.flush().unwrap();
     let entries = v.query_agenda().unwrap();
-    let bare_entry = entries.iter().find(|entry| entry.item.page == bare).unwrap();
+    let bare_entry = entries
+        .iter()
+        .find(|entry| entry.item.page == bare)
+        .unwrap();
     assert!(bare_entry.item.done);
     assert_eq!(bare_entry.date_ms, Some(DAY));
     assert!(!entries.iter().any(|entry| entry.item.page == cleared));

@@ -273,7 +273,13 @@ impl AgentHost {
             s.close.cancel();
         }
         let agent = self.slot.lock().await.take();
-        let engines: Vec<Shared> = self.job_engines.lock().await.drain().map(|(_, a)| a).collect();
+        let engines: Vec<Shared> = self
+            .job_engines
+            .lock()
+            .await
+            .drain()
+            .map(|(_, a)| a)
+            .collect();
         // Off the runtime, so the agent's own runtime can stop.
         let _ = tokio::task::spawn_blocking(move || {
             let _ = std::thread::spawn(move || {
@@ -310,7 +316,11 @@ fn check_device(hub: &Hub, token: &str, device: &str) -> Result<(), (StatusCode,
     Err((status, body))
 }
 
-pub(crate) async fn check(hub: &Arc<Hub>, token: &str, device: &str) -> Result<(), (StatusCode, String)> {
+pub(crate) async fn check(
+    hub: &Arc<Hub>,
+    token: &str,
+    device: &str,
+) -> Result<(), (StatusCode, String)> {
     let (hub, token, device) = (hub.clone(), token.to_string(), device.to_string());
     tokio::task::spawn_blocking(move || check_device(&hub, &token, &device))
         .await

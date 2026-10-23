@@ -12,10 +12,10 @@ use futures_util::StreamExt;
 use serde_json::Value;
 use vault_mcp::McpServer;
 
-use vault_tools::ToolSet;
 use crate::mcp_log;
 use crate::mcp_oauth::AuthError;
 use crate::AppState;
+use vault_tools::ToolSet;
 
 const MAX_BODY: usize = 8 << 20;
 
@@ -179,7 +179,10 @@ pub(crate) async fn handle(State(state): State<Arc<AppState>>, req: Request) -> 
         .filter(|d| !d.is_empty())
         .map(str::to_owned);
     if let Some(device) = device {
-        if crate::agent::check(&state.hub, &token, &device).await.is_err() {
+        if crate::agent::check(&state.hub, &token, &device)
+            .await
+            .is_err()
+        {
             return unauthorized(&state, true);
         }
         let input = match read_body(req.into_body(), state.import_source_limit_bytes).await {
@@ -253,7 +256,10 @@ pub(crate) async fn dispatch_vault(
             vault.with_actor(&actor, || {
                 // The hub answers jobs itself: it knows the caller and runs them.
                 if vault_tools::canonical(name) == "jobs" {
-                    return state.jobs.call(&actor, set, args).map_err(vault_mcp::McpError);
+                    return state
+                        .jobs
+                        .call(&actor, set, args)
+                        .map_err(vault_mcp::McpError);
                 }
                 // Devices reach the vault through sync; on /mcp they start jobs.
                 if actor.starts_with(crate::jobs::DEVICE_PREFIX) {

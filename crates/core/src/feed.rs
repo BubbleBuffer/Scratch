@@ -129,16 +129,32 @@ mod tests {
         f.push(Change::PageChanged("a".into()));
         let before = f.poll_documents(0);
         for generation in 1..=(WINDOW as u64 + 5) {
-            f.push(Change::IndexCommitted { generation, pages: vec!["a".into()] });
+            f.push(Change::IndexCommitted {
+                generation,
+                pages: vec!["a".into()],
+            });
         }
-        assert!(f.poll(0).reset, "the ordinary feed retains its bounded window");
+        assert!(
+            f.poll(0).reset,
+            "the ordinary feed retains its bounded window"
+        );
         assert_eq!(f.poll_documents(0), before);
-        assert_eq!(f.poll_documents(before.seq), ChangeBatch {
-            seq: before.seq, changes: Vec::new(), reset: false,
-        });
+        assert_eq!(
+            f.poll_documents(before.seq),
+            ChangeBatch {
+                seq: before.seq,
+                changes: Vec::new(),
+                reset: false,
+            }
+        );
         f.push(Change::TreeChanged);
-        assert_eq!(f.poll_documents(before.seq), ChangeBatch {
-            seq: before.seq + 1, changes: vec![Change::TreeChanged], reset: false,
-        });
+        assert_eq!(
+            f.poll_documents(before.seq),
+            ChangeBatch {
+                seq: before.seq + 1,
+                changes: vec![Change::TreeChanged],
+                reset: false,
+            }
+        );
     }
 }

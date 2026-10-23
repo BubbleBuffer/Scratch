@@ -331,7 +331,10 @@ fn digest<T: serde::Serialize>(value: &T) -> String {
 
 /// Bytes and files of one directory's entries with a suffix.
 fn dir_stats(dir: &Path, suffix: &str) -> (u64, usize) {
-    fs::read_dir(dir).into_iter().flatten().filter_map(|e| e.ok())
+    fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
         .filter(|e| e.file_name().to_string_lossy().ends_with(suffix))
         .fold((0, 0), |(b, n), e| (b + e.metadata().unwrap().len(), n + 1))
 }
@@ -371,7 +374,10 @@ fn history_timings(dir: &str) {
     )
     .unwrap();
     let samples: Vec<Sample> = serde_json::from_value(manifest["samples"].clone()).unwrap();
-    assert!(!samples.is_empty(), "manifest has no samples: run the cold phase on this fixture first");
+    assert!(
+        !samples.is_empty(),
+        "manifest has no samples: run the cold phase on this fixture first"
+    );
     let used = base.join(".vault/bench-used");
     assert!(
         !used.exists(),
@@ -379,9 +385,17 @@ fn history_timings(dir: &str) {
     );
 
     // The writer's idle cold pass must not run during the timings.
-    fs::write(base.join(".vault/cold-policy.json"), r#"{"idle_seconds":3600}"#).unwrap();
+    fs::write(
+        base.join(".vault/cold-policy.json"),
+        r#"{"idle_seconds":3600}"#,
+    )
+    .unwrap();
     let edit = PathBuf::from(format!("{dir}.edit"));
-    assert!(!edit.exists(), "{} already exists; use a fresh disposable copy", edit.display());
+    assert!(
+        !edit.exists(),
+        "{} already exists; use a fresh disposable copy",
+        edit.display()
+    );
     let skipped = copy_dir(base, &edit).unwrap();
     fs::write(&used, b"").unwrap();
 
@@ -435,11 +449,21 @@ fn history_timings(dir: &str) {
     let (mut old_first, mut old_rep, mut old_bad) = (Split::default(), Split::default(), 0usize);
     for s in &samples {
         let v = Vault::open(dir.to_owned()).unwrap();
-        let (view, t) = time(|| v.load_page_at(s.page.clone(), s.old_version.clone()).unwrap());
+        let (view, t) = time(|| {
+            v.load_page_at(s.page.clone(), s.old_version.clone())
+                .unwrap()
+        });
         old_first.push(s.big, t);
         old_bad += (digest(&view) != s.old_view_sha256) as usize;
         for _ in 0..REPEATS {
-            old_rep.push(s.big, time(|| v.load_page_at(s.page.clone(), s.old_version.clone()).unwrap()).1);
+            old_rep.push(
+                s.big,
+                time(|| {
+                    v.load_page_at(s.page.clone(), s.old_version.clone())
+                        .unwrap()
+                })
+                .1,
+            );
         }
     }
     old_first.report("old version first (fresh vault)");
@@ -450,9 +474,17 @@ fn history_timings(dir: &str) {
     let mut export_bytes = 0usize;
     let pages = export_vault.page_versions().unwrap();
     for page in &pages {
-        export_bytes += export_vault.export_updates(page.page.clone(), Vec::new()).unwrap().len();
+        export_bytes += export_vault
+            .export_updates(page.page.clone(), Vec::new())
+            .unwrap()
+            .len();
     }
-    println!("full export pages={} bytes={} elapsed_ms={:.3}", pages.len(), export_bytes, ms(t.elapsed()));
+    println!(
+        "full export pages={} bytes={} elapsed_ms={:.3}",
+        pages.len(),
+        export_bytes,
+        ms(t.elapsed())
+    );
     drop(export_vault);
 
     // Edits on the disposable copy: the first insert after a fresh open (cold), then a
@@ -473,8 +505,14 @@ fn history_timings(dir: &str) {
                 },
             }]
         };
-        edit_cold.push(s.big, time(|| v.apply(s.page.clone(), insert("bench edit 1")).unwrap()).1);
-        edit_warm.push(s.big, time(|| v.apply(s.page.clone(), insert("bench edit 2")).unwrap()).1);
+        edit_cold.push(
+            s.big,
+            time(|| v.apply(s.page.clone(), insert("bench edit 1")).unwrap()).1,
+        );
+        edit_warm.push(
+            s.big,
+            time(|| v.apply(s.page.clone(), insert("bench edit 2")).unwrap()).1,
+        );
         v.flush().unwrap();
     }
     edit_cold.report("edit first (fresh vault, cold page)");
@@ -484,8 +522,14 @@ fn history_timings(dir: &str) {
         "check versions_mismatch={list_bad} old_view_mismatch={old_bad} of {}",
         samples.len()
     );
-    assert_eq!(list_bad, 0, "version lists differ from the cold phase's digests");
-    assert_eq!(old_bad, 0, "old versions differ from the cold phase's digests");
+    assert_eq!(
+        list_bad, 0,
+        "version lists differ from the cold phase's digests"
+    );
+    assert_eq!(
+        old_bad, 0,
+        "old versions differ from the cold phase's digests"
+    );
 }
 
 /// Read-only page/history timings on an existing fixture; seed only if empty.
@@ -499,10 +543,16 @@ fn storage_timings(root: &str, pages: u32, big: u32) {
     }
     let page = std::env::var("COLD_BENCH_PAGE").unwrap_or_else(|_| {
         let entry = std::fs::read_dir(std::path::Path::new(root).join(".vault/docs"))
-            .unwrap().filter_map(|e| e.ok())
+            .unwrap()
+            .filter_map(|e| e.ok())
             .filter(|e| e.file_name().to_string_lossy().ends_with(".loro"))
-            .max_by_key(|e| e.metadata().unwrap().len()).expect("page");
-        entry.file_name().to_string_lossy().trim_end_matches(".loro").to_owned()
+            .max_by_key(|e| e.metadata().unwrap().len())
+            .expect("page");
+        entry
+            .file_name()
+            .to_string_lossy()
+            .trim_end_matches(".loro")
+            .to_owned()
     });
     let mut cold = Vec::new();
     for _ in 0..5 {
@@ -513,14 +563,18 @@ fn storage_timings(root: &str, pages: u32, big: u32) {
     let v = Vault::open(root.to_owned()).unwrap();
     v.load_page(page.clone()).unwrap();
     let mut warm = Vec::new();
-    for _ in 0..30 { warm.push(time(|| v.load_page(page.clone()).unwrap()).1); }
+    for _ in 0..30 {
+        warm.push(time(|| v.load_page(page.clone()).unwrap()).1);
+    }
     let versions = v.list_versions(page.clone()).unwrap();
     let old = versions.last().unwrap().id.clone();
     drop(v);
     let v = Vault::open(root.to_owned()).unwrap();
     let first_history = time(|| v.load_page_at(page.clone(), old.clone()).unwrap()).1;
     let mut history = Vec::new();
-    for _ in 0..10 { history.push(time(|| v.load_page_at(page.clone(), old.clone()).unwrap()).1); }
+    for _ in 0..10 {
+        history.push(time(|| v.load_page_at(page.clone(), old.clone()).unwrap()).1);
+    }
     println!("storage page={page} versions={} page_open_first_ms={first:.3} cold={} warm={} history_first_ms={first_history:.3} repeat={}",
         versions.len(), Stats::of(cold).line(), Stats::of(warm).line(), Stats::of(history).line());
 }

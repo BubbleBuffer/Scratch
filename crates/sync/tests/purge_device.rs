@@ -235,8 +235,14 @@ fn a_fieldless_purge_from_a_capability_off_producer_reads_back_with_no_id() {
     a.sync();
     let reader = net.since(from);
     for e in sync_exchanges(&reader) {
-        assert_eq!(header(&e.req_headers, PURGE_DEVICE_CAPABILITY_HEADER), Some("1"));
-        assert_eq!(header(&e.hub_headers, PURGE_DEVICE_CAPABILITY_HEADER), Some("1"));
+        assert_eq!(
+            header(&e.req_headers, PURGE_DEVICE_CAPABILITY_HEADER),
+            Some("1")
+        );
+        assert_eq!(
+            header(&e.hub_headers, PURGE_DEVICE_CAPABILITY_HEADER),
+            Some("1")
+        );
     }
     assert_answer_layout(&reader, true);
     let pulled = answers_v2(&reader, true);
@@ -244,7 +250,10 @@ fn a_fieldless_purge_from_a_capability_off_producer_reads_back_with_no_id() {
         .iter()
         .flat_map(|r| &r.purges)
         .any(|p| p.page == t && p.device.is_none()));
-    assert!(a.v().purged_pages().contains(&t), "the phone applied the purge");
+    assert!(
+        a.v().purged_pages().contains(&t),
+        "the phone applied the purge"
+    );
 
     // Leg 3: after a restart the record is still fieldless on the hub, and a
     // new capability-on device gets it extended with no id.
@@ -303,8 +312,14 @@ fn a_known_device_from_a_capability_on_producer_reads_back_as_fieldless_wire() {
     b.sync();
     let producer = net.since(from);
     for e in sync_exchanges(&producer) {
-        assert_eq!(header(&e.req_headers, PURGE_DEVICE_CAPABILITY_HEADER), Some("1"));
-        assert_eq!(header(&e.hub_headers, PURGE_DEVICE_CAPABILITY_HEADER), Some("1"));
+        assert_eq!(
+            header(&e.req_headers, PURGE_DEVICE_CAPABILITY_HEADER),
+            Some("1")
+        );
+        assert_eq!(
+            header(&e.hub_headers, PURGE_DEVICE_CAPABILITY_HEADER),
+            Some("1")
+        );
     }
     assert_request_layout(&producer, true);
     let pushed = request_purges(&producer, true);
@@ -336,12 +351,21 @@ fn a_known_device_from_a_capability_on_producer_reads_back_as_fieldless_wire() {
     assert_answer_layout(&reader, false);
     let pulled = answers_v2(&reader, false);
     assert!(pulled.iter().flat_map(|r| &r.purges).any(|p| p.page == t));
-    assert!(!a.v().purged_pages().contains(&t), "the offline edit superseded the purge");
+    assert!(
+        !a.v().purged_pages().contains(&t),
+        "the offline edit superseded the purge"
+    );
     let restored = a.v().load_page(t.clone()).unwrap();
     assert!(!restored.in_trash);
     assert_eq!(restored.title, "T (phone)");
-    assert_eq!(restored.blocks.iter().map(|block| block.text.as_str()).collect::<Vec<_>>(),
-        vec!["one (phone)", "two"]);
+    assert_eq!(
+        restored
+            .blocks
+            .iter()
+            .map(|block| block.text.as_str())
+            .collect::<Vec<_>>(),
+        vec!["one (phone)", "two"]
+    );
 
     let sides = purge_sides(a.v(), &t);
     assert!(!sides.is_empty(), "the phone recorded the purge");
@@ -400,7 +424,10 @@ fn health_advertises_both_purge_capabilities() {
         cancel: None,
     });
     assert_eq!(r.status, 200);
-    assert_eq!(header(&r.headers, PURGE_CAPABILITY_HEADER), Some(PURGE_CAPABILITY));
+    assert_eq!(
+        header(&r.headers, PURGE_CAPABILITY_HEADER),
+        Some(PURGE_CAPABILITY)
+    );
     assert_eq!(
         header(&r.headers, PURGE_DEVICE_CAPABILITY_HEADER),
         Some(PURGE_DEVICE_CAPABILITY)

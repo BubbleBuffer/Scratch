@@ -753,7 +753,12 @@ impl NotesAgent {
     /// `/mcp/agent?host=<this device's name>` runs this agent's tools here
     /// (desktop pack included, no approval prompts). Restarts a running
     /// relay; drops reconnect with backoff. Fails on a hub connection.
-    pub fn host_relay_start(&self, url: String, device: String, token: String) -> Result<(), String> {
+    pub fn host_relay_start(
+        &self,
+        url: String,
+        device: String,
+        token: String,
+    ) -> Result<(), String> {
         self.inner.host_relay_start(url, device, token)
     }
 

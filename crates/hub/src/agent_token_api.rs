@@ -156,8 +156,7 @@ pub(crate) async fn create(
     }
     let st = state.clone();
     let result = tokio::task::spawn_blocking(move || {
-        st.agent_tokens
-            .add_expiring(&b.name, scope, b.expires_days)
+        st.agent_tokens.add_expiring(&b.name, scope, b.expires_days)
     })
     .await;
     match result {

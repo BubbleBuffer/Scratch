@@ -1678,10 +1678,17 @@ fn ordinary_tasks_section_deletion_retains_generic_conflicts_with_a_journal_pres
         assert_eq!(restored.blocks[0].children[0].text, "Edited offline");
         let pending = v.list_conflicts(Some(page.clone())).unwrap();
         assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].scope, ConflictScope::Subtree { root: "tasks".into() });
+        assert_eq!(
+            pending[0].scope,
+            ConflictScope::Subtree {
+                root: "tasks".into()
+            }
+        );
         assert_eq!(pending[0].status, ConflictStatus::Pending);
-        assert!(matches!(&pending[0].applied[0].by, ResolutionBy::Auto { rule }
-            if rule == "edit-beats-delete"));
+        assert!(
+            matches!(&pending[0].applied[0].by, ResolutionBy::Auto { rule }
+            if rule == "edit-beats-delete")
+        );
     }
 }
 
@@ -1754,8 +1761,15 @@ fn concurrent_edit_of_one_block_is_a_conflict() {
     assert!(c2.sides[1].block.is_none());
     // The text rule shows one side, the later edit (device id breaks ties),
     // until the user confirms or switches.
-    let later = c1.sides.iter().max_by(|x, y| x.time_ms.cmp(&y.time_ms)
-        .then_with(|| x.device.as_bytes().cmp(y.device.as_bytes()))).unwrap();
+    let later = c1
+        .sides
+        .iter()
+        .max_by(|x, y| {
+            x.time_ms
+                .cmp(&y.time_ms)
+                .then_with(|| x.device.as_bytes().cmp(y.device.as_bytes()))
+        })
+        .unwrap();
     assert_eq!(texts(&b, &p)[0], later.block.as_ref().unwrap().text);
     // The conflict syncs as recorded; the other side records no second one.
     push(&b, &a);
@@ -1778,7 +1792,8 @@ fn concurrent_edit_of_one_block_is_a_conflict() {
     assert_eq!(pending.len(), 1);
     let id = pending[0].id.clone();
     b.apply(p.clone(), vec![set_text("1", "A and B")]).unwrap();
-    b.resolve_conflict(p.clone(), id.clone(), ConflictResolution::Keep).unwrap();
+    b.resolve_conflict(p.clone(), id.clone(), ConflictResolution::Keep)
+        .unwrap();
     assert_eq!(texts(&b, &p)[0], "A and B");
     assert!(matches!(
         b.resolve_conflict(p.clone(), id, ConflictResolution::Keep),
@@ -2066,17 +2081,40 @@ fn sync_feed_ignores_index_only_wakes_but_retains_document_changes() {
     let writer = v.clone();
     let indexed = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(50));
-        writer.upsert_search_row("test".into(), ExternalSearchRow {
-            id: "local-index-only".into(), title: "External".into(), body: "preview".into(),
-            page_type: "chat".into(), target: None, updated_ms: 1,
-        }).unwrap();
+        writer
+            .upsert_search_row(
+                "test".into(),
+                ExternalSearchRow {
+                    id: "local-index-only".into(),
+                    title: "External".into(),
+                    body: "preview".into(),
+                    page_type: "chat".into(),
+                    target: None,
+                    updated_ms: 1,
+                },
+            )
+            .unwrap();
     });
     let start = Instant::now();
     let unchanged = v.wait_sync_changes(seq, 250);
     indexed.join().unwrap();
-    assert!(start.elapsed() >= Duration::from_millis(200), "index-only work must not end a sync wait");
-    assert_eq!(unchanged, ChangeBatch { seq, changes: Vec::new(), reset: false });
-    assert!(v.poll_changes(raw_seq).changes.iter().any(|change| matches!(change, Change::IndexCommitted { .. })));
+    assert!(
+        start.elapsed() >= Duration::from_millis(200),
+        "index-only work must not end a sync wait"
+    );
+    assert_eq!(
+        unchanged,
+        ChangeBatch {
+            seq,
+            changes: Vec::new(),
+            reset: false
+        }
+    );
+    assert!(v
+        .poll_changes(raw_seq)
+        .changes
+        .iter()
+        .any(|change| matches!(change, Change::IndexCommitted { .. })));
     let editor = v.clone();
     let edit = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(50));
@@ -2087,7 +2125,10 @@ fn sync_feed_ignores_index_only_wakes_but_retains_document_changes() {
     let id = edit.join().unwrap();
     assert!(start.elapsed() < Duration::from_secs(4));
     assert!(changed.changes.contains(&Change::PageCreated(id)));
-    assert!(changed.changes.iter().all(|change| !matches!(change, Change::IndexCommitted { .. })));
+    assert!(changed
+        .changes
+        .iter()
+        .all(|change| !matches!(change, Change::IndexCommitted { .. })));
 }
 
 #[test]
@@ -2139,46 +2180,74 @@ fn purge_restore_preserves_whole_editor_state_in_both_orders() {
 
 /// Purger B deletes and purges a page that editor A then edits offline.
 /// Returns the page and the tombstones B forwards.
-fn purge_against_offline_edit(editor: &Vault, purger: &Vault, tag: &str) -> (PageId, Vec<PurgeRecord>) {
+fn purge_against_offline_edit(
+    editor: &Vault,
+    purger: &Vault,
+    tag: &str,
+) -> (PageId, Vec<PurgeRecord>) {
     let p = editor.create_page(None, tag.into()).unwrap();
-    editor.apply(p.clone(), vec![ins(None, nb("body", "original"))]).unwrap();
+    editor
+        .apply(p.clone(), vec![ins(None, nb("body", "original"))])
+        .unwrap();
     sync(editor, purger);
     purger.delete_page(p.clone()).unwrap();
     purger.purge_page(p.clone()).unwrap();
     let tombstones = purger.purge_records();
-    editor.apply(p.clone(), vec![set_text("body", "offline edit")]).unwrap();
+    editor
+        .apply(p.clone(), vec![set_text("body", "offline edit")])
+        .unwrap();
     (p, tombstones)
 }
 
 #[test]
 fn purge_conflict_names_the_purging_device_on_each_replica() {
-    let (ta, tb) = (TempDir::new("purge_side_editor"), TempDir::new("purge_side_purger"));
+    let (ta, tb) = (
+        TempDir::new("purge_side_editor"),
+        TempDir::new("purge_side_purger"),
+    );
     let (editor, purger) = (ta.open(), tb.open());
     let (p, tombstones) = purge_against_offline_edit(&editor, &purger, "Purge side");
     let purged_by = purger.device_id();
     assert_eq!(tombstones[0].device.as_deref(), Some(purged_by.as_str()));
-    purger.import_updates(p.clone(), editor.export_updates(p.clone(), vec![]).unwrap()).unwrap();
+    purger
+        .import_updates(p.clone(), editor.export_updates(p.clone(), vec![]).unwrap())
+        .unwrap();
     editor.import_purge_records(tombstones).unwrap();
     for vault in [&purger, &editor] {
         let conflicts = vault.list_conflicts(Some(p.clone())).unwrap();
         assert_eq!(conflicts.len(), 1);
         // Side 0 is the editing side and side 1 the purge; the auto rule
         // applied side 0.
-        assert!(matches!(conflicts[0].sides[0].state, SideState::Present { .. }));
-        assert!(matches!(conflicts[0].sides[1].state, SideState::Purged { .. }));
+        assert!(matches!(
+            conflicts[0].sides[0].state,
+            SideState::Present { .. }
+        ));
+        assert!(matches!(
+            conflicts[0].sides[1].state,
+            SideState::Purged { .. }
+        ));
         assert_eq!(conflicts[0].sides[1].device, purged_by);
-        assert_eq!(conflicts[0].applied[0].resolution, Some(ConflictResolution::UseSide(0)));
+        assert_eq!(
+            conflicts[0].applied[0].resolution,
+            Some(ConflictResolution::UseSide(0))
+        );
     }
 }
 
 #[test]
 fn fieldless_tombstone_names_the_purging_side_unknown() {
-    let (ta, tb) = (TempDir::new("fieldless_editor"), TempDir::new("fieldless_purger"));
+    let (ta, tb) = (
+        TempDir::new("fieldless_editor"),
+        TempDir::new("fieldless_purger"),
+    );
     let (editor, purger) = (ta.open(), tb.open());
     let (p, tombstones) = purge_against_offline_edit(&editor, &purger, "Fieldless purge");
     let fieldless: Vec<PurgeRecord> = tombstones
         .into_iter()
-        .map(|record| PurgeRecord { device: None, ..record })
+        .map(|record| PurgeRecord {
+            device: None,
+            ..record
+        })
         .collect();
     editor.import_purge_records(fieldless).unwrap();
     let conflicts = editor.list_conflicts(Some(p)).unwrap();
@@ -2199,24 +2268,43 @@ fn purging_device_persists_and_fieldless_duplicates_keep_it() {
     let tombstone = tombstones[0].clone();
     // A relay forwards the original identity; it never stamps its own device.
     relay.import_purge_records(vec![tombstone.clone()]).unwrap();
-    assert_eq!(relay.purge_records()[0].device.as_deref(), Some(purged_by.as_str()));
+    assert_eq!(
+        relay.purge_records()[0].device.as_deref(),
+        Some(purged_by.as_str())
+    );
     drop(purger);
     let purger = tb.open();
-    assert_eq!(purger.purge_records()[0].device.as_deref(), Some(purged_by.as_str()));
+    assert_eq!(
+        purger.purge_records()[0].device.as_deref(),
+        Some(purged_by.as_str())
+    );
     // A fieldless copy and an ID-only legacy copy of the same purge keep the
     // known device and do not add a second tombstone.
     purger
         .import_purge_records(vec![
-            PurgeRecord { device: None, ..tombstone.clone() },
-            PurgeRecord { page: p.clone(), version: None, device: None },
+            PurgeRecord {
+                device: None,
+                ..tombstone.clone()
+            },
+            PurgeRecord {
+                page: p.clone(),
+                version: None,
+                device: None,
+            },
         ])
         .unwrap();
     assert_eq!(purger.purge_records().len(), 1);
-    assert_eq!(purger.purge_records()[0].device.as_deref(), Some(purged_by.as_str()));
+    assert_eq!(
+        purger.purge_records()[0].device.as_deref(),
+        Some(purged_by.as_str())
+    );
     drop(purger);
     let purger = tb.open();
     assert_eq!(purger.purge_records().len(), 1);
-    assert_eq!(purger.purge_records()[0].device.as_deref(), Some(purged_by.as_str()));
+    assert_eq!(
+        purger.purge_records()[0].device.as_deref(),
+        Some(purged_by.as_str())
+    );
 }
 
 #[test]
@@ -2245,7 +2333,9 @@ fn concurrent_purgers(tag: &str) -> (Vec<PurgeRecord>, Vec<String>) {
     let origin = TempDir::new(&format!("{tag}_origin"));
     let editor = origin.open();
     let p = editor.create_page(None, tag.into()).unwrap();
-    editor.apply(p.clone(), vec![ins(None, nb("body", "original"))]).unwrap();
+    editor
+        .apply(p.clone(), vec![ins(None, nb("body", "original"))])
+        .unwrap();
     let (mut tombstones, mut devices) = (Vec::new(), Vec::new());
     for i in 0..3 {
         let dir = TempDir::new(&format!("{tag}_purger{i}"));
@@ -2280,11 +2370,22 @@ fn settle_in_order(tag: &str, records: &[PurgeRecord]) -> PurgeRecord {
 fn concurrent_purgers_settle_on_the_greater_device_in_every_order() {
     let (tombstones, devices) = concurrent_purgers("concurrent_orders");
     let greatest = devices.iter().max().unwrap().clone();
-    let orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    let orders = [
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ];
     for (n, order) in orders.iter().enumerate() {
         let records: Vec<PurgeRecord> = order.iter().map(|&i| tombstones[i].clone()).collect();
         let settled = settle_in_order(&format!("concurrent_order_{n}"), &records);
-        assert_eq!(settled.device.as_deref(), Some(greatest.as_str()), "order {order:?}");
+        assert_eq!(
+            settled.device.as_deref(),
+            Some(greatest.as_str()),
+            "order {order:?}"
+        );
     }
 }
 
@@ -2292,9 +2393,15 @@ fn concurrent_purgers_settle_on_the_greater_device_in_every_order() {
 fn equal_coverage_from_different_purgers_settles_in_both_orders() {
     let (tombstones, devices) = concurrent_purgers("equal_coverage");
     let mine = tombstones[0].clone();
-    let theirs = PurgeRecord { device: Some(devices[1].clone()), ..tombstones[0].clone() };
+    let theirs = PurgeRecord {
+        device: Some(devices[1].clone()),
+        ..tombstones[0].clone()
+    };
     let greater = devices[0].clone().max(devices[1].clone());
-    for (n, records) in [vec![mine.clone(), theirs.clone()], vec![theirs, mine]].iter().enumerate() {
+    for (n, records) in [vec![mine.clone(), theirs.clone()], vec![theirs, mine]]
+        .iter()
+        .enumerate()
+    {
         let settled = settle_in_order(&format!("equal_coverage_{n}"), records);
         assert_eq!(settled.device.as_deref(), Some(greater.as_str()));
     }
@@ -2304,8 +2411,17 @@ fn equal_coverage_from_different_purgers_settles_in_both_orders() {
 fn a_fieldless_concurrent_copy_yields_to_the_known_purger() {
     let (tombstones, devices) = concurrent_purgers("fieldless_concurrent");
     let known = tombstones[0].clone();
-    let fieldless = PurgeRecord { device: None, ..tombstones[1].clone() };
-    for (n, records) in [vec![known.clone(), fieldless.clone()], vec![fieldless, known]].iter().enumerate() {
+    let fieldless = PurgeRecord {
+        device: None,
+        ..tombstones[1].clone()
+    };
+    for (n, records) in [
+        vec![known.clone(), fieldless.clone()],
+        vec![fieldless, known],
+    ]
+    .iter()
+    .enumerate()
+    {
         let settled = settle_in_order(&format!("fieldless_concurrent_{n}"), records);
         assert_eq!(settled.device.as_deref(), Some(devices[0].as_str()));
     }
@@ -2315,11 +2431,18 @@ fn a_fieldless_concurrent_copy_yields_to_the_known_purger() {
 fn id_only_records_with_known_devices_settle_in_both_orders() {
     let (tombstones, devices) = concurrent_purgers("id_only_orders");
     let page = tombstones[0].page.clone();
-    let named = |device: &str| PurgeRecord { page: page.clone(), version: None, device: Some(device.into()) };
+    let named = |device: &str| PurgeRecord {
+        page: page.clone(),
+        version: None,
+        device: Some(device.into()),
+    };
     let greater = devices[0].clone().max(devices[1].clone());
-    for (n, records) in [vec![named(&devices[0]), named(&devices[1])], vec![named(&devices[1]), named(&devices[0])]]
-        .iter()
-        .enumerate()
+    for (n, records) in [
+        vec![named(&devices[0]), named(&devices[1])],
+        vec![named(&devices[1]), named(&devices[0])],
+    ]
+    .iter()
+    .enumerate()
     {
         let settled = settle_in_order(&format!("id_only_{n}"), records);
         assert_eq!(settled.version, None);
@@ -2329,7 +2452,10 @@ fn id_only_records_with_known_devices_settle_in_both_orders() {
 
 #[test]
 fn fieldless_replay_on_a_live_page_keeps_the_purging_side_named() {
-    let (ta, tb) = (TempDir::new("replay_live_editor"), TempDir::new("replay_live_purger"));
+    let (ta, tb) = (
+        TempDir::new("replay_live_editor"),
+        TempDir::new("replay_live_purger"),
+    );
     let (editor, purger) = (ta.open(), tb.open());
     let (p, tombstones) = purge_against_offline_edit(&editor, &purger, "Live replay");
     let purged_by = purger.device_id();
@@ -2337,7 +2463,10 @@ fn fieldless_replay_on_a_live_page_keeps_the_purging_side_named() {
     // The same purge again, fieldless, reaches the page through the live path.
     let fieldless: Vec<PurgeRecord> = tombstones
         .into_iter()
-        .map(|record| PurgeRecord { device: None, ..record })
+        .map(|record| PurgeRecord {
+            device: None,
+            ..record
+        })
         .collect();
     editor.import_purge_records(fieldless).unwrap();
     let conflicts = editor.list_conflicts(Some(p)).unwrap();

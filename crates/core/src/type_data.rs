@@ -601,14 +601,14 @@ impl PageDoc {
         let i = find_item(&list, item).ok_or_else(|| not_found("list item", &item_text(item)))?;
         let to = to_index as usize;
         if to >= list.len() {
-            return Err(invalid(format!("index {to_index} is past the end of the list")));
+            return Err(invalid(format!(
+                "index {to_index} is past the end of the list"
+            )));
         }
         if i == to {
             return Ok(());
         }
-        let v = list
-            .get(i)
-            .map_or(Value::Null, |x| node_json(&x));
+        let v = list.get(i).map_or(Value::Null, |x| node_json(&x));
         list.delete(i, 1)?;
         write_list_item(&list, to, &v)
     }
@@ -713,7 +713,8 @@ impl Vault {
         item: ListItem,
         to_index: u32,
     ) -> Result<()> {
-        self.inner
-            .edit(&page, |d| d.type_data_list_move(&addon, &path, &item, to_index))
+        self.inner.edit(&page, |d| {
+            d.type_data_list_move(&addon, &path, &item, to_index)
+        })
     }
 }

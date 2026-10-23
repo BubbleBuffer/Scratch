@@ -165,7 +165,10 @@ impl Jobs {
 
     fn create(&self, actor: &str, set: ToolSet, a: &Value) -> Result<String, String> {
         if set == ToolSet::Read {
-            return Err("read-only callers can't create jobs: a job needs the Write or Everything tool set".into());
+            return Err(
+                "read-only callers can't create jobs: a job needs the Write or Everything tool set"
+                    .into(),
+            );
         }
         if !self.agent_enabled {
             return Err("the agent is off on this hub ([agent] enabled = false)".into());
@@ -351,7 +354,13 @@ impl Jobs {
     fn run_one(&self, job: &Job, engine: Shared) {
         let session = match engine.create_session(&format!(
             "Job: {}",
-            job.prompt.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(60).collect::<String>()
+            job.prompt
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .chars()
+                .take(60)
+                .collect::<String>()
         )) {
             Ok(s) => s.id,
             Err(e) => return self.end(&job.id, End::Failed(format!("{e:#}"))),
@@ -464,4 +473,3 @@ async fn start(state: Arc<AppState>, job: Job) {
     }
     state.jobs.wake.notify_one();
 }
-

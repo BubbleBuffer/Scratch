@@ -509,23 +509,44 @@ fn journal_default_template_with_legacy_missing_flag_keeps_duplicate_sections() 
     let v = t.open();
     v.daily_note(DAY, "Day".into(), true).unwrap();
     let journal = v.find_by_role("journal".into()).unwrap().unwrap();
-    let template = v.create_template(journal.clone(), "Legacy template".into()).unwrap();
-    for (id, name) in [("t0", "Tasks"), ("t1", "Tasks"), ("l0", "Log"), ("l1", "Log")] {
-        insert(&v, &template, None, None, block(id, BlockKind::Toggle, name));
+    let template = v
+        .create_template(journal.clone(), "Legacy template".into())
+        .unwrap();
+    for (id, name) in [
+        ("t0", "Tasks"),
+        ("t1", "Tasks"),
+        ("l0", "Log"),
+        ("l1", "Log"),
+    ] {
+        insert(
+            &v,
+            &template,
+            None,
+            None,
+            block(id, BlockKind::Toggle, name),
+        );
     }
     dated(&v, &template, DAY, false);
-    v.set_default_template(journal, Some(template.clone())).unwrap();
+    v.set_default_template(journal, Some(template.clone()))
+        .unwrap();
     let legacy = LoroDoc::new();
-    legacy.import(&v.export_updates(template.clone(), vec![]).unwrap()).unwrap();
+    legacy
+        .import(&v.export_updates(template.clone(), vec![]).unwrap())
+        .unwrap();
     legacy.get_map("page").insert("istemplate", false).unwrap();
     legacy.commit();
-    v.import_updates(template.clone(), legacy.export(ExportMode::Snapshot).unwrap()).unwrap();
+    v.import_updates(
+        template.clone(),
+        legacy.export(ExportMode::Snapshot).unwrap(),
+    )
+    .unwrap();
     let before = v.load_page(template.clone()).unwrap();
     let vv = v.page_versions().unwrap();
     assert_eq!(before.blocks.len(), 4);
     assert_eq!(v.load_page(template.clone()).unwrap(), before);
     assert_eq!(v.page_versions().unwrap(), vv);
-    v.flush().unwrap(); drop(v);
+    v.flush().unwrap();
+    drop(v);
     assert_eq!(t.open().load_page(template).unwrap(), before);
 }
 
@@ -737,7 +758,10 @@ fn independent_vault_handles_create_one_daily_note() {
             );
             let page = v.load_page(notes[0].clone()).unwrap();
             assert_sections(&page.blocks);
-            assert!(page.blocks.iter().all(|section| section.children.is_empty()));
+            assert!(page
+                .blocks
+                .iter()
+                .all(|section| section.children.is_empty()));
         }
     }
 }
@@ -769,7 +793,10 @@ fn concurrent_logs_create_one_note_and_one_log_without_losing_lines() {
     assert_eq!(page.blocks[0].text, "Tasks");
     assert!(page.blocks[0].children.is_empty());
     let log = &page.blocks[1];
-    assert_eq!((log.kind.clone(), log.text.as_str()), (BlockKind::Toggle, "Log"));
+    assert_eq!(
+        (log.kind.clone(), log.text.as_str()),
+        (BlockKind::Toggle, "Log")
+    );
     assert_eq!(log.children.len(), 6);
     for i in 0..6 {
         assert_eq!(
@@ -895,7 +922,10 @@ fn journal_page_dates_stay_out_of_calendar_but_their_dated_blocks_remain() {
     v.flush().unwrap();
     let agenda = v.agenda(DAY, DAY + DAY_MS, DAY, DAY + DAY_MS).unwrap();
     assert_eq!(
-        agenda.iter().filter(|i| i.page == note && i.block.is_none()).count(),
+        agenda
+            .iter()
+            .filter(|i| i.page == note && i.block.is_none())
+            .count(),
         2,
         "both database and task-note date sources were indexed"
     );
@@ -952,7 +982,11 @@ fn link_task_adds_one_link_to_tasks_and_reports_whether_it_added() {
     let note = v.daily_note(DAY, String::new(), false).unwrap().unwrap();
     let before = v.load_page(note.clone()).unwrap();
     assert!(!v.link_task_to_day(DAY, task1.clone()).unwrap());
-    assert_eq!(v.load_page(note.clone()).unwrap(), before, "no-op changes nothing");
+    assert_eq!(
+        v.load_page(note.clone()).unwrap(),
+        before,
+        "no-op changes nothing"
+    );
     assert!(v.link_task_to_day(DAY, task2.clone()).unwrap());
 
     let page = v.load_page(note).unwrap();
@@ -1019,7 +1053,13 @@ fn older_notes_without_tasks_get_the_section_above_log_and_keep_their_content() 
     let (tasks_id, log_id) = (before[0].id.clone(), before[1].id.clone());
     v.apply(note.clone(), vec![BlockOp::Delete { id: tasks_id }])
         .unwrap();
-    insert(&v, &note, None, None, block("work", BlockKind::Toggle, "Work"));
+    insert(
+        &v,
+        &note,
+        None,
+        None,
+        block("work", BlockKind::Toggle, "Work"),
+    );
     insert(
         &v,
         &note,
@@ -1033,7 +1073,10 @@ fn older_notes_without_tasks_get_the_section_above_log_and_keep_their_content() 
 
     let page = v.load_page(note).unwrap();
     assert_eq!(
-        page.blocks.iter().map(|b| b.text.as_str()).collect::<Vec<_>>(),
+        page.blocks
+            .iter()
+            .map(|b| b.text.as_str())
+            .collect::<Vec<_>>(),
         vec!["Work", "Tasks", "Log"]
     );
     assert!(page.blocks[0].children.is_empty());
@@ -1102,7 +1145,10 @@ fn links_and_logs_share_one_day_note_with_tasks_before_log() {
 
     let page = v.load_page(note).unwrap();
     assert_eq!(
-        page.blocks.iter().map(|b| b.text.as_str()).collect::<Vec<_>>(),
+        page.blocks
+            .iter()
+            .map(|b| b.text.as_str())
+            .collect::<Vec<_>>(),
         vec!["Tasks", "Log"]
     );
     assert_eq!(

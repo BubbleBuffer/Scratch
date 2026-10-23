@@ -48,7 +48,15 @@ impl Network {
         let b_token = hub.pair("B").unwrap();
         let a = Some(SyncClient::new(dirs[1].open(), &url, &a_token));
         let b = Some(SyncClient::new(dirs[2].open(), &url, &b_token));
-        Self { hub, _server: server, a, b, url, b_token, dirs }
+        Self {
+            hub,
+            _server: server,
+            a,
+            b,
+            url,
+            b_token,
+            dirs,
+        }
     }
 
     fn a(&self) -> &SyncClient {
@@ -60,13 +68,21 @@ impl Network {
     }
 
     fn vaults(&self) -> [&Vault; 3] {
-        [self.hub.vault().as_ref(), self.a().vault().as_ref(), self.b().vault().as_ref()]
+        [
+            self.hub.vault().as_ref(),
+            self.a().vault().as_ref(),
+            self.b().vault().as_ref(),
+        ]
     }
 
     fn restart_b(&mut self) {
         self.b().vault().flush().unwrap();
         drop(self.b.take());
-        self.b = Some(SyncClient::new(self.dirs[2].open(), &self.url, &self.b_token));
+        self.b = Some(SyncClient::new(
+            self.dirs[2].open(),
+            &self.url,
+            &self.b_token,
+        ));
     }
 }
 
@@ -75,47 +91,97 @@ fn insert(parent: Option<&str>, after: Option<&str>, id: &str, text: &str) -> Bl
         parent: parent.map(str::to_owned),
         after: after.map(str::to_owned),
         block: NewBlock {
-            id: id.into(), kind: BlockKind::Paragraph, text: text.into(),
-            marks: vec![], checked: false,
+            id: id.into(),
+            kind: BlockKind::Paragraph,
+            text: text.into(),
+            marks: vec![],
+            checked: false,
         },
     }
 }
 
 fn text(id: &str, text: &str) -> BlockOp {
-    BlockOp::SetText { id: id.into(), text: text.into(), marks: vec![] }
+    BlockOp::SetText {
+        id: id.into(),
+        text: text.into(),
+        marks: vec![],
+    }
 }
 
 fn record(vault: &Vault, page: &str, id: &str) -> Conflict {
     let mut records = vault.list_conflicts(Some(page.into())).unwrap();
     records.extend(vault.conflict_log(Some(page.into())).unwrap());
-    records.into_iter().find(|record| record.id == id).expect("conflict record survives")
+    records
+        .into_iter()
+        .find(|record| record.id == id)
+        .expect("conflict record survives")
 }
 
 fn assert_purged_with_log(vault: &Vault, page: &str, id: &str) -> Conflict {
     assert!(vault.purged_pages().contains(&page.to_owned()));
-    assert!(matches!(vault.load_page(page.into()), Err(VaultError::NotFound(_))));
-    assert!(!vault.page_versions().unwrap().iter().any(|version| version.page == page),
-        "ordinary page versions describe loadable pages only");
-    assert!(vault.sync_page_versions().unwrap().iter().any(|version| version.page == page),
-        "retained history is still compared by sync");
-    assert!(vault.list_conflicts(Some(page.into())).unwrap().iter().all(|record| record.id != id));
-    let conflict = vault.conflict_log(Some(page.into())).unwrap().into_iter()
-        .find(|record| record.id == id).expect("purged resolution remains in the log");
+    assert!(matches!(
+        vault.load_page(page.into()),
+        Err(VaultError::NotFound(_))
+    ));
+    assert!(
+        !vault
+            .page_versions()
+            .unwrap()
+            .iter()
+            .any(|version| version.page == page),
+        "ordinary page versions describe loadable pages only"
+    );
+    assert!(
+        vault
+            .sync_page_versions()
+            .unwrap()
+            .iter()
+            .any(|version| version.page == page),
+        "retained history is still compared by sync"
+    );
+    assert!(vault
+        .list_conflicts(Some(page.into()))
+        .unwrap()
+        .iter()
+        .all(|record| record.id != id));
+    let conflict = vault
+        .conflict_log(Some(page.into()))
+        .unwrap()
+        .into_iter()
+        .find(|record| record.id == id)
+        .expect("purged resolution remains in the log");
     assert!(conflict.undoable());
     assert_eq!(conflict.applied.last().unwrap().by, ResolutionBy::User);
     conflict
 }
 
 fn assert_pending_with_undone_log(vault: &Vault, page: &str, id: &str) -> Conflict {
-    let pending = vault.list_conflicts(Some(page.into())).unwrap().into_iter()
-        .find(|record| record.id == id).expect("ordinary undo reopens pending review");
+    let pending = vault
+        .list_conflicts(Some(page.into()))
+        .unwrap()
+        .into_iter()
+        .find(|record| record.id == id)
+        .expect("ordinary undo reopens pending review");
     assert!(matches!(pending.status, ConflictStatus::Pending));
-    assert!(!pending.undoable(), "the undone application has been consumed");
-    let application = pending.applied.last().expect("undo keeps the resolution history");
+    assert!(
+        !pending.undoable(),
+        "the undone application has been consumed"
+    );
+    let application = pending
+        .applied
+        .last()
+        .expect("undo keeps the resolution history");
     assert_eq!(application.by, ResolutionBy::User);
-    assert!(application.undone_at.is_some(), "undo is marked on the retained application");
-    let logged = vault.conflict_log(Some(page.into())).unwrap().into_iter()
-        .find(|record| record.id == id).expect("reopened entry also keeps its undone log line");
+    assert!(
+        application.undone_at.is_some(),
+        "undo is marked on the retained application"
+    );
+    let logged = vault
+        .conflict_log(Some(page.into()))
+        .unwrap()
+        .into_iter()
+        .find(|record| record.id == id)
+        .expect("reopened entry also keeps its undone log line");
     assert_eq!(logged, pending);
     pending
 }
@@ -125,14 +191,22 @@ fn block_choice_and_scoped_undo_sync_between_two_devices_and_the_hub() {
     let net = Network::new();
     let h = net.hub.vault();
     let page = h.create_page(None, "Conflict".into()).unwrap();
-    h.apply(page.clone(), vec![
-        insert(None, None, "target", "Original"),
-        insert(None, Some("target"), "unrelated", "Unrelated"),
-    ]).unwrap();
+    h.apply(
+        page.clone(),
+        vec![
+            insert(None, None, "target", "Original"),
+            insert(None, Some("target"), "unrelated", "Unrelated"),
+        ],
+    )
+    .unwrap();
     net.a().sync_once().unwrap();
     net.b().sync_once().unwrap();
-    net.a().vault().apply(page.clone(), vec![text("target", "Local")]).unwrap();
-    h.apply(page.clone(), vec![text("target", "Cloud")]).unwrap();
+    net.a()
+        .vault()
+        .apply(page.clone(), vec![text("target", "Local")])
+        .unwrap();
+    h.apply(page.clone(), vec![text("target", "Cloud")])
+        .unwrap();
     net.a().sync_once().unwrap();
     let conflict = net.a().vault().list_conflicts(Some(page.clone())).unwrap().into_iter()
         .find(|conflict| matches!(&conflict.scope, ConflictScope::Block { block } if block == "target"))
@@ -145,19 +219,43 @@ fn block_choice_and_scoped_undo_sync_between_two_devices_and_the_hub() {
         _ => unreachable!(),
     };
     let before = net.a().vault().load_page(page.clone()).unwrap().blocks[0].clone();
-    net.a().vault().resolve_conflict(page.clone(), conflict.id.clone(),
-        ConflictResolution::UseSide(side_index as u32)).unwrap();
+    net.a()
+        .vault()
+        .resolve_conflict(
+            page.clone(),
+            conflict.id.clone(),
+            ConflictResolution::UseSide(side_index as u32),
+        )
+        .unwrap();
     net.a().sync_once().unwrap();
     net.b().sync_once().unwrap();
     net.a().sync_once().unwrap();
     for vault in net.vaults() {
         assert_eq!(vault.load_page(page.clone()).unwrap().blocks[0], chosen);
-        assert!(vault.list_conflicts(Some(page.clone())).unwrap().iter().all(|c| c.id != conflict.id));
-        assert_eq!(record(vault, &page, &conflict.id).applied.last().unwrap().by, ResolutionBy::User);
+        assert!(vault
+            .list_conflicts(Some(page.clone()))
+            .unwrap()
+            .iter()
+            .all(|c| c.id != conflict.id));
+        assert_eq!(
+            record(vault, &page, &conflict.id)
+                .applied
+                .last()
+                .unwrap()
+                .by,
+            ResolutionBy::User
+        );
     }
-    h.apply(page.clone(), vec![text("unrelated", "Later unrelated edit")]).unwrap();
+    h.apply(
+        page.clone(),
+        vec![text("unrelated", "Later unrelated edit")],
+    )
+    .unwrap();
     net.b().sync_once().unwrap();
-    net.b().vault().undo_conflict(page.clone(), conflict.id.clone()).unwrap();
+    net.b()
+        .vault()
+        .undo_conflict(page.clone(), conflict.id.clone())
+        .unwrap();
     net.b().sync_once().unwrap();
     net.a().sync_once().unwrap();
     net.b().sync_once().unwrap();
@@ -183,10 +281,19 @@ fn purged_page_choice_and_undo(warm_b: bool) {
     let mut net = Network::new();
     let h = net.hub.vault();
     let page = h.create_page(None, "Whole page".into()).unwrap();
-    h.apply(page.clone(), vec![
-        insert(None, None, "section", "Section"),
-        insert(Some("section"), None, "kept", "The editing side kept this child"),
-    ]).unwrap();
+    h.apply(
+        page.clone(),
+        vec![
+            insert(None, None, "section", "Section"),
+            insert(
+                Some("section"),
+                None,
+                "kept",
+                "The editing side kept this child",
+            ),
+        ],
+    )
+    .unwrap();
     net.a().sync_once().unwrap();
     if warm_b {
         net.b().sync_once().unwrap();
@@ -199,37 +306,76 @@ fn purged_page_choice_and_undo(warm_b: bool) {
     // page, whose old baseline is deleted by the tombstone-first response before
     // the decision delta arrives. Both must import archive/log history without
     // interpreting retained page content as an active-page restoration.
-    net.a().vault().apply(page.clone(), vec![text("section", "Offline section edit")]).unwrap();
-    h.apply(page.clone(), vec![BlockOp::Delete { id: "kept".into() }]).unwrap();
+    net.a()
+        .vault()
+        .apply(page.clone(), vec![text("section", "Offline section edit")])
+        .unwrap();
+    h.apply(page.clone(), vec![BlockOp::Delete { id: "kept".into() }])
+        .unwrap();
     h.delete_page(page.clone()).unwrap();
     h.purge_page(page.clone()).unwrap();
     net.a().sync_once().unwrap();
-    let conflict = net.a().vault().list_conflicts(Some(page.clone())).unwrap().into_iter()
-        .find(|conflict| matches!(conflict.scope, ConflictScope::Page)
-            && conflict.sides.iter().any(|side| matches!(side.state, SideState::Purged { .. })))
+    let conflict = net
+        .a()
+        .vault()
+        .list_conflicts(Some(page.clone()))
+        .unwrap()
+        .into_iter()
+        .find(|conflict| {
+            matches!(conflict.scope, ConflictScope::Page)
+                && conflict
+                    .sides
+                    .iter()
+                    .any(|side| matches!(side.state, SideState::Purged { .. }))
+        })
         .expect("purge versus offline editing is a page conflict");
     let before = net.a().vault().load_page(page.clone()).unwrap();
     assert!(!before.in_trash);
     assert_eq!(before.blocks[0].children[0].id, "kept");
-    let purged_side = conflict.sides.iter().position(|side| matches!(side.state, SideState::Purged { .. })).unwrap();
-    net.a().vault().resolve_conflict(page.clone(), conflict.id.clone(),
-        ConflictResolution::UseSide(purged_side as u32)).unwrap();
-    let old_archive = net.a().vault().export_updates(page.clone(), Vec::new()).unwrap();
+    let purged_side = conflict
+        .sides
+        .iter()
+        .position(|side| matches!(side.state, SideState::Purged { .. }))
+        .unwrap();
+    net.a()
+        .vault()
+        .resolve_conflict(
+            page.clone(),
+            conflict.id.clone(),
+            ConflictResolution::UseSide(purged_side as u32),
+        )
+        .unwrap();
+    let old_archive = net
+        .a()
+        .vault()
+        .export_updates(page.clone(), Vec::new())
+        .unwrap();
     net.a().sync_once().unwrap();
     if warm_b {
-        assert_eq!(net.b().vault().load_page(page.clone()).unwrap().blocks[0].text, "Section",
-            "offline B still holds its original active baseline before reconnecting");
+        assert_eq!(
+            net.b().vault().load_page(page.clone()).unwrap().blocks[0].text,
+            "Section",
+            "offline B still holds its original active baseline before reconnecting"
+        );
     }
     let first_b = net.b().sync_once().unwrap();
-    assert_eq!(first_b.created, 0, "archive metadata must not create an active page");
+    assert_eq!(
+        first_b.created, 0,
+        "archive metadata must not create an active page"
+    );
     if warm_b {
-        assert_eq!(first_b.purged, 1, "reconnect deletes B's old active baseline");
+        assert_eq!(
+            first_b.purged, 1,
+            "reconnect deletes B's old active baseline"
+        );
     }
     net.a().sync_once().unwrap();
     let expected = assert_purged_with_log(net.a().vault(), &page, &conflict.id);
     for vault in net.vaults() {
         assert_eq!(assert_purged_with_log(vault, &page, &conflict.id), expected);
-        vault.import_updates(page.clone(), old_archive.clone()).unwrap();
+        vault
+            .import_updates(page.clone(), old_archive.clone())
+            .unwrap();
         assert_purged_with_log(vault, &page, &conflict.id);
     }
     // Repeat incremental comparisons and reopen B. Both its
@@ -237,8 +383,14 @@ fn purged_page_choice_and_undo(warm_b: bool) {
     let repeated = net.b().sync_once().unwrap();
     assert_eq!((repeated.created, repeated.purged), (0, 0));
     net.restart_b();
-    assert_eq!(assert_purged_with_log(net.b().vault(), &page, &conflict.id), expected);
-    net.b().vault().undo_conflict(page.clone(), conflict.id.clone()).unwrap();
+    assert_eq!(
+        assert_purged_with_log(net.b().vault(), &page, &conflict.id),
+        expected
+    );
+    net.b()
+        .vault()
+        .undo_conflict(page.clone(), conflict.id.clone())
+        .unwrap();
     net.b().sync_once().unwrap();
     net.a().sync_once().unwrap();
     net.b().sync_once().unwrap();
@@ -248,7 +400,11 @@ fn purged_page_choice_and_undo(warm_b: bool) {
         assert_eq!(restored.title, before.title);
         assert_eq!(restored.blocks, before.blocks);
         assert!(!vault.purged_pages().contains(&page));
-        assert!(vault.page_versions().unwrap().iter().any(|version| version.page == page));
+        assert!(vault
+            .page_versions()
+            .unwrap()
+            .iter()
+            .any(|version| version.page == page));
         assert_pending_with_undone_log(vault, &page, &conflict.id);
     }
 }

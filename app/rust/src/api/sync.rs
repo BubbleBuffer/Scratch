@@ -57,7 +57,12 @@ impl NotesSync {
         trusted: Vec<String>,
     ) -> NotesSync {
         NotesSync {
-            client: Arc::new(SyncClient::with_trusted(vault.inner.clone(), &url, &token, trusted)),
+            client: Arc::new(SyncClient::with_trusted(
+                vault.inner.clone(),
+                &url,
+                &token,
+                trusted,
+            )),
             background: Mutex::new(None),
         }
     }
@@ -150,7 +155,10 @@ pub struct NotesHub {
 impl NotesHub {
     /// A hub for `vault` (pairing tokens live in `.vault/hub/tokens.json`).
     pub fn new(vault: &NotesVault) -> Result<NotesHub, String> {
-        Ok(NotesHub { hub: Hub::new(vault.inner.clone()).map_err(err)?, server: Mutex::new(None) })
+        Ok(NotesHub {
+            hub: Hub::new(vault.inner.clone()).map_err(err)?,
+            server: Mutex::new(None),
+        })
     }
 
     /// Serves on `addr` (for example `0.0.0.0:8787`, or `127.0.0.1:0` for a
@@ -193,7 +201,11 @@ impl NotesHub {
         self.hub
             .devices()
             .into_iter()
-            .map(|d| PairedDevice { label: d.label, device: d.device, created_ms: d.created_ms })
+            .map(|d| PairedDevice {
+                label: d.label,
+                device: d.device,
+                created_ms: d.created_ms,
+            })
             .collect()
     }
 }

@@ -42,7 +42,11 @@ pub struct AgendaEntry {
 /// The same settings snapshot drives visibility and colour. Apply visibility
 /// in SQL before LIMIT, including counts. Blocks never inherit category flags.
 fn calendar_visibility(parameter: usize, calendar: bool) -> String {
-    let switch = if calendar { "show_in_calendar" } else { "show_in_today" };
+    let switch = if calendar {
+        "show_in_calendar"
+    } else {
+        "show_in_today"
+    };
     let notes = format!("(a.source != 1 OR NOT EXISTS (SELECT 1 FROM json_each(?{parameter}, '$.calendars') cat WHERE json_extract(cat.value, '$.id') = a.calendar AND json_extract(cat.value, '$.{switch}') = 0))");
     if calendar {
         format!("{notes} AND (a.block != '' OR c.role IS NOT 'journal') AND (a.source != 0 OR a.block != '' OR NOT EXISTS (SELECT 1 FROM json_each(?{parameter}, '$.databases') d WHERE json_extract(d.value, '$.id') = c.id AND json_extract(d.value, '$.show_in_calendar') = 0))")
@@ -98,9 +102,16 @@ fn task_note(value: &serde_json::Value) -> Option<TaskNote> {
     // An absent or explicitly cleared date is an undated task. An empty
     // add-on object is ordinary page data, rather than a task note.
     let fields = value.as_object()?;
-    if !["date", "status", "calendar", "assignee", "duration_min", "checkbox"]
-        .iter()
-        .any(|key| fields.contains_key(*key))
+    if ![
+        "date",
+        "status",
+        "calendar",
+        "assignee",
+        "duration_min",
+        "checkbox",
+    ]
+    .iter()
+    .any(|key| fields.contains_key(*key))
     {
         return None;
     }
@@ -247,7 +258,11 @@ fn date_mark_ref(block: &Block) -> Option<(DateMarkRef, i64, bool)> {
         return None;
     };
     Some((
-        DateMarkRef { start: mark.start, end: mark.end, iso: iso.clone() },
+        DateMarkRef {
+            start: mark.start,
+            end: mark.end,
+            iso: iso.clone(),
+        },
         date,
         timed,
     ))
@@ -493,8 +508,7 @@ impl Index {
             }
             // A task page can be persisted before its composer writes the
             // add-on fields. The app renders it with these defaults already.
-            let fallback = (page_type == "task" && blocks.empty_task_data)
-                .then(default_task_note);
+            let fallback = (page_type == "task" && blocks.empty_task_data).then(default_task_note);
             if let Some(task) = blocks.task.as_ref().or(fallback.as_ref()) {
                 // Source 1 keeps the task note independent of the page's
                 // database date row (source 0), even with block = ''.
@@ -519,11 +533,14 @@ impl Index {
                 // Off disables Today, while the independent calendar switch
                 // still permits rows. Infer their kind from the schema.
                 let today_role = effective_role(&schema, settings.role);
-                let role = effective_role(&schema, if settings.role == AgendaRole::Off {
-                    AgendaRole::Auto
-                } else {
-                    settings.role
-                });
+                let role = effective_role(
+                    &schema,
+                    if settings.role == AgendaRole::Off {
+                        AgendaRole::Auto
+                    } else {
+                        settings.role
+                    },
+                );
                 if matches!(role, AgendaRole::Tasks | AgendaRole::Events) {
                     let done = if role == AgendaRole::Tasks {
                         let value = match done_def(&schema) {
@@ -799,10 +816,10 @@ impl Vault {
         // Read-only discovery must not initialize the lazy Calendars document
         // or normalize its CRDT lists as the settings editor does.
         let settings = match self.find_by_role("calendars".into())? {
-            Some(page) => serde_json::from_str::<CalendarSettings>(
-                &self.type_data(page, "tasks".into())?,
-            )
-            .map_err(|_| invalid("invalid calendar settings"))?,
+            Some(page) => {
+                serde_json::from_str::<CalendarSettings>(&self.type_data(page, "tasks".into())?)
+                    .map_err(|_| invalid("invalid calendar settings"))?
+            }
             None => CalendarSettings::default(),
         };
         lock(&self.inner.db).agenda_entries(
@@ -822,7 +839,9 @@ impl Vault {
             return Ok(None);
         };
         if empty_task_data(&value)
-            && self.inner.read(page, |doc| doc.meta().page_type == "task")?
+            && self
+                .inner
+                .read(page, |doc| doc.meta().page_type == "task")?
         {
             return Ok(Some(default_task_note()));
         }
@@ -951,7 +970,9 @@ impl Vault {
                 let blocks = doc.blocks();
                 for i in indices {
                     let item = &mut items[i];
-                    if let Some((reference, date, timed)) = item.block.as_deref()
+                    if let Some((reference, date, timed)) = item
+                        .block
+                        .as_deref()
                         .and_then(|id| find_dated_block(&blocks, id))
                         .and_then(date_mark_ref)
                     {
@@ -974,7 +995,9 @@ impl Vault {
         mark_ref: DateMarkRef,
         new_day_ms: i64,
     ) -> Result<()> {
-        let day = Utc.timestamp_millis_opt(new_day_ms).single()
+        let day = Utc
+            .timestamp_millis_opt(new_day_ms)
+            .single()
             .filter(|_| new_day_ms.rem_euclid(86_400_000) == 0)
             .map(|day| day.format("%Y-%m-%d").to_string())
             .filter(|day| iso_day(day) == Some(new_day_ms))
@@ -986,22 +1009,33 @@ impl Vault {
             let blocks = doc.blocks();
             let b = find_dated_block(&blocks, &block)
                 .ok_or_else(|| invalid("stale date mark reference: block is missing"))?;
-            let (current, _, _) = date_mark_ref(b)
-                .ok_or_else(|| invalid("stale date mark reference: block has no selected to-do date"))?;
+            let (current, _, _) = date_mark_ref(b).ok_or_else(|| {
+                invalid("stale date mark reference: block has no selected to-do date")
+            })?;
             if current != mark_ref {
-                return Err(invalid("stale date mark reference: selected date or range changed"));
+                return Err(invalid(
+                    "stale date mark reference: selected date or range changed",
+                ));
             }
             let iso = format!("{day}{}", &current.iso[10..]);
             if iso == current.iso {
                 return Ok(());
             }
             let mut marks = b.marks.clone();
-            let mark = marks.iter_mut().find(|mark| {
-                mark.start == current.start && mark.end == current.end
-                    && mark.kind == MarkKind::Date(current.iso.clone())
-            }).ok_or_else(|| invalid("stale date mark reference: date is missing"))?;
+            let mark = marks
+                .iter_mut()
+                .find(|mark| {
+                    mark.start == current.start
+                        && mark.end == current.end
+                        && mark.kind == MarkKind::Date(current.iso.clone())
+                })
+                .ok_or_else(|| invalid("stale date mark reference: date is missing"))?;
             mark.kind = MarkKind::Date(iso);
-            doc.apply(&[BlockOp::SetText { id: block, text: b.text.clone(), marks }])
+            doc.apply(&[BlockOp::SetText {
+                id: block,
+                text: b.text.clone(),
+                marks,
+            }])
         })
     }
     /// Undone tasks before their matching bound, oldest first, capped in SQL.
@@ -1053,10 +1087,14 @@ impl Vault {
              WHERE p.in_trash = 0 AND {NOT_TEMPLATE} AND p.id IS NOT c.template
                AND ({OVERDUE_PREDICATE}) AND {visibility}"
         );
-        let count = db
-            .conn
-            .prepare_cached(&sql)?
-            .query_row(params![timed_before_ms, day_before_ms, serde_json::to_string(&settings).unwrap()], |r| r.get(0))?;
+        let count = db.conn.prepare_cached(&sql)?.query_row(
+            params![
+                timed_before_ms,
+                day_before_ms,
+                serde_json::to_string(&settings).unwrap()
+            ],
+            |r| r.get(0),
+        )?;
         Ok(count)
     }
     pub fn set_agenda_done(&self, page: PageId, block: Option<BlockId>, done: bool) -> Result<()> {
@@ -1099,14 +1137,11 @@ impl Vault {
     ) -> Result<()> {
         if let Some(block) = block {
             let valid = self.inner.read(&page, |d| {
-                block_agenda(&d.blocks())
-                    .rows
-                    .iter()
-                    .any(|b| {
-                        b.block == block
-                            && b.kind == AgendaKind::Task
-                            && (source.is_some() || b.date.is_some())
-                    })
+                block_agenda(&d.blocks()).rows.iter().any(|b| {
+                    b.block == block
+                        && b.kind == AgendaKind::Task
+                        && (source.is_some() || b.date.is_some())
+                })
             })?;
             if !valid {
                 return Err(invalid("block is not an agenda task"));
@@ -1607,7 +1642,10 @@ impl Vault {
                     if links_page(&tasks.children, &task_page_id) {
                         return Ok(false);
                     }
-                    (tasks.id.clone(), tasks.children.last().map(|b| b.id.clone()))
+                    (
+                        tasks.id.clone(),
+                        tasks.children.last().map(|b| b.id.clone()),
+                    )
                 }
                 None => {
                     // Older notes may lack the section. Put it just above

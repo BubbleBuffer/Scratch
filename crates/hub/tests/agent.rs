@@ -744,9 +744,14 @@ async fn runs_without_a_model_use_the_vault_default_for_hub() {
         st.runs.last().expect("a run").model.clone()
     }
 
-    assert_eq!(run_model(&mut c, None).await, "scripted/scripted", "config default");
+    assert_eq!(
+        run_model(&mut c, None).await,
+        "scripted/scripted",
+        "config default"
+    );
 
-    peer.set_agent_default_runner(Some("this_device".into())).unwrap();
+    peer.set_agent_default_runner(Some("this_device".into()))
+        .unwrap();
     peer.set_agent_default_model("hub".into(), Some("scripted/vault-pick".into()))
         .unwrap();
     peer.set_agent_default_model("this_device".into(), Some("scripted/desktop-only".into()))
@@ -756,18 +761,29 @@ async fn runs_without_a_model_use_the_vault_default_for_hub() {
     let hub_defaults = e.server().hub().vault().agent_defaults().unwrap();
     assert_eq!(hub_defaults.model_for("hub"), Some("scripted/vault-pick"));
 
-    assert_eq!(run_model(&mut c, None).await, "scripted/vault-pick", "vault default");
+    assert_eq!(
+        run_model(&mut c, None).await,
+        "scripted/vault-pick",
+        "vault default"
+    );
     assert_eq!(
         run_model(&mut c, Some("scripted/scripted")).await,
         "scripted/scripted",
         "an explicit model wins"
     );
     let models: Vec<w::AgentModel> = get(c.call("models", Value::Null).await.unwrap());
-    assert!(models.iter().any(|m| m.id == "scripted/vault-pick"), "{models:?}");
+    assert!(
+        models.iter().any(|m| m.id == "scripted/vault-pick"),
+        "{models:?}"
+    );
 
     peer.set_agent_default_model("hub".into(), None).unwrap();
     sync(&client).await;
-    assert_eq!(run_model(&mut c, None).await, "scripted/scripted", "cleared: config default");
+    assert_eq!(
+        run_model(&mut c, None).await,
+        "scripted/scripted",
+        "cleared: config default"
+    );
     drop(c);
     e.server.take().unwrap().stop().await;
 }

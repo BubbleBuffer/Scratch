@@ -115,7 +115,8 @@ fn wait_for(what: &str, mut f: impl FnMut() -> bool, diagnose: impl Fn() -> Stri
     while !f() {
         assert!(
             start.elapsed() < Duration::from_secs(20),
-            "timed out: {what}; {}", diagnose()
+            "timed out: {what}; {}",
+            diagnose()
         );
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -367,20 +368,39 @@ fn background_sync_follows_changes_on_both_sides() {
     let (a, b) = (s.a.vault().clone(), s.b.vault().clone());
     let p = a.create_page(None, "Live".into()).unwrap();
     let diagnose = || {
-        let blocks = |v: &Vault| v.load_page(p.clone()).map(|page| {
-            page.blocks.into_iter().map(|block| (block.id, block.text)).collect::<Vec<_>>()
-        });
-        format!("a_status={:?}; b_status={:?}; a_blocks={:?}; hub_blocks={:?}; b_blocks={:?}",
-            bg_a.status(), bg_b.status(), blocks(&a), blocks(&s.hub_vault), blocks(&b))
+        let blocks = |v: &Vault| {
+            v.load_page(p.clone()).map(|page| {
+                page.blocks
+                    .into_iter()
+                    .map(|block| (block.id, block.text))
+                    .collect::<Vec<_>>()
+            })
+        };
+        format!(
+            "a_status={:?}; b_status={:?}; a_blocks={:?}; hub_blocks={:?}; b_blocks={:?}",
+            bg_a.status(),
+            bg_b.status(),
+            blocks(&a),
+            blocks(&s.hub_vault),
+            blocks(&b)
+        )
     };
-    wait_for("page reaches b", || b.load_page(p.clone()).is_ok(), &diagnose);
+    wait_for(
+        "page reaches b",
+        || b.load_page(p.clone()).is_ok(),
+        &diagnose,
+    );
     b.apply(p.clone(), vec![ins(None, nb("1", "from b"))])
         .unwrap();
-    wait_for("edit reaches a", || {
-        a.load_page(p.clone())
-            .map(|pg| pg.blocks.len() == 1)
-            .unwrap_or(false)
-    }, &diagnose);
+    wait_for(
+        "edit reaches a",
+        || {
+            a.load_page(p.clone())
+                .map(|pg| pg.blocks.len() == 1)
+                .unwrap_or(false)
+        },
+        &diagnose,
+    );
     let img = b
         .add_attachment_bytes("x.txt".into(), b"hello".to_vec())
         .unwrap();
@@ -401,9 +421,11 @@ fn background_sync_follows_changes_on_both_sides() {
         ],
     )
     .unwrap();
-    wait_for("attachment prefetched on a", || {
-        a.attachment_path(img.clone()).is_ok()
-    }, &diagnose);
+    wait_for(
+        "attachment prefetched on a",
+        || a.attachment_path(img.clone()).is_ok(),
+        &diagnose,
+    );
     let st = bg_a.status();
     assert!(st.last_error.is_none(), "{st:?}");
     assert!(st.syncs >= 2);
@@ -418,23 +440,33 @@ fn index_only_churn_keeps_hub_change_cursor_and_transport_history_unchanged() {
     let observer_device = new_id();
     let changes = |query: String| {
         let response = s.hub.handle(HubRequest {
-            method: "GET".into(), path: "/changes".into(), query,
-            headers: vec![("Authorization".into(), format!("Bearer {token}")),
-                (DEVICE_HEADER.into(), observer_device.clone())],
+            method: "GET".into(),
+            path: "/changes".into(),
+            query,
+            headers: vec![
+                ("Authorization".into(), format!("Bearer {token}")),
+                (DEVICE_HEADER.into(), observer_device.clone()),
+            ],
             body: Box::new(std::io::Cursor::new(Vec::<u8>::new())),
-            body_len: Some(0), cancel: None,
+            body_len: Some(0),
+            cancel: None,
         });
         assert_eq!(response.status, 200);
         vault_sync::wire::ChangesResponse::decode(&response.body).unwrap()
     };
-    let page = s.hub_vault.create_page(None, "Retained change".into()).unwrap();
+    let page = s
+        .hub_vault
+        .create_page(None, "Retained change".into())
+        .unwrap();
     s.hub_vault.flush().unwrap();
     let before = changes("wait=0".into());
     let transport = s.hub_vault.poll_sync_changes(0);
     // The raw window holds 10k entries. Even enough index-only commits to
     // overflow it must not evict document transport history or signal sync.
     for _ in 0..10_005 {
-        s.hub_vault.delete_search_row("test".into(), "already-absent".into()).unwrap();
+        s.hub_vault
+            .delete_search_row("test".into(), "already-absent".into())
+            .unwrap();
     }
     assert!(s.hub_vault.poll_changes(0).reset);
     assert_eq!(s.hub_vault.poll_sync_changes(0), transport);
@@ -446,24 +478,45 @@ fn index_only_churn_keeps_hub_change_cursor_and_transport_history_unchanged() {
     assert_eq!((waited.epoch, waited.seq), (before.epoch, before.seq));
     let report = s.a.sync_once().unwrap();
     assert_eq!(report.created, 1);
-    assert_eq!(s.a.vault().load_page(page).unwrap().title, "Retained change");
+    assert_eq!(
+        s.a.vault().load_page(page).unwrap().title,
+        "Retained change"
+    );
 }
 
 #[test]
 fn background_sync_does_not_run_for_local_or_hub_index_only_commits() {
     let s = setup();
-    let bg = s.a.start(SyncOptions { debounce_ms: 30, max_delay_ms: 100,
-        interval_ms: 60_000, long_poll_ms: 250, prefetch_attachments: false });
-    wait_for("startup sync and initial remote notification", || {
-        let status = bg.status();
-        status.syncs >= 2 && !status.syncing
-    }, || format!("{:?}", bg.status()));
+    let bg = s.a.start(SyncOptions {
+        debounce_ms: 30,
+        max_delay_ms: 100,
+        interval_ms: 60_000,
+        long_poll_ms: 250,
+        prefetch_attachments: false,
+    });
+    wait_for(
+        "startup sync and initial remote notification",
+        || {
+            let status = bg.status();
+            status.syncs >= 2 && !status.syncing
+        },
+        || format!("{:?}", bg.status()),
+    );
     let before = bg.status().syncs;
     for vault in [s.a.vault(), &s.hub_vault] {
-        vault.upsert_search_row("test".into(), ExternalSearchRow {
-            id: "index-only".into(), title: "External".into(), body: "preview".into(),
-            page_type: "chat".into(), target: None, updated_ms: 1,
-        }).unwrap();
+        vault
+            .upsert_search_row(
+                "test".into(),
+                ExternalSearchRow {
+                    id: "index-only".into(),
+                    title: "External".into(),
+                    body: "preview".into(),
+                    page_type: "chat".into(),
+                    target: None,
+                    updated_ms: 1,
+                },
+            )
+            .unwrap();
     }
     // Several remote long-poll intervals and local debounce windows elapse.
     std::thread::sleep(Duration::from_millis(800));

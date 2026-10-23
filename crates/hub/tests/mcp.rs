@@ -165,7 +165,10 @@ async fn a_token_lists_and_calls_only_its_tool_set() {
     assert_eq!(listed_names(&env, &env.everything).await, LISTED);
     assert_eq!(listed_names(&env, &env.write).await, LISTED);
     let read = listed_names(&env, &env.read).await;
-    assert_eq!(read, ["search_notes", "read_page", "memory_read", "notes_help"]);
+    assert_eq!(
+        read,
+        ["search_notes", "read_page", "memory_read", "notes_help"]
+    );
 
     // Everything calls listed write tools, hidden tools and old names.
     let created = env
@@ -176,7 +179,10 @@ async fn a_token_lists_and_calls_only_its_tool_set() {
         )
         .await;
     let page = id_in(tool_text(&created));
-    tool_text(&env.call(&env.everything, "feedback_list", json!({"limit":1})).await);
+    tool_text(
+        &env.call(&env.everything, "feedback_list", json!({"limit":1}))
+            .await,
+    );
     tool_text(
         &env.call(
             &env.everything,

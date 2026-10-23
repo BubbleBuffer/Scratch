@@ -114,7 +114,9 @@ pub enum SyncError {
     /// private CA) and is not pinned. `sha256` is the end-entity
     /// certificate's fingerprint, uppercase hex pairs separated by `:`;
     /// `SyncClient::untrusted_certificate` has the chain.
-    UntrustedCertificate { sha256: String },
+    UntrustedCertificate {
+        sha256: String,
+    },
 }
 
 impl fmt::Display for SyncError {

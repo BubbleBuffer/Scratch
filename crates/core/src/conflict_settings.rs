@@ -239,39 +239,78 @@ mod tests {
     #[test]
     fn policy_sweep_trims_purged_logs_and_preserves_archived_pending_undo() {
         use crate::types::{
-            AppliedResolution, Conflict, ConflictScope, ConflictSide, ConflictStatus,
-            ResolutionBy, SideState,
+            AppliedResolution, Conflict, ConflictScope, ConflictSide, ConflictStatus, ResolutionBy,
+            SideState,
         };
         let (_dir, vault) = vault();
         let page = vault.create_page(None, "Archived conflict".into()).unwrap();
-        let records = vault.inner.edit(&page, |doc| {
-            let applied = AppliedResolution {
-                time_ms: 0, by: ResolutionBy::Auto { rule: "edit-beats-delete".into() },
-                before: doc.version(), before_state: None, fallback: false,
-                restored_ancestors: Vec::new(), undone_at: None, resolution: None,
-            };
-            let mut resolved = Conflict {
-                page: page.clone(), id: "expired-log".into(), format: 2,
-                block: "body".into(), time_ms: 0,
-                scope: ConflictScope::Block { block: "body".into() },
-                sides: vec![
-                    ConflictSide::new("left".into(), 0, Some(doc.version()),
-                        SideState::Present { content: Vec::new() }, None),
-                    ConflictSide::new("right".into(), 0, Some(doc.version()), SideState::Deleted, None),
-                ],
-                status: ConflictStatus::Resolved(applied.clone()), applied: vec![applied],
-            };
-            crate::sync::write_conflict(doc, &resolved)?;
-            resolved.id = "pending-undo".into();
-            resolved.status = ConflictStatus::Pending;
-            resolved.applied[0].undone_at = Some(0);
-            crate::sync::write_conflict(doc, &resolved)?;
-            Ok(doc.conflicts())
-        }).unwrap();
-        lock(&vault.inner.db).set_conflicts(&page, &crate::sync::mirror_rows(&page, &records)).unwrap();
+        let records = vault
+            .inner
+            .edit(&page, |doc| {
+                let applied = AppliedResolution {
+                    time_ms: 0,
+                    by: ResolutionBy::Auto {
+                        rule: "edit-beats-delete".into(),
+                    },
+                    before: doc.version(),
+                    before_state: None,
+                    fallback: false,
+                    restored_ancestors: Vec::new(),
+                    undone_at: None,
+                    resolution: None,
+                };
+                let mut resolved = Conflict {
+                    page: page.clone(),
+                    id: "expired-log".into(),
+                    format: 2,
+                    block: "body".into(),
+                    time_ms: 0,
+                    scope: ConflictScope::Block {
+                        block: "body".into(),
+                    },
+                    sides: vec![
+                        ConflictSide::new(
+                            "left".into(),
+                            0,
+                            Some(doc.version()),
+                            SideState::Present {
+                                content: Vec::new(),
+                            },
+                            None,
+                        ),
+                        ConflictSide::new(
+                            "right".into(),
+                            0,
+                            Some(doc.version()),
+                            SideState::Deleted,
+                            None,
+                        ),
+                    ],
+                    status: ConflictStatus::Resolved(applied.clone()),
+                    applied: vec![applied],
+                };
+                crate::sync::write_conflict(doc, &resolved)?;
+                resolved.id = "pending-undo".into();
+                resolved.status = ConflictStatus::Pending;
+                resolved.applied[0].undone_at = Some(0);
+                crate::sync::write_conflict(doc, &resolved)?;
+                Ok(doc.conflicts())
+            })
+            .unwrap();
+        lock(&vault.inner.db)
+            .set_conflicts(&page, &crate::sync::mirror_rows(&page, &records))
+            .unwrap();
         vault.delete_page(page.clone()).unwrap();
         vault.purge_page(page.clone()).unwrap();
-        assert_eq!(vault.inner.read_conflict_archive(&page).unwrap().conflicts().len(), 2);
+        assert_eq!(
+            vault
+                .inner
+                .read_conflict_archive(&page)
+                .unwrap()
+                .conflicts()
+                .len(),
+            2
+        );
 
         assert_eq!(vault.sweep_conflict_policy().unwrap(), 2);
         assert!(vault.conflict_log(Some(page.clone())).unwrap().is_empty());
@@ -282,7 +321,10 @@ mod tests {
         let archived = vault.inner.read_conflict_archive(&page).unwrap();
         assert_eq!(archived.conflicts().len(), 1);
         assert_eq!(archived.conflicts()[0].0, "pending-undo");
-        assert!(matches!(vault.load_page(page), Err(crate::VaultError::NotFound(_))));
+        assert!(matches!(
+            vault.load_page(page),
+            Err(crate::VaultError::NotFound(_))
+        ));
     }
 
     #[test]

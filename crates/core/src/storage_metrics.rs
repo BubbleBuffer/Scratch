@@ -85,7 +85,13 @@ mod imp {
                 local.stack.len() - 1
             })
             .unwrap_or(0);
-        SpanGuard { label, gen, depth, start, _not_send: PhantomData }
+        SpanGuard {
+            label,
+            gen,
+            depth,
+            start,
+            _not_send: PhantomData,
+        }
     }
 
     impl Drop for SpanGuard {
@@ -126,7 +132,9 @@ mod imp {
                 let stat = totals.entry(self.label).or_default();
                 stat.calls += 1;
                 stat.inclusive_ns = stat.inclusive_ns.saturating_add(elapsed);
-                stat.exclusive_ns = stat.exclusive_ns.saturating_add(elapsed.saturating_sub(child));
+                stat.exclusive_ns = stat
+                    .exclusive_ns
+                    .saturating_add(elapsed.saturating_sub(child));
             }
         }
     }
@@ -134,13 +142,19 @@ mod imp {
     /// Adds `bytes` to `label`. No call is counted.
     pub fn add_bytes(label: &'static str, bytes: u64) {
         let gen = GEN.load(Ordering::SeqCst);
-        let current = LOCAL.try_with(|local| {
-            let local = local.borrow();
-            local.stack.is_empty() || local.gen == gen
-        }).unwrap_or(true);
-        if !current { return; }
+        let current = LOCAL
+            .try_with(|local| {
+                let local = local.borrow();
+                local.stack.is_empty() || local.gen == gen
+            })
+            .unwrap_or(true);
+        if !current {
+            return;
+        }
         let mut totals = totals();
-        if gen != GEN.load(Ordering::SeqCst) { return; }
+        if gen != GEN.load(Ordering::SeqCst) {
+            return;
+        }
         let stat = totals.entry(label).or_default();
         stat.bytes = stat.bytes.saturating_add(bytes);
     }
@@ -253,7 +267,10 @@ mod tests {
         assert_eq!(oe, oi - ii);
         assert_eq!(ie, ii, "a leaf has no children");
         // The outer span's own busy time is 2 ms before and 1 ms after the child.
-        assert!(oe >= 3_000_000, "outer self time is at least its 3 ms of busy waiting");
+        assert!(
+            oe >= 3_000_000,
+            "outer self time is at least its 3 ms of busy waiting"
+        );
     }
 
     #[test]
@@ -287,7 +304,10 @@ mod tests {
         busy(1);
         reset();
         drop(old);
-        assert!(label_of(&report(), "test.old").is_none(), "old guard was charged to the new phase");
+        assert!(
+            label_of(&report(), "test.old").is_none(),
+            "old guard was charged to the new phase"
+        );
 
         // A child span from the new phase must not be subtracted from an
         // old-phase parent, and the old parent must not appear afterwards.
@@ -301,7 +321,11 @@ mod tests {
         let (fc, _, fi, fe) = label_of(&r, "test.fresh").unwrap();
         let (_, _, ii, _) = label_of(&r, "test.inner_fresh").unwrap();
         assert_eq!(fc, 1);
-        assert_eq!(fe, fi - ii, "new-phase accounting is independent of the discarded guard");
+        assert_eq!(
+            fe,
+            fi - ii,
+            "new-phase accounting is independent of the discarded guard"
+        );
         assert!(label_of(&r, "test.old").is_none());
     }
 

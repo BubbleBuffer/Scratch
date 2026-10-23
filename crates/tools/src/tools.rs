@@ -75,7 +75,8 @@ fn search_description() -> &'static str {
     Box::leak(text.into_boxed_str())
 }
 
-static TOOLS: LazyLock<Vec<ToolDef>> = LazyLock::new(|| vec![
+static TOOLS: LazyLock<Vec<ToolDef>> = LazyLock::new(|| {
+    vec![
     ToolDef {
         name: "search_notes",
         description: search_description(),
@@ -295,10 +296,12 @@ static TOOLS: LazyLock<Vec<ToolDef>> = LazyLock::new(|| vec![
         approval: Approval::None,
         surfaces: &[Surface::Mcp],
     },
-]);
+]
+});
 
 /// What a host that runs no jobs answers to the `jobs` tool.
-pub const JOBS_NEED_A_HUB: &str = "jobs run on the hub: connect to the hub's /mcp with an agent token";
+pub const JOBS_NEED_A_HUB: &str =
+    "jobs run on the hub: connect to the hub's /mcp with an agent token";
 
 /// Tools that are callable over MCP but never listed. `memory_list` is the
 /// memory index the CLI reads (it was an alias of the old memory_search
@@ -855,7 +858,9 @@ fn read_page(v: &Vault, a: &Value) -> Result<String> {
     let id = match resolve_page(v, name) {
         Ok(id) => id,
         // Never opens a near match: the hits are listed as search results.
-        Err(e) if e.0.starts_with("no page ") => return err(crate::query::read_page_miss(v, name.trim())),
+        Err(e) if e.0.starts_with("no page ") => {
+            return err(crate::query::read_page_miss(v, name.trim()))
+        }
         Err(e) => return Err(e),
     };
     let page = v.load_page(id.clone())?;
@@ -881,7 +886,10 @@ fn read_page(v: &Vault, a: &Value) -> Result<String> {
         _ => meta.push("top level".into()),
     }
     if page.is_database() {
-        meta.push(format!("database (its rows: search_notes in:[[{}]])", page.id));
+        meta.push(format!(
+            "database (its rows: search_notes in:[[{}]])",
+            page.id
+        ));
     }
     if page.in_trash {
         meta.push("in the trash".into());

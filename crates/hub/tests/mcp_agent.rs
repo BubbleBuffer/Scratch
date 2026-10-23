@@ -2359,11 +2359,23 @@ async fn a_renamed_computer_routes_by_its_new_name_and_names_stay_unique_among_h
     let (status, body) = rename_device(&env, &desk_token, "dev-desk", "  Desk ").await;
     assert_eq!((status, &body), (StatusCode::OK, &json!({"name":"Desk"})));
     let reply = env
-        .call_at(&url, &token, Some(&session), "read", json!({"path":"a","host":"desk"}))
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a","host":"desk"}),
+        )
         .await;
     assert_eq!(success_text(&reply), "[on Desk]\npc ran read");
     let reply = env
-        .call_at(&url, &token, Some(&session), "read", json!({"path":"a","host":"pc"}))
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a","host":"pc"}),
+        )
         .await;
     assert_eq!(tool_error(&reply), "Unknown computer pc. Call hosts.");
     let locked = format!("{url}?host=Desk");
@@ -2392,7 +2404,13 @@ async fn a_renamed_computer_routes_by_its_new_name_and_names_stay_unique_among_h
         );
     }
     let reply = env
-        .call_at(&url, &token, Some(&session), "read", json!({"path":"a","host":"office"}))
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a","host":"office"}),
+        )
         .await;
     assert_eq!(tool_error(&reply), "Office is offline");
     let (status, _) = rename_device(&env, &laptop_token, "dev-laptop", " ").await;
@@ -2400,7 +2418,13 @@ async fn a_renamed_computer_routes_by_its_new_name_and_names_stay_unique_among_h
     let (status, _) = rename_device(&env, "wrong", "dev-laptop", "x").await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     let reply = env
-        .call_at(&url, &token, Some(&session), "read", json!({"path":"a","host":"laptop"}))
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a","host":"laptop"}),
+        )
         .await;
     assert_eq!(success_text(&reply), "[on laptop]\nlaptop ran read");
 }

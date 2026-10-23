@@ -13,8 +13,8 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -56,8 +56,12 @@ struct ColdPolicy {
 
 impl Default for ColdPolicy {
     fn default() -> Self {
-        Self { age_seconds: COLD_AFTER.as_secs() as i64, minimum_bytes: COLD_MIN_BYTES,
-            pages_per_pass: 2, idle_seconds: 5 }
+        Self {
+            age_seconds: COLD_AFTER.as_secs() as i64,
+            minimum_bytes: COLD_MIN_BYTES,
+            pages_per_pass: 2,
+            idle_seconds: 5,
+        }
     }
 }
 
@@ -223,19 +227,27 @@ thread_local! {
 /// Forks outside the writer (for example markdown rescan) also need an
 /// atomic hot/cold read. Reuse an enclosing flush lock on the same thread.
 pub(crate) fn with_cold_read_lock<T>(root: &Path, read: impl FnOnce() -> Result<T>) -> Result<T> {
-    if HELD_FLUSH_ROOTS.with(|held| held.borrow().contains(root)) { return read(); }
+    if HELD_FLUSH_ROOTS.with(|held| held.borrow().contains(root)) {
+        return read();
+    }
     let file = open_flush_file(root)?;
     let started = Instant::now();
     {
         #[cfg(feature = "storage-metrics")]
         let _w = storage_metrics::span("wait.cold_read_lock");
         while !try_lock_exclusive(&file)? {
-            if started.elapsed() >= FLUSH_LOCK_TIMEOUT { return Err(flush_lock_timeout()); }
+            if started.elapsed() >= FLUSH_LOCK_TIMEOUT {
+                return Err(flush_lock_timeout());
+            }
             std::thread::sleep(FLUSH_LOCK_POLL);
         }
     }
     struct ReadLock(File);
-    impl Drop for ReadLock { fn drop(&mut self) { let _ = unlock_exclusive(&self.0); } }
+    impl Drop for ReadLock {
+        fn drop(&mut self) {
+            let _ = unlock_exclusive(&self.0);
+        }
+    }
     let _guard = ReadLock(file);
     read()
 }
@@ -250,7 +262,9 @@ impl std::ops::Deref for FlushLock<'_> {
 
 impl Drop for FlushLock<'_> {
     fn drop(&mut self) {
-        HELD_FLUSH_ROOTS.with(|held| { held.borrow_mut().remove(self.root); });
+        HELD_FLUSH_ROOTS.with(|held| {
+            held.borrow_mut().remove(self.root);
+        });
         if self
             .file
             .as_ref()
@@ -412,11 +426,18 @@ pub(crate) struct Purged {
 impl Purged {
     /// The tombstone `record` leaves on its page: its coverage and purging
     /// device after the merge rule. Restore checks and persistence both use it.
-    pub(crate) fn effect(&self, record: &crate::sync::PurgeRecord) -> Result<crate::sync::PurgeRecord> {
+    pub(crate) fn effect(
+        &self,
+        record: &crate::sync::PurgeRecord,
+    ) -> Result<crate::sync::PurgeRecord> {
         let active = self.versions.get(&record.page).cloned().flatten();
         let known = self.devices.get(&record.page).cloned();
         let (version, device) = crate::sync::merge_purge_identity(active, known, record)?;
-        Ok(crate::sync::PurgeRecord { page: record.page.clone(), version, device })
+        Ok(crate::sync::PurgeRecord {
+            page: record.page.clone(),
+            version,
+            device,
+        })
     }
 }
 
@@ -784,7 +805,9 @@ impl Inner {
     fn read_conflict_archive_locked(&self, id: &str, _flush: &FlushLock<'_>) -> Result<PageDoc> {
         let bytes = match fs::read(self.conflict_archive_path(id)?) {
             Ok(bytes) => bytes,
-            Err(e) if e.kind() == ErrorKind::NotFound => return Err(not_found("conflict archive", id)),
+            Err(e) if e.kind() == ErrorKind::NotFound => {
+                return Err(not_found("conflict archive", id))
+            }
             Err(e) => return Err(e.into()),
         };
         let doc = PageDoc::from_bytes(&bytes, &[])?;
@@ -820,7 +843,10 @@ impl Inner {
             Err(e) => return Err(e),
         };
         let merged = crate::conflict_archive::merge(id, doc, old.as_ref())?;
-        if old.as_ref().is_some_and(|old| old.doc.oplog_vv() == merged.doc.oplog_vv()) {
+        if old
+            .as_ref()
+            .is_some_and(|old| old.doc.oplog_vv() == merged.doc.oplog_vv())
+        {
             return Ok(false);
         }
         let directory = self.conflict_archive_dir();
@@ -942,8 +968,11 @@ impl Inner {
             f.push(Change::PageChanged(id));
         }
         // The feed lock serializes increments across both index connections.
-        let generation = self.index_generation.load(Ordering::Relaxed)
-            .checked_add(1).expect("index generation exhausted");
+        let generation = self
+            .index_generation
+            .load(Ordering::Relaxed)
+            .checked_add(1)
+            .expect("index generation exhausted");
         self.index_generation.store(generation, Ordering::Release);
         f.push(Change::IndexCommitted { generation, pages });
         drop(f);
@@ -969,7 +998,11 @@ impl Inner {
         self.wait_feed(since, timeout, false)
     }
 
-    pub(crate) fn wait_documents(&self, since: u32, timeout: Duration) -> crate::types::ChangeBatch {
+    pub(crate) fn wait_documents(
+        &self,
+        since: u32,
+        timeout: Duration,
+    ) -> crate::types::ChangeBatch {
         self.wait_feed(since, timeout, true)
     }
 
@@ -977,11 +1010,20 @@ impl Inner {
         lock(&self.feed).poll_documents(since)
     }
 
-    fn wait_feed(&self, since: u32, timeout: Duration, documents_only: bool) -> crate::types::ChangeBatch {
+    fn wait_feed(
+        &self,
+        since: u32,
+        timeout: Duration,
+        documents_only: bool,
+    ) -> crate::types::ChangeBatch {
         let deadline = Instant::now() + timeout;
         let mut f = lock(&self.feed);
         loop {
-            let b = if documents_only { f.poll_documents(since) } else { f.poll(since) };
+            let b = if documents_only {
+                f.poll_documents(since)
+            } else {
+                f.poll(since)
+            };
             if b.reset || !b.changes.is_empty() || b.seq != since {
                 return b;
             }
@@ -1207,8 +1249,13 @@ impl Inner {
                 warned = true;
             }
             if acquired {
-                HELD_FLUSH_ROOTS.with(|held| { held.borrow_mut().insert(self.root.clone()); });
-                return Ok(FlushLock { file, root: &self.root });
+                HELD_FLUSH_ROOTS.with(|held| {
+                    held.borrow_mut().insert(self.root.clone());
+                });
+                return Ok(FlushLock {
+                    file,
+                    root: &self.root,
+                });
             }
             contended = true;
             #[cfg(test)]
@@ -1416,11 +1463,14 @@ impl Inner {
         let mut doc = PageDoc::from_bytes(&snapshot, &[])?;
         // A second instance may have split this page after our inventory was
         // read. Attaching the location is free and only affects shallow docs.
-        if doc.doc.is_shallow() && (lock(&self.cold_pages).contains(id)
-            || cold::path(&self.root, id).exists()) {
+        if doc.doc.is_shallow()
+            && (lock(&self.cold_pages).contains(id) || cold::path(&self.root, id).exists())
+        {
             doc.attach_cold(&self.root, id);
         }
-        for bytes in updates { doc.import_updates(&bytes)?; }
+        for bytes in updates {
+            doc.import_updates(&bytes)?;
+        }
         let peer = self.page_peer(&doc);
         doc.set_peer(peer)?;
         let seen = SeenFiles {
@@ -1504,7 +1554,10 @@ impl Inner {
                     }
                 }
                 db.update_content(&row.id, meta.updated, &content)?;
-                db.set_conflicts(&row.id, &crate::sync::mirror_rows(&row.id, &doc.conflicts()))?;
+                db.set_conflicts(
+                    &row.id,
+                    &crate::sync::mirror_rows(&row.id, &doc.conflicts()),
+                )?;
                 db.refresh_trash(&row.id)?;
             }
             defer.finish()?;
@@ -1608,7 +1661,9 @@ impl Inner {
             let _w = storage_metrics::span("wait.slot_state");
             lock(&slot.state)
         };
-        if st.deleted { return Err(not_found("page", id)); }
+        if st.deleted {
+            return Err(not_found("page", id));
+        }
         self.refresh_cold_state(id, &mut st)?;
         Ok(f(&mut st.doc))
     }
@@ -1621,9 +1676,17 @@ impl Inner {
         let _r = storage_metrics::span("vault.refresh_cold_state");
         let _flush = self.flush_lock()?;
         let sequence = read_sequence(&_flush)?;
-        let stamps = [self.stat_page_file(id, 0)?, self.stat_page_file(id, 1)?, self.stat_page_file(id, 2)?];
-        let changed = sequence.is_none() || sequence != st.seen.sequence || st.changed_on_disk
-            || [&st.seen.snapshot, &st.seen.old_log, &st.seen.log].iter().zip(&stamps)
+        let stamps = [
+            self.stat_page_file(id, 0)?,
+            self.stat_page_file(id, 1)?,
+            self.stat_page_file(id, 2)?,
+        ];
+        let changed = sequence.is_none()
+            || sequence != st.seen.sequence
+            || st.changed_on_disk
+            || [&st.seen.snapshot, &st.seen.old_log, &st.seen.log]
+                .iter()
+                .zip(&stamps)
                 .any(|(seen, stamp)| !seen.as_ref().is_some_and(|s| s.unchanged(stamp)));
         let before = st.doc.doc.oplog_vv();
         if changed {
@@ -1635,8 +1698,12 @@ impl Inner {
                 st.doc.doc.export(ExportMode::all_updates())?
             })?;
             st.doc = disk;
-        } else { st.doc.rehydrate()?; }
-        if st.doc.doc.oplog_vv() != before { self.mark_dirty(st, id); }
+        } else {
+            st.doc.rehydrate()?;
+        }
+        if st.doc.doc.oplog_vv() != before {
+            self.mark_dirty(st, id);
+        }
         Ok(())
     }
 
@@ -1645,10 +1712,14 @@ impl Inner {
     fn stage_cold_hot(&self, id: &str, bytes: &[u8]) -> Result<PathBuf> {
         let part = cold::read(&self.root, id)?;
         let hot = PageDoc::from_bytes(bytes, &[])?;
-        let root = hot.doc.frontiers_to_vv(&hot.doc.shallow_since_frontiers())
+        let root = hot
+            .doc
+            .frontiers_to_vv(&hot.doc.shallow_since_frontiers())
             .ok_or_else(|| invalid("hot root missing"))?;
-        if !hot.doc.is_shallow() || !part.root.vv.includes_vv(&root)
-            || !hot.doc.oplog_vv().includes_vv(&part.root.vv) {
+        if !hot.doc.is_shallow()
+            || !part.root.vv.includes_vv(&root)
+            || !hot.doc.oplog_vv().includes_vv(&part.root.vv)
+        {
             return Err(invalid("cold prefix must cover the shallow hot root"));
         }
         let prefix = loro::LoroDoc::new();
@@ -1667,15 +1738,25 @@ impl Inner {
     fn cold_page(&self, index: &Index, id: &str, policy: &ColdPolicy, at_ms: i64) -> Result<bool> {
         #[cfg(feature = "storage-metrics")]
         let _c = storage_metrics::span("archive.cold_page");
-        if self.is_purged(id) { return Ok(false); }
+        if self.is_purged(id) {
+            return Ok(false);
+        }
         let original = {
             let cache = lock(&self.cache);
             if let Some(slot) = cache.get(id) {
-                if Arc::strong_count(slot) != 1 { return Ok(false); }
-                let Ok(st) = slot.state.try_lock() else { return Ok(false); };
-                if st.dirty || st.deleted { return Ok(false); }
+                if Arc::strong_count(slot) != 1 {
+                    return Ok(false);
+                }
+                let Ok(st) = slot.state.try_lock() else {
+                    return Ok(false);
+                };
+                if st.dirty || st.deleted {
+                    return Ok(false);
+                }
                 Some((slot.clone(), st.doc.doc.oplog_vv()))
-            } else { None }
+            } else {
+                None
+            }
         };
         // All clean cached changes are already on disk. Read a separate doc
         // so compression and Loro's root search cannot delay foreground use.
@@ -1684,8 +1765,11 @@ impl Inner {
             let (mut doc, seen) = self.read_doc_locked(id, &flush)?;
             // A foreign instance's nonempty log is a dirty page too. Leave
             // its recovery data for the normal writer/index flush protocol.
-            if [&seen.old_log, &seen.log].iter().any(|seen|
-                seen.as_ref().and_then(|s| s.stamp.as_ref()).is_some_and(|s| s.len > 0)) {
+            if [&seen.old_log, &seen.log].iter().any(|seen| {
+                seen.as_ref()
+                    .and_then(|s| s.stamp.as_ref())
+                    .is_some_and(|s| s.len > 0)
+            }) {
                 return Ok(None);
             }
             let was_shallow = doc.doc.is_shallow();
@@ -1703,45 +1787,74 @@ impl Inner {
             full.doc.oplog_frontiers()
         } else {
             let Some(root) = crate::history::cutoff_root(&full, at_ms / 1000 - policy.age_seconds)?
-                else { return Ok(false); };
+            else {
+                return Ok(false);
+            };
             root
         };
         let hot_bytes = crate::history::hot_snapshot(&full, &root)?;
         let mut hot = PageDoc::from_bytes(&hot_bytes, &[])?;
-        if !hot.doc.is_shallow() { return Ok(false); }
+        if !hot.doc.is_shallow() {
+            return Ok(false);
+        }
         // Always use Loro's actual boundary, including conservative retreats.
         let actual = hot.doc.shallow_since_frontiers();
-        let vv = full.doc.frontiers_to_vv(&actual)
+        let vv = full
+            .doc
+            .frontiers_to_vv(&actual)
             .ok_or_else(|| invalid("cold root missing from page"))?;
         if lock(&self.cold_pages).contains(id) {
             let old = cold::read(&self.root, id)?;
             // The replacement cold prefix must cover the old one, since the
             // old hot file is still authoritative until the final rename.
-            if !vv.includes_vv(&old.root.vv) || (was_shallow && vv == old.root.vv) { return Ok(false); }
+            if !vv.includes_vv(&old.root.vv) || (was_shallow && vv == old.root.vv) {
+                return Ok(false);
+            }
         }
         let prefix = full.doc.fork_at(&actual)?;
         let updates = prefix.export(ExportMode::all_updates())?;
-        if !in_trash && updates.len() < policy.minimum_bytes { return Ok(false); }
-        let part = cold::ColdPart { root: cold::ColdRoot { frontiers: actual, vv }, updates };
+        if !in_trash && updates.len() < policy.minimum_bytes {
+            return Ok(false);
+        }
+        let part = cold::ColdPart {
+            root: cold::ColdRoot {
+                frontiers: actual,
+                vv,
+            },
+            updates,
+        };
         let prepared = cold::prepare(&self.root, &part)?;
         #[cfg(test)]
         {
             let hook = lock(&self.cold_before_publish).take();
-            if let Some(hook) = hook { hook(self, id); }
+            if let Some(hook) = hook {
+                hook(self, id);
+            }
         }
         let result = (|| {
             let cache = lock(&self.cache);
-            if self.is_purged(id) { return Ok(false); }
+            if self.is_purged(id) {
+                return Ok(false);
+            }
             let current = cache.get(id);
             let slot = match (&original, current) {
-                (Some((a, _)), Some(b)) if Arc::ptr_eq(a, b) && Arc::strong_count(b) == 2 => Some(b),
+                (Some((a, _)), Some(b)) if Arc::ptr_eq(a, b) && Arc::strong_count(b) == 2 => {
+                    Some(b)
+                }
                 (None, None) => None,
                 _ => return Ok(false),
             };
             let mut state = match slot {
                 Some(s) => match s.state.try_lock() {
-                    Ok(st) if !st.dirty && !st.deleted
-                        && original.as_ref().is_some_and(|(_, vv)| st.doc.doc.oplog_vv() == *vv) => Some(st),
+                    Ok(st)
+                        if !st.dirty
+                            && !st.deleted
+                            && original
+                                .as_ref()
+                                .is_some_and(|(_, vv)| st.doc.doc.oplog_vv() == *vv) =>
+                    {
+                        Some(st)
+                    }
                     _ => return Ok(false),
                 },
                 None => None,
@@ -1759,18 +1872,25 @@ impl Inner {
                     disk.import_updates(&st.doc.doc.export(ExportMode::all_updates())?)?;
                     st.doc = disk;
                     self.mark_dirty(st, id);
-                } else { self.send(Msg::Recover(id.to_owned())); }
+                } else {
+                    self.send(Msg::Recover(id.to_owned()));
+                }
                 return Ok(false);
             }
-            if [&seen.old_log, &seen.log].iter().any(|seen|
-                seen.as_ref().and_then(|s| s.stamp.as_ref()).is_some_and(|s| s.len > 0)) {
+            if [&seen.old_log, &seen.log].iter().any(|seen| {
+                seen.as_ref()
+                    .and_then(|s| s.stamp.as_ref())
+                    .is_some_and(|s| s.len > 0)
+            }) {
                 return Ok(false);
             }
             // Even an equal-VV publication by another instance may advance
             // its root. Never replace that prefix with a shorter one.
             if cold::path(&self.root, id).exists() {
                 let old = cold::read(&self.root, id)?;
-                if !part.root.vv.includes_vv(&old.root.vv) { return Ok(false); }
+                if !part.root.vv.includes_vv(&old.root.vv) {
+                    return Ok(false);
+                }
             }
             // An uncached page cannot change while the cache lock is held;
             // every edit/import obtains a slot through this lock.
@@ -1785,8 +1905,12 @@ impl Inner {
             let log_stamp = seen.log.as_ref().and_then(|s| s.stamp.clone());
             let seen = SeenFiles {
                 snapshot: Some(SeenFile::observed(self.stat_page_file(id, 0)?)),
-                old_log: Some(SeenFile::observed(self.truncate_page_log(id, 1, &old_stamp)?)),
-                log: Some(SeenFile::observed(self.truncate_page_log(id, 2, &log_stamp)?)),
+                old_log: Some(SeenFile::observed(
+                    self.truncate_page_log(id, 1, &old_stamp)?,
+                )),
+                log: Some(SeenFile::observed(
+                    self.truncate_page_log(id, 2, &log_stamp)?,
+                )),
                 sequence: Some(sequence),
             };
             let peer = self.page_peer(&hot);
@@ -1808,8 +1932,16 @@ impl Inner {
         result
     }
 
-    fn cold_pass(&self, index: &Index, cursor: &mut Option<fs::ReadDir>, policy: &ColdPolicy, at_ms: i64) -> Result<usize> {
-        if cursor.is_none() { *cursor = Some(fs::read_dir(self.docs_dir())?); }
+    fn cold_pass(
+        &self,
+        index: &Index,
+        cursor: &mut Option<fs::ReadDir>,
+        policy: &ColdPolicy,
+        at_ms: i64,
+    ) -> Result<usize> {
+        if cursor.is_none() {
+            *cursor = Some(fs::read_dir(self.docs_dir())?);
+        }
         let mut moved = 0;
         for _ in 0..policy.pages_per_pass {
             let Some(entry) = cursor.as_mut().expect("cursor").next() else {
@@ -1818,7 +1950,9 @@ impl Inner {
             };
             let entry = entry?;
             let name = entry.file_name();
-            let Some(id) = name.to_str().and_then(|s| s.strip_suffix(".loro")) else { continue; };
+            let Some(id) = name.to_str().and_then(|s| s.strip_suffix(".loro")) else {
+                continue;
+            };
             match self.cold_page(index, id, policy, at_ms) {
                 Ok(did_move) => moved += did_move as usize,
                 Err(_) if self.is_purged(id) => {
@@ -1831,7 +1965,9 @@ impl Inner {
                 Err(e) => return Err(e),
             }
         }
-        if moved > 0 { cold::maybe_train_dictionary(&self.root)?; }
+        if moved > 0 {
+            cold::maybe_train_dictionary(&self.root)?;
+        }
         Ok(moved)
     }
 
@@ -1842,7 +1978,13 @@ impl Inner {
         self.append_log_locked(st, id, bytes, sequence)
     }
 
-    fn append_log_locked(&self, st: &mut PageState, id: &str, bytes: &[u8], sequence: Option<DiskSequence>) -> Result<()> {
+    fn append_log_locked(
+        &self,
+        st: &mut PageState,
+        id: &str,
+        bytes: &[u8],
+        sequence: Option<DiskSequence>,
+    ) -> Result<()> {
         // A second instance can hold a cached page after another purges it.
         // Do not acknowledge an orphan delta that cannot reconstruct history.
         if !self.doc_path(id).exists() {
@@ -2233,8 +2375,9 @@ impl Inner {
         if let Some(st) = cached.as_mut() {
             if !st.doc.conflicts().is_empty()
                 || crate::sync::has_conflict_history(&st.doc)
-                || disk.as_ref().is_some_and(|doc| !doc.conflicts().is_empty()
-                    || crate::sync::has_conflict_history(doc))
+                || disk.as_ref().is_some_and(|doc| {
+                    !doc.conflicts().is_empty() || crate::sync::has_conflict_history(doc)
+                })
                 || self.conflict_archive_path(id)?.exists()
             {
                 let archive = crate::conflict_archive::merge(id, &st.doc, disk.as_ref())?;
@@ -2245,8 +2388,10 @@ impl Inner {
             st.log = None;
         } else {
             if let Some(doc) = &disk {
-                if !doc.conflicts().is_empty() || crate::sync::has_conflict_history(doc)
-                    || self.conflict_archive_path(id)?.exists() {
+                if !doc.conflicts().is_empty()
+                    || crate::sync::has_conflict_history(doc)
+                    || self.conflict_archive_path(id)?.exists()
+                {
                     self.store_conflict_archive_locked(id, doc, &flush)?;
                 }
             }
@@ -2336,7 +2481,9 @@ impl Inner {
                     // when this metadata-only decoder does not support them.
                     if let Ok(meta) = loro::LoroDoc::decode_import_blob_meta(&snapshot, false) {
                         if meta.mode == loro::EncodedBlobMode::ShallowSnapshot
-                            && (lock(&self.cold_pages).contains(id) || cold::path(&self.root, id).exists()) {
+                            && (lock(&self.cold_pages).contains(id)
+                                || cold::path(&self.root, id).exists())
+                        {
                             // A full cache opened before a foreign split can
                             // also lack operations archived by its newer root.
                             // Merge that prefix before the retained snapshot.
@@ -2598,7 +2745,9 @@ fn writer_loop(inner: Arc<Inner>, rx: Receiver<Msg>, index: Index) {
                 Ok(msg) => Some(msg),
                 Err(RecvTimeoutError::Disconnected) => None,
                 Err(RecvTimeoutError::Timeout) => {
-                    if let Err(e) = inner.cold_pass(&index, &mut cold_cursor, &inner.cold_policy, now_ms()) {
+                    if let Err(e) =
+                        inner.cold_pass(&index, &mut cold_cursor, &inner.cold_policy, now_ms())
+                    {
                         *lock(&inner.writer_error) = Some(format!("cold history: {e}"));
                     }
                     continue;
@@ -2761,7 +2910,12 @@ impl Vault {
         let (tx, rx) = mpsc::channel();
         let cold_pages = fs::read_dir(root.join(".vault/cold"))?
             .filter_map(|e| e.ok())
-            .filter_map(|e| e.file_name().to_str()?.strip_suffix(".cold").map(str::to_owned))
+            .filter_map(|e| {
+                e.file_name()
+                    .to_str()?
+                    .strip_suffix(".cold")
+                    .map(str::to_owned)
+            })
             .collect();
         let cold_policy = match fs::read(root.join(".vault/cold-policy.json")) {
             Ok(bytes) => serde_json::from_slice::<ColdPolicy>(&bytes)
@@ -2769,9 +2923,13 @@ impl Vault {
             Err(e) if e.kind() == ErrorKind::NotFound => ColdPolicy::default(),
             Err(e) => return Err(e.into()),
         };
-        if cold_policy.age_seconds < 0 || cold_policy.pages_per_pass == 0
-            || cold_policy.idle_seconds == 0 {
-            return Err(invalid("cold policy needs nonnegative age and positive pass/idle bounds"));
+        if cold_policy.age_seconds < 0
+            || cold_policy.pages_per_pass == 0
+            || cold_policy.idle_seconds == 0
+        {
+            return Err(invalid(
+                "cold policy needs nonnegative age and positive pass/idle bounds",
+            ));
         }
         let inner = Arc::new(Inner {
             root,
@@ -2875,7 +3033,8 @@ impl Vault {
         vault.sweep_conflict_policy()?;
         let (live_db, _) = Index::open(&db_path)?;
         let worker = vault.inner.clone();
-        let live_worker = std::thread::Builder::new().name("vault-live-queries".into())
+        let live_worker = std::thread::Builder::new()
+            .name("vault-live-queries".into())
             .spawn(move || crate::live_query::run(worker, live_db))?;
         *lock(&vault.live_worker) = Some(live_worker);
         Ok(vault)
@@ -3109,7 +3268,8 @@ impl Vault {
             crate::templates::check_template(&db, parent, t)?;
         }
         let key = order::between(db.last_child_key(Some(parent))?.as_deref(), None);
-        let mut doc = PageDoc::new_page(self.inner.actor_peer(), id, title, Some(parent), stamp_ms())?;
+        let mut doc =
+            PageDoc::new_page(self.inner.actor_peer(), id, title, Some(parent), stamp_ms())?;
         doc.set_meta_str("order", Some(&key))?;
         if let Some(t) = template {
             // A template that cannot be read is an error: nothing is installed
@@ -3356,12 +3516,24 @@ impl Vault {
                 Some(slot) => {
                     let mut st = lock(&slot.state);
                     let vv = st.doc.doc.oplog_vv().encode();
-                    (meta_row(&st.doc), st.doc.meta(), st.doc.blocks(), vv, st.doc.conflicts())
+                    (
+                        meta_row(&st.doc),
+                        st.doc.meta(),
+                        st.doc.blocks(),
+                        vv,
+                        st.doc.conflicts(),
+                    )
                 }
                 None => {
                     let mut doc = self.inner.read_doc(id)?;
                     let vv = doc.doc.oplog_vv().encode();
-                    (meta_row(&doc), doc.meta(), doc.blocks(), vv, doc.conflicts())
+                    (
+                        meta_row(&doc),
+                        doc.meta(),
+                        doc.blocks(),
+                        vv,
+                        doc.conflicts(),
+                    )
                 }
             };
             db.set_conflicts(id, &crate::sync::mirror_rows(id, &conflicts))?;

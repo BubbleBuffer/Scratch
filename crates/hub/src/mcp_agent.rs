@@ -802,9 +802,10 @@ async fn locked_call(
             Target::Hub(agent) => {
                 tool_result(id, Ok(agent.gateway_js_help(args["query"].as_str())))
             }
-            Target::Remote(conn) => {
-                tool_result(id, Err(format!("js_help is not offered by {}", conn.name())))
-            }
+            Target::Remote(conn) => tool_result(
+                id,
+                Err(format!("js_help is not offered by {}", conn.name())),
+            ),
         });
     }
     let session = need_session(ctx)?;

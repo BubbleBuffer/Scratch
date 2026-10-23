@@ -191,7 +191,8 @@ impl Vault {
         for (pid, md) in &pages {
             self.inner.remove_md(&db, pid, md.as_deref())?;
         }
-        self.inner.index_committed(&db, pages.iter().map(|(id, _)| id.clone()).collect());
+        self.inner
+            .index_committed(&db, pages.iter().map(|(id, _)| id.clone()).collect());
         drop(db);
         self.inner.emit(
             pages
@@ -236,7 +237,10 @@ impl Vault {
                 changes.push(Change::PageCreated(pid));
             }
         }
-        self.inner.index_committed(&db, db.subtree(&id)?.into_iter().map(|(id, _)| id).collect());
+        self.inner.index_committed(
+            &db,
+            db.subtree(&id)?.into_iter().map(|(id, _)| id).collect(),
+        );
         drop(db);
         changes.push(Change::TreeChanged);
         self.inner.emit(changes);

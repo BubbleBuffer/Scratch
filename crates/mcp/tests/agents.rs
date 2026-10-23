@@ -79,18 +79,19 @@ fn a_task_gets_a_placeholder_a_prompt_and_its_answer() {
             && prompt.contains("js tool")
             && !prompt.contains("AI is working")
     );
-    tasks::finish(v, &claimed.id, Ok("- Fake answer
-- Read the plan".into())).unwrap();
+    tasks::finish(
+        v,
+        &claimed.id,
+        Ok("- Fake answer
+- Read the plan"
+            .into()),
+    )
+    .unwrap();
 
     let after = texts(v, &page);
     assert_eq!(
         after,
-        [
-            "Day one",
-            "Fake answer",
-            "Read the plan",
-            "Day two"
-        ]
+        ["Day one", "Fake answer", "Read the plan", "Day two"]
     );
     assert_eq!(v.load_page(page.clone()).unwrap().blocks[0].id, ids[0]);
     let done = tasks::get(v, &claimed.id).unwrap();
@@ -146,7 +147,10 @@ fn ask_ai_on_this_device_is_pinned_and_cancellable() {
     tasks::finish(v, &got.id, Ok("Too late".into())).unwrap();
     let after = texts(v, &page);
     assert!(after.iter().all(|t| !t.contains("Too late")), "{after:?}");
-    assert!(after.iter().any(|t| t.contains("AI task cancelled")), "{after:?}");
+    assert!(
+        after.iter().any(|t| t.contains("AI task cancelled")),
+        "{after:?}"
+    );
     assert_eq!(tasks::get(v, &got.id).unwrap().status, tasks::CANCELLED);
     // A second cancel does nothing.
     assert!(!tasks::cancel(v, &got.id).unwrap());
@@ -173,7 +177,10 @@ fn a_row_naming_a_removed_runner_is_claimed_like_any_other() {
     }
     let after = texts(v, &page);
     for runner in ["claude", "codex", "deepseek"] {
-        assert!(after.contains(&format!("Answered for {runner}")), "{after:?}");
+        assert!(
+            after.contains(&format!("Answered for {runner}")),
+            "{after:?}"
+        );
     }
 }
 
@@ -202,16 +209,33 @@ fn merge_prompt_and_answer() {
         format: 2,
         block: ids[0].clone(),
         time_ms: 0,
-        scope: ConflictScope::Block { block: ids[0].clone() },
+        scope: ConflictScope::Block {
+            block: ids[0].clone(),
+        },
         status: ConflictStatus::Pending,
         applied: vec![],
         sides: vec![
-            ConflictSide::new("laptop-device".into(), 0, None,
-                SideState::Present { content: vec![side("Meet at 10 at the cafe")] }, None),
-            ConflictSide::new("phone-device".into(), 0, None,
-                SideState::Present { content: vec![side("Meet at 11")] }, None),
+            ConflictSide::new(
+                "laptop-device".into(),
+                0,
+                None,
+                SideState::Present {
+                    content: vec![side("Meet at 10 at the cafe")],
+                },
+                None,
+            ),
+            ConflictSide::new(
+                "phone-device".into(),
+                0,
+                None,
+                SideState::Present {
+                    content: vec![side("Meet at 11")],
+                },
+                None,
+            ),
         ],
-    }.with_legacy_blocks();
+    }
+    .with_legacy_blocks();
     let prompt = merge::prompt(v, &c);
     assert!(prompt.contains("The edited version wins; merge only text that both sides edited."));
     assert!(prompt.contains("Keep children intact, including unchanged descendants."));

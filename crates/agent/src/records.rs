@@ -422,12 +422,7 @@ impl Records {
 fn is_move(json: Option<&str>) -> bool {
     json.is_some_and(|json| serde_json::from_str::<MoveSnapshot>(json).is_ok())
 }
-fn undo_snapshot(
-    vault: &Vault,
-    edit: &AgentEdit,
-    before: Option<&str>,
-    after: &str,
-) -> Result<()> {
+fn undo_snapshot(vault: &Vault, edit: &AgentEdit, before: Option<&str>, after: &str) -> Result<()> {
     let after: Snapshot = serde_json::from_str(after)?;
     let current = Snapshot::capture(vault, &edit.page_id)?;
     ensure!(
@@ -467,9 +462,8 @@ fn undo_snapshot(
 /// in each old parent's original order, so a sibling that was moved too is
 /// back before it is needed.
 fn undo_moves(vault: &Vault, before: Option<&str>, after: &MoveSnapshot) -> Result<()> {
-    let before: MoveSnapshot = serde_json::from_str(
-        before.ok_or_else(|| anyhow::anyhow!("missing undo snapshot"))?,
-    )?;
+    let before: MoveSnapshot =
+        serde_json::from_str(before.ok_or_else(|| anyhow::anyhow!("missing undo snapshot"))?)?;
     for placed in &after.moves {
         let unchanged = vault
             .load_page(placed.page.clone())

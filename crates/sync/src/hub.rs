@@ -133,7 +133,10 @@ impl HubRequest<'_> {
         }
         count_bytes!("hub.request.wire_bytes", body.len());
         if body_zstd {
-            return measure!("hub.request.zstd_decompress", encoding::decompress(&body, MAX_BODY));
+            return measure!(
+                "hub.request.zstd_decompress",
+                encoding::decompress(&body, MAX_BODY)
+            );
         }
         Ok(body)
     }
@@ -199,7 +202,10 @@ fn open_response(page: &str, query: &str) -> HubResponse {
 /// The answer to a `/sync` or `/push` request: confirms the zstd capability
 /// and compresses the body when the request advertised it.
 fn answer(body: Vec<u8>, advertised: bool) -> Result<HubResponse> {
-    let (body, headers) = measure!("hub.response.zstd_compress", encoding::answer(body, advertised)?);
+    let (body, headers) = measure!(
+        "hub.response.zstd_compress",
+        encoding::answer(body, advertised)?
+    );
     count_bytes!("hub.response.wire_bytes", body.len());
     Ok(HubResponse {
         headers,
@@ -400,7 +406,10 @@ impl Hub {
             .trim()
             .to_string();
         let device = req.header(DEVICE_HEADER).unwrap_or("").to_string();
-        measure!("hub.auth.check", self.tokens.check(&token, &device, &self.device)?);
+        measure!(
+            "hub.auth.check",
+            self.tokens.check(&token, &device, &self.device)?
+        );
         // The negotiation is checked before any body is read or decoded.
         match (method.as_str(), path.as_str()) {
             ("POST", "/sync") => {
@@ -510,9 +519,9 @@ impl Hub {
         resp.purged_total = purged_all.len() as u32;
         let mine: HashMap<PageId, Vec<u8>> =
             measure!("hub.sync.page_versions", v.sync_page_versions()?)
-            .into_iter()
-            .map(|p| (p.page, p.version))
-            .collect();
+                .into_iter()
+                .map(|p| (p.page, p.version))
+                .collect();
         let theirs: HashMap<&str, &[u8]> = req
             .versions
             .iter()
@@ -562,7 +571,10 @@ impl Hub {
                 resp.more = true;
                 break;
             }
-            let bytes = match measure!("hub.sync.export_updates", v.export_updates(id.clone(), cv.to_vec())) {
+            let bytes = match measure!(
+                "hub.sync.export_updates",
+                v.export_updates(id.clone(), cv.to_vec())
+            ) {
                 Ok(b) => b,
                 // Purged since the versions were read.
                 Err(VaultError::NotFound(_)) => continue,
@@ -625,8 +637,11 @@ impl Hub {
             .retain(|(id, _)| !incoming_restore.contains(id));
 
         let purges = v.purge_records();
-        let sync_versions: HashMap<_, _> = v.sync_page_versions()?
-            .into_iter().map(|version| (version.page, version.version)).collect();
+        let sync_versions: HashMap<_, _> = v
+            .sync_page_versions()?
+            .into_iter()
+            .map(|version| (version.page, version.version))
+            .collect();
         for (id, version) in &req.request.versions {
             if version.is_empty() || incoming_restore.contains(id) {
                 continue;
@@ -659,7 +674,9 @@ impl Hub {
             // Historical proofs remain durable across re-purges. An archive
             // snapshot is metadata transport, never a new restoration proof.
             if purges.iter().any(|purge| purge.page == record.page)
-                || incoming_restore.contains(&record.page) || req.restores.contains(&record) {
+                || incoming_restore.contains(&record.page)
+                || req.restores.contains(&record)
+            {
                 continue;
             }
             response.updates.retain(|(id, _)| id != &record.page);
