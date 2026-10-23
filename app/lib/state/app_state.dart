@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import '../core/change_feed.dart';
 import '../core/link_previews.dart';
+import '../core/paths.dart';
 import '../core/vault.dart';
 import 'page_store.dart';
 import 'pages_store.dart';
@@ -61,9 +62,13 @@ class AppState {
   /// Starts the change feed and loads what the first screen shows.
   Future<void> start() async {
     await feed.start();
+    BootTiming.mark('feed.start');
     await pages.reload();
+    BootTiming.mark('pages.reload');
     await agenda.reload();
+    BootTiming.mark('agenda.reload');
     await reminders.start();
+    BootTiming.mark('reminders.start');
     tree.childrenOf(null);
   }
 

@@ -13,12 +13,17 @@ import 'src/rust/frb_generated.dart';
 
 Future<void> main() async {
   final startedAtUs = clockNow().microsecondsSinceEpoch;
+  BootTiming.start(startedAtUs);
   WidgetsFlutterBinding.ensureInitialized();
-  await RustLib.init();
   final dir = await dataDir();
   AppLog.init(dir);
+  BootTiming.mark('dart main');
+  BootTiming.mark('before RustLib.init');
+  await RustLib.init();
+  BootTiming.mark('after RustLib.init');
   installErrorHooks();
   AppLog.info('start');
   Bakeoff.instance.init(logDir: dir);
   runApp(NotesApp(dataDir: dir, startedAtUs: startedAtUs));
+  WidgetsBinding.instance.addPostFrameCallback((_) => BootTiming.mark('first frame'));
 }

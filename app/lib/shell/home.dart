@@ -8,6 +8,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import '../core/models.dart';
+import '../core/paths.dart';
 import '../registry/addon_registry.dart';
 import 'addons.dart';
 import '../features/bakeoff.dart';
@@ -79,10 +80,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    BootTiming.mark('home built');
     searchRequest.addListener(_focusSearch);
     _mobilePagesRequest.addListener(_showPages);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      BootTiming.mark('home first frame');
       final s = widget.startedAtUs;
       final ms = s == null
           ? -1

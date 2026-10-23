@@ -55,3 +55,19 @@ class AppLog {
     } catch (_) {}
   }
 }
+
+/// Boot step timings: one `boot: <step> <ms>ms` line through [AppLog], where
+/// the number is the time since the Dart main entry. Does nothing until
+/// [start] is called.
+abstract final class BootTiming {
+  static int? _startUs;
+
+  static void start(int startedAtUs) => _startUs = startedAtUs;
+
+  static void mark(String step) {
+    final s = _startUs;
+    if (s == null) return;
+    final ms = (clockNow().microsecondsSinceEpoch - s) / 1000;
+    AppLog.info('boot: $step ${ms.toStringAsFixed(0)}ms');
+  }
+}

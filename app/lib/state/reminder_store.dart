@@ -7,6 +7,7 @@ import '../core/change_feed.dart';
 import '../core/clock.dart';
 import '../core/debounce.dart';
 import '../core/models.dart';
+import '../core/paths.dart';
 import '../core/today_timers.dart';
 import '../core/vault.dart';
 import '../features/reminders/backends.dart';
@@ -50,6 +51,7 @@ class ReminderStore extends ChangeNotifier {
     _started = true;
     _taps = backend.taps.listen(_tap);
     await backend.init();
+    BootTiming.mark('backend.init');
     if (_inactive) return;
     feed.addListener(_changed);
     settings.addListener(_settingsChanged);

@@ -89,7 +89,9 @@ class _NotesAppState extends State<NotesApp> {
       final fresh = _isNew(root);
       if (fresh && seedBench && !seedDemo) await _seedBench(root);
       if (fresh && seedTaskRows > 0 && !seedDemo) await NotesVault.seedTasks(root: root, rows: seedTaskRows);
+      BootTiming.mark('before Vault.open');
       final vault = await Vault.open(root, dataDir: widget.dataDir);
+      BootTiming.mark('after Vault.open');
       if (_settings.scheduleRunsHere && (Platform.isWindows || Platform.isLinux)) vault.localRunnerSetAvailable(true).ignore();
       if (fresh) {
         if (seedDemo) {
@@ -101,17 +103,22 @@ class _NotesAppState extends State<NotesApp> {
         }
         await vault.flush();
       }
+      BootTiming.mark('before ensureSpaceColors');
       await vault.run((v) => v.ensureSpaceColors(), writes: true);
+      BootTiming.mark('after ensureSpaceColors');
       final ui = UiState.load(File('${widget.dataDir}${Platform.pathSeparator}ui_state.json'), root);
       final links = LinkPreviews(file: File('${widget.dataDir}${Platform.pathSeparator}link_previews.json'));
       final app = AppState(vault, ui: ui, links: links, settings: _settings);
+      BootTiming.mark('before app.start');
       await app.start();
+      BootTiming.mark('after app.start');
       AppLog.info('ready pages=${app.pages.count} fresh=$fresh');
       if (!mounted) {
         await app.dispose();
         return;
       }
       setState(() => _app = app);
+      BootTiming.mark('after setState');
       unawaited(startSyncAtBoot(app.sync, _settings));
     } catch (e) {
       AppLog.info('open failed: $e');
