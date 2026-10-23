@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -95,33 +96,9 @@ void main() {
     ctx.noteTypes.dispose();
   });
 
-  test('optional add-ons disable their registrations; required entries stay enabled', () {
+  test('every compiled-in add-on is enabled, in list order', () {
     final ctx = AddonContext();
-    final selected = enabledAddons({
-      'agent',
-      'board',
-      'database',
-      'document',
-      'kanban',
-      'schedule',
-      'tasks',
-      'legacy',
-      'stale',
-    });
-    bootAddons(selected, ctx);
-    expect(selected.map((a) => a.id), [
-      'legacy',
-      'document',
-      'database',
-      'search_card',
-    ]);
-    expect(ctx.noteTypes.of('task'), isNull);
-    expect(ctx.shellNavigation.all, isEmpty);
-    expect(ctx.shellPrimaryActions.all, isEmpty);
-    expect(ctx.titleChips.all, isEmpty);
-    expect(ctx.commands.of('calendar.open'), isNull);
-    expect(ctx.noteTypes.of('kanban'), isNull);
-    expect(enabledAddons({}).map((a) => a.id), [
+    final ids = [
       'legacy',
       'agent',
       'document',
@@ -131,24 +108,17 @@ void main() {
       'schedule',
       'tasks',
       'search_card',
-    ]);
-    expect(ctx.views.of(ViewKind.board), isNull);
+    ];
+    expect(addonList.map((entry) => entry.addon.id), ids);
+    bootAddons(addonList.map((entry) => entry.addon), ctx);
+    expect(ctx.installedIds, containsAll(ids));
+    expect(ctx.views.of(ViewKind.board), isNotNull);
     expect(ctx.views.of(ViewKind.table), isNotNull);
     expect(ctx.noteTypes.of('database'), isNotNull);
+    expect(ctx.noteTypes.of('task'), isNotNull);
+    expect(ctx.commands.of('calendar.open'), isNotNull);
     expect(ctx.blockKinds.has(Kinds.paragraph), isTrue);
     ctx.noteTypes.dispose();
-  });
-
-  test('optional choices persist in device settings', () {
-    final dir = Directory.systemTemp.createTempSync('notes-addon-settings-');
-    addTearDown(() => dir.deleteSync(recursive: true));
-    final file = File('${dir.path}/settings.json');
-    final settings = AppSettings(file: file);
-    settings.update((s) => s.disabledAddons.add('board'));
-    expect(AppSettings.load(file).disabledAddons, {'board'});
-    settings.update((s) => s.disabledAddons.remove('board'));
-    expect(AppSettings.load(file).disabledAddons, isEmpty);
-    settings.dispose();
   });
 
   testWidgets(
@@ -223,5 +193,26 @@ void main() {
     ids.value = {'a'};
     await tester.pump();
     expect(find.text('Changed body'), findsOneWidget);
+  });
+
+  // Runs last: it boots the process-wide registrations the app uses.
+  test('an old disabled list still installs every compiled-in add-on', () {
+    final dir = Directory.systemTemp.createTempSync('notes-legacy-boot-');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/settings.json')
+      ..writeAsStringSync(
+        jsonEncode({
+          'disabledAddons': ['agent', 'board', 'kanban', 'schedule', 'tasks'],
+        }),
+      );
+    final settings = AppSettings.load(file);
+    addTearDown(settings.dispose);
+    registerBuiltins(disabledAddons: settings.disabledAddons);
+    expect(
+      appAddonContext.installedIds,
+      containsAll(addonList.map((entry) => entry.addon.id)),
+    );
+    expect(appAddonContext.installedIds, contains('tasks'));
+    expect(viewRegistry.of(ViewKind.board), isNotNull);
   });
 }

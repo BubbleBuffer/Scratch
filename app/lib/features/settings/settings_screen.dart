@@ -17,7 +17,6 @@ import '../../feedback/feedback_host.dart';
 import '../../state/app_state.dart';
 import '../../state/reminder_store.dart';
 import '../../state/sync_store.dart';
-import '../../shell/addons.dart';
 import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
 import '../ai/ai_settings_body.dart';
@@ -586,43 +585,6 @@ class AboutBody extends StatelessWidget {
         stack: true,
         trailing: CopyableText(vault.deviceId, textKey: const ValueKey('device-id')),
       ),
-      SettingsRow(
-        label: 'Add-ons',
-        description: 'Manage the features installed on this device.',
-        trailing: TextBtn('Manage', key: const ValueKey('manage-addons'),
-          onTap: () => context.mobile
-            ? pushSettingsPage(context, 'Add-ons', const AddonsBody())
-            : showPanel(context, (_) => const Padding(
-                padding: EdgeInsets.all(24), child: AddonsBody()), shrink: true)),
-      ),
-    ]);
-  }
-}
-
-class AddonsBody extends StatelessWidget {
-  const AddonsBody({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final settings = AppSettings.of(context);
-    return Column(mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Add-ons', primary: true),
-      const Text('Changes take effect when you restart $appName.'),
-      for (final entry in addonList)
-        SettingsRow(label: entry.label,
-          description: entry.optional ? 'Optional' : 'Required',
-          trailing: entry.optional
-            ? Toggle(key: ValueKey('addon-${entry.addon.id}'),
-                value: !settings.disabledAddons.contains(entry.addon.id),
-                onChanged: (enabled) => settings.update((s) {
-                  if (enabled) { s.disabledAddons.remove(entry.addon.id); }
-                  else { s.disabledAddons.add(entry.addon.id); }
-                }))
-            : const Text('Enabled')),
-      for (final section in appAddonContext.settingsSections.all.where((s) => s.location == 'addons')) ...[
-        SettingsHeading(section.label),
-        section.build(context),
-      ],
     ]);
   }
 }
