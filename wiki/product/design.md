@@ -60,7 +60,7 @@ status: current
 - **Brief.** The notebook is the cat: an upright spiral notebook whose top edge rises into ears, with the face on the cover, calico ears (charcoal left, apricot right), a page block, and a bookmark ribbon. It uses the BubbleBuffer family contour and colours (NeedleBub, LilBub).
 - **Source.** [notes-icon.svg](../../design/icon/notes-icon.svg) is built in Pawth from the kit [bubblebuffer.kit.svg](../../design/icon/kits/bubblebuffer.kit.svg) (the `book/*` and `face/cover` parts). Run [rebuild.sh](../../design/icon/rebuild.sh) from `design/icon` to rebuild it through `pawthctl`. Edit the kit parts, not the generated SVG.
 - **Other options.** B (hardcover), C (open book), D (strap journal) and E (tail bookmark) are in `design/icon/options/`, compared on [options.html](../../design/directions/icon/options.html).
-- **Shipped.** The Pawth icon pack (`design/icon/notes-icon-icons/`) supplies the Android mipmaps, the round and adaptive icons (with a monochrome layer) and the Windows `app_icon.ico`. To update the icon, re-export the pack and copy it over these files.
+- **Shipped.** The Pawth icon pack (`design/icon/notes-icon-icons/`) supplies the Android mipmaps, the round and adaptive icons (with a monochrome layer) and the Windows `app_icon.ico`. The glyph is scaled to 80% of the canvas height by the group transform in `rebuild.sh` and in `notes-icon.svg`; change both together. To re-export the pack and copy it over these files, run `python design/icon/export_icons.py --install`.
 - **Style check.** No errors. It gives safe-zone warnings only; the circle mask grazes the ear tips.
 
 ## Decisions

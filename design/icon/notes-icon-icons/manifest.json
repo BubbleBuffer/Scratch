@@ -2,7 +2,7 @@
   "version": 1,
   "template": "android-adaptive",
   "sourceDocument": "scratch.svg",
-  "sourceRevision": 1,
+  "sourceRevision": 4,
   "sizes": {
     "android": [
       48,
@@ -56,5 +56,10 @@
     "scratch-icons/png/icon-1024.png",
     "scratch-icons/review.png",
     "scratch-icons/manifest.json"
-  ]
+  ],
+  "glyph": {
+    "heightPercent": 80,
+    "adaptiveScale": 0.659705,
+    "adaptiveSafeZoneDiameterPercent": 61.11
+  }
 }

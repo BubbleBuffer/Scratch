@@ -15,6 +15,6 @@ for p in book/pages book/ribbon book/cover book/ears book/outline book/rings fac
   $P call kit.insert_part --input "{$K,\"part\":\"$p\"}" --json >/dev/null
 done
 $P call elements.group --input '{"elements":["/Page block","/Bookmark tail","/Cat cover","/Notebook ears","/Cover outline","/Notebook rings","/Cover face"],"name":"Notebook cat"}' --json >/dev/null
-$P call elements.transform --input '{"elements":"/Notebook cat","transform":{"scaleX":0.94,"scaleY":0.94,"x":23,"y":-24}}' --json >/dev/null
+$P call elements.transform --input '{"elements":"/Notebook cat","transform":{"scaleX":1.197214,"scaleY":1.197214,"x":-161.751,"y":-198.05}}' --json >/dev/null
 $P call files.save --json >/dev/null
 $P screenshot --output "${1:-options/a-spiral.png}" --max-dimension 640 --background milk

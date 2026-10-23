@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="306 200 693 868">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="199 87 881 1106">
   <defs data-name="Kit definitions" xmlns="http://www.w3.org/2000/svg" id="defs-muyoffm4-4c-4a4fcceb"><linearGradient xmlns="http://www.w3.org/2000/svg" id="ear-highlight" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#EBC095"/>
       <stop offset="1" stop-color="#DE945F"/>
     </linearGradient></defs>
-  <g id="group-muyoffx7-54-df8a82fe" data-name="Notebook cat" transform="matrix(0.94 0 0 0.94 23 -24)">
+  <g id="group-muyoffx7-54-df8a82fe" data-name="Notebook cat" transform="matrix(1.197214 0 0 1.197214 -161.751 -198.05)">
     <g id="group-muyoffft-3q-fa5cd5a7" data-name="Page block" data-part="book/pages">
       <path id="path-muyoffft-3r-f4122141" data-name="Pages" d="M392 912L440 960H840L888 912V480L976 568V952L904 1048H480Z" fill="#FFFAF1" stroke="none" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel"/>
       <path id="path-muyoffft-3s-6dabc1b2" data-name="Page line" d="M932 500V938L878 1004H436" fill="none" stroke="#D3C8B6" stroke-width="22" stroke-linecap="square" stroke-linejoin="round"/>
