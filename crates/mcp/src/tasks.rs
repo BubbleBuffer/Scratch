@@ -12,10 +12,11 @@
 //!   page itself.
 //! - The runner (desktop) claims the oldest queued task, runs it, and
 //!   writes the result into the row's body and the target page.
-//! - A task may be pinned to one device (`node` = its device id: "Ask AI"
-//!   on a computer whose default runner is this computer); only that device
-//!   claims it. Rows whose node is `hub` are jobs ([`crate::jobs`]); a job
-//!   about a page uses the same placeholder.
+//! - A task is pinned to one device (`node` = its device id; every new task
+//!   is, see [`create_on`]); only that device claims it. Rows with no node
+//!   are legacy rows from before pinning, and any desktop claims them. Rows
+//!   whose node is `hub` are jobs ([`crate::jobs`]); a job about a page uses
+//!   the same placeholder.
 //! - A task can be cancelled ([`cancel`]): a queued one is never claimed,
 //!   and a running one's result is dropped when it ends.
 
@@ -55,8 +56,9 @@ pub struct Task {
     /// may name a removed runner (`claude`, `codex`, `deepseek`); the agent
     /// answers them like any other.
     pub runner: String,
-    /// Where it runs: empty (any desktop), a device id (only that device),
-    /// or `hub` (a job, see [`crate::jobs`]).
+    /// Where it runs: a device id (only that device), `hub` (a job, see
+    /// [`crate::jobs`]), or empty for a legacy row from before pinning (any
+    /// desktop claims it).
     #[serde(default)]
     pub node: String,
     pub status: String,
@@ -108,8 +110,8 @@ pub fn schema() -> Vec<PropDef> {
         def("error", "Error", PropKind::Text, vec![]),
         def("block", "Block", PropKind::Text, vec![]),
         def("created", "Created", PropKind::CreatedTime, vec![]),
-        // Jobs (crate::jobs): the node that runs it (`hub`), the principal
-        // that created it, its tool set, its session and when it ended.
+        // Every task names its runner node and records its session. Jobs
+        // additionally record their owner, tool set and finish time.
         def("node", "Node", PropKind::Text, vec![]),
         def("owner", "Owner", PropKind::Text, vec![]),
         def("tools", "Tools", PropKind::Text, vec![]),
@@ -285,9 +287,9 @@ pub fn create(
     create_on(v, prompt, page, after, runner, "")
 }
 
-/// [`create`] for `node`: empty (any desktop claims it), a device id (only
-/// that device claims it) or `hub` (a job; the jobs API sets its owner and
-/// tool set).
+/// [`create`] for `node`: a device id (only that device claims it) or `hub`
+/// (a job; the jobs API sets its owner and tool set). Empty means this
+/// device, so a new row is never unpinned.
 pub fn create_on(
     v: &Vault,
     prompt: &str,
@@ -295,6 +297,20 @@ pub fn create_on(
     after: Option<&str>,
     runner: &str,
     node: &str,
+) -> Result<Task> {
+    create_on_with(v, prompt, page, after, runner, node, &[])
+}
+
+/// [`create_on`] that also sets `extra` properties before the row is queued,
+/// so a claim never sees the row without them (a job's owner and tools).
+pub(crate) fn create_on_with(
+    v: &Vault,
+    prompt: &str,
+    page: &PageId,
+    after: Option<&str>,
+    runner: &str,
+    node: &str,
+    extra: &[(&str, &str)],
 ) -> Result<Task> {
     let prompt = prompt.trim();
     if prompt.is_empty() {
@@ -367,6 +383,21 @@ pub fn create_on(
         }
     };
     let row = v.create_page(Some(coll), first_line(prompt, 60))?;
+    // The node before the status: a queued row always has its node, so no
+    // claim can see a new pinned row as a legacy one.
+    let node = if node.is_empty() {
+        v.device_id()
+    } else {
+        node.to_string()
+    };
+    v.set_property(row.clone(), "node".into(), PropValue::Text(node))?;
+    for (key, value) in extra {
+        v.set_property(
+            row.clone(),
+            key.to_string(),
+            PropValue::Text(value.to_string()),
+        )?;
+    }
     v.set_property(row.clone(), "prompt".into(), PropValue::Text(prompt.into()))?;
     v.set_property(
         row.clone(),
@@ -374,17 +405,14 @@ pub fn create_on(
         PropValue::Relation(vec![page.clone()]),
     )?;
     v.set_property(row.clone(), "block".into(), PropValue::Text(block))?;
+    if !runner.is_empty() {
+        v.set_property(row.clone(), "runner".into(), PropValue::Text(runner.into()))?;
+    }
     v.set_property(
         row.clone(),
         "status".into(),
         PropValue::Select(QUEUED.into()),
     )?;
-    if !runner.is_empty() {
-        v.set_property(row.clone(), "runner".into(), PropValue::Text(runner.into()))?;
-    }
-    if !node.is_empty() {
-        v.set_property(row.clone(), "node".into(), PropValue::Text(node.into()))?;
-    }
     get(v, &row)
 }
 
@@ -470,26 +498,38 @@ pub(crate) fn set_placeholder(v: &Vault, t: &Task, status: &str) -> Result<()> {
     Ok(())
 }
 
-/// Claims the oldest queued task for `device` (marks it running): one with
-/// no node, or one pinned to `device`.
+/// Whether `device` may claim a queued row whose node is `node`: one pinned
+/// to it, or a legacy row with no node. Jobs (node `hub`) never go to a
+/// desktop, and another device's rows never come here.
+fn claimable(node: &str, device: &str) -> bool {
+    node != crate::jobs::NODE_HUB && (node.is_empty() || node == device)
+}
+
+/// Claims the oldest queued task `device` may run (marks it running): see
+/// [`claimable`].
 pub fn claim_next(v: &Vault, device: &str) -> Result<Option<Task>> {
     let Some(c) = collection(v)? else {
         return Ok(None);
     };
-    let sorts = vec![Sort {
-        prop: "$created".into(),
-        descending: false,
-    }];
-    // Jobs (node `hub`) run only on the hub, pinned tasks only on their
-    // device.
-    let Some(row) = v
-        .query(Some(c), with_status(QUEUED), sorts, 0, 200)?
-        .rows
+    let oldest_first = || {
+        vec![Sort {
+            prop: "$created".into(),
+            descending: false,
+        }]
+    };
+    let first = v.query(Some(c.clone()), with_status(QUEUED), oldest_first(), 0, 200)?;
+    // Other devices' rows must not hide this device's task: a longer queue
+    // is read whole, in one query. Paging could skip a row when a claim on
+    // another thread shifts the queue between two pages.
+    let rows = if first.total as usize > first.rows.len() {
+        v.query(Some(c), with_status(QUEUED), oldest_first(), 0, first.total)?
+            .rows
+    } else {
+        first.rows
+    };
+    let Some(row) = rows
         .into_iter()
-        .find(|r| {
-            let node = text(&r.properties, "node");
-            node.is_empty() || (node == device && node != crate::jobs::NODE_HUB)
-        })
+        .find(|r| claimable(&text(&r.properties, "node"), device))
     else {
         return Ok(None);
     };

@@ -5,7 +5,7 @@
 // - settings saved by older builds, with the removed runners' keys, load;
 // - Ask AI from the / menu on this computer: the agent answers into the
 //   page;
-// - a task queued on another device runs here and its status syncs back;
+// - a legacy unpinned task queued on another device runs here and syncs back;
 // - a row that names a removed runner is answered by the agent;
 // - the MCP endpoint from settings: bearer token required.
 
@@ -125,7 +125,7 @@ void main() {
     }
   });
 
-  appTest('a task queued on another device runs here; its status syncs back', (tester) async {
+  appTest('a legacy unpinned task queued on another device runs here; its status syncs back', (tester) async {
     final tv = await pumpApp(tester, mobile: false);
     final other = await openOtherDevice(tester);
     final store = await agentAiStore(tester);
@@ -135,6 +135,9 @@ void main() {
       final t = await real(tester,
           () => aiCreateTask(vault: other.vault.raw, prompt: 'Say ok', page: page, after: null, runner: ''));
       expect(t.status, AiStatus.queued);
+      expect(t.node, other.vault.deviceId, reason: 'new bridge rows are pinned');
+      // Reproduce a row from before creation always pinned its runner.
+      await real(tester, () => other.vault.raw.removeProperty(page: t.id, key: 'node'));
       await real(tester, () => other.vault.flush());
       await real(tester, () => other.client!.syncOnce());
       await settleUntil(tester, () => store.tasks.any((x) => x.id == t.id && _ended(x)),

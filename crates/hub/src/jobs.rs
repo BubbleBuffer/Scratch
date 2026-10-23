@@ -28,7 +28,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use tokio::sync::Notify;
-use vault_agent::tasks::{job_client, JobOutcome};
+use vault_agent::tasks::{job_client, limit_error, JobOutcome, RUN_LIMIT};
 use vault_agent::HostKind;
 use vault_core::Vault;
 use vault_mcp::jobs::{self, End, Job, NODE_HUB};
@@ -59,7 +59,7 @@ impl Default for JobLimits {
         JobLimits {
             max_queued: 4,
             max_wait: Duration::from_secs(60),
-            max_run: Duration::from_secs(60 * 60),
+            max_run: RUN_LIMIT,
             keep: Duration::from_secs(30 * 24 * 60 * 60),
             tick: Duration::from_secs(30),
         }
@@ -116,17 +116,6 @@ fn job_json(job: &Job) -> Result<String, String> {
     serde_json::to_string_pretty(job).map_err(|e| e.to_string())
 }
 
-fn limit_text(d: Duration) -> String {
-    let secs = d.as_secs();
-    if secs >= 3600 && secs % 3600 == 0 {
-        format!("{} h", secs / 3600)
-    } else if secs >= 60 && secs % 60 == 0 {
-        format!("{} min", secs / 60)
-    } else {
-        format!("{:.1} s", d.as_secs_f64())
-    }
-}
-
 impl Jobs {
     pub(crate) fn new(vault: Arc<Vault>, limits: JobLimits, agent_enabled: bool) -> Self {
         Jobs {
@@ -165,7 +154,10 @@ impl Jobs {
 
     fn create(&self, actor: &str, set: ToolSet, a: &Value) -> Result<String, String> {
         if set == ToolSet::Read {
-            return Err("read-only callers can't create jobs: a job needs the Write or Everything tool set".into());
+            return Err(
+                "read-only callers can't create jobs: a job needs the Write or Everything tool set"
+                    .into(),
+            );
         }
         if !self.agent_enabled {
             return Err("the agent is off on this hub ([agent] enabled = false)".into());
@@ -351,7 +343,13 @@ impl Jobs {
     fn run_one(&self, job: &Job, engine: Shared) {
         let session = match engine.create_session(&format!(
             "Job: {}",
-            job.prompt.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(60).collect::<String>()
+            job.prompt
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .chars()
+                .take(60)
+                .collect::<String>()
         )) {
             Ok(s) => s.id,
             Err(e) => return self.end(&job.id, End::Failed(format!("{e:#}"))),
@@ -386,10 +384,7 @@ impl Jobs {
             Ok(JobOutcome::Completed(text)) => End::Completed(text),
             Ok(JobOutcome::Failed(error)) => End::Failed(error),
             Ok(JobOutcome::Cancelled) => End::Cancelled,
-            Ok(JobOutcome::TimedOut) => End::Failed(format!(
-                "the run passed the {} limit and was stopped",
-                limit_text(self.limits.max_run)
-            )),
+            Ok(JobOutcome::TimedOut) => End::Failed(limit_error(self.limits.max_run)),
             Err(e) => End::Failed(format!("{e:#}")),
         };
         self.end(&job.id, end);
@@ -464,4 +459,3 @@ async fn start(state: Arc<AppState>, job: Job) {
     }
     state.jobs.wake.notify_one();
 }
-
