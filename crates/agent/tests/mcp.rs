@@ -60,7 +60,8 @@ fn open(
         AgentConfig {
             data_dir: dir.path().join("data"),
             default_model: "scripted/scripted".into(),
-            bun_path: Some(dir.path().join("missing-test-bun")),
+            // A missing extension folder disables Claude Code deterministically.
+            claude_code_dir: Some(dir.path().join("missing-test-claude-code")),
             permission_mode: PermissionMode::Manual,
             host_kind,
             mcp,
