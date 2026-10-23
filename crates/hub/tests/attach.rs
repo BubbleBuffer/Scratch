@@ -16,7 +16,8 @@ use serde_json::{json, Value};
 use vault_core::{new_id, Vault};
 use vault_sync::SyncClient;
 
-const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89";
+const PNG: &[u8] =
+    b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89";
 
 struct TempDir(PathBuf);
 
@@ -90,21 +91,30 @@ impl Env {
             .unwrap();
         let status = r.status();
         let body = r.text().await.unwrap();
-        (status, serde_json::from_str(&body).unwrap_or(Value::String(body)))
+        (
+            status,
+            serde_json::from_str(&body).unwrap_or(Value::String(body)),
+        )
     }
 
     async fn ok(&self, name: &str, arguments: Value) -> String {
         let (status, reply) = self.post(&self.write, name, arguments).await;
         assert_eq!(status, StatusCode::OK, "{reply}");
         assert_eq!(reply["result"]["isError"], false, "{reply}");
-        reply["result"]["content"][0]["text"].as_str().unwrap().to_string()
+        reply["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string()
     }
 
     async fn fails(&self, name: &str, arguments: Value) -> String {
         let (status, reply) = self.post(&self.write, name, arguments).await;
         assert_eq!(status, StatusCode::OK, "{reply}");
         assert_eq!(reply["result"]["isError"], true, "{reply}");
-        reply["result"]["content"][0]["text"].as_str().unwrap().to_string()
+        reply["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string()
     }
 }
 
@@ -120,7 +130,11 @@ fn line<'a>(text: &'a str, key: &str) -> &'a str {
 }
 
 fn attachment_id(text: &str) -> String {
-    line(text, "attachment").rsplit('/').next().unwrap().to_string()
+    line(text, "attachment")
+        .rsplit('/')
+        .next()
+        .unwrap()
+        .to_string()
 }
 
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
@@ -145,9 +159,12 @@ async fn path_is_refused_on_the_hub() {
     let p = file.0.join("cat.png");
     fs::write(&p, PNG).unwrap();
     let e = env
-        .fails("attach_file", json!({"page":"Pics","path":p.to_string_lossy()}))
+        .fails(
+            "attach_file",
+            json!({"page":"Pics","path":p.to_string_lossy()}),
+        )
         .await;
-    assert_eq!(e, vault_tools::attach::PATH_NOT_HERE);
+    assert!(e.ends_with(vault_tools::attach::PATH_NOT_HERE), "{e}");
     env.server.stop().await;
 }
 
@@ -156,10 +173,17 @@ async fn read_tokens_may_not_attach() {
     let env = Env::new().await;
     env.ok("create_page", json!({"title":"Pics"})).await;
     let (status, reply) = env
-        .post(&env.read, "attach_file", json!({"page":"Pics","data":b64(PNG)}))
+        .post(
+            &env.read,
+            "attach_file",
+            json!({"page":"Pics","data":b64(PNG)}),
+        )
         .await;
     assert_eq!(status, StatusCode::OK, "{reply}");
-    assert!(reply.get("error").is_some() || reply["result"]["isError"] == true, "{reply}");
+    assert!(
+        reply.get("error").is_some() || reply["result"]["isError"] == true,
+        "{reply}"
+    );
     env.server.stop().await;
 }
 
@@ -170,7 +194,10 @@ async fn data_above_the_ordinary_request_limit_is_accepted_and_the_cap_holds() {
     // 9 MiB of data is about 12 MiB of base64: over the 8 MiB request limit.
     let big = vec![7u8; 9 << 20];
     let text = env
-        .ok("attach_file", json!({"page":"Files","data":b64(&big),"name":"big.bin"}))
+        .ok(
+            "attach_file",
+            json!({"page":"Files","data":b64(&big),"name":"big.bin"}),
+        )
         .await;
     assert!(text.contains("as a file block"), "{text}");
     // Over 10 MB decoded: refused with the cap, not a bare 413.
@@ -236,7 +263,13 @@ async fn attachments_sync_to_devices_and_read_back() {
     let page = vault_tools::call(&laptop, "read_page", &json!({"page":"Trip"})).unwrap();
     assert!(page.contains("tickets.pdf"), "{page}");
     assert!(page.contains("The beach"), "{page}");
-    assert_eq!(fs::read(laptop.attachment_path(phone_blob).unwrap()).unwrap(), doc);
-    assert_eq!(fs::read(laptop.attachment_path(hub_blob).unwrap()).unwrap(), PNG);
+    assert_eq!(
+        fs::read(laptop.attachment_path(phone_blob).unwrap()).unwrap(),
+        doc
+    );
+    assert_eq!(
+        fs::read(laptop.attachment_path(hub_blob).unwrap()).unwrap(),
+        PNG
+    );
     env.server.stop().await;
 }

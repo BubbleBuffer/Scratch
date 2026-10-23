@@ -9,7 +9,8 @@ use serde_json::{json, Value};
 use vault_core::{BlockKind, Vault};
 use vault_tools::call;
 
-const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89";
+const PNG: &[u8] =
+    b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89";
 
 struct Temp(std::path::PathBuf);
 
@@ -20,7 +21,8 @@ impl Drop for Temp {
 }
 
 fn temp() -> (Temp, Vault) {
-    let dir = Temp(std::env::temp_dir().join(format!("vault_tools_attach_{}", vault_core::new_id())));
+    let dir =
+        Temp(std::env::temp_dir().join(format!("vault_tools_attach_{}", vault_core::new_id())));
     let vault = Vault::open(dir.0.to_string_lossy().into_owned()).unwrap();
     (dir, vault)
 }
@@ -74,7 +76,10 @@ fn attaches_an_image_by_data_at_the_end() {
     assert_eq!(last.kind, BlockKind::Image);
     assert_eq!(last.text, "A dot");
     let blob = last.target.clone().unwrap();
-    assert_eq!(std::fs::read(v.attachment_path(blob.clone()).unwrap()).unwrap(), PNG);
+    assert_eq!(
+        std::fs::read(v.attachment_path(blob.clone()).unwrap()).unwrap(),
+        PNG
+    );
     // The stored name gets an image extension, so its MIME type is right.
     let info = v.attachment_info(blob).unwrap();
     assert_eq!(info.mime, "image/png");
@@ -122,7 +127,11 @@ fn attaches_a_file_and_keeps_a_sanitised_name() {
     let info = v.attachment_info(b.target.unwrap()).unwrap();
     assert_eq!(info.name, "report_2026.csv");
     // Image bytes stored as a file when asked.
-    let out = ok(&v, "attach_file", json!({"page":"Docs","data":b64(PNG),"as":"file","name":"dot.png"}));
+    let out = ok(
+        &v,
+        "attach_file",
+        json!({"page":"Docs","data":b64(PNG),"as":"file","name":"dot.png"}),
+    );
     assert!(out.contains("as a file block"), "{out}");
 }
 
@@ -131,14 +140,24 @@ fn attaches_by_local_path_when_enabled() {
     vault_tools::allow_local_paths(true);
     let (d, v) = temp();
     let id = page(&v, "Local", "");
-    let file = d.0.join("..").join(format!("attach_src_{}.png", vault_core::new_id()));
+    let file =
+        d.0.join("..")
+            .join(format!("attach_src_{}.png", vault_core::new_id()));
     std::fs::write(&file, PNG).unwrap();
-    let out = ok(&v, "attach_file", json!({"page":"Local","path":file.to_string_lossy()}));
+    let out = ok(
+        &v,
+        "attach_file",
+        json!({"page":"Local","path":file.to_string_lossy()}),
+    );
     std::fs::remove_file(&file).unwrap();
     assert!(out.contains("as an image block"), "{out}");
     let b = v.load_page(id).unwrap().blocks.pop().unwrap();
     assert_eq!(b.kind, BlockKind::Image);
-    let e = fails(&v, "attach_file", json!({"page":"Local","path":d.0.join("missing.png").to_string_lossy()}));
+    let e = fails(
+        &v,
+        "attach_file",
+        json!({"page":"Local","path":d.0.join("missing.png").to_string_lossy()}),
+    );
     assert!(e.contains("cannot read"), "{e}");
 }
 
@@ -150,11 +169,18 @@ fn refuses_oversized_input() {
     let over = vec![0u8; vault_tools::attach::MAX_DATA_BYTES + 1];
     let e = fails(&v, "attach_file", json!({"page":"Big","data":b64(&over)}));
     assert!(e.contains("10 MB"), "{e}");
-    let file = d.0.join("..").join(format!("attach_big_{}.bin", vault_core::new_id()));
+    let file =
+        d.0.join("..")
+            .join(format!("attach_big_{}.bin", vault_core::new_id()));
     let f = std::fs::File::create(&file).unwrap();
-    f.set_len(vault_tools::attach::MAX_BYTES as u64 + 1).unwrap();
+    f.set_len(vault_tools::attach::MAX_BYTES as u64 + 1)
+        .unwrap();
     drop(f);
-    let e = fails(&v, "attach_file", json!({"page":"Big","path":file.to_string_lossy()}));
+    let e = fails(
+        &v,
+        "attach_file",
+        json!({"page":"Big","path":file.to_string_lossy()}),
+    );
     std::fs::remove_file(&file).unwrap();
     assert!(e.contains("25 MB"), "{e}");
 }
@@ -163,25 +189,53 @@ fn refuses_oversized_input() {
 fn validates_images_and_arguments() {
     let (_d, v) = temp();
     page(&v, "Check", "");
-    let e = fails(&v, "attach_file", json!({"page":"Check","data":b64(b"just text"),"as":"image"}));
+    let e = fails(
+        &v,
+        "attach_file",
+        json!({"page":"Check","data":b64(b"just text"),"as":"image"}),
+    );
     assert!(e.contains("not an image"), "{e}");
     let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>";
     let e = fails(&v, "attach_file", json!({"page":"Check","data":b64(svg)}));
     assert!(e.contains("svg refused"), "{e}");
-    let e = fails(&v, "attach_file", json!({"page":"Check","data":b64(svg),"as":"image"}));
+    let e = fails(
+        &v,
+        "attach_file",
+        json!({"page":"Check","data":b64(svg),"as":"image"}),
+    );
     assert!(e.contains("svg refused"), "{e}");
     let clean = b"<svg xmlns=\"http://www.w3.org/2000/svg\"><circle r=\"1\"/></svg>";
-    let out = ok(&v, "attach_file", json!({"page":"Check","data":b64(clean),"name":"c"}));
+    let out = ok(
+        &v,
+        "attach_file",
+        json!({"page":"Check","data":b64(clean),"name":"c"}),
+    );
     assert!(out.contains("c.svg"), "{out}");
     let e = fails(&v, "attach_file", json!({"page":"Check"}));
     assert!(e.contains("exactly one of path, url or data"), "{e}");
-    let e = fails(&v, "attach_file", json!({"page":"Check","data":"AA==","url":"https://example.com/a.png"}));
+    let e = fails(
+        &v,
+        "attach_file",
+        json!({"page":"Check","data":"AA==","url":"https://example.com/a.png"}),
+    );
     assert!(e.contains("exactly one"), "{e}");
-    let e = fails(&v, "attach_file", json!({"page":"Check","url":"http://example.com/a.png"}));
+    let e = fails(
+        &v,
+        "attach_file",
+        json!({"page":"Check","url":"http://example.com/a.png"}),
+    );
     assert!(e.contains("https"), "{e}");
-    let e = fails(&v, "attach_file", json!({"page":"Check","url":"https://127.0.0.1/a.png"}));
+    let e = fails(
+        &v,
+        "attach_file",
+        json!({"page":"Check","url":"https://127.0.0.1/a.png"}),
+    );
     assert!(e.contains("private"), "{e}");
-    let e = fails(&v, "attach_file", json!({"page":"Check","data":"not base64!"}));
+    let e = fails(
+        &v,
+        "attach_file",
+        json!({"page":"Check","data":"not base64!"}),
+    );
     assert!(e.contains("base64"), "{e}");
     let e = fails(&v, "attach_file", json!({"page":"Missing","data":b64(PNG)}));
     assert!(!e.is_empty());

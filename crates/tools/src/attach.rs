@@ -29,8 +29,7 @@ pub const FETCH_TIMEOUT: Duration = Duration::from_secs(30);
 pub const MAX_REDIRECTS: u32 = 3;
 
 /// The error for `path` where the tool does not run on the user's computer.
-pub const PATH_NOT_HERE: &str =
-    "path is only available on your own computer; pass url or data";
+pub const PATH_NOT_HERE: &str = "path is only available on your own computer; pass url or data";
 
 /// The longest base64 text, in bytes, a host should accept for `data`: the
 /// encoding of [`MAX_DATA_BYTES`] plus room for line breaks.
@@ -190,7 +189,11 @@ pub(crate) fn attach_file(v: &Vault, a: &Value) -> Result<String> {
             },
         ],
     )?;
-    let what = if kind == BlockKind::Image { "an image" } else { "a file" };
+    let what = if kind == BlockKind::Image {
+        "an image"
+    } else {
+        "a file"
+    };
     Ok(format!(
         "Attached {name} ({size} bytes) as {what} block: {block}\nattachment: ../.vault/blobs/{}/{id}\nblock link: {}\nlink: {}",
         &id[..2],
@@ -398,11 +401,16 @@ fn fetch_url(u: &str) -> Result<Fetched> {
     if bytes.is_empty() {
         return err("the url returned no content");
     }
-    let name = parsed
-        .path_segments()
-        .and_then(|mut s| s.next_back())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.replace("%20", " "));
+    // The name comes from the final URL, after redirects.
+    let name = {
+        use ureq::ResponseExt as _;
+        resp.get_uri()
+            .path()
+            .rsplit('/')
+            .next()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.replace("%20", " "))
+    };
     Ok(Fetched {
         bytes,
         name,
@@ -416,7 +424,9 @@ fn fetch_error(e: ureq::Error) -> ToolError {
         ureq::Error::TooManyRedirects => {
             ToolError(format!("url redirected more than {MAX_REDIRECTS} times"))
         }
-        ureq::Error::RequireHttpsOnly(_) => ToolError("url must be https (also after redirects)".into()),
+        ureq::Error::RequireHttpsOnly(_) => {
+            ToolError("url must be https (also after redirects)".into())
+        }
         ureq::Error::Timeout(_) => ToolError(format!(
             "url took longer than {} s",
             FETCH_TIMEOUT.as_secs()
@@ -523,7 +533,11 @@ fn has_event_attr(lower: &str) -> bool {
     let mut i = 0;
     while let Some(off) = lower[i..].find("on") {
         let at = i + off;
-        let before_ok = at > 0 && (b[at - 1].is_ascii_whitespace() || b[at - 1] == b'/' || b[at - 1] == b'"' || b[at - 1] == b'\'');
+        let before_ok = at > 0
+            && (b[at - 1].is_ascii_whitespace()
+                || b[at - 1] == b'/'
+                || b[at - 1] == b'"'
+                || b[at - 1] == b'\'');
         if before_ok {
             let mut j = at + 2;
             while j < b.len() && (b[j].is_ascii_alphanumeric() || b[j] == b'-' || b[j] == b'_') {
@@ -567,7 +581,10 @@ pub(crate) fn sanitize_name(raw: &str) -> String {
             }
         })
         .collect();
-    let trimmed = cleaned.trim().trim_start_matches('.').trim_end_matches(['.', ' ']);
+    let trimmed = cleaned
+        .trim()
+        .trim_start_matches('.')
+        .trim_end_matches(['.', ' ']);
     let mut out: String = trimmed.chars().take(120).collect();
     if out.trim().is_empty() {
         out = "file".into();
@@ -581,7 +598,8 @@ mod tests {
     use std::io::{BufRead, BufReader, Write};
     use std::net::TcpListener;
 
-    const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89";
+    const PNG: &[u8] =
+        b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89";
 
     struct Loopback;
     impl Loopback {
@@ -651,7 +669,14 @@ mod tests {
     fn refuses_http_and_private_addresses_without_the_flag() {
         let e = fetch_url("http://example.com/a.png").err().unwrap();
         assert!(e.0.contains("https"), "{e}");
-        for host in ["127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.169.254", "[::1]", "[fd00::1]"] {
+        for host in [
+            "127.0.0.1",
+            "10.0.0.1",
+            "192.168.1.1",
+            "169.254.169.254",
+            "[::1]",
+            "[fd00::1]",
+        ] {
             let e = fetch_url(&format!("https://{host}/a.png")).err().unwrap();
             assert!(e.0.contains("private"), "{host}: {e}");
         }
@@ -663,7 +688,9 @@ mod tests {
         // goes to a private address, which the resolver refuses.
         let _flag = Loopback::on();
         let port = serve(1, |_, _| redirect("http://10.255.255.1:9/secret"));
-        let e = fetch_url(&format!("http://127.0.0.1:{port}/start")).err().unwrap();
+        let e = fetch_url(&format!("http://127.0.0.1:{port}/start"))
+            .err()
+            .unwrap();
         assert!(e.0.contains("private"), "{e}");
     }
 
@@ -674,7 +701,9 @@ mod tests {
             let n: u32 = path.trim_start_matches('/').parse().unwrap_or(0);
             redirect(&format!("http://127.0.0.1:{port}/{}", n + 1))
         });
-        let e = fetch_url(&format!("http://127.0.0.1:{port}/0")).err().unwrap();
+        let e = fetch_url(&format!("http://127.0.0.1:{port}/0"))
+            .err()
+            .unwrap();
         assert!(e.0.contains("redirected"), "{e}");
     }
 
@@ -688,7 +717,9 @@ mod tests {
             )
             .into_bytes()
         });
-        let e = fetch_url(&format!("http://127.0.0.1:{port}/big")).err().unwrap();
+        let e = fetch_url(&format!("http://127.0.0.1:{port}/big"))
+            .err()
+            .unwrap();
         assert!(e.0.contains("25 MB"), "{e}");
     }
 
@@ -700,7 +731,9 @@ mod tests {
             r.extend(std::iter::repeat_n(b'a', MAX_BYTES + 10));
             r
         });
-        let e = fetch_url(&format!("http://127.0.0.1:{port}/big")).err().unwrap();
+        let e = fetch_url(&format!("http://127.0.0.1:{port}/big"))
+            .err()
+            .unwrap();
         assert!(e.0.contains("25 MB"), "{e}");
     }
 
@@ -710,9 +743,22 @@ mod tests {
             assert!(is_public(ip.parse().unwrap()), "{ip}");
         }
         for ip in [
-            "127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.0.1", "169.254.169.254",
-            "100.64.0.1", "0.0.0.0", "255.255.255.255", "::1", "::", "fe80::1",
-            "fc00::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "64:ff9b::a00:1", "224.0.0.1",
+            "127.0.0.1",
+            "10.1.2.3",
+            "172.16.0.1",
+            "192.168.0.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "0.0.0.0",
+            "255.255.255.255",
+            "::1",
+            "::",
+            "fe80::1",
+            "fc00::1",
+            "::ffff:127.0.0.1",
+            "::ffff:10.0.0.1",
+            "64:ff9b::a00:1",
+            "224.0.0.1",
         ] {
             assert!(!is_public(ip.parse().unwrap()), "{ip}");
         }
