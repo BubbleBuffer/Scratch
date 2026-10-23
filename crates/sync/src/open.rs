@@ -15,6 +15,17 @@ pub const CACHE_CONTROL: &str = "no-store";
 /// malformed id (`invalid page id` or `invalid block id`); the route answers
 /// 400 with it. Ids must be vault ids ([`vault_core::is_page_id`]).
 pub fn bounce_page(page: &str, block: Option<&str>) -> Result<String, &'static str> {
+    bounce_page_with(page, block, "")
+}
+
+/// [`bounce_page`] with `extra`, trusted HTML the caller built, shown under
+/// the link (the standalone hub adds its "Sign in to view in the browser"
+/// button there).
+pub fn bounce_page_with(
+    page: &str,
+    block: Option<&str>,
+    extra: &str,
+) -> Result<String, &'static str> {
     if !is_page_id(page) {
         return Err("invalid page id");
     }
@@ -25,7 +36,7 @@ pub fn bounce_page(page: &str, block: Option<&str>) -> Result<String, &'static s
         }
         target.push_str(&format!("?block={block}"));
     }
-    Ok(open_html(&target))
+    Ok(open_html(&target, extra))
 }
 
 /// The value of `block` in a query string (without `?`), percent-decoded.
@@ -40,7 +51,7 @@ pub fn block_query(query: &str) -> Option<String> {
 
 /// The bounce page. `target` is a `notes://` link built from checked ids; it
 /// is escaped for the attribute and the script anyway.
-fn open_html(target: &str) -> String {
+fn open_html(target: &str, extra: &str) -> String {
     let attr = html_escape(target);
     let js = serde_json::to_string(target)
         .unwrap_or_else(|_| "\"\"".to_string())
@@ -56,7 +67,7 @@ fn open_html(target: &str) -> String {
 <style>body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;\
 font:16px/1.5 system-ui,sans-serif;text-align:center}}main{{padding:16px}}</style>\n\
 </head>\n<body>\n<main>\n<p><a href=\"{attr}\">Open in Scratch</a></p>\n\
-<p>You can close this tab.</p>\n</main>\n<script>location.replace({js});</script>\n\
+<p>You can close this tab.</p>\n{extra}</main>\n<script>location.replace({js});</script>\n\
 </body>\n</html>\n"
     )
 }
@@ -88,7 +99,7 @@ mod tests {
             html_escape("<a href='x'>&\""),
             "&lt;a href=&#39;x&#39;&gt;&amp;&quot;"
         );
-        let html = open_html("notes://page/01ARZ3NDEKTSV4RRFFQ69G5FAV?block=</script>");
+        let html = open_html("notes://page/01ARZ3NDEKTSV4RRFFQ69G5FAV?block=</script>", "");
         // The script literal is JSON, with `<` and `>` written as \u escapes.
         let escaped = "notes://page/01ARZ3NDEKTSV4RRFFQ69G5FAV?block=\\u003c/script\\u003e";
         assert!(html.contains(&format!("location.replace(\"{escaped}\")")));

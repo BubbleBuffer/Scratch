@@ -19,7 +19,7 @@ Start with the [architecture index](architecture/index.md), then the [data model
 - [Kanban](addons/kanban.md): Optional kanban notes with manually collected cards and compact embeds.
 - [Architecture](architecture/index.md): How the app works now: data model, folder mounts, sync and storage, add-ons, and the built app, core, sync and hub.
 - [Decisions](decisions/index.md): Decisions that shape what's built, one line each with its date.
-- [Integrations](integrations/index.md): Connections to AI assistants and the agent.
+- [Integrations](integrations/index.md): Connections to AI assistants and the agent, and note sharing.
 - [Product](product/index.md): What the app does now, how it looks and feels, and the speed measurements behind it.
 - [Prototypes](prototypes/index.md): The Tauri and Flutter bake-off prototypes: what each is, how it is built and tested, and its known gaps.
 <!-- /wiki:children -->

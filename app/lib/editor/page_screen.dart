@@ -41,6 +41,7 @@ import '../features/page/page_menu.dart';
 import '../features/templates/templates.dart';
 import '../features/sync/conflicts.dart';
 import '../features/sync/sync_indicator.dart';
+import '../features/share/share_popup.dart';
 import '../state/sync_store.dart';
 import '../features/trash/trash_panel.dart';
 import '../registry/block_registry.dart';
@@ -3380,6 +3381,10 @@ class PageEditorState extends State<PageScreen>
       favorite: _favorite,
       canUndo: canUndo,
       canAskAi: !readOnly,
+      // The hub refuses to share databases, so they get no Share item.
+      canShare:
+          (_page?.pageType ?? documentType) != databaseType &&
+          defaultShareClient(context) != null,
     );
     if (a == null || !mounted) return;
     switch (a) {
@@ -3388,6 +3393,15 @@ class PageEditorState extends State<PageScreen>
       case PageMenuAction.copyLink:
         await Clipboard.setData(
           ClipboardData(text: PageLink(widget.pageId).url),
+        );
+      case PageMenuAction.share:
+        _saveTitle();
+        await session.save();
+        if (!mounted) return;
+        await showSharePopup(
+          context,
+          pageId: widget.pageId,
+          pageTitle: titleCtl.text,
         );
       case PageMenuAction.duplicate:
         _saveTitle();

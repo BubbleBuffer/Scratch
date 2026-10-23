@@ -1,6 +1,6 @@
 // The page's "•••" menu:
-// small text and full width switches, lock, favourites, copy link,
-// duplicate, move to, Ask AI (about the page), undo, page history, deleted pages, delete, import
+// small text and full width switches, lock, favourites, copy link, share (with a hub
+// sign-in), duplicate, move to, Ask AI (about the page), undo, page history, deleted pages, delete, import
 // and export, then Send feedback. The switches apply in place; the other rows close the menu
 // and hand their action to the editor. A popover on desktop, a sheet on
 // mobile.
@@ -14,15 +14,16 @@ import '../../ui/ui.dart';
 import '../ai/ask_ai.dart' show AiMark;
 import '../settings/controls.dart' show Toggle;
 
-enum PageMenuAction { favorite, copyLink, duplicate, moveTo, askAi, undo, history, trash, delete, import, export, feedback }
+enum PageMenuAction { favorite, copyLink, share, duplicate, moveTo, askAi, undo, history, trash, delete, import, export, feedback }
 
 Future<PageMenuAction?> showPageMenu(BuildContext context, Rect? anchor,
-    {required String pageId, required bool favorite, required bool canUndo, bool canAskAi = false}) {
+    {required String pageId, required bool favorite, required bool canUndo, bool canAskAi = false, bool canShare = false}) {
   Widget body(BuildContext ctx) => PageMenu(
         pageId: pageId,
         favorite: favorite,
         canUndo: canUndo,
         canAskAi: canAskAi,
+        canShare: canShare,
         sheet: context.mobile,
         onAction: (a) => Navigator.of(ctx).pop(a),
       );
@@ -42,9 +43,13 @@ class PageMenu extends StatefulWidget {
     required this.onAction,
     this.sheet = false,
     this.canAskAi = false,
+    this.canShare = false,
   });
   final String pageId;
   final bool favorite, canUndo, sheet;
+
+  /// Shows "Share" (the share popup; only with a hub sign-in, not for databases).
+  final bool canShare;
 
   /// Shows "Ask AI" (an answer about the page, written at its end).
   final bool canAskAi;
@@ -166,6 +171,7 @@ class _PageMenuState extends State<PageMenu> {
               SpaceDot(meta.color), const SizedBox(width: 6), ico(Ico.chevronRight),
             ])),
       row('copy-link', ico(Ico.link), 'Copy link', () => onAction(PageMenuAction.copyLink), shortcut: 'Ctrl+L'),
+      if (widget.canShare) row('share', icx(Ix.linkPage), 'Share', () => onAction(PageMenuAction.share)),
       row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: 'Ctrl+D'),
       row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo), shortcut: 'Ctrl+Shift+P'),
       if (widget.canAskAi) row('ask-ai', AiMark(size: iconSize), 'Ask AI', () => onAction(PageMenuAction.askAi)),

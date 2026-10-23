@@ -71,7 +71,7 @@ use std::fmt;
 pub use auth::PairedDevice;
 pub use client::{BackgroundSync, SyncClient, SyncOptions, SyncReport};
 pub use hub::{Hub, HubRequest, HubResponse, HubServer};
-pub use open::bounce_page;
+pub use open::{bounce_page, bounce_page_with};
 pub use tls::CertificateInfo;
 
 /// Header carrying the client vault's device id on every request.
