@@ -433,6 +433,38 @@ impl Tool for ProjectTool {
     }
 }
 
+/// The desktop pack's built-in tools, in order. A computer offers these to the
+/// hub's `/mcp/agent` relay under the same names.
+pub const CORE_COMPUTER_TOOLS: &[&str] = &[
+    "read", "write", "edit", "search", "list", "exec", "poll", "wait", "cancel",
+];
+
+fn desktop_definitions(definition_root: &std::path::Path) -> Result<Vec<ToolDefinition>> {
+    let workspace = WorkspaceTools::new(definition_root)?;
+    let processes = Arc::new(ProcessTools::new(workspace.clone()));
+    let mut native = ToolRegistry::new();
+    workspace.register(&mut native, false)?;
+    processes.register(&mut native)?;
+    processes.register_wait(&mut native)?;
+    Ok(CORE_COMPUTER_TOOLS
+        .iter()
+        .map(|name| {
+            let mut definition = native.get_host(name).expect("native tool").definition();
+            if *name == "exec" {
+                definition.description.push_str(" The working directory defaults to the current project's folder. This is not a sandbox: commands can access files outside the project.");
+            }
+            definition
+        })
+        .collect())
+}
+
+/// The core computer tools' definitions as a desktop advertises them, without
+/// a desktop: the hub's any-computer `/mcp/agent` lists these. Approval is
+/// left at its default (relay calls run under Bypass).
+pub fn core_computer_tool_definitions() -> Result<Vec<ToolDefinition>> {
+    desktop_definitions(&std::env::temp_dir())
+}
+
 pub fn register_desktop_tools(
     registry: &mut ToolRegistry,
     projects: Arc<crate::projects::Projects>,
@@ -454,24 +486,17 @@ pub(crate) fn register_desktop_tools_recorded(
     // Definitions are static. Use the agent's existing internal workspace so
     // a moved/unavailable project never prevents listing or repairing projects.
     // Project roots and process pools are constructed only when invoked.
-    let workspace = WorkspaceTools::new(definition_root)?;
-    let processes = Arc::new(ProcessTools::new(workspace.clone()));
-    let mut native = ToolRegistry::new();
-    workspace.register(&mut native, false)?;
-    processes.register(&mut native)?;
-    processes.register_wait(&mut native)?;
-    for name in [
-        "read", "write", "edit", "search", "list", "exec", "poll", "wait", "cancel",
-    ] {
-        let mut definition = native.get_host(name).expect("native tool").definition();
+    for mut definition in desktop_definitions(definition_root)? {
+        let name = CORE_COMPUTER_TOOLS
+            .iter()
+            .copied()
+            .find(|name| *name == definition.name)
+            .expect("core tool");
         definition.approval = if matches!(name, "write" | "edit" | "exec") {
             Approval::Confirm
         } else {
             Approval::None
         };
-        if name == "exec" {
-            definition.description.push_str(" The working directory defaults to the current project's folder. This is not a sandbox: commands can access files outside the project.");
-        }
         let tool: Arc<dyn Tool> = Arc::new(DesktopTool {
             desktop: desktop.clone(),
             source: name,

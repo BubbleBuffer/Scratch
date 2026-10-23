@@ -38,7 +38,9 @@ pub struct Config {
     pub mcp_oauth: McpOAuthConfig,
     /// Opt-in BubblePaw MCP gateway. Requires the existing MCP OAuth config.
     pub mcp_agent_enabled: bool,
-    /// Global fallback when neither the tool argument nor URL selects a host.
+    /// Deprecated and ignored since 2026-10-23: `/mcp/agent` without
+    /// `?host=` is any-computer mode, with no default host. [`Config::load`]
+    /// prints a deprecation line when it is set to anything but `hub`.
     pub mcp_agent_default_host: String,
     pub agent: AgentSection,
     pub schedules: SchedulesSection,
@@ -94,6 +96,8 @@ fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
 
 const LEGACY_APPROVALS: &str = "notes-hub: [agent] approvals and NOTES_HUB_AGENT_APPROVALS \
      are deprecated and ignored (hub agent runs use Bypass); remove them.";
+
+const LEGACY_DEFAULT_HOST: &str = "notes-hub: mcp_agent_default_host and      NOTES_HUB_MCP_AGENT_DEFAULT_HOST are deprecated and ignored (/mcp/agent names the      computer in each call; /mcp/agent?host=<name> pins one); remove them.";
 
 impl Default for AgentSection {
     fn default() -> AgentSection {
@@ -237,6 +241,9 @@ impl Config {
         c.validate()?;
         if c.agent.legacy_approvals {
             eprintln!("{LEGACY_APPROVALS}");
+        }
+        if c.mcp_agent_default_host != "hub" {
+            eprintln!("{LEGACY_DEFAULT_HOST}");
         }
         Ok(c)
     }

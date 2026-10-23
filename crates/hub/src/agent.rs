@@ -141,19 +141,6 @@ impl AgentHost {
         self.enabled
     }
 
-    /// The host the vault's default runner names, as the gateway knows hosts:
-    /// `hub` for both `hub` and `this_device` (the hub is the device here).
-    /// None when the vault sets no default runner.
-    pub(crate) fn vault_default_host(&self) -> Option<String> {
-        match self.vault.agent_defaults() {
-            Ok(defaults) => defaults.runner.map(|_| vault_core::AGENT_RUNNER_HUB.to_owned()),
-            Err(error) => {
-                tracing::warn!("agent defaults unreadable: {error}");
-                None
-            }
-        }
-    }
-
     fn config(&self) -> AgentConfig {
         AgentConfig {
             // The agent keeps `agent/` (store, workspace) inside it.

@@ -46,14 +46,19 @@ Future<void> showMcpServers(BuildContext context) async {
   });
 }
 
-/// `<hub>/mcp/agent?host=<name>`: the connector address that runs this
-/// computer's tools through [hubUrl].
-String hostConnectorUrl(String hubUrl, String name) {
+/// `<hub>/mcp/agent?host=<name>`: the connector address pinned to this
+/// computer, through [hubUrl].
+String hostConnectorUrl(String hubUrl, String name) =>
+    '${anyComputerConnectorUrl(hubUrl)}?host=${Uri.encodeComponent(name.trim())}';
+
+/// `<hub>/mcp/agent`: the connector address that reaches any of the user's
+/// computers (each call names the computer in its `host` argument).
+String anyComputerConnectorUrl(String hubUrl) {
   var base = hubUrl.trim();
   while (base.endsWith('/')) {
     base = base.substring(0, base.length - 1);
   }
-  return '$base/mcp/agent?host=${Uri.encodeComponent(name.trim())}';
+  return '$base/mcp/agent';
 }
 
 class HostRelayDetails extends StatefulWidget {
@@ -167,8 +172,10 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
               ),
             ),
           ),
+        // Two connector addresses for ChatGPT or claude.ai: pinned to this
+        // computer, or any computer with the relay on (the assistant picks).
         SettingsRow(
-          label: 'Connector address',
+          label: 'This computer only',
           description:
               'Add it as a custom connector in ChatGPT or claude.ai to use '
               'this computer through the hub.',
@@ -177,6 +184,18 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
             hostConnectorUrl(widget.hubUrl, widget.name),
             key: const ValueKey('host-relay-url'),
             textKey: const ValueKey('host-relay-url-text'),
+          ),
+        ),
+        SettingsRow(
+          label: 'Any of your computers',
+          description:
+              'One connector for every computer with this setting on; the AI '
+              'picks which one to use.',
+          stack: true,
+          trailing: CopyableText(
+            anyComputerConnectorUrl(widget.hubUrl),
+            key: const ValueKey('host-relay-any-url'),
+            textKey: const ValueKey('host-relay-any-url-text'),
           ),
         ),
       ],

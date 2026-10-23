@@ -177,8 +177,20 @@ impl Hosts {
         }
     }
 
+    /// The host called `name`: an exact match, else the one host whose name
+    /// matches ignoring case.
     pub fn lookup(&self, name: &str) -> Lookup {
-        match self.by_name.lock().unwrap().get(name) {
+        let hosts = self.by_name.lock().unwrap();
+        let slot = hosts.get(name).or_else(|| {
+            let mut matches = hosts
+                .iter()
+                .filter(|(known, _)| known.to_lowercase() == name.to_lowercase());
+            match (matches.next(), matches.next()) {
+                (Some((_, slot)), None) => Some(slot),
+                _ => None,
+            }
+        });
+        match slot {
             Some(Some(conn)) if !conn.close.is_cancelled() => Lookup::Online(conn.clone()),
             Some(_) => Lookup::Offline,
             None => Lookup::Unknown,

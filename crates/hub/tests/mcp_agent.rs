@@ -131,26 +131,17 @@ struct Env {
     client: Client,
     base: String,
     url: String,
+    hub_url: String,
     static_token: String,
     _data: TempDir,
 }
 
 impl Env {
     async fn boot(gateway: bool, agent: bool) -> Self {
-        Self::with_default_host(gateway, agent, "hub").await
+        Self::configured(gateway, agent, true, 64 << 20).await
     }
 
-    async fn with_default_host(gateway: bool, agent: bool, default_host: &str) -> Self {
-        Self::configured(gateway, agent, default_host, true, 64 << 20).await
-    }
-
-    async fn configured(
-        gateway: bool,
-        agent: bool,
-        default_host: &str,
-        enable_js: bool,
-        import_limit: usize,
-    ) -> Self {
+    async fn configured(gateway: bool, agent: bool, enable_js: bool, import_limit: usize) -> Self {
         let data = TempDir(std::env::temp_dir().join(format!("notes_hub_mcp_agent_{}", new_id())));
         let issuer = MockIssuer::start().await;
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -163,7 +154,6 @@ impl Env {
             trust_proxy: false,
             import_source_limit_bytes: import_limit,
             mcp_agent_enabled: gateway,
-            mcp_agent_default_host: default_host.into(),
             mcp_oauth: McpOAuthConfig {
                 issuer: issuer.shared.url.clone(),
                 client_id: CLIENT_ID.into(),
@@ -202,6 +192,7 @@ impl Env {
                 .build()
                 .unwrap(),
             url: format!("{base}/mcp/agent"),
+            hub_url: format!("{base}/mcp/agent?host=hub"),
             base,
             static_token,
             _data: data,
@@ -245,7 +236,7 @@ impl Env {
     }
 
     async fn send(&self, token: Option<&str>, session: Option<&str>, body: Value) -> Response {
-        self.send_at(&self.url, token, session, body).await
+        self.send_at(&self.hub_url, token, session, body).await
     }
 
     async fn send_at(
@@ -388,7 +379,7 @@ fn tool_error(reply: &Value) -> String {
 #[tokio::test]
 async fn gateway_lists_exact_vault_definitions_and_native_host_schemas_with_optional_js() {
     for enable_js in [false, true] {
-        let env = Env::configured(true, true, "hub", enable_js, 64 << 20).await;
+        let env = Env::configured(true, true, enable_js, 64 << 20).await;
         let token = env.ann();
         // Discovery is available before initialize and reflects this host's mode.
         let reply = env.rpc(&token, None, "tools/list", json!({})).await;
@@ -430,7 +421,9 @@ async fn gateway_lists_exact_vault_definitions_and_native_host_schemas_with_opti
             .iter()
             .filter(|tool| !vault_names.contains(tool["name"].as_str().unwrap()))
             .collect();
-        for required in ["hosts", "environments", "chat_read"] {
+        // Locked to the hub: its runtime tools are listed, the computer picker is not.
+        assert!(!names.contains("hosts"), "{reply}");
+        for required in ["environments", "chat_read"] {
             assert!(
                 names.contains(required),
                 "missing native host capability {required}: {reply}"
@@ -442,13 +435,7 @@ async fn gateway_lists_exact_vault_definitions_and_native_host_schemas_with_opti
         for tool in host_tools {
             let schema = &tool["inputSchema"];
             assert_eq!(schema["type"], "object", "{tool}");
-            assert_eq!(schema["properties"]["host"]["type"], "string", "{tool}");
-            assert!(
-                !schema["required"]
-                    .as_array()
-                    .is_some_and(|fields| fields.iter().any(|field| field == "host")),
-                "host must remain optional: {tool}"
-            );
+            assert!(schema["properties"].get("host").is_none(), "{tool}");
             assert!(
                 tool["description"]
                     .as_str()
@@ -483,8 +470,8 @@ async fn gateway_lists_exact_vault_definitions_and_native_host_schemas_with_opti
         }
         if enable_js {
             for (name, expected) in [
-                ("js", vec!["code", "environment", "host", "maxOutputTokens"]),
-                ("js_help", vec!["host", "query"]),
+                ("js", vec!["code", "environment", "maxOutputTokens"]),
+                ("js_help", vec!["query"]),
             ] {
                 let tool = tools.iter().find(|tool| tool["name"] == name).unwrap();
                 let mut properties: Vec<_> = tool["inputSchema"]["properties"]
@@ -508,7 +495,7 @@ async fn gateway_lists_exact_vault_definitions_and_native_host_schemas_with_opti
 
 #[tokio::test]
 async fn native_host_calls_require_owned_sessions_and_forward_runtime_validation() {
-    let env = Env::configured(true, true, "hub", false, 64 << 20).await;
+    let env = Env::configured(true, true, false, 64 << 20).await;
     let token = env.ann();
     let request = call("environments", json!({"action":"inspect"}));
     let response = env.send(Some(&token), None, request.clone()).await;
@@ -523,17 +510,17 @@ async fn native_host_calls_require_owned_sessions_and_forward_runtime_validation
             &token,
             Some(&session),
             "environments",
-            json!({"action":"inspect","host":"hub"}),
+            json!({"action":"inspect"}),
         )
         .await;
     assert!(returned(&listed)["environments"].is_array(), "{listed}");
-    // The selector must be stripped before the strict runtime schema validates input.
+    // The strict runtime schema validates the arguments.
     let invalid = env
         .call(
             &token,
             Some(&session),
             "environments",
-            json!({"action":"not-an-action","host":"hub"}),
+            json!({"action":"not-an-action"}),
         )
         .await;
     tool_error(&invalid);
@@ -610,7 +597,7 @@ fn normalized_import_report(mut report: Value) -> Value {
 
 #[tokio::test]
 async fn vault_calls_match_notes_mcp_without_a_session_or_available_execution_host() {
-    let env = Env::configured(true, false, "missing-global-host", false, 8192).await;
+    let env = Env::configured(true, false, false, 8192).await;
     let token = env.ann();
     let notes = format!("{}/mcp", env.base);
     let gateway = format!("{}?host=missing-url-host", env.url);
@@ -743,7 +730,7 @@ async fn vault_calls_match_notes_mcp_without_a_session_or_available_execution_ho
 
 #[tokio::test]
 async fn gateway_preserves_import_only_large_body_allowance() {
-    let env = Env::configured(true, false, "hub", false, 12 << 20).await;
+    let env = Env::configured(true, false, false, 12 << 20).await;
     let token = env.ann();
     let archive = archive(&[("intro.md", b"intro"), ("large.txt", &vec![b'x'; 7 << 20])]);
     let mut reports = Vec::new();
@@ -776,135 +763,52 @@ async fn gateway_preserves_import_only_large_body_allowance() {
 }
 
 #[tokio::test]
-async fn top_level_hosts_reports_actual_availability_and_selection_without_a_session() {
-    for (enabled, default_host) in [(true, ""), (true, "global-host"), (false, "hub")] {
-        let env = Env::configured(true, enabled, default_host, false, 64 << 20).await;
-        let token = env.ann();
-        for (suffix, arguments, selected) in [
-            (
-                "",
-                json!({}),
-                if default_host.is_empty() {
-                    "hub"
-                } else {
-                    default_host
-                },
-            ),
-            ("?host=hub", json!({}), "hub"),
-            ("?host=missing-url", json!({}), "missing-url"),
-            ("?host=missing-url", json!({"host":"hub"}), "hub"),
-            (
-                "?host=hub",
-                json!({"host":"missing-argument"}),
-                "missing-argument",
-            ),
-        ] {
-            let reply = env
-                .call_at(
-                    &format!("{}{suffix}", env.url),
-                    &token,
-                    None,
-                    "hosts",
-                    arguments,
-                )
-                .await;
-            if selected == "hub" {
-                assert_eq!(
-                    returned(&reply),
-                    json!([{"name":"hub","online":enabled,"default":true}]),
-                    "{suffix}: {reply}"
-                );
-            } else {
-                let error = tool_error(&reply);
-                assert!(error.contains(selected), "{reply}");
-                assert!(error.to_lowercase().contains("available"), "{reply}");
-                assert!(error.contains("hub"), "{reply}");
-            }
-        }
-        env.stop().await;
-    }
-}
-
-#[tokio::test]
-async fn native_host_selection_and_discovery_respect_argument_url_and_global_defaults() {
-    let env = Env::configured(true, true, "global-host", false, 64 << 20).await;
+async fn locked_mode_is_pinned_to_its_host() {
+    let env = Env::new().await;
     let token = env.ann();
     let session = env.initialize(&token).await;
-    for (suffix, arguments, expected) in [
-        ("", json!({"action":"inspect"}), "global-host"),
-        ("?host=url-host", json!({"action":"inspect"}), "url-host"),
-        (
-            "?host=url-host",
-            json!({"action":"inspect","host":"argument-host"}),
-            "argument-host",
-        ),
-    ] {
-        let reply = env
-            .call_at(
-                &format!("{}{suffix}", env.url),
-                &token,
-                Some(&session),
-                "environments",
-                arguments,
-            )
-            .await;
-        let error = tool_error(&reply);
-        assert!(
-            error.contains(expected)
-                && error.contains("hub")
-                && error.to_lowercase().contains("available"),
-            "{reply}"
-        );
-    }
-    for (suffix, arguments) in [
-        ("?host=hub", json!({"action":"inspect"})),
-        (
-            "?host=missing-url",
-            json!({"action":"inspect","host":"hub"}),
-        ),
-    ] {
-        let reply = env
-            .call_at(
-                &format!("{}{suffix}", env.url),
-                &token,
-                Some(&session),
-                "environments",
-                arguments,
-            )
-            .await;
-        assert!(returned(&reply)["environments"].is_array(), "{reply}");
-    }
-    for (suffix, expected) in [("", "global-host"), ("?host=missing-url", "missing-url")] {
-        let response = env
-            .send_at(
-                &format!("{}{suffix}", env.url),
-                Some(&token),
-                None,
-                rpc("tools/list", json!({})),
-            )
-            .await;
-        assert_eq!(response.status(), StatusCode::OK);
-        let reply: Value = response.json().await.unwrap();
-        let error = reply["error"]["message"]
-            .as_str()
-            .expect("discovery must reject unknown selected hosts");
-        assert!(error.contains(expected) && error.contains("hub"), "{reply}");
-    }
-    let response = env
-        .send_at(
-            &format!("{}?host=hub", env.url),
-            Some(&token),
-            None,
-            rpc("tools/list", json!({})),
+    let listed = env.rpc(&token, None, "tools/list", json!({})).await;
+    let tools = listed["result"]["tools"].as_array().unwrap();
+    assert!(tools.iter().all(|tool| tool["name"] != "hosts"), "{listed}");
+    assert!(
+        tools
+            .iter()
+            .all(|tool| tool["inputSchema"]["properties"].get("host").is_none()),
+        "{listed}"
+    );
+    let hosts = env.call(&token, Some(&session), "hosts", json!({})).await;
+    assert_eq!(hosts["error"]["code"], -32602, "{hosts}");
+    assert_eq!(
+        hosts["error"]["message"], "unknown or unavailable host tool: hosts",
+        "{hosts}"
+    );
+    let missing = format!("{}?host=missing-host", env.url);
+    let reply = env
+        .send_at(&missing, Some(&token), None, rpc("tools/list", json!({})))
+        .await;
+    assert_eq!(reply.status(), StatusCode::OK);
+    let reply: Value = reply.json().await.unwrap();
+    let error = reply["error"]["message"]
+        .as_str()
+        .expect("unknown host error");
+    assert!(
+        error.contains("missing-host") && error.contains("hub"),
+        "{reply}"
+    );
+    let call = env
+        .call_at(
+            &missing,
+            &token,
+            Some(&session),
+            "environments",
+            json!({"action":"inspect"}),
         )
         .await;
-    assert_eq!(response.status(), StatusCode::OK);
-    let reply: Value = response.json().await.unwrap();
-    assert!(reply["result"]["tools"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|tool| tool["name"] == "environments"));
+    let error = tool_error(&call);
+    assert!(
+        error.contains("missing-host") && error.contains("hub"),
+        "{call}"
+    );
     env.stop().await;
 }
 
@@ -948,12 +852,7 @@ async fn help_lists_tools_and_searches_signatures_and_documentation_without_a_se
         assert!(output.contains(name), "{output}");
     }
     let help = env
-        .call(
-            &token,
-            None,
-            "js_help",
-            json!({"query":"search_notes","host":"hub"}),
-        )
+        .call(&token, None, "js_help", json!({"query":"search_notes"}))
         .await;
     let output = success_text(&help);
     assert!(output.contains("tools.search_notes({"), "{output}");
@@ -971,57 +870,6 @@ async fn help_lists_tools_and_searches_signatures_and_documentation_without_a_se
         "runtime help must document persistent state: {output}"
     );
     assert!(output.contains("maxOutputTokens"), "{output}");
-    env.stop().await;
-}
-
-#[tokio::test]
-async fn unknown_hosts_report_available_hosts_for_both_tools() {
-    let env = Env::new().await;
-    let token = env.ann();
-    let session = env.initialize(&token).await;
-    for (name, arguments) in [
-        (
-            "js",
-            json!({"code":"return 1;","host":"missing-workstation"}),
-        ),
-        (
-            "js_help",
-            json!({"query":"search_notes","host":"missing-workstation"}),
-        ),
-    ] {
-        let reply = env.call(&token, Some(&session), name, arguments).await;
-        let output = tool_error(&reply);
-        assert!(output.contains("missing-workstation"), "{output}");
-        assert!(output.to_lowercase().contains("available"), "{output}");
-        assert!(output.contains("hub"), "{output}");
-    }
-    env.stop().await;
-}
-
-#[tokio::test]
-async fn configured_default_host_applies_to_both_tools_and_explicit_host_overrides_it() {
-    let env = Env::with_default_host(true, true, "preferred-workstation").await;
-    let token = env.ann();
-    let session = env.initialize(&token).await;
-    for (name, arguments) in [
-        ("js", json!({"code":"return 23;"})),
-        ("js_help", json!({"query":"search_notes"})),
-    ] {
-        let reply = env
-            .call(&token, Some(&session), name, arguments.clone())
-            .await;
-        let output = tool_error(&reply);
-        assert!(output.contains("preferred-workstation"), "{output}");
-        assert!(output.contains("hub"), "{output}");
-        let mut explicit = arguments;
-        explicit["host"] = json!("hub");
-        let reply = env.call(&token, Some(&session), name, explicit).await;
-        if name == "js" {
-            assert_eq!(returned(&reply), 23);
-        } else {
-            assert!(success_text(&reply).contains("search_notes"));
-        }
-    }
     env.stop().await;
 }
 
@@ -1072,58 +920,6 @@ async fn connection_uri_host_is_preserved_by_oauth_challenges_and_resource_metad
     assert!(output.contains("unavailable-laptop"), "{output}");
     assert!(output.to_lowercase().contains("available"), "{output}");
     assert!(output.contains("hub"), "{output}");
-    env.stop().await;
-}
-
-#[tokio::test]
-async fn host_selection_uses_argument_then_uri_then_global() {
-    let env = Env::with_default_host(true, true, "global-default").await;
-    let token = env.ann();
-    let session = env.initialize(&token).await;
-    for (name, arguments) in [
-        ("js", json!({"code":"return 41;"})),
-        ("js_help", json!({"query":"search_notes"})),
-    ] {
-        let selected = env
-            .call(&token, Some(&session), name, arguments.clone())
-            .await;
-        let output = tool_error(&selected);
-        assert!(output.contains("global-default"), "{output}");
-        assert!(output.to_lowercase().contains("available"), "{output}");
-        assert!(output.contains("hub"), "{output}");
-
-        let uri = format!("{}?host=uri-default", env.url);
-        let selected = env
-            .call_at(&uri, &token, Some(&session), name, arguments.clone())
-            .await;
-        assert!(tool_error(&selected).contains("uri-default"));
-        let mut explicit = arguments.clone();
-        explicit["host"] = json!("argument-default");
-        let selected = env
-            .call_at(&uri, &token, Some(&session), name, explicit)
-            .await;
-        assert!(tool_error(&selected).contains("argument-default"));
-
-        let uri_hub = format!("{}?host=hub", env.url);
-        let selected = env
-            .call_at(&uri_hub, &token, Some(&session), name, arguments.clone())
-            .await;
-        if name == "js" {
-            assert_eq!(returned(&selected), 41);
-        } else {
-            assert!(success_text(&selected).contains("search_notes"));
-        }
-        let mut explicit_hub = arguments;
-        explicit_hub["host"] = json!("hub");
-        let selected = env
-            .call_at(&uri, &token, Some(&session), name, explicit_hub)
-            .await;
-        if name == "js" {
-            assert_eq!(returned(&selected), 41);
-        } else {
-            assert!(success_text(&selected).contains("search_notes"));
-        }
-    }
     env.stop().await;
 }
 
@@ -1214,48 +1010,9 @@ async fn oauth_tokens_and_discovery_are_shared_across_notes_and_agent_connection
 }
 
 #[tokio::test]
-async fn native_hosts_and_help_expose_hub_availability_and_default_fallback() {
-    // An empty global host falls back to hub.
-    let env = Env::with_default_host(true, true, "").await;
-    let token = env.ann();
-    let session = env.initialize(&token).await;
-    let hosts = env
-        .js(&token, &session, "return await tools.hosts();")
-        .await;
-    assert_eq!(
-        returned(&hosts),
-        json!([{"name":"hub","online":true,"default":true}])
-    );
-    for arguments in [
-        json!({}),
-        json!({"query":"search_notes"}),
-        json!({"query":"js"}),
-    ] {
-        let reply = env.call(&token, None, "js_help", arguments).await;
-        let output = success_text(&reply);
-        let prefix = output.split("tools.").next().unwrap();
-        assert!(
-            output
-                .lines()
-                .next()
-                .unwrap()
-                .to_lowercase()
-                .contains("hosts"),
-            "{output}"
-        );
-        assert!(prefix.contains("hub"), "{output}");
-        assert!(prefix.to_lowercase().contains("online"), "{output}");
-        assert!(prefix.to_lowercase().contains("default"), "{output}");
-    }
-    env.stop().await;
-}
-
-#[tokio::test]
 async fn unreachable_hub_reports_its_name_and_available_hosts() {
     let env = Env::boot(true, false).await;
-    let reply = env
-        .call(&env.ann(), None, "js_help", json!({"host":"hub"}))
-        .await;
+    let reply = env.call(&env.ann(), None, "js_help", json!({})).await;
     let output = tool_error(&reply);
     assert!(output.contains("hub"), "{output}");
     assert!(output.to_lowercase().contains("available"), "{output}");
@@ -1320,7 +1077,7 @@ async fn oauth_metadata_challenge_audience_allowlist_and_origins_are_shared_with
         })
     );
     let request = rpc("tools/list", json!({}));
-    let response = env.send(None, None, request.clone()).await;
+    let response = env.send_at(&env.url, None, None, request.clone()).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(
         response.headers()["www-authenticate"],
@@ -1329,7 +1086,9 @@ async fn oauth_metadata_challenge_audience_allowlist_and_origins_are_shared_with
     // Static agent and sync device tokens remain valid only for their original transports.
     let device = env.server.hub().pair("gateway-test-device").unwrap();
     for token in [&env.static_token, &device] {
-        let response = env.send(Some(token), None, request.clone()).await;
+        let response = env
+            .send_at(&env.url, Some(token), None, request.clone())
+            .await;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(
             response.headers()["www-authenticate"],
@@ -1490,7 +1249,7 @@ async fn named_environments_and_output_limits_reach_the_native_runtime() {
     assert_eq!(returned(&made), true);
     let args = json!({
         "code":"state.gatewayMarker = 'named-environment'; return state.gatewayMarker;",
-        "environment":"scratch", "maxOutputTokens":256, "host":"hub",
+        "environment":"scratch", "maxOutputTokens":256,
     });
     let stored = env.call(&token, Some(&first), "js", args).await;
     assert_eq!(returned(&stored), "named-environment");
@@ -1544,7 +1303,7 @@ async fn deleting_an_active_session_cancels_suspended_js_without_waiting_for_its
     let other_session = env.initialize(&token).await;
     let marker = "Suspended gateway script started";
     let client = env.client.clone();
-    let url = env.url.clone();
+    let url = env.hub_url.clone();
     let active_token = token.clone();
     let active_id = active_session.clone();
     let active = tokio::spawn(async move {
@@ -1567,7 +1326,7 @@ async fn deleting_an_active_session_cancels_suspended_js_without_waiting_for_its
             }
             let response = env
                 .client
-                .post(&env.url)
+                .post(&env.hub_url)
                 .bearer_auth(&token)
                 .header(SESSION, &active_session)
                 .timeout(Duration::from_secs(1))
@@ -1630,34 +1389,6 @@ async fn deleting_an_active_session_cancels_suspended_js_without_waiting_for_its
         )
         .await;
     assert_eq!(returned(&unaffected), "other session still works");
-    env.stop().await;
-}
-
-/// Integration spec phase 3: the vault's default runner (synced) wins over
-/// the server's `mcp_agent_default_host`; `this_device` means the hub here.
-#[tokio::test]
-async fn vault_default_runner_replaces_the_configured_default_host() {
-    let env = Env::with_default_host(true, true, "preferred-workstation").await;
-    let token = env.ann();
-    let session = env.initialize(&token).await;
-    let vault = env.server.hub().vault().clone();
-    for runner in ["this_device", "hub"] {
-        vault
-            .set_agent_default_runner(Some(runner.into()))
-            .unwrap();
-        let reply = env
-            .call(&token, Some(&session), "js", json!({"code":"return 23;"}))
-            .await;
-        assert_eq!(returned(&reply), 23, "runner {runner}");
-    }
-    vault.set_agent_default_runner(None).unwrap();
-    let reply = env
-        .call(&token, Some(&session), "js", json!({"code":"return 23;"}))
-        .await;
-    assert!(
-        tool_error(&reply).contains("preferred-workstation"),
-        "cleared: the configured host again"
-    );
     env.stop().await;
 }
 
@@ -1789,10 +1520,6 @@ async fn wait_online(env: &Env, count: usize) {
     }
 }
 
-fn hosts_list(reply: &Value) -> Vec<Value> {
-    serde_json::from_str::<Vec<Value>>(&success_text(reply)).unwrap()
-}
-
 #[tokio::test]
 async fn a_desktop_host_registers_lists_and_runs_a_routed_call() {
     let env = Env::new().await;
@@ -1803,15 +1530,8 @@ async fn a_desktop_host_registers_lists_and_runs_a_routed_call() {
     let token = env.ann();
 
     let at_host = format!("{}?host=work-pc", env.url);
-    let reply = env.call_at(&at_host, &token, None, "hosts", json!({})).await;
-    let hosts = hosts_list(&reply);
-    assert!(
-        hosts.contains(&json!({"name":"work-pc","online":true,"default":true})),
-        "{hosts:?}"
-    );
-    assert!(hosts.iter().any(|h| h["name"] == "hub" && h["default"] == false));
 
-    // Discovery lists the desktop's tools next to the hub's vault tools.
+    // Pinned to the desktop: its tools are listed next to the vault tools.
     let response = env
         .send_at(&at_host, Some(&token), None, rpc("tools/list", json!({})))
         .await;
@@ -1822,16 +1542,38 @@ async fn a_desktop_host_registers_lists_and_runs_a_routed_call() {
         .iter()
         .map(|tool| tool["name"].as_str().unwrap().to_owned())
         .collect();
-    assert!(names.contains("read") && names.contains("read_page") && names.contains("hosts"));
+    assert!(names.contains("read") && names.contains("read_page"));
+    assert!(!names.contains("hosts"), "{listed}");
+    let read = listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "read")
+        .unwrap();
+    assert!(
+        read["inputSchema"]["properties"].get("host").is_none(),
+        "{read}"
+    );
 
     let session = env.initialize(&token).await;
     let reply = env
-        .call_at(&at_host, &token, Some(&session), "read", json!({"path":"notes.txt"}))
+        .call_at(
+            &at_host,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"notes.txt"}),
+        )
         .await;
     assert_eq!(success_text(&reply), "file body");
-    // The host argument also selects it, from the plain URL.
     let reply = env
-        .call(&token, Some(&session), "read", json!({"path":"b.txt","host":"work-pc"}))
+        .call_at(
+            &at_host,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"b.txt"}),
+        )
         .await;
     assert_eq!(success_text(&reply), "file body");
 
@@ -1875,14 +1617,15 @@ async fn a_closed_host_connection_goes_offline_with_a_clear_error() {
     host.wait_closed().await;
     wait_online(&env, 0).await;
 
-    let reply = env.call(&token, None, "hosts", json!({})).await;
-    assert!(
-        hosts_list(&reply).contains(&json!({"name":"work-pc","online":false,"default":false})),
-        "{reply}"
-    );
     let at_host = format!("{}?host=work-pc", env.url);
     let reply = env
-        .call_at(&at_host, &token, Some(&session), "read", json!({"path":"a"}))
+        .call_at(
+            &at_host,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a"}),
+        )
         .await;
     assert_eq!(tool_error(&reply), "work-pc is offline");
     // Discovery against it fails the same way.
@@ -1893,12 +1636,16 @@ async fn a_closed_host_connection_goes_offline_with_a_clear_error() {
         .await
         .unwrap();
     assert!(
-        listed["error"]["message"].as_str().unwrap().contains("work-pc is offline"),
+        listed["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("work-pc is offline"),
         "{listed}"
     );
     // A name never seen is still unknown.
+    let other = format!("{}?host=other-pc", env.url);
     let reply = env
-        .call(&token, Some(&session), "read", json!({"path":"a","host":"other-pc"}))
+        .call_at(&other, &token, Some(&session), "read", json!({"path":"a"}))
         .await;
     assert!(tool_error(&reply).contains("unknown host"), "{reply}");
     env.stop().await;
@@ -1916,8 +1663,15 @@ async fn a_reconnect_replaces_the_old_host_connection() {
 
     let token = env.ann();
     let session = env.initialize(&token).await;
+    let at_host = format!("{}?host=work-pc", env.url);
     let reply = env
-        .call(&token, Some(&session), "read", json!({"path":"a","host":"work-pc"}))
+        .call_at(
+            &at_host,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a"}),
+        )
         .await;
     assert_eq!(success_text(&reply), "second");
     assert!(first.seen("call").is_empty());
@@ -1938,7 +1692,7 @@ async fn agent_and_device_tokens_cannot_drive_a_host() {
                 &at_host,
                 Some(bearer),
                 None,
-                call("read", json!({"path":"a","host":"work-pc"})),
+                call("read", json!({"path":"a"})),
             )
             .await;
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
@@ -1970,8 +1724,15 @@ async fn a_host_call_times_out_and_is_cancelled_on_the_desktop() {
     wait_online(&env, 1).await;
     let token = env.ann();
     let session = env.initialize(&token).await;
+    let at_host = format!("{}?host=work-pc", env.url);
     let reply = env
-        .call(&token, Some(&session), "read", json!({"path":"a","host":"work-pc"}))
+        .call_at(
+            &at_host,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a"}),
+        )
         .await;
     assert!(tool_error(&reply).contains("did not finish"), "{reply}");
     let call_id = host.seen("call")[0]["id"].clone();
@@ -1983,8 +1744,575 @@ async fn a_host_call_times_out_and_is_cancelled_on_the_desktop() {
     assert_eq!(host.seen("cancel")[0]["params"]["id"], call_id);
     // The session is free again for the next call.
     let reply = env
-        .call(&token, Some(&session), "read", json!({"path":"a","host":"work-pc"}))
+        .call_at(
+            &at_host,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a"}),
+        )
         .await;
     assert!(tool_error(&reply).contains("did not finish"), "{reply}");
+    env.stop().await;
+}
+
+// Any-computer mode: `/mcp/agent` without `?host=`. Every computer tool names
+// its computer; nothing is kept per MCP session.
+
+const NO_HOST: &str = "Unknown computer (no host given). Call hosts.";
+
+fn process_handle(label: &str) -> String {
+    let n = if label == "laptop" { 1 } else { 2 };
+    format!("process:00000000-0000-4000-8000-00000000000{n}")
+}
+
+/// A fake desktop advertising the core computer tools as the agent crate
+/// defines them, plus `extra` MCP-server tools. `exec` answers a running
+/// process with a handle of its own; other calls answer "<label> ran <tool>".
+fn computer(label: &'static str, extra: Vec<Value>) -> Script {
+    let mut tools: Vec<Value> = vault_agent::tools::core_computer_tool_definitions()
+        .unwrap()
+        .into_iter()
+        .map(|tool| {
+            json!({"name":tool.name,"description":tool.description,
+                "input_schema":tool.input_schema,"read_only":tool.read_only})
+        })
+        .collect();
+    tools.extend(extra);
+    Arc::new(move |request| match request.method.as_str() {
+        "tools" => Some(json!({ "tools": tools.clone() })),
+        "call" => {
+            let name = request.params["name"].as_str().unwrap_or("");
+            let content = if name == "exec" {
+                json!({"status":"running","handle":process_handle(label)}).to_string()
+            } else {
+                format!("{label} ran {name}")
+            };
+            Some(json!({"content":content,"is_error":false,"pending":false}))
+        }
+        "close_session" => Some(Value::Null),
+        _ => None,
+    })
+}
+
+fn grep_tool() -> Value {
+    json!({"name":"mcp__files__grep","description":"Search text in files.",
+        "input_schema":{"type":"object","properties":{"pattern":{"type":"string"}},"required":["pattern"]},
+        "read_only":true})
+}
+
+/// Two computers online: "pc" (core tools only) and "laptop" (plus an
+/// MCP-server tool).
+async fn two_computers(env: &Env) -> (FakeHost, FakeHost) {
+    let (pc_token, pc) = env.server.hub().login_device("dev-pc", "pc").unwrap();
+    let (laptop_token, laptop) = env
+        .server
+        .hub()
+        .login_device("dev-laptop", "laptop")
+        .unwrap();
+    assert_eq!((pc.as_str(), laptop.as_str()), ("pc", "laptop"));
+    let pc = FakeHost::connect(&env.base, &pc_token, "dev-pc", computer("pc", vec![])).await;
+    let laptop = FakeHost::connect(
+        &env.base,
+        &laptop_token,
+        "dev-laptop",
+        computer("laptop", vec![grep_tool()]),
+    )
+    .await;
+    wait_online(env, 2).await;
+    (pc, laptop)
+}
+
+async fn listed_tools(env: &Env, url: &str, token: &str, session: Option<&str>) -> Vec<Value> {
+    let response = env
+        .send_at(url, Some(token), session, rpc("tools/list", json!({})))
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let listed: Value = response.json().await.unwrap();
+    listed["result"]["tools"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{listed}"))
+        .clone()
+}
+
+fn names_of(tools: &[Value]) -> BTreeSet<String> {
+    tools
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+/// A tagged result's computer line and the rest.
+fn on(text: &str) -> (&str, &str) {
+    let (first, rest) = text.split_once('\n').unwrap_or((text, ""));
+    (
+        first
+            .strip_prefix("[on ")
+            .and_then(|line| line.strip_suffix(']'))
+            .unwrap_or_else(|| panic!("untagged result: {text}")),
+        rest,
+    )
+}
+
+#[tokio::test]
+async fn any_computer_mode_lists_a_fixed_set_and_locked_mode_lists_no_new_tools() {
+    let env = Env::new().await;
+    let (_pc, _laptop) = two_computers(&env).await;
+    let token = env.ann();
+    let new_tools = ["hosts", "tool_search", "call_tool"];
+
+    let any = listed_tools(&env, &env.url, &token, None).await;
+    let names = names_of(&any);
+    assert!(names.contains("read_page") && names.contains("search_notes"));
+    for name in vault_agent::tools::CORE_COMPUTER_TOOLS
+        .iter()
+        .chain(&new_tools)
+    {
+        assert!(names.contains(*name), "{name} missing: {names:?}");
+    }
+    for absent in [
+        "select_host",
+        "mcp__files__grep",
+        "js",
+        "js_help",
+        "environments",
+        "chat_read",
+        "project_list",
+    ] {
+        assert!(!names.contains(absent), "{absent} listed: {names:?}");
+    }
+    for tool in &any {
+        let name = tool["name"].as_str().unwrap();
+        let schema = &tool["inputSchema"];
+        let computer_tool = vault_agent::tools::CORE_COMPUTER_TOOLS.contains(&name)
+            || matches!(name, "tool_search" | "call_tool");
+        assert_eq!(
+            schema["properties"].get("host").is_some(),
+            computer_tool,
+            "{name}"
+        );
+        let required = schema["required"].as_array().cloned().unwrap_or_default();
+        assert_eq!(required.contains(&json!("host")), computer_tool, "{name}");
+    }
+
+    // Locked mode: the pinned computer's own list, no new tools.
+    let laptop_url = format!("{}?host=laptop", env.url);
+    let locked = names_of(&listed_tools(&env, &laptop_url, &token, None).await);
+    assert!(locked.contains("read") && locked.contains("mcp__files__grep"));
+    for name in new_tools {
+        assert!(!locked.contains(name), "{name} in locked mode: {locked:?}");
+    }
+
+    // Schema drift: apart from host, the hub's core tools match what a
+    // desktop advertises.
+    let pc_url = format!("{}?host=pc", env.url);
+    let pinned = listed_tools(&env, &pc_url, &token, None).await;
+    for name in vault_agent::tools::CORE_COMPUTER_TOOLS {
+        let find = |tools: &[Value]| {
+            tools
+                .iter()
+                .find(|tool| tool["name"] == *name)
+                .cloned()
+                .unwrap_or_else(|| panic!("{name} not listed"))
+        };
+        let mut hub = find(&any);
+        let schema = hub["inputSchema"].as_object_mut().unwrap();
+        schema["properties"].as_object_mut().unwrap().remove("host");
+        let required: Vec<Value> = schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|field| **field != "host")
+            .cloned()
+            .collect();
+        if required.is_empty() && find(&pinned)["inputSchema"].get("required").is_none() {
+            schema.remove("required");
+        } else {
+            schema.insert("required".into(), Value::Array(required));
+        }
+        assert_eq!(hub, find(&pinned), "{name}");
+    }
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn each_call_runs_on_the_computer_it_names_and_says_so() {
+    let env = Env::new().await;
+    let (pc, laptop) = two_computers(&env).await;
+    let token = env.ann();
+    let url = env.url.clone();
+    let session = env.initialize(&token).await;
+
+    let reply = env.call_at(&url, &token, None, "hosts", json!({})).await;
+    let hosts: Value = serde_json::from_str(&success_text(&reply)).unwrap();
+    assert_eq!(
+        hosts,
+        json!([{"name":"laptop","online":true},{"name":"pc","online":true}])
+    );
+
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a.txt","host":"laptop"}),
+        )
+        .await;
+    assert_eq!(success_text(&reply), "[on laptop]\nlaptop ran read");
+    assert_eq!(reply["result"]["_meta"]["notes/host"], "laptop");
+    let calls = laptop.seen("call");
+    assert_eq!(calls.len(), 1);
+    // The host argument is the hub's; the desktop gets the tool's own.
+    assert_eq!(calls[0]["params"]["arguments"], json!({"path":"a.txt"}));
+    assert!(pc.seen("call").is_empty());
+
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "read",
+            // Host names match ignoring case; the result names the computer.
+            json!({"path":"a.txt","host":"PC"}),
+        )
+        .await;
+    assert_eq!(success_text(&reply), "[on pc]\npc ran read");
+    assert_eq!(pc.seen("call").len(), 1);
+
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "exec",
+            json!({"command":"echo hi","host":"laptop"}),
+        )
+        .await;
+    let text = success_text(&reply);
+    let (computer, body) = on(&text);
+    assert_eq!(computer, "laptop");
+    assert_eq!(
+        serde_json::from_str::<Value>(body).unwrap()["handle"],
+        process_handle("laptop")
+    );
+    assert_eq!(laptop.seen("call").len(), 2);
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn missing_unknown_and_offline_computers_are_errors() {
+    let env = Env::new().await;
+    let (pc, mut laptop) = two_computers(&env).await;
+    let token = env.ann();
+    let url = env.url.clone();
+    let session = env.initialize(&token).await;
+
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "exec",
+            json!({"command":"echo hi"}),
+        )
+        .await;
+    assert_eq!(tool_error(&reply), NO_HOST);
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "exec",
+            json!({"command":"echo hi","host":"phone"}),
+        )
+        .await;
+    assert_eq!(tool_error(&reply), "Unknown computer phone. Call hosts.");
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "tool_search",
+            json!({"query":"grep"}),
+        )
+        .await;
+    assert_eq!(tool_error(&reply), NO_HOST);
+    // The hub runtime is not a computer here.
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "read",
+            json!({"path":"a","host":"hub"}),
+        )
+        .await;
+    assert_eq!(tool_error(&reply), "Unknown computer hub. Call hosts.");
+
+    laptop.disconnect();
+    laptop.wait_closed().await;
+    wait_online(&env, 1).await;
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "exec",
+            json!({"command":"echo hi","host":"laptop"}),
+        )
+        .await;
+    assert_eq!(tool_error(&reply), "laptop is offline");
+    let reply = env.call_at(&url, &token, None, "hosts", json!({})).await;
+    let hosts: Value = serde_json::from_str(&success_text(&reply)).unwrap();
+    assert_eq!(
+        hosts,
+        json!([{"name":"laptop","online":false},{"name":"pc","online":true}])
+    );
+    assert!(pc.seen("call").is_empty());
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn two_clients_without_shared_state_both_work() {
+    let env = Env::new().await;
+    let (pc, laptop) = two_computers(&env).await;
+    let url = env.url.clone();
+    let ann = env.ann();
+    let other = env.token("bob-sub", None);
+    let first = env.initialize(&ann).await;
+    let second = env.initialize(&other).await;
+
+    for _ in 0..2 {
+        let reply = env
+            .call_at(
+                &url,
+                &ann,
+                Some(&first),
+                "read",
+                json!({"path":"a","host":"laptop"}),
+            )
+            .await;
+        assert_eq!(success_text(&reply), "[on laptop]\nlaptop ran read");
+        let reply = env
+            .call_at(
+                &url,
+                &other,
+                Some(&second),
+                "read",
+                json!({"path":"a","host":"pc"}),
+            )
+            .await;
+        assert_eq!(success_text(&reply), "[on pc]\npc ran read");
+    }
+    // A reconnected client (a new session) needs nothing from the old one.
+    let third = env.initialize(&ann).await;
+    let reply = env
+        .call_at(
+            &url,
+            &ann,
+            Some(&third),
+            "read",
+            json!({"path":"a","host":"pc"}),
+        )
+        .await;
+    assert_eq!(success_text(&reply), "[on pc]\npc ran read");
+    assert_eq!(laptop.seen("call").len(), 2);
+    assert_eq!(pc.seen("call").len(), 3);
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn a_process_is_polled_only_on_the_computer_that_started_it() {
+    let env = Env::new().await;
+    let (pc, laptop) = two_computers(&env).await;
+    let token = env.ann();
+    let url = env.url.clone();
+    let session = env.initialize(&token).await;
+    let handle = process_handle("laptop");
+
+    env.call_at(
+        &url,
+        &token,
+        Some(&session),
+        "exec",
+        json!({"command":"sleep 1","host":"laptop"}),
+    )
+    .await;
+    for (tool, arguments) in [
+        ("poll", json!({"handle":handle,"host":"pc"})),
+        ("wait", json!({"handle":handle,"host":"pc"})),
+        ("cancel", json!({"handle":handle,"host":"pc"})),
+        // The bare uuid names the same process.
+        (
+            "poll",
+            json!({"handle":handle.strip_prefix("process:").unwrap(),"host":"pc"}),
+        ),
+    ] {
+        let reply = env
+            .call_at(&url, &token, Some(&session), tool, arguments.clone())
+            .await;
+        let shown = arguments["handle"].as_str().unwrap().to_owned();
+        assert_eq!(
+            tool_error(&reply),
+            format!(
+                "Process {shown} was started on laptop, not pc. Call {tool} with host \"laptop\"."
+            )
+        );
+    }
+    assert!(pc.seen("call").is_empty());
+
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "poll",
+            json!({"handle":handle,"host":"laptop"}),
+        )
+        .await;
+    assert_eq!(success_text(&reply), "[on laptop]\nlaptop ran poll");
+    assert_eq!(
+        laptop.seen("call")[1]["params"]["arguments"],
+        json!({"handle":handle})
+    );
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn tool_search_and_call_tool_reach_one_computers_mcp_server_tools() {
+    let env = Env::new().await;
+    let (pc, laptop) = two_computers(&env).await;
+    let token = env.ann();
+    let url = env.url.clone();
+    let session = env.initialize(&token).await;
+
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "tool_search",
+            json!({"query":"grep","host":"laptop"}),
+        )
+        .await;
+    let text = success_text(&reply);
+    let (computer, body) = on(&text);
+    assert_eq!(computer, "laptop");
+    let found: Value = serde_json::from_str(body).unwrap();
+    assert_eq!(
+        found,
+        json!([{"name":"mcp__files__grep","description":"Search text in files.",
+            "inputSchema":{"type":"object","properties":{"pattern":{"type":"string"}},"required":["pattern"]}}])
+    );
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "tool_search",
+            json!({"query":"grep","host":"pc"}),
+        )
+        .await;
+    assert_eq!(success_text(&reply), "[on pc]\n[]");
+    // Built-in tools are not search results.
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "tool_search",
+            json!({"query":"","host":"pc"}),
+        )
+        .await;
+    assert_eq!(success_text(&reply), "[on pc]\n[]");
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "tool_search",
+            json!({"query":"SEARCH files","host":"laptop"}),
+        )
+        .await;
+    assert!(success_text(&reply).contains("mcp__files__grep"));
+
+    let arguments = json!({"pattern":"todo"});
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "call_tool",
+            json!({"name":"mcp__files__grep","arguments":arguments,"host":"laptop"}),
+        )
+        .await;
+    assert_eq!(
+        success_text(&reply),
+        "[on laptop]\nlaptop ran mcp__files__grep"
+    );
+    let calls = laptop.seen("call");
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["params"]["name"], "mcp__files__grep");
+    assert_eq!(calls[0]["params"]["arguments"], arguments);
+
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "call_tool",
+            json!({"name":"mcp__files__grep","arguments":arguments,"host":"pc"}),
+        )
+        .await;
+    assert_eq!(
+        tool_error(&reply),
+        "[on pc]\npc has no tool mcp__files__grep; use tool_search"
+    );
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "call_tool",
+            json!({"name":"mcp__files__grep","arguments":arguments}),
+        )
+        .await;
+    assert_eq!(tool_error(&reply), NO_HOST);
+    let reply = env
+        .call_at(
+            &url,
+            &token,
+            Some(&session),
+            "call_tool",
+            json!({"name":"exec","host":"pc"}),
+        )
+        .await;
+    assert!(tool_error(&reply).starts_with("call_tool runs a computer's MCP-server tools"));
+    assert!(pc.seen("call").is_empty());
+    env.stop().await;
+}
+
+#[tokio::test]
+async fn agent_and_device_tokens_cannot_drive_any_computer() {
+    let env = Env::new().await;
+    let (pc, laptop) = two_computers(&env).await;
+    let (device_token, _) = env.server.hub().login_device("dev-other", "other").unwrap();
+    for bearer in [env.static_token.as_str(), device_token.as_str()] {
+        for body in [
+            call("hosts", json!({})),
+            call("exec", json!({"command":"echo hi","host":"laptop"})),
+            call(
+                "call_tool",
+                json!({"name":"mcp__files__grep","host":"laptop"}),
+            ),
+        ] {
+            let response = env.send_at(&env.url, Some(bearer), None, body).await;
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        }
+    }
+    for host in [&pc, &laptop] {
+        assert!(host.seen("call").is_empty() && host.seen("tools").is_empty());
+    }
     env.stop().await;
 }

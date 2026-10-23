@@ -133,7 +133,13 @@ void main() {
       'Connected to the hub.',
     );
     const url = 'http://hub.example.com/mcp/agent?host=Work%20PC';
+    expect(find.text('This computer only'), findsOneWidget);
     expect(tester.widget<Text>(key('host-relay-url-text')).data, url);
+    expect(find.text('Any of your computers'), findsOneWidget);
+    expect(
+      tester.widget<Text>(key('host-relay-any-url-text')).data,
+      'http://hub.example.com/mcp/agent',
+    );
 
     await tapAndSettle(
       tester,
@@ -149,6 +155,7 @@ void main() {
 
     await tapAndSettle(tester, key('host-relay-toggle'));
     expect(key('host-relay-name'), findsNothing);
+    expect(key('host-relay-any-url'), findsNothing);
   });
 
   appTest('Android: phones never show the toggle', (tester) async {

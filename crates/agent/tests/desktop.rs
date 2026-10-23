@@ -905,3 +905,25 @@ fn default_bypass_startup_ignores_and_preserves_old_permission_files() {
         drop(agent);
     }
 }
+
+/// The hub's any-computer `/mcp/agent` lists the core computer tools from
+/// `core_computer_tool_definitions` without asking a desktop. They must match
+/// what a desktop's relay advertises.
+#[test]
+fn core_computer_tool_definitions_match_the_relay_list() {
+    let _serial = serial_guard();
+    let fx = Fixture::new();
+    let agent = fx.open(true, PermissionMode::Bypass);
+    let relay = agent.relay_tool_definitions(None).unwrap();
+    let core = vault_agent::tools::core_computer_tool_definitions().unwrap();
+    let names: Vec<_> = core.iter().map(|tool| tool.name.as_str()).collect();
+    assert_eq!(names, vault_agent::tools::CORE_COMPUTER_TOOLS);
+    for tool in core {
+        let advertised = relay
+            .iter()
+            .find(|listed| listed.name == tool.name)
+            .unwrap_or_else(|| panic!("relay lists no {}", tool.name));
+        assert_eq!(advertised.description, tool.description, "{}", tool.name);
+        assert_eq!(advertised.input_schema, tool.input_schema, "{}", tool.name);
+    }
+}

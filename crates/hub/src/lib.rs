@@ -257,10 +257,7 @@ pub async fn start_with(
         agent_tokens,
         mcp_oauth,
         assetlinks: config.assetlinks_json(),
-        mcp_agent: mcp_agent::Gateway::new(
-            config.mcp_agent_enabled,
-            config.mcp_agent_default_host.clone(),
-        ),
+        mcp_agent: mcp_agent::Gateway::new(config.mcp_agent_enabled),
         hosts: hosts::Hosts::new(),
         scheduler,
         schedule_runner: std::sync::Mutex::new(schedule_runner),
