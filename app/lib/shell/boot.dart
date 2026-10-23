@@ -61,7 +61,7 @@ class _NotesAppState extends State<NotesApp> {
   @override
   void initState() {
     super.initState();
-    registerBuiltins(disabledAddons: _settings.disabledAddons);
+    registerBuiltins();
     if (Platform.isWindows) {
       UpdateController.current = UpdateController(
         currentTag: effectiveReleaseTag(),

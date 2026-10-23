@@ -210,7 +210,7 @@ void main() {
       );
     final settings = AppSettings.load(file);
     addTearDown(settings.dispose);
-    registerBuiltins(disabledAddons: settings.disabledAddons);
+    registerBuiltins();
     expect(
       appAddonContext.installedIds,
       containsAll(addonList.map((entry) => entry.addon.id)),
