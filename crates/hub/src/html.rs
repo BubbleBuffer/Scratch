@@ -145,8 +145,7 @@ fn page_body(r: &Rendered) -> String {
     )
 }
 
-const BRAND: &str =
-    "<span class=\"brand\"><img src=\"/icon.png\" alt=\"\">Scratch</span>";
+const BRAND: &str = "<span class=\"brand\"><img src=\"/icon.png\" alt=\"\">Scratch</span>";
 
 /// A rendered page as a whole document.
 pub(crate) fn page_document(r: &Rendered, card: &Card, chrome: Chrome) -> String {
@@ -170,7 +169,10 @@ pub(crate) fn page_document(r: &Rendered, card: &Card, chrome: Chrome) -> String
             ));
             html.push_str(&page_body(r));
             html.push_str(SHARE_DIALOG);
-            html.push_str(&format!("<script nonce=\"{}\">{SHARE_SCRIPT}</script>\n", escape(nonce)));
+            html.push_str(&format!(
+                "<script nonce=\"{}\">{SHARE_SCRIPT}</script>\n",
+                escape(nonce)
+            ));
             html.push_str("</body>\n</html>\n");
         }
     }

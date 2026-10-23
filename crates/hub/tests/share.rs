@@ -438,7 +438,11 @@ impl Env {
         (status, headers, r.text().await.unwrap())
     }
 
-    async fn get_bytes(&self, path: &str, cookie: Option<&str>) -> (StatusCode, HeaderMap, Vec<u8>) {
+    async fn get_bytes(
+        &self,
+        path: &str,
+        cookie: Option<&str>,
+    ) -> (StatusCode, HeaderMap, Vec<u8>) {
         let mut req = self.http.get(format!("{}{path}", self.hub_url));
         if let Some(c) = cookie {
             req = req.header(header::COOKIE, c);
@@ -506,7 +510,9 @@ fn insert(after: Option<&str>, block: NewBlock) -> BlockOp {
 fn fixture(v: &Vault) -> Fixture {
     let other = v.create_page(None, "Other".into()).unwrap();
     let trip = v.create_page(None, "Trip".into()).unwrap();
-    let image = v.add_attachment_bytes("dot.png".into(), PNG.to_vec()).unwrap();
+    let image = v
+        .add_attachment_bytes("dot.png".into(), PNG.to_vec())
+        .unwrap();
     let mut png2 = PNG.to_vec();
     png2.extend_from_slice(b"other");
     let other_image = v.add_attachment_bytes("other.png".into(), png2).unwrap();
@@ -540,12 +546,22 @@ fn fixture(v: &Vault) -> Fixture {
         )
         .unwrap();
     let stage = &schema[0];
-    let row1 = v.create_page(Some(tasks.clone()), "Flights".into()).unwrap();
+    let row1 = v
+        .create_page(Some(tasks.clone()), "Flights".into())
+        .unwrap();
     v.create_page(Some(tasks.clone()), "Hotel".into()).unwrap();
-    v.set_property(row1, stage.key.clone(), PropValue::Select(stage.options[0].id.clone()))
-        .unwrap();
-    v.set_property(trip.clone(), "Where".into(), PropValue::Text("Lisbon".into()))
-        .unwrap();
+    v.set_property(
+        row1,
+        stage.key.clone(),
+        PropValue::Select(stage.options[0].id.clone()),
+    )
+    .unwrap();
+    v.set_property(
+        trip.clone(),
+        "Where".into(),
+        PropValue::Text("Lisbon".into()),
+    )
+    .unwrap();
     v.apply(
         trip.clone(),
         vec![
@@ -625,7 +641,9 @@ async fn the_viewer_renders_a_page_for_a_web_session() {
     }
     assert_eq!(og(&html, "og:title").as_deref(), Some("Trip"));
     assert_eq!(og(&html, "og:site_name").as_deref(), Some("Scratch"));
-    assert!(og(&html, "og:description").unwrap().starts_with("Plan Pack bags"));
+    assert!(og(&html, "og:description")
+        .unwrap()
+        .starts_with("Plan Pack bags"));
     let csp = headers["content-security-policy"].to_str().unwrap();
     assert!(csp.contains("script-src 'nonce-"), "{csp}");
     assert_eq!(headers["cache-control"], "no-store");
@@ -641,8 +659,15 @@ async fn the_viewer_renders_a_page_for_a_web_session() {
         )
         .unwrap();
     let (_, _, html) = e.get(&open, Some(&cookie)).await;
-    assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"), "{html}");
-    assert_eq!(html.matches("<script").count(), 1, "only the share dialog's script");
+    assert!(
+        html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"),
+        "{html}"
+    );
+    assert_eq!(
+        html.matches("<script").count(),
+        1,
+        "only the share dialog's script"
+    );
 
     // The page's image, only with the session.
     let asset = format!("/open/{}/a/{}", f.trip, f.image);
@@ -668,8 +693,14 @@ async fn open_without_a_session_bounces_with_a_sign_in_button() {
     let f = fixture(e.vault());
     let (status, _, html) = e.get(&format!("/open/{}", f.trip), None).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(html.contains("location.replace(") && html.contains(&format!("notes://page/{}", f.trip)), "{html}");
-    assert!(html.contains(&format!("href=\"/auth/web?return=/open/{}\"", f.trip)), "{html}");
+    assert!(
+        html.contains("location.replace(") && html.contains(&format!("notes://page/{}", f.trip)),
+        "{html}"
+    );
+    assert!(
+        html.contains(&format!("href=\"/auth/web?return=/open/{}\"", f.trip)),
+        "{html}"
+    );
     assert!(html.contains("Sign in to view in the browser"));
     assert!(!html.contains("Lisbon") && !html.contains("Plan"));
     // A made-up cookie is no session.
@@ -685,7 +716,11 @@ async fn web_login_sets_a_session_cookie_refuses_others_and_logs_out() {
     let f = fixture(e.vault());
     let open = format!("/open/{}", f.trip);
     // Only viewer and share paths are return addresses.
-    for bad in ["https://evil.example.com/", "//evil.example.com", "/auth/web"] {
+    for bad in [
+        "https://evil.example.com/",
+        "//evil.example.com",
+        "/auth/web",
+    ] {
         let (status, _, _) = e
             .get(&format!("/auth/web?return={}", urlencode(bad)), None)
             .await;
@@ -694,19 +729,28 @@ async fn web_login_sets_a_session_cookie_refuses_others_and_logs_out() {
     let r = e.web_callback(&open).await;
     assert_eq!(r.status(), StatusCode::FOUND);
     let c = set_cookie(&r).unwrap();
-    for part in ["HttpOnly", "Secure", "SameSite=Lax", "Path=/", "Max-Age=2592000"] {
+    for part in [
+        "HttpOnly",
+        "Secure",
+        "SameSite=Lax",
+        "Path=/",
+        "Max-Age=2592000",
+    ] {
         assert!(c.contains(part), "{c}");
     }
     let cookie = c.split(';').next().unwrap().to_string();
     // The store keeps only a hash of the cookie value.
     let secret = cookie.trim_start_matches("scratch_session=");
-    let store = fs::read_to_string(
-        PathBuf::from(e.vault().root()).join(".vault/hub/web-sessions.json"),
-    )
-    .unwrap();
+    let store =
+        fs::read_to_string(PathBuf::from(e.vault().root()).join(".vault/hub/web-sessions.json"))
+            .unwrap();
     assert!(!store.contains(secret));
     assert!(store.contains(&sha256_hex(secret.as_bytes())));
-    assert!(e.get(&open, Some(&cookie)).await.2.contains("<h2>Plan</h2>"));
+    assert!(e
+        .get(&open, Some(&cookie))
+        .await
+        .2
+        .contains("<h2>Plan</h2>"));
 
     // A group member may sign in too; someone else may not.
     e.sign_in_as(Knobs::user("gus-sub", "gus@example.com", &["notes-users"]));
@@ -753,7 +797,10 @@ async fn shares_public_private_snapshot_live_and_revoke() {
     };
     // At least 128 random bits in the token.
     let tok = path(&pub_snap).trim_start_matches("/s/").to_string();
-    assert!(tok.len() >= 32 && tok.bytes().all(|b| b.is_ascii_hexdigit()), "{tok}");
+    assert!(
+        tok.len() >= 32 && tok.bytes().all(|b| b.is_ascii_hexdigit()),
+        "{tok}"
+    );
     assert_eq!(pub_snap["created_by"], format!("device:{DEVICE}"));
 
     // Public: anyone, with the card and no script.
@@ -774,12 +821,19 @@ async fn shares_public_private_snapshot_live_and_revoke() {
         assert!(html.contains("name=\"twitter:card\""));
         // Page links are text for a signed-out reader.
         assert!(!html.contains(&format!("/open/{}", f.other)), "{html}");
-        assert!(html.contains("<span class=\"pagelink\">Other</span>"), "{html}");
-        let (status, _, bytes) = e.get_bytes(&format!("{}/a/{}", path(s), f.image), None).await;
+        assert!(
+            html.contains("<span class=\"pagelink\">Other</span>"),
+            "{html}"
+        );
+        let (status, _, bytes) = e
+            .get_bytes(&format!("{}/a/{}", path(s), f.image), None)
+            .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(bytes, PNG);
         // The token reaches only this page's attachments.
-        let (status, _, _) = e.get(&format!("{}/a/{}", path(s), f.other_image), None).await;
+        let (status, _, _) = e
+            .get(&format!("{}/a/{}", path(s), f.other_image), None)
+            .await;
         assert_eq!(status, StatusCode::NOT_FOUND);
     }
 
@@ -787,7 +841,10 @@ async fn shares_public_private_snapshot_live_and_revoke() {
     for s in [&priv_live, &priv_snap] {
         let (status, _, html) = e.get(&path(s), None).await;
         assert_eq!(status, StatusCode::OK);
-        assert!(html.contains("<title>Private note · Scratch</title>"), "{html}");
+        assert!(
+            html.contains("<title>Private note · Scratch</title>"),
+            "{html}"
+        );
         assert_eq!(og(&html, "og:title").as_deref(), Some("Private note"));
         assert_eq!(og(&html, "og:site_name").as_deref(), Some("Scratch"));
         assert!(og(&html, "og:description").is_none(), "{html}");
@@ -800,7 +857,9 @@ async fn shares_public_private_snapshot_live_and_revoke() {
         let (status, _, html) = e.get(&path(s), Some(&cookie)).await;
         assert_eq!(status, StatusCode::OK);
         assert!(html.contains("Original text"), "{html}");
-        let (status, _, _) = e.get(&format!("{}/a/{}", path(s), f.image), Some(&cookie)).await;
+        let (status, _, _) = e
+            .get(&format!("{}/a/{}", path(s), f.image), Some(&cookie))
+            .await;
         assert_eq!(status, StatusCode::OK);
     }
 
@@ -836,12 +895,18 @@ async fn shares_public_private_snapshot_live_and_revoke() {
     };
     let shares = list(&e).await;
     assert_eq!(shares.len(), 4);
-    assert!(shares.iter().all(|s| s["url"].as_str().is_some() && s["kind"].as_str().is_some()));
+    assert!(shares
+        .iter()
+        .all(|s| s["url"].as_str().is_some() && s["kind"].as_str().is_some()));
 
     // Revoked: 410, page and attachments; gone from the list.
     let r = e
         .http
-        .delete(format!("{}/shares/{}", e.hub_url, pub_snap["id"].as_str().unwrap()))
+        .delete(format!(
+            "{}/shares/{}",
+            e.hub_url,
+            pub_snap["id"].as_str().unwrap()
+        ))
         .bearer_auth(&token)
         .header("X-Device", DEVICE)
         .send()
@@ -850,12 +915,17 @@ async fn shares_public_private_snapshot_live_and_revoke() {
     assert_eq!(r.status(), StatusCode::NO_CONTENT);
     assert_eq!(e.get(&path(&pub_snap), None).await.0, StatusCode::GONE);
     assert_eq!(
-        e.get(&format!("{}/a/{}", path(&pub_snap), f.image), None).await.0,
+        e.get(&format!("{}/a/{}", path(&pub_snap), f.image), None)
+            .await
+            .0,
         StatusCode::GONE
     );
     assert_eq!(list(&e).await.len(), 3);
     // Unknown tokens are 404.
-    assert_eq!(e.get(&format!("/s/{}", "0".repeat(48)), None).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(
+        e.get(&format!("/s/{}", "0".repeat(48)), None).await.0,
+        StatusCode::NOT_FOUND
+    );
 
     // A live link of a page in the trash shows nothing.
     e.vault().delete_page(f.trip.clone()).unwrap();
@@ -884,9 +954,15 @@ async fn only_devices_and_web_sessions_create_shares() {
         async move { req.send().await.unwrap().status() }
     };
     assert_eq!(post(None, None).await, StatusCode::UNAUTHORIZED);
-    assert_eq!(post(Some(("not-a-token", DEVICE)), None).await, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        post(Some(("not-a-token", DEVICE)), None).await,
+        StatusCode::UNAUTHORIZED
+    );
     // The device token from another device id is refused.
-    assert_ne!(post(Some((&token, "someone-else")), None).await, StatusCode::CREATED);
+    assert_ne!(
+        post(Some((&token, "someone-else")), None).await,
+        StatusCode::CREATED
+    );
 
     // An agent token, minted by the device, may not create shares.
     let r = e
@@ -902,7 +978,10 @@ async fn only_devices_and_web_sessions_create_shares() {
     let agent: Value = r.json().await.unwrap();
     let agent = agent["token"].as_str().unwrap().to_string();
     let status = post(Some((&agent, DEVICE)), None).await;
-    assert!(status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN, "{status}");
+    assert!(
+        status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN,
+        "{status}"
+    );
     let r = e
         .http
         .get(format!("{}/shares?page={}", e.hub_url, f.trip))
@@ -914,13 +993,22 @@ async fn only_devices_and_web_sessions_create_shares() {
 
     // A web session: only with this hub's Origin.
     let cookie = e.web_session(&format!("/open/{}", f.trip)).await;
-    assert_eq!(post(None, Some((&cookie, None))).await, StatusCode::FORBIDDEN);
+    assert_eq!(
+        post(None, Some((&cookie, None))).await,
+        StatusCode::FORBIDDEN
+    );
     assert_eq!(
         post(None, Some((&cookie, Some("https://evil.example.com")))).await,
         StatusCode::FORBIDDEN
     );
-    assert_eq!(post(None, Some((&cookie, Some(&e.hub_url)))).await, StatusCode::CREATED);
-    assert_eq!(post(Some((&token, DEVICE)), None).await, StatusCode::CREATED);
+    assert_eq!(
+        post(None, Some((&cookie, Some(&e.hub_url)))).await,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        post(Some((&token, DEVICE)), None).await,
+        StatusCode::CREATED
+    );
 
     // Databases are not shared.
     let db = e.vault().create_page(None, "Board".into()).unwrap();
@@ -949,7 +1037,11 @@ async fn write_screenshot_pages() {
     let f = fixture(e.vault());
     let token = e.device_token(DEVICE).await;
     let s = e.share(&token, &f.trip, "public", "snapshot").await;
-    let path = s["url"].as_str().unwrap().trim_start_matches(&e.hub_url).to_string();
+    let path = s["url"]
+        .as_str()
+        .unwrap()
+        .trim_start_matches(&e.hub_url)
+        .to_string();
     let (_, _, html) = e.get(&path, None).await;
     fs::create_dir_all(dir.join("a")).unwrap();
     fs::write(dir.join("share.html"), html).unwrap();

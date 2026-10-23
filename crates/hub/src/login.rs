@@ -293,7 +293,10 @@ pub(crate) async fn web_start(
         return not_configured();
     };
     let Some(return_to) = p.return_to.filter(|r| crate::web::valid_return(r)) else {
-        return page(StatusCode::BAD_REQUEST, "The return address is not allowed.");
+        return page(
+            StatusCode::BAD_REQUEST,
+            "The return address is not allowed.",
+        );
     };
     begin(login, Flow::Web { return_to }).await
 }
@@ -361,8 +364,15 @@ pub(crate) async fn callback(
             app_state,
         } => (device, name, redirect, app_state),
         Flow::Web { return_to } => {
-            return web_callback(&state, login, p, pending.verifier, &pending.nonce, &return_to)
-                .await
+            return web_callback(
+                &state,
+                login,
+                p,
+                pending.verifier,
+                &pending.nonce,
+                &return_to,
+            )
+            .await
         }
     };
     let app_state = app_state.as_deref();
@@ -457,16 +467,25 @@ async fn web_callback(
     return_to: &str,
 ) -> Response {
     if p.error.is_some() {
-        return page(StatusCode::FORBIDDEN, "The sign-in provider refused the sign-in.");
+        return page(
+            StatusCode::FORBIDDEN,
+            "The sign-in provider refused the sign-in.",
+        );
     }
     let Some(code) = p.code else {
-        return page(StatusCode::BAD_REQUEST, "The sign-in provider sent no code.");
+        return page(
+            StatusCode::BAD_REQUEST,
+            "The sign-in provider sent no code.",
+        );
     };
     let user = match login.oidc.finish(code, verifier, nonce).await {
         Ok(u) => u,
         Err(e) => {
             tracing::warn!("web login failed: {e}");
-            return page(StatusCode::FORBIDDEN, "The sign-in could not be checked. Try again.");
+            return page(
+                StatusCode::FORBIDDEN,
+                "The sign-in could not be checked. Try again.",
+            );
         }
     };
     if !login.oidc.allowed(&user) {
@@ -484,7 +503,10 @@ async fn web_callback(
         Ok(s) => s,
         Err(e) => {
             tracing::error!("web login: {e}");
-            return page(StatusCode::INTERNAL_SERVER_ERROR, "The hub could not sign you in.");
+            return page(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "The hub could not sign you in.",
+            );
         }
     };
     tracing::info!(sub = %user.sub, "web login: signed in");

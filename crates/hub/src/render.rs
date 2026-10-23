@@ -210,7 +210,10 @@ fn page_link_html(v: &Vault, id: &str, text_html: &str, opts: &RenderOpts) -> (S
             format!("{text_html}</a>"),
         )
     } else {
-        ("<span class=\"pagelink\">".into(), format!("{text_html}</span>"))
+        (
+            "<span class=\"pagelink\">".into(),
+            format!("{text_html}</span>"),
+        )
     }
 }
 
@@ -441,7 +444,12 @@ fn database_table(v: &Vault, db: &str, opts: &RenderOpts) -> String {
 
 /// Blocks to HTML: runs of ordinary blocks through markdown, inline
 /// databases as tables.
-fn blocks_html(v: &Vault, blocks: &[Block], assets: &BTreeSet<String>, opts: &RenderOpts) -> String {
+fn blocks_html(
+    v: &Vault,
+    blocks: &[Block],
+    assets: &BTreeSet<String>,
+    opts: &RenderOpts,
+) -> String {
     let mut html = String::new();
     let mut run: Vec<Block> = Vec::new();
     let flush = |run: &mut Vec<Block>, html: &mut String| {
@@ -491,7 +499,10 @@ mod tests {
         assert!(is_attachment_id(&id));
         assert!(!is_attachment_id(&"A".repeat(64)));
         assert!(!is_attachment_id("01ARZ3NDEKTSV4RRFFQ69G5FAV"));
-        assert_eq!(blob_of(&format!("../.vault/blobs/aa/{id}")), Some(id.as_str()));
+        assert_eq!(
+            blob_of(&format!("../.vault/blobs/aa/{id}")),
+            Some(id.as_str())
+        );
         assert_eq!(blob_of("https://example.com/x.png"), None);
     }
 

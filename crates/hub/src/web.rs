@@ -330,7 +330,10 @@ fn with_headers(mut r: Response, csp: &str, cache: &str) -> Response {
     if let Ok(v) = HeaderValue::from_str(cache) {
         h.insert(header::CACHE_CONTROL, v);
     }
-    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    h.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
     h.insert("x-robots-tag", HeaderValue::from_static("noindex"));
     h.insert(
         header::X_CONTENT_TYPE_OPTIONS,
@@ -370,7 +373,11 @@ fn json_error(status: StatusCode, error: &str) -> Response {
 
 fn asset_response(bytes: Vec<u8>, mime: &str, name: &str, cache: &str) -> Response {
     let inline = mime.starts_with("image/");
-    let ctype = if inline { mime } else { "application/octet-stream" };
+    let ctype = if inline {
+        mime
+    } else {
+        "application/octet-stream"
+    };
     let mut r = (StatusCode::OK, bytes).into_response();
     let h = r.headers_mut();
     if let Ok(v) = HeaderValue::from_str(ctype) {
@@ -382,7 +389,11 @@ fn asset_response(bytes: Vec<u8>, mime: &str, name: &str, cache: &str) -> Respon
             .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' '))
             .take(100)
             .collect();
-        let safe = if safe.trim().is_empty() { "file".into() } else { safe };
+        let safe = if safe.trim().is_empty() {
+            "file".into()
+        } else {
+            safe
+        };
         if let Ok(v) = HeaderValue::from_str(&format!("attachment; filename=\"{safe}\"")) {
             h.insert(header::CONTENT_DISPOSITION, v);
         }
@@ -531,7 +542,11 @@ pub(crate) async fn open_asset(
         return not_found();
     }
     if session(&state, &headers).is_none() {
-        return message(StatusCode::UNAUTHORIZED, "Sign in", "Sign in to view this file.");
+        return message(
+            StatusCode::UNAUTHORIZED,
+            "Sign in",
+            "Sign in to view this file.",
+        );
     }
     live_asset(&state, page, asset, "private, no-store").await
 }
@@ -577,7 +592,11 @@ pub(crate) async fn logout(
         .filter(|r| valid_return(r));
     let mut r = match back {
         Some(to) => (StatusCode::SEE_OTHER, [(header::LOCATION, to)]).into_response(),
-        None => message(StatusCode::OK, "Signed out", "You're signed out of this hub."),
+        None => message(
+            StatusCode::OK,
+            "Signed out",
+            "You're signed out of this hub.",
+        ),
     };
     if let Ok(v) = HeaderValue::from_str(&clear_cookie()) {
         r.headers_mut().insert(header::SET_COOKIE, v);
@@ -598,7 +617,8 @@ enum Access {
 /// request: a private share without a session then gets a bare 401, not
 /// the card page.
 fn share_access(state: &AppState, token: &str, headers: &HeaderMap, asset: bool) -> Access {
-    let valid = !token.is_empty() && token.len() <= 128 && token.bytes().all(|b| b.is_ascii_hexdigit());
+    let valid =
+        !token.is_empty() && token.len() <= 128 && token.bytes().all(|b| b.is_ascii_hexdigit());
     let Some(share) = valid.then(|| state.web.shares.by_token(token)).flatten() else {
         return Access::Response(message(
             StatusCode::NOT_FOUND,
@@ -751,7 +771,11 @@ pub(crate) async fn share_asset(
 /// Who is calling the share API: a device (bearer token and `X-Device`,
 /// checked like `/sync`) or a web session. `changes` also needs a
 /// same-origin `Origin` from a session.
-async fn principal(state: &AppState, headers: &HeaderMap, changes: bool) -> Result<String, Response> {
+async fn principal(
+    state: &AppState,
+    headers: &HeaderMap,
+    changes: bool,
+) -> Result<String, Response> {
     if let Some(auth) = headers.get(header::AUTHORIZATION) {
         let token = auth
             .to_str()
@@ -771,7 +795,10 @@ async fn principal(state: &AppState, headers: &HeaderMap, changes: bool) -> Resu
             Ok(()) => Ok(format!("device:{device}")),
             Err((status, msg)) => {
                 let msg = msg.trim();
-                Err(json_error(status, if msg.is_empty() { "unauthorized" } else { msg }))
+                Err(json_error(
+                    status,
+                    if msg.is_empty() { "unauthorized" } else { msg },
+                ))
             }
         };
     }
@@ -842,12 +869,19 @@ pub(crate) struct CreateBody {
 
 /// Renders a snapshot into `dir`: `index.html`, each attachment by id, and
 /// `assets.json` (id → mime and name).
-fn write_snapshot(v: &Vault, page: &Page, base: &str, token: &str, dir: &FsPath) -> Result<(), String> {
+fn write_snapshot(
+    v: &Vault,
+    page: &Page,
+    base: &str,
+    token: &str,
+    dir: &FsPath,
+) -> Result<(), String> {
     let (doc, _) = share_document(v, page, base, token);
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let mut assets = SnapshotAssets::new();
     for a in render::page_assets(page) {
-        let (Ok(info), Ok(path)) = (v.attachment_info(a.clone()), v.attachment_path(a.clone())) else {
+        let (Ok(info), Ok(path)) = (v.attachment_info(a.clone()), v.attachment_path(a.clone()))
+        else {
             continue;
         };
         if std::fs::copy(&path, dir.join(&a)).is_ok() {
@@ -953,7 +987,15 @@ mod tests {
     fn returns_are_only_viewer_and_share_paths() {
         assert!(valid_return("/open/01ARZ3NDEKTSV4RRFFQ69G5FAV"));
         assert!(valid_return("/s/abcdef0123"));
-        for bad in ["/", "//evil.example.com", "https://evil.example.com", "/open/x", "/s/", "/s/a/b", "/auth/web"] {
+        for bad in [
+            "/",
+            "//evil.example.com",
+            "https://evil.example.com",
+            "/open/x",
+            "/s/",
+            "/s/a/b",
+            "/auth/web",
+        ] {
             assert!(!valid_return(bad), "{bad}");
         }
     }
@@ -961,10 +1003,19 @@ mod tests {
     #[test]
     fn the_cookie_is_read_among_others() {
         let mut h = HeaderMap::new();
-        h.insert(header::COOKIE, "a=1; scratch_session=abc; b=2".parse().unwrap());
+        h.insert(
+            header::COOKIE,
+            "a=1; scratch_session=abc; b=2".parse().unwrap(),
+        );
         assert_eq!(cookie_value(&h).as_deref(), Some("abc"));
         let cookie = session_cookie("abc");
-        for part in ["HttpOnly", "Secure", "SameSite=Lax", "Path=/", "Max-Age=2592000"] {
+        for part in [
+            "HttpOnly",
+            "Secure",
+            "SameSite=Lax",
+            "Path=/",
+            "Max-Age=2592000",
+        ] {
             assert!(cookie.contains(part), "{cookie}");
         }
     }

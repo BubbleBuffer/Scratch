@@ -99,7 +99,10 @@ mod tests {
             html_escape("<a href='x'>&\""),
             "&lt;a href=&#39;x&#39;&gt;&amp;&quot;"
         );
-        let html = open_html("notes://page/01ARZ3NDEKTSV4RRFFQ69G5FAV?block=</script>", "");
+        let html = open_html(
+            "notes://page/01ARZ3NDEKTSV4RRFFQ69G5FAV?block=</script>",
+            "",
+        );
         // The script literal is JSON, with `<` and `>` written as \u escapes.
         let escaped = "notes://page/01ARZ3NDEKTSV4RRFFQ69G5FAV?block=\\u003c/script\\u003e";
         assert!(html.contains(&format!("location.replace(\"{escaped}\")")));
@@ -108,7 +111,9 @@ mod tests {
 
     #[test]
     fn bounce_page_checks_both_ids() {
-        assert!(bounce_page(PAGE, None).unwrap().contains("notes://page/01ARZ3NDEKTSV4RRFFQ69G5FAV\""));
+        assert!(bounce_page(PAGE, None)
+            .unwrap()
+            .contains("notes://page/01ARZ3NDEKTSV4RRFFQ69G5FAV\""));
         assert_eq!(bounce_page("bad", None), Err("invalid page id"));
         assert_eq!(bounce_page(PAGE, Some("")), Err("invalid block id"));
         assert_eq!(
