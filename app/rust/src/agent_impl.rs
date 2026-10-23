@@ -234,6 +234,7 @@ impl Inner {
             Inner::Remote(_) => AgentClaudeDetection {
                 bun_path: None,
                 claude_code_dir: None,
+                ignored_bun_override: None,
             },
         }
     }
@@ -536,6 +537,10 @@ mod desktop {
                     .map(|p| p.to_string_lossy().into_owned()),
                 claude_code_dir: found
                     .claude_code_dir
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().into_owned()),
+                ignored_bun_override: found
+                    .ignored_bun_override
                     .as_ref()
                     .map(|p| p.to_string_lossy().into_owned()),
             }
