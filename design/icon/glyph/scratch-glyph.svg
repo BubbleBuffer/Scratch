@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="306 200 693 868">
+  <defs data-name="Kit definitions" xmlns="http://www.w3.org/2000/svg" id="defs-muyoffm4-4c-4a4fcceb"><linearGradient xmlns="http://www.w3.org/2000/svg" id="ear-highlight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EBC095"/>
+      <stop offset="1" stop-color="#DE945F"/>
+    </linearGradient></defs>
+  <g id="group-muyoffx7-54-df8a82fe" data-name="Notebook cat" transform="matrix(0.94 0 0 0.94 23 -24)">
+    <g id="group-muyoffft-3q-fa5cd5a7" data-name="Page block" data-part="book/pages">
+      <path id="path-muyoffft-3r-f4122141" data-name="Pages" d="M392 912L440 960H840L888 912V480L976 568V952L904 1048H480Z" fill="#FFFAF1" stroke="none" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel"/>
+      <path id="path-muyoffft-3s-6dabc1b2" data-name="Page line" d="M932 500V938L878 1004H436" fill="none" stroke="#D3C8B6" stroke-width="22" stroke-linecap="square" stroke-linejoin="round"/>
+      <path id="path-muyoffft-3t-e19770f8" data-name="Page outline" d="M392 912L440 960H840L888 912V480L976 568V952L904 1048H480Z" fill="none" stroke="#282A2F" stroke-width="54.52" stroke-linecap="square" stroke-linejoin="bevel"/>
+    </g>
+    <g id="group-muyoffho-3w-00d8a61a" data-name="Bookmark tail" data-part="book/ribbon">
+      <path id="path-muyoffho-3x-0ea88c1f" data-name="Ribbon" d="M716 990V1112L766 1076L816 1112V990" fill="#DE945F" stroke="#282A2F" stroke-width="37.93" stroke-linecap="square" stroke-linejoin="bevel"/>
+    </g>
+    <g id="group-muyoffjv-40-c9c2d5fd" data-name="Cat cover" data-part="book/cover">
+      <path id="path-muyoffjv-41-694831ea" data-name="Cover" d="M392 480L440 300H480L580 430H700L800 300H840L888 480V912L840 960H440L392 912Z" fill="#FFFAF1" stroke="none" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel"/>
+      <path id="path-muyoffjv-42-d08db8f0" data-name="Quiet lower facet" d="M392 850L460 900H888V912L840 960H440L392 912Z" fill="#E4DCCF" stroke="none" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel"/>
+    </g>
+    <g id="group-muyoffm4-45-0eabf42b" data-name="Notebook ears" data-part="book/ears">
+      <g id="group-muyoffm4-46-bbe1e33d" data-name="Left ear">
+        <path id="path-muyoffm4-47-682ce11d" data-name="Charcoal ear patch" d="M396 488L440 300H480L592 444L540 478L470 492Z" fill="#282A2F" stroke="none" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel"/>
+        <path id="path-muyoffm4-48-ff956b25" data-name="Left ivory ear inset" d="M444 424L464 352L522 428Z" fill="#FFFAF1" stroke="none" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel"/>
+      </g>
+      <g id="group-muyoffm4-49-1393d651" data-name="Right ear">
+        <path id="path-muyoffm4-4a-ca909267" data-name="Apricot ear patch" d="M884 488L840 300H800L688 444L740 478L810 492Z" fill="url(#ear-highlight)" stroke="none" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel"/>
+        <path id="path-muyoffm4-4b-aa5c193e" data-name="Right ivory ear inset" d="M836 424L816 352L758 428Z" fill="#FFFAF1" stroke="none" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel"/>
+      </g>
+    </g>
+    <g id="group-muyoffoy-4f-81b04687" data-name="Cover outline" data-part="book/outline">
+      <path id="path-muyoffoy-4g-3e52b3b3" data-name="Outline" d="M392 480L440 300H480L580 430H700L800 300H840L888 480V912L840 960H440L392 912Z" fill="none" stroke="#282A2F" stroke-width="54.52" stroke-linecap="square" stroke-linejoin="bevel"/>
+    </g>
+    <g id="group-muyoffr2-4j-522c0635" data-name="Notebook rings" data-part="book/rings">
+      <g id="group-muyoffr2-4k-24281d86" data-name="Ring 1">
+        <rect id="rect-muyoffr2-4l-27c4b815" data-name="Loop" x="336" y="526" width="112" height="44" rx="22" ry="22" fill="#282A2F" stroke="none" stroke-width="0"/>
+        <ellipse id="ellipse-muyoffr2-4m-5b2eeead" data-name="Hole" cx="424" cy="548" rx="9" ry="9" fill="#FFFAF1" stroke="none" stroke-width="0" stroke-linecap="square" stroke-linejoin="bevel"/>
+      </g>
+      <g id="group-muyoffr2-4n-63c2be70" data-name="Ring 2">
+        <rect id="rect-muyoffr2-4o-4ad5aa6b" data-name="Loop" x="336" y="636" width="112" height="44" rx="22" ry="22" fill="#282A2F" stroke="none" stroke-width="0"/>
+        <ellipse id="ellipse-muyoffr2-4p-295a4de6" data-name="Hole" cx="424" cy="658" rx="9" ry="9" fill="#FFFAF1" stroke="none" stroke-width="0" stroke-linecap="square" stroke-linejoin="bevel"/>
+      </g>
+      <g id="group-muyoffr2-4q-969d3c1a" data-name="Ring 3">
+        <rect id="rect-muyoffr2-4r-8cde76fd" data-name="Loop" x="336" y="746" width="112" height="44" rx="22" ry="22" fill="#282A2F" stroke="none" stroke-width="0"/>
+        <ellipse id="ellipse-muyoffr2-4s-bea6f641" data-name="Hole" cx="424" cy="768" rx="9" ry="9" fill="#FFFAF1" stroke="none" stroke-width="0" stroke-linecap="square" stroke-linejoin="bevel"/>
+      </g>
+    </g>
+    <g id="group-muyofftq-4v-90e48064" data-name="Cover face" data-part="face/cover">
+      <path id="path-muyofftq-4w-5bf0c383" data-name="Left happy eye" d="M480 620L533 567H551L604 620" fill="none" stroke="#282A2F" stroke-width="41.48" stroke-linecap="round" stroke-linejoin="bevel"/>
+      <path id="path-muyofftq-4x-064b583c" data-name="Right happy eye" d="M676 620L729 567H747L800 620" fill="none" stroke="#282A2F" stroke-width="41.48" stroke-linecap="round" stroke-linejoin="bevel"/>
+      <path id="path-muyofftq-4y-eb28840a" data-name="Soft triangular nose" d="M623 668H657Q665 668 659 675L646 687Q640 692 634 687L621 675Q615 668 623 668Z" fill="#DE945F" stroke="none" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel"/>
+      <path id="path-muyofftq-4z-bc625f68" data-name="Double smile" d="M563 704C563 792 640 792 640 710C640 792 717 792 717 704" fill="none" stroke="#282A2F" stroke-width="37.93" stroke-linecap="round" stroke-linejoin="bevel"/>
+      <path id="path-muyofftq-50-85c57667" data-name="Left rosy cheek" d="M470 692L506 700" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round" stroke-linejoin="bevel"/>
+      <path id="path-muyofftq-51-445ecab4" data-name="Right rosy cheek" d="M774 700L810 692" fill="none" stroke="#DDA39D" stroke-width="26.07" stroke-linecap="round" stroke-linejoin="bevel"/>
+    </g>
+  </g>
+</svg>
