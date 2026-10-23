@@ -30,6 +30,11 @@ ShareClient? defaultShareClient(BuildContext context) {
   );
 }
 
+/// This device's share client, or null when it is not signed in to a hub.
+/// The popup, the page menu and the Shared links settings all use this.
+ShareClient? shareClientOf(BuildContext context) =>
+    (SharePopup.debugClientFor ?? defaultShareClient)(context);
+
 /// Opens the share popup for [pageId]: a centred panel on desktop, a sheet
 /// on a phone.
 Future<void> showSharePopup(
@@ -97,7 +102,7 @@ class _SharePopupState extends State<SharePopup> {
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
-    _client = (SharePopup.debugClientFor ?? defaultShareClient)(context);
+    _client = shareClientOf(context);
     _load();
   }
 
@@ -142,8 +147,12 @@ class _SharePopupState extends State<SharePopup> {
       if (!mounted) return;
       setState(() {
         _created = share;
+        // An existing link is already in the list from the hub; only a new
+        // one is added to the top.
         final links = _links;
-        if (links != null) _links = [share, ...links];
+        if (links != null && links.every((x) => x.id != share.id)) {
+          _links = [share, ...links];
+        }
       });
       if (_links == null) _load();
       _markCopied(_createdCopyKey);
@@ -250,72 +259,15 @@ class _SharePopupState extends State<SharePopup> {
         onTap: onTap,
       );
 
-  Widget _row(BuildContext context, Share s) {
-    final c = context.colors;
-    if (_confirming == s.id) {
-      return Padding(
-        key: ValueKey('share-row-${s.id}'),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Revoke this link? It stops working for everyone.',
-              key: ValueKey('share-confirm-${s.id}'),
-              style: tsRaw(14, 20, 400, c.textPrimary),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextBtn(
-                  'Cancel',
-                  key: ValueKey('share-cancel-${s.id}'),
-                  color: c.textSecondary,
-                  onTap: () => setState(() => _confirming = null),
-                ),
-                const SizedBox(width: 8),
-                TextBtn(
-                  'Revoke',
-                  key: ValueKey('share-revoke-confirm-${s.id}'),
-                  color: c.inlineCodeText,
-                  onTap: () => _revoke(s),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-    return Padding(
-      key: ValueKey('share-row-${s.id}'),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(s.label, style: tsRaw(14, 20, 400, c.textPrimary)),
-                Text(
-                  relativeTime(s.created),
-                  style: tsRaw(12, 16, 400, c.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          _copyButton(context, s.id, () => _copy(s.id, s.url)),
-          const SizedBox(width: 8),
-          TextBtn(
-            'Revoke',
-            key: ValueKey('share-revoke-${s.id}'),
-            color: c.inlineCodeText,
-            onTap: () => setState(() => _confirming = s.id),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _row(BuildContext context, Share s) => ShareLinkRow(
+    share: s,
+    copied: _copiedKey == s.id,
+    confirming: _confirming == s.id,
+    onCopy: () => _copy(s.id, s.url),
+    onAskRevoke: () => setState(() => _confirming = s.id),
+    onCancelRevoke: () => setState(() => _confirming = null),
+    onRevoke: () => _revoke(s),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -436,6 +388,15 @@ class _SharePopupState extends State<SharePopup> {
               ),
             ),
           ],
+          if (created != null && created.existing)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Link already exists',
+                key: const ValueKey('share-existing'),
+                style: tsRaw(12, 16, 400, c.textSecondary),
+              ),
+            ),
           const SizedBox(height: 20),
           Text(
             'Links to this page',
@@ -463,6 +424,152 @@ class _SharePopupState extends State<SharePopup> {
             for (final s in links) _row(context, s),
         ],
       ),
+    );
+  }
+}
+
+/// One link in a list: its kind and date, with Copy and Revoke (inline
+/// confirm). The popup's list and Settings › Shared links both use it.
+/// [showTitle] adds the page's title (or "Deleted page") and an Open note
+/// button, which is disabled while [onOpen] is null.
+class ShareLinkRow extends StatelessWidget {
+  const ShareLinkRow({
+    super.key,
+    required this.share,
+    required this.copied,
+    required this.confirming,
+    required this.onCopy,
+    required this.onAskRevoke,
+    required this.onCancelRevoke,
+    required this.onRevoke,
+    this.showTitle = false,
+    this.onOpen,
+  });
+
+  final Share share;
+
+  /// The Copy button reads "Copied" for a moment after a copy.
+  final bool copied;
+
+  /// The row asks "Revoke this link?" with Cancel and Revoke.
+  final bool confirming;
+  final VoidCallback onCopy;
+  final VoidCallback onAskRevoke;
+  final VoidCallback onCancelRevoke;
+  final VoidCallback onRevoke;
+  final bool showTitle;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final s = share;
+    if (confirming) {
+      return Padding(
+        key: ValueKey('share-row-${s.id}'),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Revoke this link? It stops working for everyone.',
+              key: ValueKey('share-confirm-${s.id}'),
+              style: tsRaw(14, 20, 400, c.textPrimary),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextBtn(
+                  'Cancel',
+                  key: ValueKey('share-cancel-${s.id}'),
+                  color: c.textSecondary,
+                  onTap: onCancelRevoke,
+                ),
+                const SizedBox(width: 8),
+                TextBtn(
+                  'Revoke',
+                  key: ValueKey('share-revoke-confirm-${s.id}'),
+                  color: c.inlineCodeText,
+                  onTap: onRevoke,
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+    final title = s.title;
+    // Phones (under 480 px) stack the actions under the text, aligned left.
+    final narrow = MediaQuery.sizeOf(context).width < 480;
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showTitle)
+          Text(
+            title == null ? 'Deleted page' : displayTitle(title),
+            key: ValueKey('share-title-${s.id}'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: title == null
+                ? tsRaw(14, 20, 500, c.textTertiary).copyWith(
+                    fontStyle: FontStyle.italic,
+                  )
+                : tsRaw(14, 20, 500, c.textPrimary),
+          ),
+        Text(s.label, style: tsRaw(14, 20, 400, c.textPrimary)),
+        Text(relativeTime(s.created), style: tsRaw(12, 16, 400, c.textSecondary)),
+      ],
+    );
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showTitle)
+          // A disabled Open note is faded, so it reads as off in both themes.
+          Opacity(
+            opacity: onOpen == null ? 0.4 : 1,
+            child: TextBtn(
+              'Open note',
+              key: ValueKey('share-open-${s.id}'),
+              color: c.textSecondary,
+              onTap: onOpen,
+            ),
+          ),
+        TextBtn(
+          copied ? 'Copied' : 'Copy',
+          key: ValueKey('share-copy-${s.id}'),
+          color: c.textSecondary,
+          onTap: onCopy,
+        ),
+        const SizedBox(width: 8),
+        TextBtn(
+          'Revoke',
+          key: ValueKey('share-revoke-${s.id}'),
+          color: c.inlineCodeText,
+          onTap: onAskRevoke,
+        ),
+      ],
+    );
+    return Padding(
+      key: ValueKey('share-row-${s.id}'),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: narrow
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                text,
+                const SizedBox(height: 2),
+                // The buttons' own padding is 8 px; pull them back so their
+                // labels line up with the text above.
+                Transform.translate(offset: const Offset(-8, 0), child: actions),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: text),
+                actions,
+              ],
+            ),
     );
   }
 }

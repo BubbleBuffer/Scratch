@@ -13,6 +13,13 @@ import '../../ui/icon_x.dart';
 import '../../ui/ui.dart';
 import '../ai/ask_ai.dart' show AiMark;
 import '../settings/controls.dart' show Toggle;
+import '../share/share_popup.dart' show shareClientOf;
+
+/// The Share item's label: "Share · 1 link", "Share · 2 links". Plain "Share"
+/// while the count is unknown (loading or failed) and with no links.
+String shareMenuLabel(int? links) => (links == null || links == 0)
+    ? 'Share'
+    : 'Share · $links ${links == 1 ? 'link' : 'links'}';
 
 enum PageMenuAction { favorite, copyLink, share, duplicate, moveTo, askAi, undo, history, trash, delete, import, export, feedback }
 
@@ -63,6 +70,30 @@ class _PageMenuState extends State<PageMenu> {
   bool _colour = false;
   bool _saving = false;
   String? _error;
+
+  /// The page's share links on the hub; null while loading or on error.
+  int? _shareCount;
+  bool _counted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_counted || !widget.canShare) return;
+    _counted = true;
+    _countLinks();
+  }
+
+  /// One GET when the menu opens: the Share item then says how many links.
+  Future<void> _countLinks() async {
+    final client = shareClientOf(context);
+    if (client == null) return;
+    try {
+      final links = await client.list(widget.pageId);
+      if (mounted) setState(() => _shareCount = links.length);
+    } catch (_) {
+      // The item keeps its plain label.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +202,7 @@ class _PageMenuState extends State<PageMenu> {
               SpaceDot(meta.color), const SizedBox(width: 6), ico(Ico.chevronRight),
             ])),
       row('copy-link', ico(Ico.link), 'Copy link', () => onAction(PageMenuAction.copyLink), shortcut: 'Ctrl+L'),
-      if (widget.canShare) row('share', icx(Ix.linkPage), 'Share', () => onAction(PageMenuAction.share)),
+      if (widget.canShare) row('share', icx(Ix.linkPage), shareMenuLabel(_shareCount), () => onAction(PageMenuAction.share)),
       row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: 'Ctrl+D'),
       row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo), shortcut: 'Ctrl+Shift+P'),
       if (widget.canAskAi) row('ask-ai', AiMark(size: iconSize), 'Ask AI', () => onAction(PageMenuAction.askAi)),

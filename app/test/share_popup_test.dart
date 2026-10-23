@@ -30,6 +30,9 @@ class _FakeShares extends ShareClient {
 
   /// When set, the next create fails with this message.
   String? createError;
+
+  /// When set, create answers with this link as one the page already had.
+  Share? existingLink;
   int _n = 0;
 
   @override
@@ -44,6 +47,8 @@ class _FakeShares extends ShareClient {
   }) async {
     final error = createError;
     if (error != null) throw ShareException(error, status: 500);
+    final existing = existingLink;
+    if (existing != null) return existing;
     created.add((pageId, visibility, kind));
     _n++;
     final share = Share(
@@ -374,5 +379,46 @@ void main() {
     expect(key('share-url'), findsNothing);
     expect(copied, isEmpty);
     expect(hub.created, isEmpty);
+  });
+
+  testWidgets('create answering an existing link says so and adds no row', (t) async {
+    final copied = recordClipboard(t);
+    final old = Share(
+      id: 'a1',
+      url: 'https://hub.example.com/s/a1',
+      page: _page,
+      visibility: 'private',
+      kind: 'snapshot',
+      created: DateTime(2026, 10, 20, 12).millisecondsSinceEpoch,
+    );
+    hub.shares.add(old);
+    hub.existingLink = Share(
+      id: old.id,
+      url: old.url,
+      page: old.page,
+      visibility: old.visibility,
+      kind: old.kind,
+      created: old.created,
+      existing: true,
+    );
+    await pumpPopup(t);
+
+    await tapAndSettle(t, key('share-create'));
+
+    expect(find.text('Link already exists'), findsOneWidget);
+    expect(t.widget<Text>(key('share-url')).data, old.url);
+    expect(copied, [old.url]);
+    expect(find.text('Copied'), findsOneWidget);
+    expect(find.byKey(const ValueKey('share-row-a1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('share-row-new1')), findsNothing);
+  });
+
+  testWidgets('a new link does not say the link already exists', (t) async {
+    await pumpPopup(t);
+
+    await tapAndSettle(t, key('share-create'));
+
+    expect(key('share-row-new1'), findsOneWidget);
+    expect(find.text('Link already exists'), findsNothing);
   });
 }

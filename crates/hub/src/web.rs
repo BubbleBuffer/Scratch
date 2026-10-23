@@ -183,8 +183,12 @@ pub(crate) fn session(state: &AppState, headers: &HeaderMap) -> Option<Session> 
     state.web.sessions.check(&secret)
 }
 
-/// Where a browser login may return to: `/open/<page id>` or `/s/<token>`.
+/// Where a browser login may return to: `/open/<page id>`, `/s/<token>`
+/// or `/shares`.
 pub(crate) fn valid_return(path: &str) -> bool {
+    if path == "/shares" {
+        return true;
+    }
     if let Some(id) = path.strip_prefix("/open/") {
         return is_page_id(id);
     }
@@ -221,6 +225,28 @@ pub(crate) struct Share {
     created_by: String,
     #[serde(default)]
     revoked: Option<i64>,
+    /// A snapshot's content version ([`content_version`]); shares made
+    /// before 2026-10-23 have none and are never reused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    content: Option<String>,
+}
+
+impl Share {
+    /// Whether creating `(page, visibility, kind, content)` should return
+    /// this share instead of a new one.
+    fn reusable_for(
+        &self,
+        page: &str,
+        visibility: Visibility,
+        kind: Kind,
+        content: Option<&str>,
+    ) -> bool {
+        self.revoked.is_none()
+            && self.page == page
+            && self.visibility == visibility
+            && self.kind == kind
+            && (kind == Kind::Live || (content.is_some() && self.content.as_deref() == content))
+    }
 }
 
 /// A snapshot's attachments: id → (mime, name).
@@ -260,10 +286,47 @@ impl Shares {
         v
     }
 
-    fn add(&self, share: Share) -> Result<(), String> {
+    /// Every share that is not revoked, newest first.
+    fn all(&self) -> Vec<Share> {
+        let mut v: Vec<Share> = lock(&self.entries)
+            .iter()
+            .filter(|s| s.revoked.is_none())
+            .cloned()
+            .collect();
+        v.sort_by_key(|s| std::cmp::Reverse(s.created));
+        v
+    }
+
+    /// The newest share that creating `share` again should return.
+    fn reusable(&self, share: &Share) -> Option<Share> {
+        Self::newest_match(&lock(&self.entries), share)
+    }
+
+    fn newest_match(entries: &[Share], share: &Share) -> Option<Share> {
+        entries
+            .iter()
+            .filter(|s| {
+                s.reusable_for(
+                    &share.page,
+                    share.visibility,
+                    share.kind,
+                    share.content.as_deref(),
+                )
+            })
+            .max_by_key(|s| s.created)
+            .cloned()
+    }
+
+    /// Adds `share`, unless a matching one was added meanwhile: then that
+    /// one is returned and `share` is not stored.
+    fn add(&self, share: Share) -> Result<Option<Share>, String> {
         let mut entries = lock(&self.entries);
+        if let Some(existing) = Self::newest_match(&entries, &share) {
+            return Ok(Some(existing));
+        }
         entries.push(share);
-        save_json(&self.path, &*entries)
+        save_json(&self.path, &*entries)?;
+        Ok(None)
     }
 
     /// Marks a share revoked and deletes its snapshot; false if unknown or
@@ -595,6 +658,36 @@ pub(crate) async fn logout(
     r
 }
 
+/// `GET /shares` for a browser: every link you can revoke, across pages.
+fn shares_page(state: &AppState, headers: &HeaderMap) -> Response {
+    if session(state, headers).is_none() {
+        if state.web.login {
+            return (
+                StatusCode::SEE_OTHER,
+                [
+                    (header::LOCATION, "/auth/web?return=/shares"),
+                    (header::CACHE_CONTROL, "no-store"),
+                ],
+            )
+                .into_response();
+        }
+        return message(
+            StatusCode::UNAUTHORIZED,
+            "Sign in",
+            "Sign in to the hub to see your shared links.",
+        );
+    }
+    let Ok(nonce) = random_hex(16) else {
+        return message(StatusCode::INTERNAL_SERVER_ERROR, "Error", "Try again.");
+    };
+    html_response(
+        StatusCode::OK,
+        html::shares_document(&nonce),
+        &format!("{PAGE_CSP}; script-src 'nonce-{nonce}'; connect-src 'self'"),
+        "no-store",
+    )
+}
+
 // ---- share pages ----
 
 enum Access {
@@ -806,11 +899,14 @@ async fn principal(
     Ok(s.account)
 }
 
-fn share_json(web: &Web, s: &Share) -> Value {
+/// A share for the API. `title` is the page's title, or `None` when the
+/// page is deleted or in the trash.
+fn share_json(web: &Web, s: &Share, title: Option<&str>) -> Value {
     json!({
         "id": s.id,
         "url": web.share_url(&s.token),
         "page": s.page,
+        "title": title,
         "visibility": s.visibility,
         "kind": s.kind,
         "created": s.created,
@@ -821,27 +917,55 @@ fn share_json(web: &Web, s: &Share) -> Value {
 #[derive(Deserialize)]
 pub(crate) struct ListQuery {
     page: Option<String>,
+    all: Option<String>,
+}
+
+/// The shares with their pages' titles (`None` for a deleted or trashed
+/// page), looked up once per page.
+async fn with_titles(state: &AppState, shares: Vec<Share>) -> Vec<(Share, Option<String>)> {
+    let vault = state.hub.vault().clone();
+    blocking(move || {
+        let mut titles: BTreeMap<String, Option<String>> = BTreeMap::new();
+        shares
+            .into_iter()
+            .map(|s| {
+                let t = titles
+                    .entry(s.page.clone())
+                    .or_insert_with(|| {
+                        live_page(&vault, &s.page).map(|p| render::display_title(&p))
+                    })
+                    .clone();
+                (s, t)
+            })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
 }
 
 /// `GET /shares?page=<id>`: the page's links that are not revoked, newest
-/// first.
+/// first. `GET /shares?all=1`: every such link, deleted pages included.
+/// `GET /shares` with neither: the signed-in Shared links page.
 pub(crate) async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(q): Query<ListQuery>,
 ) -> Response {
+    if q.page.is_none() && q.all.is_none() {
+        return shares_page(&state, &headers);
+    }
     if let Err(r) = principal(&state, &headers, false).await {
         return r;
     }
-    let Some(page) = q.page.filter(|p| is_page_id(p)) else {
-        return json_error(StatusCode::BAD_REQUEST, "invalid_page");
+    let found = match q.page {
+        Some(page) if is_page_id(&page) => state.web.shares.for_page(&page),
+        Some(_) => return json_error(StatusCode::BAD_REQUEST, "invalid_page"),
+        None => state.web.shares.all(),
     };
-    let shares: Vec<Value> = state
-        .web
-        .shares
-        .for_page(&page)
+    let shares: Vec<Value> = with_titles(&state, found)
+        .await
         .iter()
-        .map(|s| share_json(&state.web, s))
+        .map(|(s, t)| share_json(&state.web, s, t.as_deref()))
         .collect();
     let mut r = Json(json!({ "shares": shares })).into_response();
     r.headers_mut()
@@ -881,7 +1005,35 @@ fn write_snapshot(
     write_atomic(&dir.join("index.html"), doc.as_bytes()).map_err(|e| e.to_string())
 }
 
-/// `POST /shares` `{page, visibility, kind}`.
+/// A page's content version for snapshot reuse: a hash of what a snapshot
+/// shows (title, icon, properties, body). Attachments count only through
+/// their references in the body.
+fn content_version(v: &Vault, page: &Page) -> String {
+    let r = render::render_page(
+        v,
+        page,
+        &RenderOpts {
+            asset_base: "/a",
+            link_pages: false,
+        },
+    );
+    let mut s = String::new();
+    for part in [
+        r.title.as_str(),
+        r.icon.as_deref().unwrap_or(""),
+        r.props_html.as_str(),
+        r.body_html.as_str(),
+    ] {
+        s.push_str(part);
+        s.push('\0');
+    }
+    sha256_hex(s.as_bytes())
+}
+
+/// `POST /shares` `{page, visibility, kind}`: 201 with a new link, or 200
+/// with `existing: true` when the page already has one for this choice
+/// (live: per visibility; snapshot: per visibility and content version).
+/// Revoked links are never returned.
 pub(crate) async fn create(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -900,47 +1052,65 @@ pub(crate) async fn create(
     let (Ok(id), Ok(token)) = (random_hex(8), random_hex(24)) else {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error");
     };
-    let share = Share {
-        id: id.clone(),
-        token: token.clone(),
-        page: b.page.clone(),
-        visibility: b.visibility,
-        kind: b.kind,
-        created: now_ms(),
-        created_by: who,
-        revoked: None,
-    };
-    let vault = state.hub.vault().clone();
-    let base = state.web.base.clone();
-    let dir = state.web.shares.snapshot_dir(&id);
-    let kind = b.kind;
-    let page_id = b.page.clone();
-    let made = blocking(move || -> Result<(), (StatusCode, &'static str)> {
-        let p = live_page(&vault, &page_id).ok_or((StatusCode::NOT_FOUND, "no_page"))?;
-        if p.is_database() {
-            return Err((StatusCode::BAD_REQUEST, "databases_not_shareable"));
-        }
-        if kind == Kind::Snapshot {
-            write_snapshot(&vault, &p, &base, &token, &dir).map_err(|e| {
-                tracing::error!("share snapshot: {e}");
+    let st = state.clone();
+    let made = blocking(
+        move || -> Result<(Share, bool, String), (StatusCode, &'static str)> {
+            let vault = st.hub.vault();
+            let p = live_page(vault, &b.page).ok_or((StatusCode::NOT_FOUND, "no_page"))?;
+            if p.is_database() {
+                return Err((StatusCode::BAD_REQUEST, "databases_not_shareable"));
+            }
+            let title = render::display_title(&p);
+            let share = Share {
+                id: id.clone(),
+                token: token.clone(),
+                page: b.page.clone(),
+                visibility: b.visibility,
+                kind: b.kind,
+                created: now_ms(),
+                created_by: who,
+                revoked: None,
+                content: (b.kind == Kind::Snapshot).then(|| content_version(vault, &p)),
+            };
+            let shares = &st.web.shares;
+            if let Some(existing) = shares.reusable(&share) {
+                return Ok((existing, true, title));
+            }
+            let dir = shares.snapshot_dir(&id);
+            let server_error = |e: String| {
+                tracing::error!("shares: {e}");
                 let _ = std::fs::remove_dir_all(&dir);
                 (StatusCode::INTERNAL_SERVER_ERROR, "server_error")
-            })?;
-        }
-        Ok(())
-    })
+            };
+            if b.kind == Kind::Snapshot {
+                write_snapshot(vault, &p, &st.web.base, &token, &dir).map_err(server_error)?;
+            }
+            match shares.add(share.clone()).map_err(server_error)? {
+                Some(existing) => {
+                    let _ = std::fs::remove_dir_all(&dir);
+                    Ok((existing, true, title))
+                }
+                None => Ok((share, false, title)),
+            }
+        },
+    )
     .await
     .unwrap_or(Err((StatusCode::INTERNAL_SERVER_ERROR, "server_error")));
-    if let Err((status, e)) = made {
-        return json_error(status, e);
+    let (share, existing, title) = match made {
+        Ok(m) => m,
+        Err((status, e)) => return json_error(status, e),
+    };
+    if !existing {
+        tracing::info!(share = %share.id, "share created");
     }
-    if let Err(e) = state.web.shares.add(share.clone()) {
-        tracing::error!("shares: {e}");
-        let _ = std::fs::remove_dir_all(state.web.shares.snapshot_dir(&id));
-        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error");
-    }
-    tracing::info!(share = %share.id, "share created");
-    let mut r = (StatusCode::CREATED, Json(share_json(&state.web, &share))).into_response();
+    let mut body = share_json(&state.web, &share, Some(&title));
+    body["existing"] = json!(existing);
+    let status = if existing {
+        StatusCode::OK
+    } else {
+        StatusCode::CREATED
+    };
+    let mut r = (status, Json(body)).into_response();
     r.headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
@@ -976,6 +1146,7 @@ mod tests {
     fn returns_are_only_viewer_and_share_paths() {
         assert!(valid_return("/open/01ARZ3NDEKTSV4RRFFQ69G5FAV"));
         assert!(valid_return("/s/abcdef0123"));
+        assert!(valid_return("/shares"));
         for bad in [
             "/",
             "//evil.example.com",
@@ -984,6 +1155,8 @@ mod tests {
             "/s/",
             "/s/a/b",
             "/auth/web",
+            "/shares/x",
+            "/shares?all=1",
         ] {
             assert!(!valid_return(bad), "{bad}");
         }

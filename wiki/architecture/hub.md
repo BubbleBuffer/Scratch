@@ -74,7 +74,7 @@ allowed_groups = ["notes"]
 | `GET /open/<page id>/a/<attachment>` | An attachment the page uses, for a web session only (401 otherwise). |
 | `GET /auth/web?return=<path>`, `POST /auth/web/logout` | The web viewer's sign-in (same provider and `/auth/callback` as the app login; ends in the `scratch_session` cookie) and sign-out. [Sharing](../integrations/sharing.md#web-viewer-and-sign-in). |
 | `GET /s/<token>`, `GET /s/<token>/a/<attachment>` | A share link and its page's attachments: public, or private (web session); snapshot or live; 410 once revoked. |
-| `GET /shares?page=<id>`, `POST /shares`, `DELETE /shares/{id}` | List, create and revoke share links: device token and `X-Device`, or a web session with the hub's own `Origin`. Agent tokens are refused. |
+| `GET /shares?page=<id>`, `GET /shares?all=1`, `POST /shares`, `DELETE /shares/{id}` | List (one page or all), create (idempotent, 200 `existing` for a reused link) and revoke share links: device token and `X-Device`, or a web session with the hub's own `Origin`. Agent tokens are refused. A browser `GET /shares` with a session is the Shared links page. |
 | `GET /icon.png` | The app icon, for preview cards. |
 | `/sync`, `/push`, `/changes`, `/blobs/<id>` | The sync protocol, unchanged ([Sync (state)](sync-state.md#protocol)). Paths outside the explicit hub routes fall through to `Hub::handle` on a blocking thread, with the body streamed through a sync reader only after the token check. |
 | `GET /auth/start?device=<id>&name=<label>&redirect=<uri>[&state=<s>]` | Starts a login (below). |

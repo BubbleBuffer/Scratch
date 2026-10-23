@@ -452,19 +452,44 @@ impl Env {
         (status, headers, r.bytes().await.unwrap().to_vec())
     }
 
-    /// `POST /shares` as a device.
+    /// `POST /shares` as a device, expecting a new link.
     async fn share(&self, token: &str, page: &str, visibility: &str, kind: &str) -> Value {
+        let (status, v) = self.share_as(token, DEVICE, page, visibility, kind).await;
+        assert_eq!(status, StatusCode::CREATED, "{v}");
+        v
+    }
+
+    /// `POST /shares` as `device`: the status and body.
+    async fn share_as(
+        &self,
+        token: &str,
+        device: &str,
+        page: &str,
+        visibility: &str,
+        kind: &str,
+    ) -> (StatusCode, Value) {
         let r = self
             .http
             .post(format!("{}/shares", self.hub_url))
             .bearer_auth(token)
-            .header("X-Device", DEVICE)
+            .header("X-Device", device)
             .json(&json!({ "page": page, "visibility": visibility, "kind": kind }))
             .send()
             .await
             .unwrap();
-        assert_eq!(r.status(), StatusCode::CREATED);
-        r.json().await.unwrap()
+        (r.status(), r.json().await.unwrap())
+    }
+
+    /// `DELETE /shares/<id>` as a device.
+    async fn revoke(&self, token: &str, id: &Value) -> StatusCode {
+        self.http
+            .delete(format!("{}/shares/{}", self.hub_url, id.as_str().unwrap()))
+            .bearer_auth(token)
+            .header("X-Device", DEVICE)
+            .send()
+            .await
+            .unwrap()
+            .status()
     }
 }
 
@@ -1005,10 +1030,16 @@ async fn only_devices_and_web_sessions_create_shares() {
         post(None, Some((&cookie, Some(&e.hub_url)))).await,
         StatusCode::CREATED
     );
-    assert_eq!(
-        post(Some((&token, DEVICE)), None).await,
-        StatusCode::CREATED
-    );
+    // The same choice again is the same link.
+    assert_eq!(post(Some((&token, DEVICE)), None).await, StatusCode::OK);
+    let r = e
+        .http
+        .get(format!("{}/shares?all=1", e.hub_url))
+        .bearer_auth(&agent)
+        .send()
+        .await
+        .unwrap();
+    assert!(!r.status().is_success());
 
     // Databases are not shared.
     let db = e.vault().create_page(None, "Board".into()).unwrap();
@@ -1023,6 +1054,167 @@ async fn only_devices_and_web_sessions_create_shares() {
         .await
         .unwrap();
     assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn one_link_per_choice_from_anywhere_and_revocable_from_shares() {
+    let e = env().await;
+    let f = fixture(e.vault());
+    let laptop = e.device_token(DEVICE).await;
+    let phone = e.device_token("dev-phone").await;
+    let cookie = e.web_session("/shares").await;
+    let web_post = |body: Value| {
+        let req = e
+            .http
+            .post(format!("{}/shares", e.hub_url))
+            .header(header::COOKIE, &cookie)
+            .header(header::ORIGIN, &e.hub_url)
+            .json(&body);
+        async move {
+            let r = req.send().await.unwrap();
+            (r.status(), r.json::<Value>().await.unwrap())
+        }
+    };
+    let path = |s: &Value| {
+        s["url"]
+            .as_str()
+            .unwrap()
+            .trim_start_matches(&e.hub_url)
+            .to_string()
+    };
+
+    // Live: one link per visibility, from any device or the web.
+    let (status, live) = e.share_as(&laptop, DEVICE, &f.trip, "public", "live").await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(live["existing"], false);
+    assert_eq!(live["title"], "Trip");
+    let (status, again) = e
+        .share_as(&phone, "dev-phone", &f.trip, "public", "live")
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(again["existing"], true);
+    assert_eq!(again["url"], live["url"]);
+    let (status, web) =
+        web_post(json!({ "page": f.trip, "visibility": "public", "kind": "live" })).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(web["url"], live["url"]);
+    let (status, private) = e
+        .share_as(&laptop, DEVICE, &f.trip, "private", "live")
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_ne!(private["url"], live["url"]);
+
+    // This version: the same link while the page is unchanged, a new one
+    // after an edit; the old one keeps working.
+    let snap = e.share(&laptop, &f.trip, "public", "snapshot").await;
+    let (status, same) = e
+        .share_as(&phone, "dev-phone", &f.trip, "public", "snapshot")
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(same["url"], snap["url"]);
+    e.vault()
+        .apply(
+            f.trip.clone(),
+            vec![BlockOp::SetText {
+                id: "p".into(),
+                text: "Edited text".into(),
+                marks: vec![],
+            }],
+        )
+        .unwrap();
+    let (status, edited) = e
+        .share_as(&laptop, DEVICE, &f.trip, "public", "snapshot")
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_ne!(edited["url"], snap["url"]);
+    let (status, _, html) = e.get(&path(&snap), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Original text"));
+
+    // After a revoke, a new token; the revoked one stays gone.
+    assert_eq!(e.revoke(&laptop, &live["id"]).await, StatusCode::NO_CONTENT);
+    let (status, fresh) = e
+        .share_as(&phone, "dev-phone", &f.trip, "public", "live")
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_ne!(fresh["url"], live["url"]);
+    assert_eq!(e.get(&path(&live), None).await.0, StatusCode::GONE);
+
+    // `/shares`: the page needs a session.
+    let r = e
+        .http
+        .get(format!("{}/shares", e.hub_url))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::SEE_OTHER);
+    assert_eq!(r.headers()[header::LOCATION], "/auth/web?return=/shares");
+    let (status, headers, html) = e.get("/shares", Some(&cookie)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        html.contains("<h1 class=\"title\">Shared links</h1>"),
+        "{html}"
+    );
+    assert!(html.contains("<meta name=\"robots\" content=\"noindex\">"));
+    assert!(headers[header::CONTENT_SECURITY_POLICY]
+        .to_str()
+        .unwrap()
+        .contains("script-src 'nonce-"));
+    // The viewer links to it.
+    let (_, _, viewer) = e.get(&format!("/open/{}", f.trip), Some(&cookie)).await;
+    assert!(viewer.contains("href=\"/shares\">Shared links</a>"));
+
+    // Every link across pages; a deleted page's links stay, untitled.
+    let other = e.share(&laptop, &f.other, "private", "live").await;
+    e.vault().delete_page(f.other.clone()).unwrap();
+    let all = |c: Option<&str>| {
+        let mut req = e.http.get(format!("{}/shares?all=1", e.hub_url));
+        req = match c {
+            Some(c) => req.header(header::COOKIE, c),
+            None => req.bearer_auth(&phone).header("X-Device", "dev-phone"),
+        };
+        async move {
+            let r = req.send().await.unwrap();
+            assert_eq!(r.status(), StatusCode::OK);
+            let v: Value = r.json().await.unwrap();
+            v["shares"].as_array().unwrap().clone()
+        }
+    };
+    let listed = all(Some(&cookie)).await;
+    // Private live, the two snapshots, the fresh live and the other
+    // page's; not the revoked one.
+    assert_eq!(listed.len(), 5, "{listed:?}");
+    assert!(listed.iter().all(|s| s["id"] != live["id"]));
+    let o = listed.iter().find(|s| s["id"] == other["id"]).unwrap();
+    assert!(o["title"].is_null(), "{o}");
+    assert!(listed
+        .iter()
+        .filter(|s| s["page"] == f.trip.as_str())
+        .all(|s| s["title"] == "Trip"));
+    assert_eq!(all(None).await.len(), 5);
+    let r = e
+        .http
+        .get(format!("{}/shares?all=1", e.hub_url))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::UNAUTHORIZED);
+
+    // The deleted page's link is revocable from the web.
+    let r = e
+        .http
+        .delete(format!(
+            "{}/shares/{}",
+            e.hub_url,
+            other["id"].as_str().unwrap()
+        ))
+        .header(header::COOKIE, &cookie)
+        .header(header::ORIGIN, &e.hub_url)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::NO_CONTENT);
+    assert_eq!(all(Some(&cookie)).await.len(), 4);
 }
 
 /// Writes sample pages for the screenshots when `SHARE_SHOTS_DIR` is set:
@@ -1054,4 +1246,13 @@ async fn write_screenshot_pages() {
     fs::write(dir.join("viewer.html"), html).unwrap();
     let (_, _, html) = e.get(&format!("/s/{}", "0".repeat(48)), None).await;
     fs::write(dir.join("missing.html"), html).unwrap();
+    // The Shared links page and what it fetches: links on two pages, one
+    // of them deleted.
+    e.share(&token, &f.trip, "private", "live").await;
+    e.share(&token, &f.other, "public", "live").await;
+    e.vault().delete_page(f.other.clone()).unwrap();
+    let (_, _, html) = e.get("/shares", Some(&cookie)).await;
+    fs::write(dir.join("shares.html"), html).unwrap();
+    let (_, _, json) = e.get("/shares?all=1", Some(&cookie)).await;
+    fs::write(dir.join("shares.json"), json).unwrap();
 }

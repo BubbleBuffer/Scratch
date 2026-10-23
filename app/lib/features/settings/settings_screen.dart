@@ -25,6 +25,8 @@ import '../ai/ask_ai.dart';
 import '../mounts/mounts.dart';
 import '../sync/conflicts.dart';
 import '../sync/sync_icons.dart';
+import '../share/share_popup.dart' show shareClientOf;
+import '../share/shared_links_settings.dart';
 import '../sync/sync_settings.dart';
 import 'controls.dart';
 import 'settings_store.dart';
@@ -35,6 +37,7 @@ enum SettingsSection {
   preferences('Preferences'),
   reminders('Reminders'),
   sync('Sync'),
+  sharedLinks('Shared links'),
   devices('Devices'),
   conflicts('Conflicts'),
   ai('AI'),
@@ -44,15 +47,21 @@ enum SettingsSection {
   const SettingsSection(this.label);
   final String label;
 
-  /// Devices are the hub's, so only desktop lists them.
-  static List<SettingsSection> get visible =>
-      [for (final s in values) if (s != devices || SyncStore.canHost) s];
+  /// Devices are the hub's, so only desktop lists them. Shared links show
+  /// only while this device is signed in to a hub.
+  static List<SettingsSection> visibleFor(BuildContext context) => [
+    for (final s in values)
+      if ((s != devices || SyncStore.canHost) &&
+          (s != sharedLinks || shareClientOf(context) != null))
+        s,
+  ];
 }
 
 Widget sectionIcon(SettingsSection s, Color color, double size) => switch (s) {
       SettingsSection.preferences => SyncIcon(SyncIco.sun, size: size, color: color),
       SettingsSection.reminders => Icon20(Ico.clock, size: size, color: color),
       SettingsSection.sync => SyncIcon(SyncIco.cloud, size: size, color: color),
+      SettingsSection.sharedLinks => Icon20(Ico.link, size: size, color: color),
       SettingsSection.devices => SyncIcon(SyncIco.devices, size: size, color: color),
       SettingsSection.conflicts => SyncIcon(SyncIco.conflict, size: size, color: color),
       SettingsSection.ai =>
@@ -65,6 +74,7 @@ Widget sectionBody(SettingsSection s) => switch (s) {
       SettingsSection.preferences => const PreferencesBody(),
       SettingsSection.reminders => const RemindersBody(),
       SettingsSection.sync => const SyncBody(),
+      SettingsSection.sharedLinks => const SharedLinksBody(),
       SettingsSection.devices => const DevicesBody(),
       SettingsSection.conflicts => const ConflictsBody(),
       SettingsSection.ai => const AiSettingsBody(),
@@ -230,7 +240,7 @@ class _SettingsModalState extends State<SettingsModal> {
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
             child: Text('Settings', style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
           ),
-          for (final s in SettingsSection.visible)
+          for (final s in SettingsSection.visibleFor(context))
             _NavItem(
               key: ValueKey('settings-nav-${s.name}'),
               section: s,
@@ -330,7 +340,7 @@ class SettingsPage extends StatelessWidget {
       title: 'Settings',
       padded: false,
       body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (final s in SettingsSection.visible)
+        for (final s in SettingsSection.visibleFor(context))
           Hover(
             key: ValueKey('settings-nav-${s.name}'),
             onTap: () => pushSettingsPage(context, s.label, sectionBody(s)),

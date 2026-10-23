@@ -51,7 +51,16 @@ A share is stored in `.vault/hub/shares.json` with these fields:
 - `visibility`: `public` or `private`;
 - `kind`: `snapshot` or `live`;
 - `created` and `created_by` (`device:<id>` or the web account);
-- `revoked`, set once it is turned off.
+- `revoked`, set once it is turned off;
+- `content` (snapshots only): the content version, see below.
+
+**One link per choice.** Creating a link is idempotent on the hub, whichever device or web session asks:
+
+- **Live:** one link per page and visibility.
+- **This version:** one link per page, visibility and content version. The content version is the SHA-256 of what the snapshot shows (title, icon, properties table and body HTML). Attachments count only through their references in the body. An unchanged page gets its existing snapshot link back; an edited page gets a new one, and the older snapshot links keep working.
+- A reused link comes back as 200 with `existing: true`. The popup and the web dialog then say "Link already exists". A new link is 201 with `existing: false`.
+- Revoked links are never reused: creating again after a revoke makes a new token.
+- Links made before 2026-10-23 all stay valid and listed. Live ones are reused (the newest match wins). Older snapshots have no content version and are never reused.
 
 Who can open a link and what it shows:
 
@@ -71,8 +80,10 @@ Every share page carries `<meta name="robots" content="noindex">` and `X-Robots-
 
 | Route | |
 |---|---|
-| `GET /shares?page=<id>` | The page's active links, newest first: `{shares: [{id, url, page, visibility, kind, created, created_by}]}` |
-| `POST /shares` `{page, visibility, kind}` | 201 with the new share |
+| `GET /shares?page=<id>` | The page's active links, newest first: `{shares: [{id, url, page, title, visibility, kind, created, created_by}]}`. `title` is null for a deleted or trashed page. |
+| `GET /shares?all=1` | Every active link across pages, newest first, deleted pages included. |
+| `GET /shares` (browser) | The signed-in **Shared links** page; without a session it redirects to sign-in (`return=/shares`). |
+| `POST /shares` `{page, visibility, kind}` | 201 with a new share, or 200 with the existing one (`existing`) |
 | `DELETE /shares/<id>` | 204, or 404 `no_share` |
 
 Callers authenticate in one of two ways:
@@ -95,6 +106,13 @@ The two choices are labelled "Who can view" and "What to share", and only the se
 
 The viewer's Share button opens the same controls, with the same behaviour, in a small HTML dialog, the only script on the viewer.
 
+Both lists come from the hub, so they show every link to the page, wherever it was made. The page menu item reads "Share · 2 links" when the page has links.
+
+**Revoking from anywhere:**
+
+- **Web:** the viewer header links to **Shared links** (`/shares`). It lists all active links with the page title (or "Deleted page"), visibility, kind and date, plus Copy, Open and Revoke (with the same inline confirm). Links of deleted or trashed pages stay listed and revocable.
+- **App:** **Settings › Shared links**, next to Sync, appears only when the device is signed in to a hub. It shows the same list from `GET /shares?all=1`, using the popup's row widget ([shared_links_settings.dart](../../app/lib/features/share/shared_links_settings.dart)). Open note opens the page and is disabled for a deleted page. The empty state reads "No shared links yet. Share a note from its menu."
+
 ## Tests
 
 [tests/share.rs](../../crates/hub/tests/share.rs) runs against the mock OIDC issuer of `login.rs` and covers:
@@ -105,9 +123,14 @@ The viewer's Share button opens the same controls, with the same behaviour, in a
 - public, private, snapshot, live, revoke and trash;
 - tokens reaching only their own page's attachments;
 - Origin checks and refused agent tokens;
-- the preview tags.
+- the preview tags;
+- one link per choice from two devices and a web session; snapshot reuse until an edit; a new token after a revoke; `/shares` (session, all pages, deleted pages, revoke).
 
-Setting `SHARE_SHOTS_DIR` makes `write_screenshot_pages` write the sample pages used for the screenshots. Widget tests are in `app/test/share_popup_test.dart` and `app/test/share_menu_test.dart`.
+Setting `SHARE_SHOTS_DIR` makes `write_screenshot_pages` write the sample pages used for the screenshots. Widget tests are in `app/test/share_popup_test.dart`, `share_menu_test.dart`, `share_menu_label_test.dart` and `shared_links_settings_test.dart`.
+
+## Decisions
+
+- 2026-10-23: Share links are stable. Creating is idempotent per (page, visibility) for live links and per (page, visibility, content version) for snapshots, from any device or the web. Revoked tokens are never reused, and existing duplicates stay valid. Links can be revoked from the popup, the viewer dialog, the web Shared links page and the app's Settings › Shared links.
 
 ## Limits
 

@@ -18,6 +18,8 @@ class Share {
     required this.kind,
     required this.created,
     this.createdBy,
+    this.title,
+    this.existing = false,
   });
 
   final String id;
@@ -32,6 +34,14 @@ class Share {
   final int created;
   final String? createdBy;
 
+  /// The page's title as the hub has it; null when the page is deleted or in
+  /// the trash. Set on the lists across pages.
+  final String? title;
+
+  /// True when a create answered with a link the page already had (the hub
+  /// answers 200 instead of 201).
+  final bool existing;
+
   factory Share.fromJson(Map<String, dynamic> j) => Share(
     id: j['id'] as String,
     url: j['url'] as String,
@@ -40,6 +50,8 @@ class Share {
     kind: j['kind'] as String,
     created: (j['created'] as num).toInt(),
     createdBy: j['created_by'] as String?,
+    title: j['title'] as String?,
+    existing: j['existing'] == true,
   );
 
   /// "Public · This version" or "Private · Live link".
@@ -78,15 +90,19 @@ class ShareClient {
       '/shares?page=${Uri.encodeQueryComponent(pageId)}',
     );
     if (status != 200) throw _error(status, body);
-    final j = body as Map<String, dynamic>;
-    return [
-      for (final s in (j['shares'] as List? ?? const []))
-        Share.fromJson(s as Map<String, dynamic>),
-    ];
+    return _shareList(body);
   }
 
-  /// A new link to [pageId]. [visibility] is `public` or `private`, [kind]
-  /// `snapshot` or `live`.
+  /// Every active link across pages, newest first, deleted pages included.
+  Future<List<Share>> listAll() async {
+    final (status, body) = await _send('GET', '/shares?all=1');
+    if (status != 200) throw _error(status, body);
+    return _shareList(body);
+  }
+
+  /// A link to [pageId]: a new one (201), or the page's existing link with
+  /// the same choices (200, [Share.existing] true). [visibility] is `public`
+  /// or `private`, [kind] `snapshot` or `live`.
   Future<Share> create(
     String pageId, {
     required String visibility,
@@ -97,8 +113,16 @@ class ShareClient {
       'visibility': visibility,
       'kind': kind,
     });
-    if (status != 201) throw _error(status, body);
+    if (status != 201 && status != 200) throw _error(status, body);
     return Share.fromJson(body as Map<String, dynamic>);
+  }
+
+  List<Share> _shareList(Object? body) {
+    final j = body as Map<String, dynamic>;
+    return [
+      for (final s in (j['shares'] as List? ?? const []))
+        Share.fromJson(s as Map<String, dynamic>),
+    ];
   }
 
   /// Ends a link. A link that is already gone counts as ended.

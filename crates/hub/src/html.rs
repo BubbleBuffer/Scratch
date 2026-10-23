@@ -12,10 +12,10 @@ html{background:var(--desk)}
 body{margin:0;background:var(--desk);color:var(--text);font:16px/1.5 "Atkinson Hyperlegible Next","Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
 ::selection{background:var(--sel)}
 a{color:var(--link)}
-.bar{max-width:816px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:8px;font-size:14px}
+.bar{max-width:816px;margin:0 auto;padding:12px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px}
 .brand{display:flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none;font-weight:600;margin-right:auto}
 .brand img{width:22px;height:22px;border-radius:6px}
-.btn{display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border-radius:7px 11px 6px 9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 14px/1 inherit;font-family:inherit;text-decoration:none;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border-radius:7px 11px 6px 9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:600 14px/1 inherit;font-family:inherit;text-decoration:none;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--card)}
 .btn.primary{background:var(--accent);border-color:transparent;color:var(--on-accent);font-weight:700}
 .btn.primary:hover{background:var(--accent-hover)}
@@ -74,10 +74,10 @@ dialog .group-h{font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 
 .share-url input{flex:1;min-width:0;height:34px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);padding:0 8px;font:13px "Fragment Mono",ui-monospace,monospace}
 .share-list{list-style:none;padding:0;margin:0;border-top:1px solid var(--border)}
 .share-list li{display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
-.share-list .what{flex:1}.share-list .when{display:block;color:var(--faint);font-size:12px}
+.share-list .what{flex:1}.share-list .page{display:block;font-weight:600}.share-list .page.gone{color:var(--muted);font-style:italic}.share-list .when{display:block;color:var(--faint);font-size:12px}
 .status{min-height:20px;color:var(--muted);font-size:13px;margin:6px 0 0}
 .close{float:right}
-@media (max-width:640px){.sheet{padding:24px 16px 40px;border-radius:0}.title{font-size:32px;line-height:40px}.bar{padding:10px 16px}}
+@media (max-width:640px){.sheet{padding:24px 16px 40px;border-radius:0}.title{font-size:32px;line-height:40px}.bar{padding:10px 16px;gap:6px}.bar .btn{padding:0 10px;height:32px;font-size:13px}.bar .brand{font-size:0;gap:0}}
 "#;
 
 /// The preview card: Open Graph and Twitter tags.
@@ -165,6 +165,7 @@ pub(crate) fn page_document(r: &Rendered, card: &Card, chrome: Chrome) -> String
             let id = escape(page_id);
             html.push_str(&format!(
                 "<body data-page=\"{id}\">\n<header class=\"bar\">{BRAND}\
+                 <a class=\"btn\" href=\"/shares\">Shared links</a>\
                  <a class=\"btn\" href=\"notes://page/{id}\">Open in app</a>\
                  <button class=\"btn primary\" id=\"share-open\" type=\"button\">Share</button>\
                  <form method=\"post\" action=\"/auth/web/logout\" style=\"margin:0\">\
@@ -204,6 +205,7 @@ const SHARE_DIALOG: &str = r#"<dialog id="share" aria-labelledby="share-h">
 <button class="btn primary" type="submit" style="width:100%">Create link</button>
 </form>
 <div class="share-url" id="share-made" hidden><input id="share-url" readonly aria-label="Link"><button class="btn small" id="share-copy" type="button">Copy</button></div>
+<p class="muted hint" id="share-exists" hidden>Link already exists</p>
 <p class="status" id="share-status" role="status"></p>
 <h3 class="list-h">Links to this page</h3>
 <ul class="share-list" id="share-list"><li class="empty">No links yet.</li></ul>
@@ -226,8 +228,47 @@ function empty(){list.textContent='';list.appendChild(el('li','empty','No links 
 async function load(){try{const r=await api('GET','/shares?page='+encodeURIComponent(page));list.textContent='';if(!r.shares.length){empty();return}for(const s of r.shares)list.appendChild(row(s))}catch(e){say('Could not load links: '+e.message)}}
 document.getElementById('share-open').onclick=()=>{say('');hints();dlg.showModal();load()};
 const made=document.getElementById('share-copy');
-form.onsubmit=async(ev)=>{ev.preventDefault();const f=new FormData(form);try{const s=await api('POST','/shares',{page,visibility:f.get('visibility'),kind:f.get('kind')});document.getElementById('share-made').hidden=false;const u=document.getElementById('share-url');u.value=s.url;u.select();await copy(s.url,made);load()}catch(e){say('Could not create the link: '+e.message)}};
+form.onsubmit=async(ev)=>{ev.preventDefault();const f=new FormData(form);try{const s=await api('POST','/shares',{page,visibility:f.get('visibility'),kind:f.get('kind')});document.getElementById('share-made').hidden=false;document.getElementById('share-exists').hidden=!s.existing;const u=document.getElementById('share-url');u.value=s.url;u.select();await copy(s.url,made);load()}catch(e){say('Could not create the link: '+e.message)}};
 made.onclick=()=>copy(document.getElementById('share-url').value,made);
+})();
+"#;
+
+/// `GET /shares` in a browser: every link not revoked, across pages, with
+/// Copy, Open and Revoke.
+pub(crate) fn shares_document(nonce: &str) -> String {
+    let empty = Card {
+        title: "Shared links",
+        description: "",
+        image_url: "/icon.png",
+        url: "",
+    };
+    let mut html = head("Shared links · Scratch", &empty);
+    html.push_str(&format!(
+        "<body>\n<header class=\"bar\">{BRAND}\
+         <form method=\"post\" action=\"/auth/web/logout\" style=\"margin:0\">\
+         <input type=\"hidden\" name=\"return\" value=\"/shares\">\
+         <button class=\"btn\" type=\"submit\">Sign out</button></form></header>\n\
+         <main class=\"sheet\">\n<h1 class=\"title\">Shared links</h1>\n\
+         <p class=\"status\" id=\"share-status\" role=\"status\"></p>\n\
+         <ul class=\"share-list\" id=\"share-list\"><li class=\"empty\">Loading…</li></ul>\n\
+         </main>\n<script nonce=\"{}\">{SHARES_SCRIPT}</script>\n</body>\n</html>\n",
+        escape(nonce)
+    ));
+    html
+}
+
+const SHARES_SCRIPT: &str = r#"
+(function(){
+const list=document.getElementById('share-list'),status=document.getElementById('share-status');
+function say(t){status.textContent=t}
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function btn(text,cls){const b=el('button','btn small'+(cls?' '+cls:''),text);b.type='button';return b}
+async function api(method,path){const r=await fetch(path,{method,credentials:'same-origin'});if(!r.ok){let e=r.status;try{e=(await r.json()).error||e}catch(_){}throw new Error(e)}return r.status===204?null:r.json()}
+function what(s){return (s.visibility==='public'?'Public':'Private')+' · '+(s.kind==='live'?'Live link':'This version')}
+async function copy(url,b){try{await navigator.clipboard.writeText(url);b.textContent='Copied';clearTimeout(b._t);b._t=setTimeout(()=>{b.textContent='Copy'},2000)}catch(_){say('Could not copy: '+url)}}
+function row(s){const li=el('li');function show(){li.textContent='';const w=el('span','what');w.appendChild(el('span','page'+(s.title==null?' gone':''),s.title==null?'Deleted page':s.title));w.appendChild(el('span','when',what(s)+' · '+new Date(s.created).toLocaleString()));const c=btn('Copy');c.onclick=()=>copy(s.url,c);li.append(w,c);if(s.title!=null){const o=el('a','btn small','Open');o.href='/open/'+encodeURIComponent(s.page);li.append(o)}const x=btn('Revoke','danger');x.onclick=ask;li.append(x)}function ask(){li.textContent='';const q=el('span','what','Revoke this link? It stops working for everyone.');const no=btn('Cancel');no.onclick=show;const yes=btn('Revoke','danger');yes.onclick=async()=>{try{await api('DELETE','/shares/'+encodeURIComponent(s.id));load()}catch(e){say('Could not revoke: '+e.message);show()}};li.append(q,no,yes)}show();return li}
+async function load(){try{const r=await api('GET','/shares?all=1');list.textContent='';if(!r.shares.length){list.appendChild(el('li','empty','No shared links yet. Share a note from its menu.'));return}for(const s of r.shares)list.appendChild(row(s))}catch(e){say('Could not load links: '+e.message)}}
+load();
 })();
 "#;
 
