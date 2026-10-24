@@ -21,7 +21,9 @@ class RunnerChip extends StatelessWidget {
     final c = context.colors;
     final a = assignment;
     final Color background = switch (a.state) {
-      AssignState.queued || AssignState.cancelling => c.bgSecondary,
+      AssignState.queued ||
+      AssignState.cancelling ||
+      AssignState.cancelled => c.bgSecondary,
       AssignState.waiting => c.attnBg,
       AssignState.running => c.infoBg,
       AssignState.done => c.okBg,

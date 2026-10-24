@@ -42,7 +42,8 @@ enum AssignState {
   running('running'),
   cancelling('cancelling'),
   done('done'),
-  failed('failed');
+  failed('failed'),
+  cancelled('cancelled');
 
   const AssignState(this.label);
 
@@ -85,6 +86,14 @@ abstract class RunnerBackend {
 
   /// Assigns the task [taskId] to the runner [runnerId].
   Future<RunnerAssignment> assign(String taskId, String runnerId);
+
+  /// The assignment this backend already knows for [taskId], or null. Chips
+  /// read it on every redraw, so it must not call the backend.
+  RunnerAssignment? current(String taskId) => null;
+
+  /// Fires when [current] may have changed. Null: it changes only through
+  /// [RunnerAssignments.record].
+  Listenable? get changes => null;
 }
 
 /// The assignments the UI has seen, per task id, and the backend that makes
@@ -92,11 +101,17 @@ abstract class RunnerBackend {
 class RunnerAssignments extends ChangeNotifier {
   RunnerAssignments(this.backend);
 
+  RunnerAssignments(this.backend) {
+    backend.changes?.addListener(notifyListeners);
+  }
+
   final RunnerBackend backend;
   final Map<String, RunnerAssignment> _byTask = {};
 
-  /// The task's latest assignment, or null when it has none.
-  RunnerAssignment? of(String taskId) => _byTask[taskId];
+  /// The task's latest assignment, or null when it has none. The backend's
+  /// own answer wins over one recorded from an earlier assign.
+  RunnerAssignment? of(String taskId) =>
+      backend.current(taskId) ?? _byTask[taskId];
 
   Future<List<Runner>> runners() => backend.listRunners();
 
@@ -112,6 +127,21 @@ class RunnerAssignments extends ChangeNotifier {
     _byTask[assignment.taskId] = assignment;
     notifyListeners();
   }
+
+  @override
+  void dispose() {
+    backend.changes?.removeListener(notifyListeners);
+    super.dispose();
+  }
+}
+
+/// How long ago [seen] was, as the picker words it: "2 h ago".
+String lastSeenText(DateTime seen, DateTime now) {
+  final gap = now.difference(seen);
+  if (gap.inMinutes < 1) return 'just now';
+  if (gap.inHours < 1) return '${gap.inMinutes} min ago';
+  if (gap.inDays < 1) return '${gap.inHours} h ago';
+  return '${gap.inDays} d ago';
 }
 
 /// Gives the board its runner assignments. Without this ancestor the board

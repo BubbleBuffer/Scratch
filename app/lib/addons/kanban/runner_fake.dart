@@ -5,15 +5,6 @@
 
 import 'runner_backend.dart';
 
-/// How long ago [seen] was, as the picker words it: "2 h ago".
-String lastSeenText(DateTime seen, DateTime now) {
-  final gap = now.difference(seen);
-  if (gap.inMinutes < 1) return 'just now';
-  if (gap.inHours < 1) return '${gap.inMinutes} min ago';
-  if (gap.inDays < 1) return '${gap.inHours} h ago';
-  return '${gap.inDays} d ago';
-}
-
 class FakeRunnerBackend extends RunnerBackend {
   FakeRunnerBackend({required this.runners, DateTime? now})
     : now = now ?? DateTime.now();

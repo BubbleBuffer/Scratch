@@ -31,6 +31,8 @@ export 'runner_backend.dart'
 export 'runner_chip.dart' show RunnerChip, runnerChipText;
 export 'runner_fake.dart' show FakeRunnerBackend, demoRunnerAssignments;
 export 'runner_picker.dart' show showRunnerPicker;
+export 'runner_real.dart'
+    show RealRunnerBackend, aiRunnerAssignments, runnerCardPrompt;
 export 'view.dart' show KanbanBoard, KanbanPage;
 
 class KanbanAddon extends Addon {

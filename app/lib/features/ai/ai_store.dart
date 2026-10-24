@@ -37,10 +37,12 @@ import '../../src/rust/api/ai.dart';
 import '../../src/rust/api/agent.dart' show aiRunTaskWithAgent;
 import '../../state/app_state.dart';
 import '../../addons/agent/api.dart';
+import 'ai_runners.dart';
 import 'ai_settings.dart';
 import 'hub_jobs_client.dart';
 
 export '../../src/rust/api/ai.dart' show AiTask;
+export 'ai_runners.dart' show AiRunnerBridge;
 
 /// Task statuses (the "Status" select of the AI tasks collection).
 abstract final class AiStatus {
@@ -53,6 +55,16 @@ abstract final class AiStatus {
 
   /// Whether a run with [status] has not ended yet.
   static bool active(String status) => status == queued || status == running;
+}
+
+/// What the kanban runner picker reads: the task rows (newest first), whether
+/// a hub can take runs, the runner calls, and a refresh after a write. It
+/// listens to the store, so a change in the rows redraws the chips.
+abstract interface class AiTaskSource implements Listenable {
+  List<AiTask> get tasks;
+  bool get hubUsable;
+  AiRunnerBridge get runnerBridge;
+  Future<void> refresh();
 }
 
 /// Starts and stops the agent's runs for add-ons (a task assigned to the
@@ -69,7 +81,7 @@ abstract interface class AgentRuns {
   Future<AiTask?> run(String id);
 }
 
-class AiStore extends ChangeNotifier implements AgentRuns {
+class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   AiStore._(this.vault, this.feed, this._settings) {
     _settings.addListener(notifyListeners);
     feed?.addListener(_onChanges);
@@ -211,6 +223,22 @@ class AiStore extends ChangeNotifier implements AgentRuns {
 
   /// The hub, when this device can create hub jobs.
   HubLink? get hubLink => _agents.hubLink;
+
+  /// Whether the hub can be picked as a runner: the Hub is the only host on
+  /// phones, and elsewhere a signed-in hub link is needed.
+  @override
+  bool get hubUsable => hubAgentPlatform || hubLink != null;
+
+  /// Makes the runner calls for [vault] (tests use a fake bridge).
+  @visibleForTesting
+  static AiRunnerBridge Function(Vault vault)? runnerBridgeOverride;
+
+  AiRunnerBridge? _runnerBridge;
+
+  @override
+  AiRunnerBridge get runnerBridge =>
+      _runnerBridge ??=
+          (runnerBridgeOverride ?? VaultAiRunnerBridge.new)(vault);
 
   /// Starts [prompt] about [page] on [runsOn]; its placeholder goes after
   /// block [after] (an empty paragraph there becomes it) or at the page's
