@@ -11081,8 +11081,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AiTask dco_decode_ai_task(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 11)
-      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    if (arr.length != 13)
+      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
     return AiTask(
       id: dco_decode_String(arr[0]),
       prompt: dco_decode_String(arr[1]),
@@ -11092,9 +11092,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       status: dco_decode_String(arr[5]),
       device: dco_decode_String(arr[6]),
       error: dco_decode_String(arr[7]),
-      createdMs: dco_decode_i_64(arr[8]),
-      updatedMs: dco_decode_i_64(arr[9]),
-      node: dco_decode_String(arr[10]),
+      progress: dco_decode_String(arr[8]),
+      progressAt: dco_decode_String(arr[9]),
+      createdMs: dco_decode_i_64(arr[10]),
+      updatedMs: dco_decode_i_64(arr[11]),
+      node: dco_decode_String(arr[12]),
     );
   }
 
@@ -13941,6 +13943,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_status = sse_decode_String(deserializer);
     var var_device = sse_decode_String(deserializer);
     var var_error = sse_decode_String(deserializer);
+    var var_progress = sse_decode_String(deserializer);
+    var var_progressAt = sse_decode_String(deserializer);
     var var_createdMs = sse_decode_i_64(deserializer);
     var var_updatedMs = sse_decode_i_64(deserializer);
     var var_node = sse_decode_String(deserializer);
@@ -13953,6 +13957,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       status: var_status,
       device: var_device,
       error: var_error,
+      progress: var_progress,
+      progressAt: var_progressAt,
       createdMs: var_createdMs,
       updatedMs: var_updatedMs,
       node: var_node,
@@ -17279,6 +17285,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.status, serializer);
     sse_encode_String(self.device, serializer);
     sse_encode_String(self.error, serializer);
+    sse_encode_String(self.progress, serializer);
+    sse_encode_String(self.progressAt, serializer);
     sse_encode_i_64(self.createdMs, serializer);
     sse_encode_i_64(self.updatedMs, serializer);
     sse_encode_String(self.node, serializer);

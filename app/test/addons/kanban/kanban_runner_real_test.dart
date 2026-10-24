@@ -58,6 +58,8 @@ AiTask _row(
   status: status,
   device: '',
   error: error,
+  progress: '',
+  progressAt: '',
   createdMs: 0,
   updatedMs: 0,
   node: node,

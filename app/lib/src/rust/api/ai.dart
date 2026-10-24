@@ -233,6 +233,12 @@ class AiTask {
   /// The device that ran it.
   final String device;
   final String error;
+
+  /// The latest progress report, empty until one is recorded.
+  final String progress;
+
+  /// Unix epoch milliseconds as stored in the row, empty until reported.
+  final String progressAt;
   final PlatformInt64 createdMs;
   final PlatformInt64 updatedMs;
 
@@ -249,6 +255,8 @@ class AiTask {
     required this.status,
     required this.device,
     required this.error,
+    required this.progress,
+    required this.progressAt,
     required this.createdMs,
     required this.updatedMs,
     required this.node,
@@ -264,6 +272,8 @@ class AiTask {
       status.hashCode ^
       device.hashCode ^
       error.hashCode ^
+      progress.hashCode ^
+      progressAt.hashCode ^
       createdMs.hashCode ^
       updatedMs.hashCode ^
       node.hashCode;
@@ -281,6 +291,8 @@ class AiTask {
           status == other.status &&
           device == other.device &&
           error == other.error &&
+          progress == other.progress &&
+          progressAt == other.progressAt &&
           createdMs == other.createdMs &&
           updatedMs == other.updatedMs &&
           node == other.node;

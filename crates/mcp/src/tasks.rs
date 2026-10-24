@@ -71,6 +71,12 @@ pub struct Task {
     /// The device that claimed it.
     pub device: String,
     pub error: String,
+    /// The latest progress report, empty until one is recorded.
+    #[serde(default)]
+    pub progress: String,
+    /// Unix epoch milliseconds as stored in the row, empty until reported.
+    #[serde(default)]
+    pub progress_at: String,
     pub created_ms: i64,
     pub updated_ms: i64,
 }
@@ -226,6 +232,8 @@ fn task_of(row: &PageSummary) -> Task {
         status: text(p, "status"),
         device: text(p, "device"),
         error: text(p, "error"),
+        progress: text(p, "progress"),
+        progress_at: text(p, "progress_at"),
         created_ms: row.created_ms,
         updated_ms: row.updated_ms,
     }

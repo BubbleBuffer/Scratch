@@ -13219,6 +13219,8 @@ impl SseDecode for crate::api::ai::AiTask {
         let mut var_status = <String>::sse_decode(deserializer);
         let mut var_device = <String>::sse_decode(deserializer);
         let mut var_error = <String>::sse_decode(deserializer);
+        let mut var_progress = <String>::sse_decode(deserializer);
+        let mut var_progressAt = <String>::sse_decode(deserializer);
         let mut var_createdMs = <i64>::sse_decode(deserializer);
         let mut var_updatedMs = <i64>::sse_decode(deserializer);
         let mut var_node = <String>::sse_decode(deserializer);
@@ -13231,6 +13233,8 @@ impl SseDecode for crate::api::ai::AiTask {
             status: var_status,
             device: var_device,
             error: var_error,
+            progress: var_progress,
+            progress_at: var_progressAt,
             created_ms: var_createdMs,
             updated_ms: var_updatedMs,
             node: var_node,
@@ -17797,6 +17801,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::ai::AiTask {
             self.status.into_into_dart().into_dart(),
             self.device.into_into_dart().into_dart(),
             self.error.into_into_dart().into_dart(),
+            self.progress.into_into_dart().into_dart(),
+            self.progress_at.into_into_dart().into_dart(),
             self.created_ms.into_into_dart().into_dart(),
             self.updated_ms.into_into_dart().into_dart(),
             self.node.into_into_dart().into_dart(),
@@ -20390,6 +20396,8 @@ impl SseEncode for crate::api::ai::AiTask {
         <String>::sse_encode(self.status, serializer);
         <String>::sse_encode(self.device, serializer);
         <String>::sse_encode(self.error, serializer);
+        <String>::sse_encode(self.progress, serializer);
+        <String>::sse_encode(self.progress_at, serializer);
         <i64>::sse_encode(self.created_ms, serializer);
         <i64>::sse_encode(self.updated_ms, serializer);
         <String>::sse_encode(self.node, serializer);

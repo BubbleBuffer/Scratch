@@ -104,6 +104,10 @@ pub struct AiTask {
     /// The device that ran it.
     pub device: String,
     pub error: String,
+    /// The latest progress report, empty until one is recorded.
+    pub progress: String,
+    /// Unix epoch milliseconds as stored in the row, empty until reported.
+    pub progress_at: String,
     pub created_ms: i64,
     pub updated_ms: i64,
     /// Where it runs: "" (any desktop), a device id (only that device) or
@@ -121,6 +125,8 @@ fn task(t: tasks::Task) -> AiTask {
         status: t.status,
         device: t.device,
         error: t.error,
+        progress: t.progress,
+        progress_at: t.progress_at,
         created_ms: t.created_ms,
         updated_ms: t.updated_ms,
         node: t.node,
@@ -264,6 +270,39 @@ pub fn ai_finish_task(vault: &NotesVault, id: String, ok: bool, text: String) ->
 #[cfg(all(test, any(target_os = "windows", target_os = "linux", target_os = "macos")))]
 mod runner_tests {
     use super::*;
+
+    #[test]
+    fn stored_progress_reaches_task_get_and_list() {
+        struct Temp(std::path::PathBuf);
+        impl Drop for Temp {
+            fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+        }
+        let dir = Temp(std::env::temp_dir().join(format!("bridge_progress_{}", vault_core::new_id())));
+        let vault = NotesVault::open(dir.0.to_string_lossy().into_owned(), None).unwrap();
+        let page = vault.inner.create_page(None, "Plan".into()).unwrap();
+        let queued = ai_create_task_here(&vault, "Summarize".into(), page, None).unwrap();
+        assert_eq!(queued.progress, "");
+        assert_eq!(queued.progress_at, "");
+        let unset = ai_get_task(&vault, queued.id.clone()).unwrap();
+        assert_eq!(unset.progress, "");
+        assert_eq!(unset.progress_at, "");
+        let running = ai_claim_next(&vault).unwrap().unwrap();
+        assert_eq!(running.id, queued.id);
+        tasks::report_progress(&vault.inner, &running.id, "  Reading the plan  ").unwrap();
+        let stored = vault.inner.load_page(running.id.clone()).unwrap();
+        let stored_at = stored.properties.iter().find_map(|p| match (&*p.key, &p.value) {
+            ("progress_at", vault_core::PropValue::Text(value)) => Some(value.clone()),
+            _ => None,
+        }).unwrap();
+        assert!(stored_at.parse::<i64>().unwrap() > 0);
+        let fetched = ai_get_task(&vault, running.id.clone()).unwrap();
+        assert_eq!(fetched.progress, "Reading the plan");
+        assert_eq!(fetched.progress_at, stored_at);
+        let listed = ai_list_tasks(&vault, 10).unwrap().into_iter()
+            .find(|t| t.id == running.id).unwrap();
+        assert_eq!(listed.progress, fetched.progress);
+        assert_eq!(listed.progress_at, fetched.progress_at);
+    }
 
     #[test]
     fn app_open_registers_a_runner_and_picker_calls_reach_real_storage() {
