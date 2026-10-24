@@ -82,10 +82,21 @@ fn desktop_js_task_reports_progress_and_keeps_it_when_done() {
         dir.path(),
         v.clone(),
         ExecutionMode::Js,
-        vec![step(
-            "js",
-            json!({"code": "return await tools.report_progress({message: '  Read three pages  '});"}),
-        )],
+        vec![
+            step(
+                "js",
+                json!({"code": "return await tools.report_progress({message: '  Read three pages  '});"}),
+            ),
+            // The scripted provider consumes one queue across sessions. End
+            // this run before supplying the next task's progress call.
+            ScriptedStep::Text {
+                text: "First task finished.".into(),
+            },
+            step(
+                "js",
+                json!({"code": "return await tools.report_progress({message: 'Read the next task'});"}),
+            ),
+        ],
         vec![],
     );
     let before = vault_mcp::jobs::now_ms();
@@ -99,7 +110,8 @@ fn desktop_js_task_reports_progress_and_keeps_it_when_done() {
 
     // Reusing the engine binds the next run to its own row.
     assert!(agent.run_task(&v, &unrelated).unwrap().ok);
-    assert_eq!(property(&v, &unrelated, "progress"), "Read three pages");
+    assert_eq!(property(&v, &unrelated, "progress"), "Read the next task");
+    assert_eq!(property(&v, &task, "progress"), "Read three pages");
     assert_eq!(property(&v, &task, "progress_at"), at.to_string());
 }
 
