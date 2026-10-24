@@ -19,7 +19,9 @@ void main() {
       v.onWrite = () => writes++;
       final page = await v.createPage(title: 'Typed', pageType: 'mod:example');
       expect((await v.loadPage(page)).pageType, 'mod:example');
-      expect((await v.listPages(offset: 0, limit: 10)).single.pageType, 'mod:example');
+      // The device's node record is listed too; find this page by its ID.
+      final listed = await v.listPages(offset: 0, limit: 10);
+      expect(listed.singleWhere((row) => row.id == page).pageType, 'mod:example');
       expect(writes, 1);
       final plain = await v.createPage(title: 'Plain');
       expect((await v.loadPage(plain)).pageType, documentType);

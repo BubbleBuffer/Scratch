@@ -333,8 +333,6 @@ void main() {
       (tester) async {
         await pumpPhone(tester);
         await expandAllPages(tester);
-        await tester.ensureVisible(key('today-selected-heading'));
-        await settle(tester);
         final body = find.byWidgetPredicate(
           (widget) =>
               widget is CustomScrollView &&
@@ -343,6 +341,12 @@ void main() {
         final list = tester.state<ScrollableState>(
           find.descendant(of: body, matching: find.byType(Scrollable)).first,
         );
+        // Expanding the page browser scrolls away from Today. Return through
+        // the scroll position: the heading can be outside the built viewport
+        // once the vault also contains its device record.
+        list.position.jumpTo(list.position.minScrollExtent);
+        await settle(tester);
+        expect(key('today-selected-heading'), findsOneWidget);
         final strip = tester.getRect(key('today-date-strip'));
         final before = list.position.pixels;
         await tester.fling(

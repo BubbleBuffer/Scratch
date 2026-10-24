@@ -474,18 +474,24 @@ void main() {
         vault.resetCounts();
         vault.countGate = Completer<void>();
         vault.countStarted = Completer<void>();
-        await vault.createPage(title: 'New page');
+        final created = await vault.createPage(title: 'New page');
         await feed.poll();
         await vault.countStarted!.future.timeout(const Duration(seconds: 10));
         await vault.apply(first, [edit('content during structural reload')]);
         await feed.poll();
         vault.countGate!.complete();
         await settle(feed);
+        // First, the new page and this device's node record (an ordinary page
+        // under the hidden Nodes page).
         expect(
           store.count,
-          2,
+          3,
           reason: 'the cancelled reload must still be required',
         );
+        final rowIds = [
+          for (var i = 0; i < store.count; i++) store.rowAt(i)!.id,
+        ];
+        expect(rowIds, containsAll([first, created]));
         expect(vault.pageCountCalls, 2);
         await compareWithFresh(
           vault: vault,

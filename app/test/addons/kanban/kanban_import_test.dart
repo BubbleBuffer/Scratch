@@ -92,7 +92,9 @@ void main() {
           writes: true,
         ),
       );
-      expect(report.pages, 4);
+      // The folder holds four pages plus the source's hidden Nodes page and its
+      // device node file (both flat .md files, imported as ordinary pages).
+      expect(report.pages, 6);
       expect(report.unresolvedLinks, 0);
       final rows = await core(tester, (v) => v.listChildren(null));
       final imported = {for (final row in rows) row.title: row.id};

@@ -24,13 +24,18 @@ void main() {
       await vault.run((v) => v.importMarkdown(dir: source.path), writes: true);
       await vault.flush();
       final rows = await vault.listPages(offset: 0, limit: 10);
+      // This device's node record is an ordinary page of type node under the
+      // hidden Nodes page. It is not part of this test, so it is left out by ID.
+      final nodes = {for (final row in rows) if (row.pageType == 'node') row.id};
+      expect(nodes, hasLength(1));
+      final imported = rows.where((row) => !nodes.contains(row.id)).toList();
       final expected = {
         'Plain': 'document',
         'Database': 'database',
         'Unknown': ' mod:board 雪 ',
       };
-      expect(rows.length, expected.length);
-      for (final row in rows) {
+      expect(imported.length, expected.length);
+      for (final row in imported) {
         expect(row.pageType, expected[row.title]);
         expect(row.isDatabase, row.title == 'Database');
         final page = await vault.loadPage(row.id);
@@ -45,7 +50,8 @@ void main() {
       vault.dispose();
       vault = null;
       vault = await Vault.open('${dir.path}/vault');
-      for (final row in await vault.listPages(offset: 0, limit: 10)) {
+      final reopened = await vault.listPages(offset: 0, limit: 10);
+      for (final row in reopened.where((r) => !nodes.contains(r.id))) {
         expect((await vault.loadPage(row.id)).pageType, expected[row.title]);
       }
     } finally {
