@@ -226,12 +226,11 @@ class AiStore extends ChangeNotifier implements AgentRuns {
       unawaited(refresh());
       return job.id;
     }
-    // This computer runs it. A device without agents (not a desktop)
-    // leaves it to any desktop, as before.
+    // Resolve once at creation: new desktop rows always name this device.
+    // A device without a local runner must use its hub instead.
+    if (!canRun) throw 'This device needs a hub to run AI tasks.';
     final t = await vault.run(
-        (v) => canRun
-            ? aiCreateTaskHere(vault: v, prompt: prompt, page: page, after: after)
-            : aiCreateTask(vault: v, prompt: prompt, page: page, after: after, runner: ''),
+        (v) => aiCreateTaskHere(vault: v, prompt: prompt, page: page, after: after),
         writes: true);
     await refresh();
     unawaited(pump());
@@ -266,7 +265,7 @@ class AiStore extends ChangeNotifier implements AgentRuns {
   }
 
   /// Stops run [id]: a hub job on the hub, a task on this device here
-  /// (marked cancelled; a late answer is dropped).
+  /// (the runner stops its engine session; a late answer is dropped).
   @override
   Future<void> cancel(String id) async {
     final t = await run(id);
