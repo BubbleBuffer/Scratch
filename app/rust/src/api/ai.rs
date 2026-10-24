@@ -136,7 +136,8 @@ pub fn ai_create_task(
     after: Option<String>,
     runner: String,
 ) -> Result<AiTask, String> {
-    tasks::create(&vault.inner, &prompt, &page, after.as_deref(), &runner).map(task).map_err(err)
+    let v = &vault.inner;
+    tasks::create_on(v, &prompt, &page, after.as_deref(), &runner, &v.device_id()).map(task).map_err(err)
 }
 
 /// [`ai_create_task`] pinned to this device: only this device claims it

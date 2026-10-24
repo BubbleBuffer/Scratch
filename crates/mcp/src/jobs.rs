@@ -3,9 +3,10 @@
 //! job note: properties hold the state, the node, the owner, the tool set and
 //! the session; the body holds the result.
 //!
-//! A job row has `node` set (only `hub` for now) and no target page. Desktops
-//! never claim it ([`crate::tasks::claim_next`] skips rows with a node). Only
-//! the node's jobs API changes a job's state; this module is its storage.
+//! A job row has `node` = [`NODE_HUB`], the only node that runs jobs; a row
+//! pinned to a desktop is a task, never a job. Desktops never claim a job
+//! ([`crate::tasks::claim_next`] skips hub rows). Only the node's jobs API
+//! changes a job's state; this module is its storage.
 //!
 //! A job may be about a page ("Ask AI" or a task assigned to the agent, sent
 //! by a device): it then has a target page and a placeholder there, like a
@@ -147,16 +148,21 @@ fn summary(v: &Vault, id: &str) -> Result<Option<PageSummary>> {
     }))
 }
 
-/// Creates a queued job for `node`, owned by `owner`, with tool set `tools`.
+/// Creates a queued job for `node` (only [`NODE_HUB`] runs jobs), owned by
+/// `owner`, with tool set `tools`.
 pub fn create(v: &Vault, prompt: &str, owner: &str, tools: &str, node: &str) -> Result<Job> {
     let prompt = prompt.trim();
     if prompt.is_empty() {
         return err("the job needs a prompt");
     }
+    if node != NODE_HUB {
+        return err("a job runs on the hub");
+    }
     let coll = tasks::ensure_collection(v)?;
     let row = v.create_page(Some(coll), tasks::first_line(prompt, 60))?;
-    v.set_property(row.clone(), "prompt".into(), PropValue::Text(prompt.into()))?;
+    // The node before the status, as in [`tasks::create_on`].
     v.set_property(row.clone(), "node".into(), PropValue::Text(node.into()))?;
+    v.set_property(row.clone(), "prompt".into(), PropValue::Text(prompt.into()))?;
     v.set_property(row.clone(), "owner".into(), PropValue::Text(owner.into()))?;
     v.set_property(row.clone(), "tools".into(), PropValue::Text(tools.into()))?;
     v.set_property(
@@ -182,10 +188,14 @@ pub fn create_for_page(
     page: &PageId,
     after: Option<&str>,
 ) -> Result<Job> {
-    let task = tasks::create_on(v, prompt, page, after, "", node)?;
+    if node != NODE_HUB {
+        return err("a job runs on the hub");
+    }
+    // The owner and tools are set before the row is queued: the hub may
+    // start a queued job at once.
+    let extra = [("owner", owner), ("tools", tools)];
+    let task = tasks::create_on_with(v, prompt, page, after, "", node, &extra)?;
     let row = task.id;
-    v.set_property(row.clone(), "owner".into(), PropValue::Text(owner.into()))?;
-    v.set_property(row.clone(), "tools".into(), PropValue::Text(tools.into()))?;
     match get(v, &row)? {
         Some(job) => Ok(job),
         None => err("the job was not saved"),
@@ -209,14 +219,15 @@ fn placeholder(v: &Vault, id: &str, status: &str) -> Result<()> {
 }
 
 /// The job with row id `id`, with its result; None when there is no such
-/// job (another row, a trashed row, or no row).
+/// job (another row, a trashed row, no row, or a desktop task row).
 pub fn get(v: &Vault, id: &str) -> Result<Option<Job>> {
     Ok(summary(v, id)?
         .map(|row| job_of(v, &row, true))
-        .filter(|j| !j.node.is_empty()))
+        .filter(|j| j.node == NODE_HUB))
 }
 
-/// Every job (rows with a node), newest first, without results.
+/// Every job (hub rows), newest first, without results. Desktop task rows
+/// are not jobs.
 pub fn all(v: &Vault) -> Result<Vec<Job>> {
     let Some(c) = tasks::collection(v)? else {
         return Ok(Vec::new());
@@ -233,7 +244,7 @@ pub fn all(v: &Vault) -> Result<Vec<Job>> {
         out.extend(
             rows.iter()
                 .map(|r| job_of(v, r, false))
-                .filter(|j| !j.node.is_empty()),
+                .filter(|j| j.node == NODE_HUB),
         );
         if n < 500 {
             break;
@@ -250,7 +261,11 @@ pub fn mark_running(v: &Vault, id: &str, session: &str) -> Result<()> {
         "session".into(),
         PropValue::Text(session.into()),
     )?;
-    v.set_property(id.to_string(), "device".into(), PropValue::Text(NODE_HUB.into()))?;
+    v.set_property(
+        id.to_string(),
+        "device".into(),
+        PropValue::Text(NODE_HUB.into()),
+    )?;
     v.set_property(
         id.to_string(),
         "status".into(),
