@@ -53,6 +53,14 @@ Cards use the note type registry's card builder, with title and first-line fallb
 
 The source listens to the host change feed for type-data and card changes. It uses the same feed for local writes and incoming changes, and refreshes card metadata and first-line previews. Column colors, when present, use the kit's existing color tokens.
 
+## Runner picker
+
+A card's ellipsis menu offers **Assign to Agent** when the board has a `RunnerScope`, or when the app runs with `--dart-define=SEED_DEMO=true` and no scope is given (the board then uses `demoRunnerAssignments`). The entry opens **Run on**: a popover under the card at 700 px and wider, and a bottom sheet below that. The 700 px switch is `runnerSheetBelow` in `runner_picker.dart`; it is separate from the app's 768 px panel breakpoint. The picker lists the backend's runners, starts on the default, and assigns on **Assign**. A card with an assignment shows a chip, "<runner> · <state>", under its body. A `waiting` assignment shows its reason under the chip.
+
+The UI talks only to `RunnerBackend` (`runner_backend.dart`): `listRunners()` and `assign(taskId, runnerId)`. This branch ships only `FakeRunnerBackend` (`runner_fake.dart`), with four demo runners: Hub, Studio-PC (this device and the default), Office-PC (online) and Laptop (offline, last seen 2 h ago). Assigning to an online runner returns `queued`, and nothing moves it on; a test or a later engine records the next state with `RunnerAssignments.record`. Assigning to an offline runner returns `waiting` with a reason such as "Laptop is offline (last seen 2 h ago)". Assignments live in memory only. The picker does not touch the Rust bridge or the AI task rows. A real backend will implement the same interface.
+
+Source: [`runner_picker.dart`](../../app/lib/addons/kanban/runner_picker.dart), [`runner_chip.dart`](../../app/lib/addons/kanban/runner_chip.dart), [`runner_fake.dart`](../../app/lib/addons/kanban/runner_fake.dart). Tests: [`kanban_runner_picker_test.dart`](../../app/test/addons/kanban/kanban_runner_picker_test.dart), [`kanban_runner_backend_test.dart`](../../app/test/addons/kanban/kanban_runner_backend_test.dart).
+
 ## Limits
 
 The shared page host currently inserts an empty paragraph when it opens a block-less kanban, despite `usesEditor: false`. Blocks take precedence over `$markdown` during export, so an opened board can export the empty paragraph instead of its readable projection. The same-page Markdown round-trip acceptance is blocked until the host stops inserting editor blocks for these types. The add-on still stores its projection; no host workaround is added here.

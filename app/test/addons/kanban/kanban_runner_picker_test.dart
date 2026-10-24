@@ -1,0 +1,175 @@
+// The card's "Assign to Agent" flow against the fake runner backend: the
+// ellipsis menu, the Run on picker (a popover at 700 px and wider, a bottom
+// sheet below), assigning, and the runner chip for each state.
+
+import 'package:flutter/widgets.dart' show ValueKey;
+import 'package:flutter_test/flutter_test.dart';
+import 'package:notes_app/addons/kanban/api.dart';
+import 'package:notes_app/ui/sheet.dart' show SheetSurface;
+
+import 'kanban_fixture.dart';
+
+const _assignLabel = 'Assign to Agent';
+
+/// Opens the card menu of [garden] and chooses Assign to Agent.
+Future<void> _openPicker(WidgetTester tester, String garden) async {
+  await tapAndSettle(tester, cardMenuTrigger(garden));
+  await tapAndSettle(tester, menuItem(_assignLabel));
+}
+
+/// A board with one card, "Garden plan", opened on screen.
+Future<String> _openBoard(WidgetTester tester, String garden) async {
+  final board = await seedKanban(
+    tester,
+    title: 'Launch board',
+    columns: {
+      'To do': [garden],
+      'Doing': [],
+      'Done': [],
+    },
+  );
+  await openNote(tester, board, 'Launch board');
+  return board;
+}
+
+void main() {
+  setUpAll(initCore);
+
+  appTest(
+    'desktop: the ellipsis offers Assign to Agent, a popover lists the runners and the chosen one is assigned',
+    (tester) async {
+      final backend = FakeRunnerBackend.demo();
+      final f = await pumpApp(
+        tester,
+        mobile: false,
+        runners: RunnerAssignments(backend),
+      );
+      final garden = f.pages['Garden plan']!;
+      await _openBoard(tester, garden);
+      await hoverCard(tester, 'Garden plan');
+      await _openPicker(tester, garden);
+
+      expect(find.text('Run on'), findsOneWidget);
+      expect(find.byType(SheetSurface), findsNothing, reason: 'a popover at 1440 px');
+      for (final name in ['Hub', 'Studio-PC', 'Office-PC', 'Laptop']) {
+        expect(find.text(name), findsOneWidget);
+      }
+      expect(find.text('Always on · vault tools only'), findsOneWidget);
+      expect(find.text('This device · online'), findsOneWidget);
+      expect(find.text('Online'), findsOneWidget);
+      expect(find.text('Offline · last seen 2 h ago'), findsOneWidget);
+      expect(find.text('default'), findsOneWidget);
+      expect(find.text('Change default in Settings'), findsOneWidget);
+
+      // Studio-PC is the default, so it starts selected.
+      final assign = find.byKey(const ValueKey('runner-assign'));
+      await tapAndSettle(tester, find.byKey(const ValueKey('runner-row-office')));
+      await tapAndSettle(tester, assign);
+
+      expect(backend.calls, contains('assign:$garden:office'));
+      expect(find.text('Run on'), findsNothing, reason: 'the picker closes');
+      expect(find.text('Office-PC · queued'), findsOneWidget);
+    },
+  );
+
+  appTest(
+    'phone: under 700 px the picker is a bottom sheet, and an offline runner leaves the task waiting with its reason',
+    (tester) async {
+      final backend = FakeRunnerBackend.demo();
+      final f = await pumpApp(
+        tester,
+        mobile: true,
+        runners: RunnerAssignments(backend),
+      );
+      final garden = f.pages['Garden plan']!;
+      await _openBoard(tester, garden);
+      await _openPicker(tester, garden);
+
+      expect(find.text('Run on'), findsOneWidget);
+      expect(find.byType(SheetSurface), findsOneWidget, reason: 'a sheet at 375 px');
+
+      await tapAndSettle(tester, find.byKey(const ValueKey('runner-row-laptop')));
+      await tapAndSettle(tester, find.byKey(const ValueKey('runner-assign')));
+
+      expect(backend.calls, contains('assign:$garden:laptop'));
+      expect(find.text('Laptop · waiting'), findsOneWidget);
+      expect(
+        find.text('Laptop is offline (last seen 2 h ago)'),
+        findsOneWidget,
+        reason: 'the reason sits under the chip',
+      );
+    },
+  );
+
+  appTest('each assignment state shows its chip text and reason on the card', (
+    tester,
+  ) async {
+    final runners = RunnerAssignments(FakeRunnerBackend.demo());
+    final f = await pumpApp(tester, mobile: false, runners: runners);
+    final garden = f.pages['Garden plan']!;
+    await _openBoard(tester, garden);
+
+    void record(AssignState state, {String? reason}) => runners.record(
+      RunnerAssignment(
+        taskId: garden,
+        runnerId: 'studio',
+        runnerName: 'Studio-PC',
+        state: state,
+        reason: reason,
+      ),
+    );
+
+    record(AssignState.queued);
+    await settle(tester);
+    expect(find.text('Studio-PC · queued'), findsOneWidget);
+
+    record(AssignState.running);
+    await settle(tester);
+    expect(find.text('Studio-PC · running'), findsOneWidget);
+
+    record(AssignState.cancelling);
+    await settle(tester);
+    expect(find.text('Studio-PC · cancelling'), findsOneWidget);
+
+    record(AssignState.done);
+    await settle(tester);
+    expect(find.text('Studio-PC · done'), findsOneWidget);
+
+    record(AssignState.failed, reason: 'The agent stopped with an error.');
+    await settle(tester);
+    expect(find.text('Studio-PC · failed'), findsOneWidget);
+    expect(find.text('The agent stopped with an error.'), findsOneWidget);
+  });
+
+  appTest('without a runner scope the card menu has no Assign to Agent entry', (
+    tester,
+  ) async {
+    final f = await pumpApp(tester, mobile: false);
+    final garden = f.pages['Garden plan']!;
+    await _openBoard(tester, garden);
+    await hoverCard(tester, 'Garden plan');
+    await tapAndSettle(tester, cardMenuTrigger(garden));
+
+    expect(menuItem('Open'), findsOneWidget);
+    expect(menuItem(_assignLabel), findsNothing);
+  });
+
+  appTest('the picker shows the reason when the runners cannot be listed', (
+    tester,
+  ) async {
+    final backend = FakeRunnerBackend.demo()..error = 'The hub is not reachable.';
+    final f = await pumpApp(
+      tester,
+      mobile: false,
+      runners: RunnerAssignments(backend),
+    );
+    final garden = f.pages['Garden plan']!;
+    await _openBoard(tester, garden);
+    await hoverCard(tester, 'Garden plan');
+    await _openPicker(tester, garden);
+
+    expect(find.text('The hub is not reachable.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('runner-assign')), findsOneWidget);
+    expect(find.text('Office-PC'), findsNothing);
+  });
+}
