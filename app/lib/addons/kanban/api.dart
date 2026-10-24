@@ -18,6 +18,19 @@ import 'view.dart';
 export 'create.dart' show createKanban;
 export 'data.dart' show KanbanColumn, KanbanData;
 export 'source.dart' show KanbanBoardSource;
+export 'runner_backend.dart'
+    show
+        AssignState,
+        Runner,
+        RunnerAssignment,
+        RunnerAssignments,
+        RunnerBackend,
+        RunnerKind,
+        RunnerScope,
+        RunnerUnavailable;
+export 'runner_chip.dart' show RunnerChip, runnerChipText;
+export 'runner_fake.dart' show FakeRunnerBackend, demoRunnerAssignments;
+export 'runner_picker.dart' show showRunnerPicker;
 export 'view.dart' show KanbanBoard, KanbanPage;
 
 class KanbanAddon extends Addon {

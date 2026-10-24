@@ -35,6 +35,7 @@ import 'package:notes_app/state/app_state.dart';
 import 'package:notes_app/features/reminders/backends.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
 import 'package:notes_app/state/ui_state.dart';
+import 'package:notes_app/addons/kanban/api.dart' show RunnerAssignments, RunnerScope;
 import 'package:notes_app/ui/ui.dart';
 
 import 'fake_dialogs.dart';
@@ -542,6 +543,7 @@ Future<TestVault> pumpApp(
   bool fresh = false,
   String? copyVault,
   DateTime? now,
+  RunnerAssignments? runners,
 }) async {
   FileDialogs.instance = FakeFileDialogs();
   fakeLinks.clear();
@@ -588,7 +590,7 @@ Future<TestVault> pumpApp(
     ),
   ))!;
   _current = tv;
-  await _pumpShell(tester, tv, mobile: mobile, dark: dark);
+  await _pumpShell(tester, tv, mobile: mobile, dark: dark, runners: runners);
   return tv;
 }
 
@@ -633,12 +635,17 @@ Future<TestVault> restartApp(
   return tv;
 }
 
+/// Gives the board a runner picker when a test passes its assignments.
+Widget _withRunners(RunnerAssignments? runners, Widget child) =>
+    runners == null ? child : RunnerScope(assignments: runners, child: child);
+
 Future<void> _pumpShell(
   WidgetTester tester,
   TestVault tv, {
   required bool mobile,
   required bool dark,
   bool restoreLastPage = false,
+  RunnerAssignments? runners,
 }) async {
   await tester.pumpWidget(
     MediaQuery.fromView(
@@ -650,9 +657,12 @@ Future<void> _pumpShell(
             Positioned.fill(
               child: NotesShell(
                 navigatorKey: GlobalKey<NavigatorState>(),
-                wrap: (child) => SettingsScope(
-                  settings: tv.app.settings,
-                  child: AppScope(state: tv.app, child: child),
+                wrap: (child) => _withRunners(
+                  runners,
+                  SettingsScope(
+                    settings: tv.app.settings,
+                    child: AppScope(state: tv.app, child: child),
+                  ),
                 ),
                 home: HomeScreen(restoreLastPage: restoreLastPage),
               ),

@@ -11,6 +11,10 @@ import '../../ui/board/board_renderer.dart';
 import '../../ui/board/board_source.dart';
 import '../../ui/database/widgets.dart' show showPanel;
 import '../../ui/ui.dart';
+import 'runner_backend.dart';
+import 'runner_chip.dart';
+import 'runner_fake.dart';
+import 'runner_picker.dart';
 import 'source.dart';
 
 /// A kanban board. [inline] is the compact embed; otherwise the board fills
@@ -61,7 +65,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
   @override
   Widget build(BuildContext context) {
     _source.colors = context.colors;
-    return ListenableBuilder(
+    final board = ListenableBuilder(
       listenable: widget.noteTypes ?? noteTypeRegistry,
       builder: (context, _) => BoardRenderer(
         source: _source,
@@ -71,6 +75,9 @@ class _KanbanBoardState extends State<KanbanBoard> {
         cardBuilder: _card,
       ),
     );
+    // Without a scope above, the SEED_DEMO build gives the board its fake runners.
+    if (RunnerScope.maybeOf(context) != null || !runnerSeedDemo) return board;
+    return RunnerScope(assignments: demoRunnerAssignments, child: board);
   }
 
   /// A card draws its note through the board builder, or its card builder.
@@ -97,12 +104,13 @@ class _KanbanBoardState extends State<KanbanBoard> {
     final body = type == null
         ? _fallback(context, title, source.firstLineOf(card.id))
         : (type.boardCard ?? type.card)(context, args);
+    final runners = RunnerScope.maybeOf(context);
     final shell = _CardShell(
       key: ValueKey('kanban-card-${card.id}'),
       lifted: lifted,
       menuKey: ValueKey('kanban-card-menu-${card.id}'),
       onMenu: () => _cardMenu(context, column, card),
-      body: body,
+      body: runners == null ? body : _withChip(body, runners, card.id),
     );
     if (lifted) return ExcludeFocus(child: shell);
     return GestureDetector(
@@ -111,6 +119,28 @@ class _KanbanBoardState extends State<KanbanBoard> {
       child: shell,
     );
   }
+
+  /// The card's body, with its runner chip under it once the card has an
+  /// assignment. The chip listens to the assignments, so it redraws alone.
+  Widget _withChip(Widget body, RunnerAssignments runners, String cardId) =>
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          body,
+          ListenableBuilder(
+            listenable: runners,
+            builder: (context, _) {
+              final assignment = runners.of(cardId);
+              if (assignment == null) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                child: RunnerChip(assignment: assignment),
+              );
+            },
+          ),
+        ],
+      );
 
   /// The title, then the first body line when the note has a title too (a
   /// note without one already shows its first line as its title).
@@ -151,6 +181,8 @@ class _KanbanBoardState extends State<KanbanBoard> {
   void _cardMenu(BuildContext context, BoardColumn column, BoardCard card) {
     final source = _source;
     final phone = context.mobile;
+    final runners = RunnerScope.maybeOf(context);
+    final anchor = globalRectOf(context);
     final others = [
       for (final other in source.columns)
         if (other.id != column.id) other,
@@ -170,6 +202,16 @@ class _KanbanBoardState extends State<KanbanBoard> {
               source.openCard(context, card);
             },
           ),
+          if (runners != null)
+            MenuItem(
+              key: const ValueKey('kanban-assign-card'),
+              label: 'Assign to Agent',
+              icon: Ico.sendHorizontal,
+              onTap: () {
+                Navigator.of(panel).pop();
+                _assignCard(context, anchor, card, runners);
+              },
+            ),
           if (phone && others.isNotEmpty)
             MenuItem(
               key: const ValueKey('kanban-move-card'),
@@ -191,6 +233,23 @@ class _KanbanBoardState extends State<KanbanBoard> {
         ],
       ),
       width: 220,
+    );
+  }
+
+  /// The runner picker for [card]: a popover under its ellipsis on a wide
+  /// screen, a bottom sheet under 700 px.
+  Future<void> _assignCard(
+    BuildContext context,
+    Rect anchor,
+    BoardCard card,
+    RunnerAssignments runners,
+  ) async {
+    if (!context.mounted) return;
+    await showRunnerPicker(
+      context,
+      anchor: anchor,
+      taskId: card.id,
+      assignments: runners,
     );
   }
 

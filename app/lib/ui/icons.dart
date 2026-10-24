@@ -42,6 +42,10 @@ enum Ico {
   settings,
   sidebar,
   close,
+  sendHorizontal,
+  hourglass,
+  terminal,
+  folder,
 }
 
 /// The Lucide glyph behind each [Ico].
@@ -81,6 +85,10 @@ const icoGlyphs = <Ico, LucideGlyph>{
   Ico.settings: (LucideIcons.settings300, LucideIcons.settings, LucideIcons.settings500), // settings
   Ico.sidebar: (LucideIcons.panelLeft300, LucideIcons.panelLeft, LucideIcons.panelLeft500), // panel-left
   Ico.close: (LucideIcons.x300, LucideIcons.x, LucideIcons.x500), // x
+  Ico.sendHorizontal: (LucideIcons.sendHorizontal300, LucideIcons.sendHorizontal, LucideIcons.sendHorizontal500), // send-horizontal
+  Ico.hourglass: (LucideIcons.hourglass300, LucideIcons.hourglass, LucideIcons.hourglass500), // hourglass
+  Ico.terminal: (LucideIcons.terminal300, LucideIcons.terminal, LucideIcons.terminal500), // terminal
+  Ico.folder: (LucideIcons.folder300, LucideIcons.folder, LucideIcons.folder500), // folder
 };
 
 class Icon20 extends StatelessWidget {
