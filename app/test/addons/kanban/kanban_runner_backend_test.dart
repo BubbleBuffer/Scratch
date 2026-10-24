@@ -104,6 +104,7 @@ void main() {
         AssignState.cancelling: 'cancelling',
         AssignState.done: 'done',
         AssignState.failed: 'failed',
+        AssignState.cancelled: 'cancelled',
       };
       expect(names.keys.toSet(), AssignState.values.toSet(), reason: 'every state has a chip word');
       for (final entry in names.entries) {
