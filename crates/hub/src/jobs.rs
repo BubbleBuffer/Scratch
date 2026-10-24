@@ -380,7 +380,7 @@ impl Jobs {
                 job.prompt
             ),
         };
-        let end = match engine.run_job(&session, &prompt, self.limits.max_run) {
+        let end = match engine.run_job(&job.id, &session, &prompt, self.limits.max_run) {
             Ok(JobOutcome::Completed(text)) => End::Completed(text),
             Ok(JobOutcome::Failed(error)) => End::Failed(error),
             Ok(JobOutcome::Cancelled) => End::Cancelled,

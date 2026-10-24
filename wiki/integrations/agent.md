@@ -22,6 +22,10 @@ Ctrl+K and mobile search group Pages and Chats. Chapter hits show `Chat title â€
 
 - **`vault_agent`**: Desktop part built 2026-10-08: [crates/agent](../../crates/agent).
 
+Delegated AI tasks on the desktop and hub jobs additionally get `report_progress({message: string})` (inside JavaScript: `await tools.report_progress({message: "Reading the references"})`). The runner binds it to the current task row and session; callers cannot select another row. It trims the message, keeps at most 500 Unicode characters, rejects empty messages and rejects reports when the row is no longer `running`. Ordinary chats and the MCP gateway do not offer this tool. The desktop pack is reused unchanged; the delegated run adds the capability to its own registry, including for native tool execution.
+
+Each report replaces the row's `progress` text and `progress_at` timestamp (text containing Unix epoch milliseconds, like `finished`). Older AI tasks databases gain both properties through the existing additive schema migration. Only the runner writes progress, which reaches other devices through ordinary vault sync. There is no history or progress event. Done, failed, cancelled and interrupted runs retain the last report and its timestamp; result and placeholder handling are unchanged. See [AI tasks](ai-assistants.md#ai-tasks) and [hub jobs](../architecture/hub.md#jobs).
+
 ## Agent MCP gateway (`/mcp/agent`)
 
 **Implemented; deployment and real connector sign-in are not established here.** The separate endpoint `https://notes.example.com/mcp/agent` exposes the vault tools and your computers' tools to an external assistant, in one of two modes (see below). The existing `/mcp` endpoint keeps its vault tools and agent-token behavior. Host tool calls run through BubblePaw's single-tool API (`Harness::call_tool`) without invoking a model or provider; see [gateway runtime](../../crates/agent/src/gateway.rs) and [HTTP adapter](../../crates/hub/src/mcp_agent.rs).

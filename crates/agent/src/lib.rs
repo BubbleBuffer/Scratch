@@ -402,6 +402,8 @@ pub struct Agent {
     permission_mode: Mutex<PermissionMode>,
     permission_file: PathBuf,
     harness: Arc<Harness>,
+    /// Template for delegated runs, whose registry adds a task-bound tool.
+    task_harness_config: HarnessConfig,
     store: Store,
     /// `<data_dir>/agent/chat_outline.sqlite`, the notes-owned chapters and sections.
     outline_path: PathBuf,
@@ -734,7 +736,7 @@ impl Agent {
             store.clone(),
             providers.clone(),
             tools,
-            harness_config,
+            harness_config.clone(),
         ));
         drop(_context);
         Ok(Agent {
@@ -752,6 +754,7 @@ impl Agent {
             permission_mode: Mutex::new(permission_mode),
             permission_file,
             harness,
+            task_harness_config: harness_config,
             store,
             outline_path: dir.join(vault_tools::outline::FILE_NAME),
             repl,
