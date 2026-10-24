@@ -4,7 +4,6 @@
 // call is made for the list or the rename.
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:notes_app/features/ai/ai_runners.dart';
 import 'package:notes_app/features/ai/ai_store.dart';
 import 'package:notes_app/src/rust/api/ai.dart';
 
