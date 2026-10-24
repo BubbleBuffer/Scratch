@@ -104,6 +104,16 @@ impl Fixture {
         )
         .unwrap()
     }
+
+    fn device_record(&self) -> Value {
+        serde_json::from_str(
+            &self
+                .vault
+                .type_data(self.runner.node_id().into(), "node".into())
+                .unwrap(),
+        )
+        .unwrap()
+    }
 }
 
 #[test]
@@ -367,23 +377,10 @@ fn refusal_is_written_once_and_preview_reports_unsupported_versions() {
 }
 
 #[test]
-fn log_keeps_last_fifty_with_watermark_and_record_refresh_is_bounded() {
+fn log_keeps_last_fifty_with_watermark() {
     let f = Fixture::new("skip", true);
     f.accept();
-    let before: Value = serde_json::from_str(
-        &f.vault
-            .type_data(f.runner.node_id().into(), "node".into())
-            .unwrap(),
-    )
-    .unwrap();
     f.tick("2026-10-01T01:00:00Z");
-    let same: Value = serde_json::from_str(
-        &f.vault
-            .type_data(f.runner.node_id().into(), "node".into())
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(same, before);
     f.tick("2028-10-01T00:00:00Z");
     let state = f.runner.state(&f.page).unwrap();
     assert_eq!(state.last_runs.len(), 50);
@@ -391,6 +388,56 @@ fn log_keeps_last_fifty_with_watermark_and_record_refresh_is_bounded() {
     f.tick("2028-10-01T00:00:00Z");
     assert_eq!(f.runner.state(&f.page).unwrap().last_runs.len(), 50);
     assert!(f.notes().is_empty());
+}
+
+#[test]
+fn device_record_refreshes_once_per_activity_interval() {
+    let f = Fixture::new("latest", true);
+    f.tick("2028-10-01T00:00:00Z");
+    assert_eq!(f.device_record()["last_seen"], "2028-10-01T00:00:00Z");
+    f.tick("2028-10-01T00:00:59Z");
+    assert_eq!(f.device_record()["last_seen"], "2028-10-01T00:00:00Z");
+    f.tick("2028-10-01T00:01:00Z");
+    assert_eq!(f.device_record()["last_seen"], "2028-10-01T00:01:00Z");
+}
+
+#[test]
+fn rename_survives_later_scheduler_writes() {
+    let f = Fixture::new("latest", true);
+    f.accept();
+    f.vault
+        .rename_device(f.vault.device_id(), "Studio mac".into())
+        .unwrap();
+    f.vault
+        .type_data_set(
+            f.runner.node_id().into(),
+            "node".into(),
+            vec!["extra".into()],
+            json!({"keep": true}).to_string(),
+        )
+        .unwrap();
+    Scheduler::open(
+        f.vault.clone(),
+        f._dir.path(),
+        "desktop",
+        "Test desktop",
+        true,
+    )
+    .unwrap();
+    f.tick("2028-10-01T00:00:00Z");
+    let record = f.device_record();
+    assert_eq!(record["name"], "Studio mac");
+    assert_eq!(record["extra"]["keep"], true);
+    assert_eq!(record["device_id"], f.vault.device_id());
+    assert_eq!(record["kind"], "desktop");
+    assert_eq!(record["available"], true);
+    assert_eq!(record["schedule_format"], 1);
+    assert_eq!(record["steps"], json!(["note.from_template"]));
+    assert_eq!(record["last_seen"], "2028-10-01T00:00:00Z");
+    assert_eq!(
+        f.vault.load_page(f.runner.node_id().into()).unwrap().title,
+        "Studio mac"
+    );
 }
 
 #[test]

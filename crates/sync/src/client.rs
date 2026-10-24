@@ -405,9 +405,25 @@ impl SyncClient {
         // Device ids ride only on protocol v2, so the flag needs both.
         st.purge_device = health.purge_v2 && health.purge_device;
         let mut restarted = false;
+        let mut activity_checked = false;
         loop {
             match self.run(&mut st, &mut report)? {
-                true => return Ok(report),
+                true => {
+                    // Desktop app open registers the device. Storage-only
+                    // callers and phones do not become PC runners by syncing.
+                    // Stamp activity only after a successful exchange, then
+                    // send that ordinary page change in this same sync call.
+                    if !activity_checked {
+                        activity_checked = true;
+                        let id = vault_core::node_record_id(&self.vault.device_id());
+                        match self.vault.load_page(id) {
+                            Ok(_) if self.vault.publish_device_activity()? => continue,
+                            Ok(_) | Err(vault_core::VaultError::NotFound(_)) => {}
+                            Err(e) => return Err(e.into()),
+                        }
+                    }
+                    return Ok(report);
+                }
                 false if !restarted => {
                     // The hub restarted or our base is too old.
                     st.base = None;

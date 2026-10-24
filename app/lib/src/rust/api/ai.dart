@@ -10,10 +10,48 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'vault.dart';
 
 // These functions are ignored because they are not marked as `pub`: `lock`, `task`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// The default listen address of the app's MCP endpoint.
 String mcpDefaultAddr() => RustLib.instance.api.crateApiAiMcpDefaultAddr();
+
+/// Lists the hub first, then the vault's PCs. Pass whether the app has a
+/// usable hub link, as AgentStore.usableHosts does; online is independently
+/// derived from the synced last-seen timestamp and the five-minute window.
+Future<AiRunnerList> aiListRunners({
+  required NotesVault vault,
+  required bool hubUsable,
+}) => RustLib.instance.api.crateApiAiAiListRunners(
+  vault: vault,
+  hubUsable: hubUsable,
+);
+
+/// Queues a real AI task pinned to the selected runner, including offline
+/// runners. An unknown id or a block outside the page is rejected.
+Future<AiTask> aiAssignTask({
+  required NotesVault vault,
+  required String prompt,
+  required String page,
+  String? block,
+  required String runnerId,
+}) => RustLib.instance.api.crateApiAiAiAssignTask(
+  vault: vault,
+  prompt: prompt,
+  page: page,
+  block: block,
+  runnerId: runnerId,
+);
+
+/// Renames a device from any copy of the vault. Only its trimmed name changes.
+Future<void> aiRenameDevice({
+  required NotesVault vault,
+  required String deviceId,
+  required String name,
+}) => RustLib.instance.api.crateApiAiAiRenameDevice(
+  vault: vault,
+  deviceId: deviceId,
+  name: name,
+);
 
 /// Queues a task about `page`; its placeholder goes after block `after`
 /// (an empty paragraph there becomes the placeholder) or at the end.
@@ -109,6 +147,69 @@ abstract class NotesMcp implements RustOpaqueInterface {
 
   /// The URL while running.
   String? url();
+}
+
+class AiRunner {
+  /// `hub` or the device id in `.vault/device`, never a node-record page id.
+  final String id;
+  final String name;
+  final AiRunnerKind kind;
+  final bool online;
+
+  /// Unix epoch milliseconds; absent until a timestamp is known.
+  final PlatformInt64? lastSeenMs;
+  final bool isThisDevice;
+
+  const AiRunner({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.online,
+    this.lastSeenMs,
+    required this.isThisDevice,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      kind.hashCode ^
+      online.hashCode ^
+      lastSeenMs.hashCode ^
+      isThisDevice.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiRunner &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          kind == other.kind &&
+          online == other.online &&
+          lastSeenMs == other.lastSeenMs &&
+          isThisDevice == other.isThisDevice;
+}
+
+/// The hub or a PC that uses this vault.
+enum AiRunnerKind { hub, pc }
+
+class AiRunnerList {
+  final List<AiRunner> runners;
+  final String defaultRunnerId;
+
+  const AiRunnerList({required this.runners, required this.defaultRunnerId});
+
+  @override
+  int get hashCode => runners.hashCode ^ defaultRunnerId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiRunnerList &&
+          runtimeType == other.runtimeType &&
+          runners == other.runners &&
+          defaultRunnerId == other.defaultRunnerId;
 }
 
 /// An AI task (a row of the "AI tasks" collection).

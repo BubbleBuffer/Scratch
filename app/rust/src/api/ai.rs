@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use flutter_rust_bridge::frb;
 use vault_core::Vault;
 use vault_mcp::http::{HttpOptions, McpHttp};
-use vault_mcp::{endpoint, tasks, McpServer};
+use vault_mcp::{endpoint, runners, tasks, McpServer};
 
 use crate::api::vault::NotesVault;
 use crate::convert::*;
@@ -127,6 +127,71 @@ fn task(t: tasks::Task) -> AiTask {
     }
 }
 
+/// The hub or a PC that uses this vault.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AiRunnerKind {
+    Hub,
+    Pc,
+}
+
+#[derive(Debug, Clone)]
+pub struct AiRunner {
+    /// `hub` or the device id in `.vault/device`, never a node-record page id.
+    pub id: String,
+    pub name: String,
+    pub kind: AiRunnerKind,
+    pub online: bool,
+    /// Unix epoch milliseconds; absent until a timestamp is known.
+    pub last_seen_ms: Option<i64>,
+    pub is_this_device: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct AiRunnerList {
+    pub runners: Vec<AiRunner>,
+    pub default_runner_id: String,
+}
+
+/// Lists the hub first, then the vault's PCs. Pass whether the app has a
+/// usable hub link, as AgentStore.usableHosts does; online is independently
+/// derived from the synced last-seen timestamp and the five-minute window.
+pub fn ai_list_runners(vault: &NotesVault, hub_usable: bool) -> Result<AiRunnerList, String> {
+    let local = cfg!(any(target_os = "windows", target_os = "linux", target_os = "macos"));
+    let list = runners::list(&vault.inner, hub_usable, local).map_err(err)?;
+    Ok(AiRunnerList {
+        default_runner_id: list.default_runner_id,
+        runners: list.runners.into_iter().map(|r| AiRunner {
+            id: r.id,
+            name: r.name,
+            kind: match r.kind {
+                runners::RunnerKind::Hub => AiRunnerKind::Hub,
+                runners::RunnerKind::Pc => AiRunnerKind::Pc,
+            },
+            online: r.online,
+            last_seen_ms: r.last_seen_ms,
+            is_this_device: r.is_this_device,
+        }).collect(),
+    })
+}
+
+/// Queues a real AI task pinned to the selected runner, including offline
+/// runners. An unknown id or a block outside the page is rejected.
+pub fn ai_assign_task(
+    vault: &NotesVault,
+    prompt: String,
+    page: String,
+    block: Option<String>,
+    runner_id: String,
+) -> Result<AiTask, String> {
+    runners::assign(&vault.inner, &prompt, &page, block.as_deref(), &runner_id)
+        .map(task).map_err(err)
+}
+
+/// Renames a device from any copy of the vault. Only its trimmed name changes.
+pub fn ai_rename_device(vault: &NotesVault, device_id: String, name: String) -> Result<(), String> {
+    vault.inner.rename_device(device_id, name).map_err(err)
+}
+
 /// Queues a task about `page`; its placeholder goes after block `after`
 /// (an empty paragraph there becomes the placeholder) or at the end.
 pub fn ai_create_task(
@@ -194,4 +259,41 @@ pub fn ai_retry_task(vault: &NotesVault, id: String) -> Result<(), String> {
 pub fn ai_finish_task(vault: &NotesVault, id: String, ok: bool, text: String) -> Result<(), String> {
     let r = if ok { Ok(text) } else { Err(text) };
     tasks::finish(&vault.inner, &id, r).map_err(err)
+}
+
+#[cfg(all(test, any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+mod runner_tests {
+    use super::*;
+
+    #[test]
+    fn app_open_registers_a_runner_and_picker_calls_reach_real_storage() {
+        struct Temp(std::path::PathBuf);
+        impl Drop for Temp {
+            fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+        }
+        let dir = Temp(std::env::temp_dir().join(format!("bridge_runners_{}", vault_core::new_id())));
+        let root = dir.0.to_string_lossy().into_owned();
+        let vault = NotesVault::open(root.clone(), None).unwrap();
+        let id = vault.device_id();
+        let list = ai_list_runners(&vault, false).unwrap();
+        assert_eq!(list.default_runner_id, id);
+        assert_eq!(list.runners.len(), 2);
+        assert_eq!(list.runners[0].id, "hub");
+        assert_eq!(list.runners[1].id, id);
+        assert_eq!(list.runners[1].kind, AiRunnerKind::Pc);
+        assert!(list.runners[1].is_this_device);
+        assert!(list.runners[1].last_seen_ms.is_some());
+        assert!(!list.runners[1].name.trim().is_empty());
+        ai_rename_device(&vault, id.clone(), "  Studio PC  ".into()).unwrap();
+        let page = vault.inner.create_page(None, "Plan".into()).unwrap();
+        let task = ai_assign_task(&vault, "Summarize".into(), page, None, id.clone()).unwrap();
+        assert_eq!(task.node, id);
+        assert_eq!(ai_get_task(&vault, task.id).unwrap().status, tasks::QUEUED);
+        vault.inner.flush().unwrap();
+        drop(vault);
+        let reopened = NotesVault::open(root, None).unwrap();
+        let list = ai_list_runners(&reopened, false).unwrap();
+        assert_eq!(list.runners[1].id, id);
+        assert_eq!(list.runners[1].name, "Studio PC");
+    }
 }

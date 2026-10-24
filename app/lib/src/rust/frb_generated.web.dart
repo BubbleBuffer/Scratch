@@ -258,6 +258,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentUiAction dco_decode_agent_ui_action(dynamic raw);
 
   @protected
+  AiRunner dco_decode_ai_runner(dynamic raw);
+
+  @protected
+  AiRunnerKind dco_decode_ai_runner_kind(dynamic raw);
+
+  @protected
+  AiRunnerList dco_decode_ai_runner_list(dynamic raw);
+
+  @protected
   AiTask dco_decode_ai_task(dynamic raw);
 
   @protected
@@ -551,6 +560,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AgentToolCall> dco_decode_list_agent_tool_call(dynamic raw);
+
+  @protected
+  List<AiRunner> dco_decode_list_ai_runner(dynamic raw);
 
   @protected
   List<AiTask> dco_decode_list_ai_task(dynamic raw);
@@ -1153,6 +1165,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentUiAction sse_decode_agent_ui_action(SseDeserializer deserializer);
 
   @protected
+  AiRunner sse_decode_ai_runner(SseDeserializer deserializer);
+
+  @protected
+  AiRunnerKind sse_decode_ai_runner_kind(SseDeserializer deserializer);
+
+  @protected
+  AiRunnerList sse_decode_ai_runner_list(SseDeserializer deserializer);
+
+  @protected
   AiTask sse_decode_ai_task(SseDeserializer deserializer);
 
   @protected
@@ -1522,6 +1543,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<AgentToolCall> sse_decode_list_agent_tool_call(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<AiRunner> sse_decode_list_ai_runner(SseDeserializer deserializer);
 
   @protected
   List<AiTask> sse_decode_list_ai_task(SseDeserializer deserializer);
@@ -2232,6 +2256,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_agent_ui_action(AgentUiAction self, SseSerializer serializer);
 
   @protected
+  void sse_encode_ai_runner(AiRunner self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ai_runner_kind(AiRunnerKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ai_runner_list(AiRunnerList self, SseSerializer serializer);
+
+  @protected
   void sse_encode_ai_task(AiTask self, SseSerializer serializer);
 
   @protected
@@ -2707,6 +2740,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     List<AgentToolCall> self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_list_ai_runner(List<AiRunner> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_ai_task(List<AiTask> self, SseSerializer serializer);

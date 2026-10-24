@@ -13,12 +13,11 @@ use jiff::Timestamp;
 use notes_agent_wire::{SchedulePreview, ScheduleRun, ScheduleState};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use vault_core::{MarkKind, Vault};
+use vault_core::{MarkKind, Vault, DEVICE_ACTIVITY_INTERVAL_MS};
 
 use format::{definition_hash, Schedule};
 
 pub const TICK_SECONDS: u64 = 30;
-const RECORD_REFRESH_SECONDS: i64 = 6 * 60 * 60;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 struct SavedSchedule {
@@ -175,7 +174,9 @@ impl Scheduler {
                 Ok(_) => {}
             }
         }
-        self.vault.write_node_record(
+        // Merging keeps the name a Settings rename gave the record, and keeps
+        // fields this scheduler does not write.
+        self.vault.merge_node_record(
             self.vault.device_id(),
             json!({
                 "device_id": self.vault.device_id(), "name": self.name,
@@ -499,7 +500,11 @@ impl Scheduler {
     }
 
     fn tick_locked(&self, local: &mut Local, now: Timestamp) -> Result<()> {
-        if now.as_second() - local.record_at.as_second() >= RECORD_REFRESH_SECONDS {
+        // Refreshing `last_seen` at the activity interval keeps the device
+        // inside the hub's online window.
+        if now.as_millisecond() - local.record_at.as_millisecond()
+            >= DEVICE_ACTIVITY_INTERVAL_MS
+        {
             self.write_record(local.available, now)?;
             local.record_at = now;
         }

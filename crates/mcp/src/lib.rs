@@ -21,6 +21,7 @@ pub mod jobs;
 pub mod merge;
 pub use vault_tools::props;
 pub mod proxy;
+pub mod runners;
 mod server;
 pub mod stdio;
 pub mod tasks;
