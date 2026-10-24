@@ -1,10 +1,16 @@
 //! AI tasks run by the agent (runner value `agent`).
 
 use std::pin::pin;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Result};
-use bubblepaw_core::{ClientInfo, Run, RunOptions};
+use async_trait::async_trait;
+use bubblepaw_core::{
+    Approval, ClientInfo, Harness, Run, RunOptions, Tool, ToolContext, ToolDefinition,
+    ToolRegistry, ToolResult,
+};
+use serde_json::{json, Value};
 use vault_core::{PropValue, Vault};
 use vault_mcp::jobs::NODE_HUB;
 use vault_mcp::tasks::{self, PromptTools, Task, CANCELLED};
@@ -20,6 +26,81 @@ pub const RUN_LIMIT: Duration = Duration::from_secs(60 * 60);
 
 /// How often a run's wait looks at its task row for a cancel.
 const WATCH_EVERY: Duration = Duration::from_millis(500);
+
+/// Only delegated runs register this capability. The row and session come
+/// from the runner, never from model arguments.
+struct ReportProgress {
+    vault: Arc<Vault>,
+    task: String,
+    session: String,
+}
+
+#[async_trait]
+impl Tool for ReportProgress {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "report_progress".into(),
+            description: "Report current progress on this delegated task. Keeps only the latest message (trimmed, at most 500 characters). Use while working; the final reply remains the result.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {"message": {"type": "string"}},
+                "required": ["message"],
+                "additionalProperties": false
+            }),
+            read_only: false,
+            approval: Approval::None,
+        }
+    }
+
+    async fn invoke(&self, context: ToolContext, input: Value) -> Result<ToolResult> {
+        if context.session_id != self.session {
+            return Ok(ToolResult::error(
+                "progress belongs to another task session",
+            ));
+        }
+        let Some(message) = input.get("message").and_then(Value::as_str) else {
+            return Ok(ToolResult::error("report_progress needs a message string"));
+        };
+        let (vault, task, message) = (self.vault.clone(), self.task.clone(), message.to_string());
+        let result =
+            tokio::task::spawn_blocking(move || tasks::report_progress(&vault, &task, &message))
+                .await?;
+        Ok(match result {
+            Ok(()) => ToolResult::text("Progress reported."),
+            Err(error) => ToolResult::error(error.0),
+        })
+    }
+}
+
+impl Agent {
+    /// A separate registry over the same store/runtime preserves chat and MCP
+    /// surfaces and cancellation, without ever advertising progress to chats.
+    fn task_harness(&self, task: &str, session: &str) -> Result<Harness> {
+        let progress: Arc<dyn Tool> = Arc::new(ReportProgress {
+            vault: self.vault.clone(),
+            task: task.into(),
+            session: session.into(),
+        });
+        let register = move |mut registry: ToolRegistry| -> Result<ToolRegistry> {
+            registry.register_host(progress.clone())?;
+            registry.show_always(["report_progress"]);
+            Ok(registry)
+        };
+        let mut config = self.task_harness_config.clone();
+        let tools = register(self.base_tools.clone())?;
+        if let Some(resolve) = config.registry_resolver.take() {
+            config.registry_resolver = Some(Arc::new(move || {
+                register(resolve()).expect("delegated progress tool name is reserved")
+            }));
+        }
+        Ok(Harness::new(
+            self.store.clone(),
+            self.providers.clone(),
+            tools,
+            config,
+        ))
+    }
+}
 
 /// What running a task gave.
 #[derive(Debug, Clone)]
@@ -145,12 +226,13 @@ impl Agent {
     ) -> Result<Ended> {
         let model = Some(self.default_model()).filter(|m| !m.trim().is_empty());
         let system_prompt = self.run_prompt(session)?;
+        let harness = self.task_harness(task_id, session)?;
         self.runtime.block_on(async {
             // Cancelled after the session was saved, before the engine starts.
             if is_cancelled(vault, task_id) {
                 return Ok(Ended::Cancelled);
             }
-            self.harness.start(
+            harness.start(
                 session,
                 prompt,
                 RunOptions {
@@ -161,7 +243,7 @@ impl Agent {
                     ..RunOptions::default()
                 },
             )?;
-            let mut wait = pin!(self.harness.wait_for_idle(session));
+            let mut wait = pin!(harness.wait_for_idle(session));
             let started = Instant::now();
             loop {
                 let left = limit.saturating_sub(started.elapsed());
@@ -210,11 +292,18 @@ impl Agent {
     /// Runs `prompt` in `session` as a job and waits for it: this engine's
     /// tools only, no approval prompts (every call it has is allowed), the
     /// runner's default model. A run still going after `limit` is cancelled.
-    pub fn run_job(&self, session: &str, prompt: &str, limit: Duration) -> Result<JobOutcome> {
+    pub fn run_job(
+        &self,
+        task_id: &str,
+        session: &str,
+        prompt: &str,
+        limit: Duration,
+    ) -> Result<JobOutcome> {
         let model = Some(self.default_model()).filter(|m| !m.trim().is_empty());
         let system_prompt = self.run_prompt(session)?;
+        let harness = self.task_harness(task_id, session)?;
         self.runtime.block_on(async {
-            self.harness.start(
+            harness.start(
                 session,
                 prompt,
                 RunOptions {
@@ -225,7 +314,7 @@ impl Agent {
                     ..RunOptions::default()
                 },
             )?;
-            match tokio::time::timeout(limit, self.harness.wait_for_idle(session)).await {
+            match tokio::time::timeout(limit, harness.wait_for_idle(session)).await {
                 Ok(run) => {
                     let run = run?;
                     Ok(match run.status.as_str() {

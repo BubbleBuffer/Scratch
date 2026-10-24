@@ -19,6 +19,9 @@
 //!   the same placeholder.
 //! - A task can be cancelled ([`cancel`]): a queued one is never claimed,
 //!   and a running one's result is dropped when it ends.
+//! - A running task can report its progress ([`report_progress`]). Only the
+//!   row's latest message and its time change; the status and placeholder
+//!   stay as they are, and the last report stays when the task ends.
 
 use serde::{Deserialize, Serialize};
 use vault_core::{
@@ -42,6 +45,9 @@ pub const FAILED: &str = "failed";
 pub const CANCELLED: &str = "cancelled";
 /// Jobs only: the hub restarted while the job ran.
 pub const INTERRUPTED: &str = "interrupted";
+
+/// The most characters of a progress message kept (see [`report_progress`]).
+pub const PROGRESS_MAX: usize = 500;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
@@ -117,6 +123,10 @@ pub fn schema() -> Vec<PropDef> {
         def("tools", "Tools", PropKind::Text, vec![]),
         def("session", "Session", PropKind::Text, vec![]),
         def("finished", "Finished", PropKind::Text, vec![]),
+        // A running task's latest progress message, and when it was reported
+        // (ms since the epoch, as `finished`).
+        def("progress", "Progress", PropKind::Text, vec![]),
+        def("progress_at", "Progress at", PropKind::Text, vec![]),
     ]
 }
 
@@ -641,6 +651,34 @@ pub fn cancel(v: &Vault, id: &str) -> Result<bool> {
     )?;
     set_placeholder(v, &t, CANCELLED)?;
     Ok(true)
+}
+
+/// Records a running task's latest progress: `message` is trimmed and kept
+/// to [`PROGRESS_MAX`] characters, and the row gets it with the time it was
+/// reported. Only those two properties change. An empty message, or a task
+/// that is not running (queued, ended or cancelled), is an error and writes
+/// nothing.
+pub fn report_progress(v: &Vault, id: &str, message: &str) -> Result<()> {
+    let message: String = message.trim().chars().take(PROGRESS_MAX).collect();
+    if message.is_empty() {
+        return err("the progress needs a message");
+    }
+    let t = get(v, id)?;
+    if t.status != RUNNING {
+        return err("only a running task takes progress");
+    }
+    // A database from before these properties gets them now: set_property
+    // refuses a key its collection's schema lacks.
+    if let Some(c) = collection(v)? {
+        migrate_schema(v, &c)?;
+    }
+    v.set_property(t.id.clone(), "progress".into(), PropValue::Text(message))?;
+    v.set_property(
+        t.id.clone(),
+        "progress_at".into(),
+        PropValue::Text(crate::jobs::now_ms().to_string()),
+    )?;
+    Ok(())
 }
 
 /// Writes a finished task's result `md` into its page: in place of the

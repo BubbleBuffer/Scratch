@@ -261,6 +261,47 @@ fn sleep_call(ms: u64) -> ToolCall {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_hub_job_reports_progress_even_with_the_read_tool_set() {
+    let env = env(
+        steps(vec![call(
+            "report_progress",
+            json!({"message":"  Read the references  "}),
+        )]),
+        "Finished.",
+    )
+    .await;
+    let job = env
+        .jobs(
+            &env.writer,
+            json!({
+                "action":"create", "prompt":"Read references", "tools":"read"
+            }),
+        )
+        .await
+        .unwrap();
+    let id = job["id"].as_str().unwrap().to_string();
+    let done = env.finished(&env.writer, &id).await;
+    assert_eq!(done["status"], "completed", "{done}");
+    let vault = env.vault().clone();
+    tokio::task::spawn_blocking(move || {
+        let row = vault.load_page(id).unwrap();
+        let prop = |key: &str| {
+            row.properties
+                .iter()
+                .find_map(|p| match &p.value {
+                    vault_core::PropValue::Text(text) if p.key == key => Some(text.clone()),
+                    _ => None,
+                })
+                .unwrap_or_default()
+        };
+        assert_eq!(prop("progress"), "Read the references");
+        assert!(prop("progress_at").parse::<i64>().unwrap() > 0);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn start_status_result_end_to_end() {
     let env = env(
         steps(vec![call(
