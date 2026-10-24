@@ -136,6 +136,7 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   Timer? _debounce;
 
   /// The newest tasks first (loaded by [refresh]).
+  @override
   List<AiTask> tasks = const [];
 
   /// The task this device is running.
@@ -314,6 +315,7 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
     unawaited(pump());
   }
 
+  @override
   Future<void> refresh() async {
     try {
       tasks = await vault.run((v) => aiListTasks(vault: v, limit: 50));

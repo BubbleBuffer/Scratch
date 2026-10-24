@@ -9,7 +9,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../../services/addon_services.dart'
-    show AiRunnerBridge, AiTask, AiTaskSource;
+    show AiTask, AiTaskSource;
 import '../../src/rust/api/ai.dart' show AiRunner, AiRunnerKind, AiRunnerList;
 import 'runner_backend.dart';
 

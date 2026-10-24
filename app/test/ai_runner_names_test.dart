@@ -2,6 +2,7 @@
 // their vault names, the hub is not, and Rename changes one through the runner
 // bridge. The bridge is a fake (AiStore.runnerBridgeOverride), so no vault
 // call is made for the list or the rename.
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/features/ai/ai_runners.dart';
 import 'package:notes_app/features/ai/ai_store.dart';

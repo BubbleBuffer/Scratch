@@ -99,8 +99,6 @@ abstract class RunnerBackend {
 /// The assignments the UI has seen, per task id, and the backend that makes
 /// them. Cards listen here, so a new assignment redraws its chip.
 class RunnerAssignments extends ChangeNotifier {
-  RunnerAssignments(this.backend);
-
   RunnerAssignments(this.backend) {
     backend.changes?.addListener(notifyListeners);
   }

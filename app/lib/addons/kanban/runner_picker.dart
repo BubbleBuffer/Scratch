@@ -10,7 +10,6 @@ import '../../services/addon_services.dart'
     show SettingsSection, showSettings;
 import '../../ui/ui.dart';
 import 'runner_backend.dart';
-import 'runner_fake.dart' show lastSeenText;
 
 /// Below this width the picker is a bottom sheet; at or above it, a popover.
 const runnerSheetBelow = 700.0;
