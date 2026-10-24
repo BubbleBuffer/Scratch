@@ -448,7 +448,12 @@ Future<void> settle(WidgetTester tester, {Duration min = Duration.zero}) async {
     final feedIdle = _current?.app.feed.idle ?? true;
     final dataBusy =
         Vault.inFlight.value > 0 || !feedIdle || Debounce.pending > 0;
-    final busy = dataBusy || tester.binding.hasScheduledFrame;
+    // Unmocked platform calls (Clipboard.setData, say) are answered by the
+    // engine in real time; a widget awaiting one rebuilds only afterwards.
+    final busy =
+        dataBusy ||
+        tester.binding.hasScheduledFrame ||
+        tester.binding.defaultBinaryMessenger.pendingMessageCount > 0;
     quiet = busy ? 0 : quiet + 1;
     if (quiet >= 3 && elapsed >= min) return;
     // Keep the old 30s fake animation bound (spinners never become quiet),
