@@ -414,6 +414,9 @@ void main() {
   });
 
   testWidgets('a new link does not say the link already exists', (t) async {
+    // Create awaits the clipboard before it lists the link. Unmocked, the
+    // engine answers in real time and settle can return before it does.
+    recordClipboard(t);
     await pumpPopup(t);
 
     await tapAndSettle(t, key('share-create'));
