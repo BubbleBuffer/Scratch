@@ -6,7 +6,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
-import '../../features/settings/settings_screen.dart'
+import '../../services/addon_services.dart'
     show SettingsSection, showSettings;
 import '../../ui/ui.dart';
 import 'runner_backend.dart';
