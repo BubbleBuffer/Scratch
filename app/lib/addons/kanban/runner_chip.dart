@@ -1,6 +1,7 @@
 // A card's runner chip, "Laptop · waiting", with the assignment's reason
-// underneath when there is one. The chip stays on one line and ends in an
-// ellipsis.
+// underneath when there is one, then the agent's progress line. The chip and
+// each line stay on one line and end in an ellipsis; the full text is in a
+// tooltip.
 
 import 'package:flutter/widgets.dart';
 
@@ -10,6 +11,18 @@ import 'runner_backend.dart';
 /// The chip's words: the runner's name, a dot and the state.
 String runnerChipText(RunnerAssignment assignment) =>
     '${assignment.runnerName} · ${assignment.state.label}';
+
+/// The progress line under the chip, or null when there is none to show. It
+/// shows while the run is going and after a failed or cancelled run, where it
+/// keeps the last text. A done run shows none.
+String? runnerProgressText(RunnerAssignment assignment) {
+  final text = assignment.progress?.trim();
+  if (text == null || text.isEmpty) return null;
+  return switch (assignment.state) {
+    AssignState.running || AssignState.failed || AssignState.cancelled => text,
+    _ => null,
+  };
+}
 
 class RunnerChip extends StatelessWidget {
   const RunnerChip({super.key, required this.assignment});
@@ -57,17 +70,36 @@ class RunnerChip extends StatelessWidget {
       ),
     );
     final reason = a.reason;
-    if (reason == null) return chip;
+    final progress = runnerProgressText(a);
+    if (reason == null && progress == null) return chip;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         chip,
-        const SizedBox(height: 4),
-        Text(
-          reason,
-          style: ts(const TypeSpec(12.5, 17, 400), c.textSecondary),
-        ),
+        if (reason != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            reason,
+            style: ts(const TypeSpec(12.5, 17, 400), c.textSecondary),
+          ),
+        ],
+        if (progress != null) ...[
+          const SizedBox(height: 4),
+          AppTooltip(
+            label: progress,
+            child: Text(
+              progress,
+              key: ValueKey('runner-progress-${a.taskId}'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: ts(
+                const TypeSpec(12.5, 17, 400),
+                a.state == AssignState.running ? c.textSecondary : c.textTertiary,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

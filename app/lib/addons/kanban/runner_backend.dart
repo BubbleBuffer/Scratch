@@ -52,7 +52,9 @@ enum AssignState {
 }
 
 /// A task's assignment to a runner. [reason] is shown under the chip when
-/// there is one, for example why the task waits.
+/// there is one, for example why the task waits. [progress] is the agent's
+/// latest progress line; the chip shows it while the run is going and keeps it
+/// after a failed or cancelled run.
 class RunnerAssignment {
   const RunnerAssignment({
     required this.taskId,
@@ -60,6 +62,7 @@ class RunnerAssignment {
     required this.runnerName,
     required this.state,
     this.reason,
+    this.progress,
   });
 
   final String taskId;
@@ -67,6 +70,9 @@ class RunnerAssignment {
   final String runnerName;
   final AssignState state;
   final String? reason;
+
+  /// The latest progress text, or null when the agent has reported none.
+  final String? progress;
 }
 
 /// The backend could not answer. [reason] is shown as is.

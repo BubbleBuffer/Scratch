@@ -5,6 +5,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/kanban/api.dart';
+import 'package:notes_app/ui/tokens.dart';
 import 'package:notes_app/services/addon_services.dart'
     show AiRunnerBridge, AiTask, AiTaskSource;
 import 'package:notes_app/src/rust/api/ai.dart'
@@ -50,6 +51,7 @@ AiTask _row(
   String status, {
   String node = 'studio',
   String error = '',
+  String progress = '',
 }) => AiTask(
   id: id,
   prompt: runnerCardPrompt,
@@ -58,7 +60,7 @@ AiTask _row(
   status: status,
   device: '',
   error: error,
-  progress: '',
+  progress: progress,
   progressAt: '',
   createdMs: 0,
   updatedMs: 0,
@@ -239,6 +241,53 @@ void main() {
     });
   });
 
+  group('progress line', () {
+    RunnerAssignment at(AssignState s, {String? progress}) => RunnerAssignment(
+      taskId: 't',
+      runnerId: 'studio',
+      runnerName: 'Studio-PC',
+      state: s,
+      progress: progress,
+    );
+
+    test('shows while running and after a failed or cancelled run, never after a done run', () {
+      expect(runnerProgressText(at(AssignState.running, progress: 'Reading')), 'Reading');
+      expect(runnerProgressText(at(AssignState.failed, progress: 'Reading')), 'Reading');
+      expect(runnerProgressText(at(AssignState.cancelled, progress: 'Reading')), 'Reading');
+      expect(runnerProgressText(at(AssignState.done, progress: 'Reading')), isNull);
+      expect(runnerProgressText(at(AssignState.queued, progress: 'Reading')), isNull);
+      expect(runnerProgressText(at(AssignState.waiting, progress: 'Reading')), isNull);
+    });
+
+    test('is trimmed, and blank or unset text shows nothing', () {
+      expect(runnerProgressText(at(AssignState.running, progress: '  Reading  ')), 'Reading');
+      expect(runnerProgressText(at(AssignState.running, progress: '   ')), isNull);
+      expect(runnerProgressText(at(AssignState.running)), isNull);
+    });
+
+    test('the real backend maps the row progress onto the assignment', () async {
+      final source = _FakeSource(_FakeBridge(_fleet()));
+      final backend = RealRunnerBackend(source, clock: () => _now);
+      await backend.listRunners();
+
+      source.tasks = [_row('t1', 'card-p', 'running', progress: '  Reading the plan  ')];
+      expect(backend.current('card-p')!.progress, 'Reading the plan');
+
+      source.tasks = [_row('t2', 'card-q', 'running')];
+      expect(backend.current('card-q')!.progress, isNull);
+    });
+
+    test('the demo runs its first online assignment with sample progress, then queues', () async {
+      final backend = FakeRunnerBackend.demo(now: _now, sampleRunning: true);
+      final first = await backend.assign('card-1', 'office');
+      expect(first.state, AssignState.running);
+      expect(first.progress, sampleRunnerProgress);
+      final second = await backend.assign('card-2', 'office');
+      expect(second.state, AssignState.queued);
+      expect(second.progress, isNull);
+    });
+  });
+
   setUpAll(initCore);
 
   appTest('a board card shows its agent row as a chip, with the waiting reason', (
@@ -270,5 +319,53 @@ void main() {
       find.textContaining('Laptop is offline (last seen'),
       findsOneWidget,
     );
+  });
+
+  appTest('the progress line shows under a running chip, quietly after a failed run, and not after a done run', (
+    tester,
+  ) async {
+    final source = _FakeSource(_FakeBridge(_fleet()));
+    final runners = aiRunnerAssignments(source);
+    final f = await pumpApp(tester, mobile: false, runners: runners);
+    final running = f.pages['Garden plan']!;
+    final failed = f.pages['Budget']!;
+    final done = f.pages['Recipes']!;
+    final board = await seedKanban(
+      tester,
+      title: 'Progress board',
+      columns: {
+        'To do': [running, failed, done],
+        'Doing': [],
+        'Done': [],
+      },
+    );
+    await openNote(tester, board, 'Progress board');
+
+    source.tasks = [
+      _row('t3', done, 'done', progress: 'Wrote the summary'),
+      _row('t2', failed, 'failed', progress: 'Checking totals', error: 'The model stopped.'),
+      _row('t1', running, 'running', progress: 'Reading the plan'),
+    ];
+    source.notifyListeners();
+    await settle(tester);
+
+    final runningLine = find.byKey(ValueKey('runner-progress-$running'));
+    expect(runningLine, findsOneWidget);
+    expect(tester.widget<Text>(runningLine).data, 'Reading the plan');
+    expect(
+      tester.widget<Text>(runningLine).style?.color,
+      tester.element(runningLine).colors.textSecondary,
+    );
+
+    final failedLine = find.byKey(ValueKey('runner-progress-$failed'));
+    expect(failedLine, findsOneWidget);
+    expect(tester.widget<Text>(failedLine).data, 'Checking totals');
+    expect(
+      tester.widget<Text>(failedLine).style?.color,
+      tester.element(failedLine).colors.textTertiary,
+    );
+
+    expect(find.byKey(ValueKey('runner-progress-$done')), findsNothing);
+    expect(find.text('Wrote the summary'), findsNothing);
   });
 }

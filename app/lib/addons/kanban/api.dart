@@ -28,8 +28,9 @@ export 'runner_backend.dart'
         RunnerKind,
         RunnerScope,
         RunnerUnavailable;
-export 'runner_chip.dart' show RunnerChip, runnerChipText;
-export 'runner_fake.dart' show FakeRunnerBackend, demoRunnerAssignments;
+export 'runner_chip.dart' show RunnerChip, runnerChipText, runnerProgressText;
+export 'runner_fake.dart'
+    show FakeRunnerBackend, demoRunnerAssignments, sampleRunnerProgress;
 export 'runner_picker.dart' show showRunnerPicker;
 export 'runner_real.dart'
     show RealRunnerBackend, aiRunnerAssignments, runnerCardPrompt;

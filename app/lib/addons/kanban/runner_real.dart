@@ -140,7 +140,15 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
       runnerName: runner?.name ?? t.node,
       state: s.state,
       reason: s.reason,
+      progress: _progressOf(t),
     );
+  }
+
+  /// The row's progress line, trimmed, or null while it has none. The chip
+  /// decides by state whether to show it.
+  String? _progressOf(AiTask t) {
+    final text = t.progress.trim();
+    return text.isEmpty ? null : text;
   }
 
   /// Maps a row's status to the chip. The bridge has no `cancelling` state,
