@@ -3,6 +3,7 @@
 // task row about its page. The widget test shows a row's chip on a board.
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' as w;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/kanban/api.dart';
 import 'package:notes_app/ui/tokens.dart';
@@ -351,17 +352,17 @@ void main() {
 
     final runningLine = find.byKey(ValueKey('runner-progress-$running'));
     expect(runningLine, findsOneWidget);
-    expect(tester.widget<Text>(runningLine).data, 'Reading the plan');
+    expect(tester.widget<w.Text>(runningLine).data, 'Reading the plan');
     expect(
-      tester.widget<Text>(runningLine).style?.color,
+      tester.widget<w.Text>(runningLine).style?.color,
       tester.element(runningLine).colors.textSecondary,
     );
 
     final failedLine = find.byKey(ValueKey('runner-progress-$failed'));
     expect(failedLine, findsOneWidget);
-    expect(tester.widget<Text>(failedLine).data, 'Checking totals');
+    expect(tester.widget<w.Text>(failedLine).data, 'Checking totals');
     expect(
-      tester.widget<Text>(failedLine).style?.color,
+      tester.widget<w.Text>(failedLine).style?.color,
       tester.element(failedLine).colors.textTertiary,
     );
 
