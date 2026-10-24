@@ -328,6 +328,25 @@ fn reopening_a_desktop_off_marks_its_existing_record_unavailable() {
 }
 
 #[test]
+fn presence_record_is_not_a_registration_until_the_runner_is_on() {
+    let dir = tempfile::tempdir().unwrap();
+    let vault = Arc::new(Vault::open(dir.path().join("vault").to_string_lossy().into()).unwrap());
+    vault.publish_device_activity().unwrap();
+    let node = vault_core::node_record_id(&vault.device_id());
+    assert!(!is_registered(&vault, &node).unwrap());
+
+    let runner = Scheduler::open(vault.clone(), dir.path(), "desktop", "Test", false).unwrap();
+    let record: Value =
+        serde_json::from_str(&vault.type_data(node.clone(), "node".into()).unwrap()).unwrap();
+    assert_eq!(record["kind"], "desktop");
+    assert!(record.get("schedule_format").is_none());
+    assert!(!is_registered(&vault, &node).unwrap());
+
+    runner.set_available(true).unwrap();
+    assert!(is_registered(&vault, &node).unwrap());
+}
+
+#[test]
 fn run_now_retries_same_minute_without_duplicate_and_preserves_unknowns() {
     let f = Fixture::new("latest", true);
     f.accept();

@@ -46,6 +46,8 @@ OS hostname. A successful sync refreshes an already published local record
 at most once per minute and sends that update before returning. Storage-only
 vault opens and phone syncs do not register PC runners. Scheduler publication
 merges fields, preserves an existing name, and refreshes at the same interval.
+A presence record alone does not enable scheduled jobs: scheduler registration
+is recognized by its existing `schedule_format` field and still requires opt-in.
 Only the device publishes its activity and scheduler fields; a rename from
 another vault copy changes only the trimmed, nonempty name and page title.
 Renames merge independently from concurrent activity updates.
