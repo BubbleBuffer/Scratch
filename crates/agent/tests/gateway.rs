@@ -311,7 +311,9 @@ fn native_and_nested_js_apply_the_same_exclusions_and_noninteractive_policy() {
         .agent
         .gateway_js_help(None)
         .contains("tools.test_confirm("));
-    let allowed = f
+    // A direct call may name only the advertised surface, which in js mode is js
+    // alone, so bypass reaches test_confirm through js composition below.
+    let direct = f
         .agent
         .gateway_call_as(
             &session.id,
@@ -320,8 +322,7 @@ fn native_and_nested_js_apply_the_same_exclusions_and_noninteractive_policy() {
             client(),
         )
         .unwrap();
-    assert_eq!(allowed.content, "confirmed: native allowed");
-    assert!(!allowed.is_error);
+    assert!(direct.is_error, "{direct:?}");
     assert_eq!(
         value(f.js(
             &session.id,
