@@ -25,7 +25,16 @@ Only one process may write a vault as its device. If the app (or another `scratc
 
 ## Credentials
 
-Credentials come from the environment, as for the app's agent, and are never printed: the Claude Code login (Bun found on `PATH` or in `~/.bun/bin`; `NOTES_CLAUDE_CODE_DIR` names the extension folder), the Codex login (`CODEX_HOME`), and `OPENCODE_API_KEY` for OpenCode models.
+Credentials come from the environment, as for the app's agent, and are never printed: the Claude Code login, the Codex login (`CODEX_HOME`), and `OPENCODE_API_KEY` for OpenCode models.
+
+Claude Code needs Bun and the extension folder, found as the desktop app finds them (`vault_agent::claude::app_overrides`, then `claude::detect`):
+
+1. Extension folder: `NOTES_CLAUDE_CODE_DIR` when set; else the app's saved Claude Code folder (`agentClaudeCodeDir` in `ai_settings.json`, read beside the vault, then in the app's data folder: `NOTES_DATA_DIR`, else `%LOCALAPPDATA%\Notes` on Windows, else `~/.local/share/notes_app`); else the extension location compiled into the binary from the BubblePaw dependency, which exists only on the machine that built it.
+2. Bun: the app's saved Bun path (`agentBunPath`, same files); else `bun` on `PATH`, then `~/.bun/bin`.
+
+The Windows installer does not ship the extension, so on an installed machine set `NOTES_CLAUDE_CODE_DIR` (or the folder in the app's Settings > AI > Agent) to a BubblePaw checkout's `extensions/claude-code`.
+
+A model whose provider is missing fails the task before any request, with an error that names the provider and what is missing, for example `claude-code is unavailable: the Claude Code extension folder was not found; set NOTES_CLAUDE_CODE_DIR`. It is never sent to another provider.
 
 ## Builds and tests
 
