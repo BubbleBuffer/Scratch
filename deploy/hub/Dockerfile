@@ -29,6 +29,8 @@ RUN npm install --global @anthropic-ai/claude-code@2.1.293 @openai/codex@0.161.0
 WORKDIR /opt/bubblepaw/claude-code
 COPY --from=bubblepaw extensions/claude-code/package.json extensions/claude-code/bun.lock extensions/claude-code/NOTICE ./
 COPY --from=bubblepaw extensions/claude-code/src ./src
+# Build contexts can carry 0600 files; the hub user must read the extension.
+RUN chmod -R a+rX /opt/bubblepaw
 RUN bun install --production --frozen-lockfile
 COPY --from=builder /out/notes-hub /usr/local/bin/notes-hub
 RUN groupadd --gid 10001 hub \
