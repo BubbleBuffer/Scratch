@@ -900,8 +900,13 @@ impl Agent {
             self.model_allowed(model),
             "model {model:?} is not allowed by agent.models"
         );
-        if model.starts_with("opencode/") && self.providers.get("opencode").is_none() {
-            anyhow::bail!("OpenCode unavailable: set OPENCODE_API_KEY");
+        // The registry hands a model whose prefix names no registered
+        // provider to the default provider (Codex on a desktop host) with
+        // the prefix still on. Fail here instead, before any request.
+        if let Some((prefix, _)) = model.split_once('/') {
+            if self.providers.get(prefix).is_none() {
+                anyhow::bail!(provider_unavailable(prefix, &self.claude_detection));
+            }
         }
         Ok(())
     }
@@ -1456,6 +1461,31 @@ fn claude_credentials_available(get: impl Fn(&str) -> Option<std::ffi::OsString>
         .map(PathBuf::from)
         .or_else(|| get("HOME").map(|home| PathBuf::from(home).join(".claude")));
     dir.is_some_and(|dir| dir.join(".credentials.json").is_file())
+}
+
+/// Why a run's provider prefix has no provider on this host, naming what is missing.
+fn provider_unavailable(id: &str, claude: &claude::ClaudeDetection) -> String {
+    let missing = match id {
+        "opencode" => "OPENCODE_API_KEY is not set".to_owned(),
+        "claude-code" => {
+            let mut missing = Vec::new();
+            if claude.bun_path.is_none() {
+                missing.push("Bun was not found (on PATH or in ~/.bun/bin)");
+            }
+            if claude.claude_code_dir.is_none() {
+                missing.push(
+                    "the Claude Code extension folder was not found; set NOTES_CLAUDE_CODE_DIR",
+                );
+            }
+            if missing.is_empty() {
+                missing.push("the Claude Code extension could not be loaded");
+            }
+            missing.join(", and ")
+        }
+        "codex" => "the Codex provider is not offered on this host".to_owned(),
+        _ => format!("no provider named {id:?} is registered"),
+    };
+    format!("{id} is unavailable: {missing}")
 }
 
 /// BubblePaw's built-in OpenCode transport at the workspace's pinned revision.

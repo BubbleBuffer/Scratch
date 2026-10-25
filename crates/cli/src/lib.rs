@@ -137,6 +137,19 @@ fn data_dir(vault_dir: &Path) -> PathBuf {
         .unwrap_or_else(|| vault_dir.to_path_buf())
 }
 
+/// The app's data folder, as `paths.dart` finds it: `NOTES_DATA_DIR`, else
+/// `%LOCALAPPDATA%\Notes` on Windows, else `~/.local/share/notes_app`.
+fn app_data_dir() -> Option<PathBuf> {
+    let env = |name: &str| std::env::var_os(name).filter(|v| !v.is_empty());
+    if let Some(dir) = env("NOTES_DATA_DIR") {
+        return Some(dir.into());
+    }
+    if cfg!(windows) {
+        return env("LOCALAPPDATA").map(|base| PathBuf::from(base).join("Notes"));
+    }
+    env("HOME").map(|home| PathBuf::from(home).join(".local/share/notes_app"))
+}
+
 /// The model for runs that name none: `--model`, else the vault's default
 /// for `this_device`, else empty (the agent's built-in desktop default).
 fn default_model(vault: &Vault, flag: Option<&str>) -> String {
@@ -169,13 +182,19 @@ fn open_agent(
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
         .ok_or_else(|| anyhow!("cannot find the user's home directory"))?;
+    // Claude Code as the app finds it: NOTES_CLAUDE_CODE_DIR, else the
+    // app's saved Bun and extension paths (beside the vault, then in the
+    // app's data folder), else Bun on PATH and the bundled extension.
+    let mut settings_dirs = vec![data_dir(vault_dir)];
+    settings_dirs.extend(app_data_dir());
+    let (bun_path, claude_code_dir) = vault_agent::claude::app_overrides(&settings_dirs);
     let config = AgentConfig {
         host_kind: HostKind::Desktop,
         packs: vec![ToolPack::Desktop { root: home }],
         data_dir: data_dir(vault_dir),
         default_model: model,
-        bun_path: None,
-        claude_code_dir: None,
+        bun_path,
+        claude_code_dir,
         permission_mode: PermissionMode::Bypass,
         test: hooks.map(|make| make()).unwrap_or_default(),
         tool_set: None,
