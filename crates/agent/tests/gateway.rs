@@ -305,9 +305,12 @@ fn native_and_nested_js_apply_the_same_exclusions_and_noninteractive_policy() {
         .pending_approvals
         .is_empty());
     f.agent.permission_mode_set(PermissionMode::Bypass).unwrap();
+    // The chat surface is bound per session when first read, so a session that
+    // was listed in Manual keeps that snapshot. Check a session created after the change.
+    let bypass = f.agent.create_session("gateway policy bypass").unwrap();
     assert!(f
         .agent
-        .gateway_tool_definitions(&session.id)
+        .gateway_tool_definitions(&bypass.id)
         .unwrap()
         .iter()
         .any(|tool| tool.name == "test_confirm"));
