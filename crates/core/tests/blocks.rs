@@ -43,6 +43,39 @@ fn ins(parent: Option<&str>, after: Option<&str>, block: NewBlock) -> BlockOp {
     }
 }
 
+#[test]
+fn conditional_block_edit_preserves_children_added_since_the_snapshot() {
+    let dir = TempDir::new("conditional_blocks");
+    let v = dir.open();
+    let page = v.create_page(None, "Work".into()).unwrap();
+    let empty = v.load_page(page.clone()).unwrap().blocks;
+    v.apply_if_blocks_match(
+        page.clone(),
+        &empty,
+        vec![ins(None, None, nb("owned", BlockKind::Todo, "Read"))],
+    )
+    .unwrap();
+    let before_user_edit = v.load_page(page.clone()).unwrap().blocks;
+    v.apply(
+        page.clone(),
+        vec![ins(
+            Some("owned"),
+            None,
+            nb("user", BlockKind::Paragraph, "Keep my detail"),
+        )],
+    )
+    .unwrap();
+    let with_user_child = v.load_page(page.clone()).unwrap().blocks;
+    assert!(v
+        .apply_if_blocks_match(
+            page.clone(),
+            &before_user_edit,
+            vec![BlockOp::Delete { id: "owned".into() }],
+        )
+        .is_err());
+    assert_eq!(v.load_page(page).unwrap().blocks, with_user_child);
+}
+
 fn md_path(t: &TempDir, id: &str) -> PathBuf {
     fs::read_dir(t.0.join("pages"))
         .unwrap()
