@@ -480,7 +480,8 @@ fn test_confirm_tool_exists_only_with_its_flag_and_reports_a_denial() {
 #[test]
 fn ai_task_runs_never_wait_for_approval() {
     // The app's permission mode is Manual, yet an AI task (Ask AI on this
-    // device) runs like a hub job: nobody is there to approve.
+    // device) cannot wait for approval. This task has
+    // no project, so its Confirm tool is denied outright and the run completes.
     let t = temp();
     let v = &t.vault;
     let page = v.create_page(None, "Approvals".into()).unwrap();
@@ -492,18 +493,17 @@ fn ai_task_runs_never_wait_for_approval() {
         vec![],
         true,
     );
-    let run = agent.run_task(v, &task.id).unwrap();
+    // Bounded: a regression that asks for approval fails here instead of hanging.
+    let run = agent
+        .run_task_with_limit(v, &task.id, Duration::from_secs(30))
+        .unwrap();
     assert!(run.ok, "{run:?}");
     assert_eq!(run.text, "All done.");
     let state = agent.session_state(&run.session_id).unwrap();
-    assert!(
-        state
-            .messages
-            .iter()
-            .any(|m| m.content.contains("confirmed: go")),
-        "{:?}",
-        state.messages
-    );
+    assert!(state.pending_approvals.is_empty());
+    let transcript: String = state.messages.iter().map(|m| m.content.as_str()).collect();
+    assert!(!transcript.contains("confirmed: go"), "{transcript}");
+    assert!(transcript.contains("Denied by the user"), "{transcript}");
 }
 
 /// Signals `started` when invoked, then waits for the run's cancel (or 60 s).

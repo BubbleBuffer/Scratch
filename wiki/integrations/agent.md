@@ -82,8 +82,8 @@ repository, with no separate repository setting. Each PC publishes only project
 those choices for each PC; repository paths stay on the owning device.
 
 Task creation and `ai_assign_task` accept an optional `project_id`, saved in the
-AI tasks row's text property `project`. Empty means the existing notes-task
-behavior. A nonempty id must belong to the pinned PC's published project list;
+AI tasks row's text property `project`. Empty means an ordinary notes task.
+A nonempty id must belong to the pinned PC's published project list;
 unknown ids and projects assigned to `hub` are rejected before a row or
 placeholder is created. There is no project picker change in this slice.
 
@@ -105,9 +105,12 @@ repository.
 
 Uncommitted changes in the source repository are not included. Confirm-level
 tools, including write, edit and exec, run without approval inside this
-unattended worktree run, using a per-run policy. Chat approval settings and
-ordinary notes tasks keep their existing behavior. Worktrees and branches are
-kept after success, failure or cancellation so the user can inspect and merge
+unattended worktree run, using a per-run policy. Desktop tasks without a worktree
+deny Confirm-level tools without prompting: file writes and shell commands are
+unavailable. Read-only tools, vault tools and `report_progress` remain available
+within the runner's tool set. Assign a task with a project to enable file writes
+and shell commands in its worktree. Chat approval settings are unchanged.
+Worktrees and branches are kept after success, failure or cancellation so the user can inspect and merge
 the work; this runner performs no cleanup. Retry reuses the task row but creates
 a new session, branch and worktree, retaining the previous attempt's work.
 
@@ -148,11 +151,11 @@ The desktop agent can use MCP servers through BubblePaw's MCP client (`bubblepaw
 - **mcp.toml.** An `mcp.toml` in the data directory (BubblePaw's `[mcp.servers.<name>]` format) is imported once when the desktop app starts: its servers are added to the settings unless the name is taken, and the file is renamed to `mcp.toml.imported`. The app does not read it again. A file that can't be read or parsed is logged and left in place.
 - **Startup.** Servers start when the engine opens (or when the list changes), in parallel. A server that fails to start (bad command, handshake error, timeout) is logged, shown as failed with its error in Settings, and left out; the agent opens without it and the other servers run. Stdio servers run with the agent workspace as their working directory unless `cwd` says otherwise. Before each turn the engine re-reads the servers' tool lists, so `tools/list_changed` takes effect on the next turn. Closing the engine stops the servers.
 - **Who gets them.** Desktop engines with the Everything tool set only; the hub never starts MCP servers. In-app chats see the servers' tools like the desktop pack. The hub relay engine opens the same servers (its own processes) and offers their tools to `/mcp/agent?host=<computer>`; the relay's tool list follows settings changes live.
-- **Approval.** The in-app agent and the relay both run under Bypass, so a server's `approval = "confirm"` (BubblePaw's default for MCP tools) does not prompt: the tools run at once, in chats and from ChatGPT or claude.ai through the hub. This is the approved Everything and Bypass behaviour; a server that should not be reachable that way stays off or out of the list.
+- **Approval.** In-app chats and the relay run under Bypass, so a server's `approval = "confirm"` (BubblePaw's default for MCP tools) does not prompt: the tools run at once, in chats and from ChatGPT or claude.ai through the hub. Desktop tasks use a per-run policy: code-task worktrees retain Bypass; tasks without a worktree deny Confirm-level tools, including MCP tools marked Confirm. A server that should not be reachable through chats or the relay stays off or out of the list.
 
 ## Hub jobs
 
-Jobs started through the hub's `jobs` tool ([Jobs](../architecture/hub.md#jobs)) reuse this runtime with a fixed tool set. The hub keeps one engine per tool set: an `Agent` opened with `AgentConfig.tool_set` set, so it registers only that set's vault tools. Its sessions live under `<data_dir>/jobs/<set>/`, apart from chats. The engine runs in Bypass, so a job never prompts for approval. `Agent::run_job` runs one prompt in a session and waits for it. A run still going at the time limit (the shared 1 hour limit, also used by desktop tasks) is cancelled and reported as timed out, which the job records as failed. The outcome is completed with its text, failed, or cancelled; the hub's job worker writes it to the job's row. The app's Ask AI and Agent-assigned tasks start the same kind of job from a signed-in device; see [AI tasks](ai-assistants.md#ai-tasks).
+Jobs started through the hub's `jobs` tool ([Jobs](../architecture/hub.md#jobs)) reuse this runtime with a fixed tool set. The hub keeps one engine per tool set: an `Agent` opened with `AgentConfig.tool_set` set, so it registers only that set's vault tools. Its sessions live under `<data_dir>/jobs/<set>/`, apart from chats. The engine runs in Bypass, so a job never prompts for approval. Its current production tools all declare `Approval::None`; there is no desktop pack or MCP server, so Bypass currently enables no Confirm-level tool. `Agent::run_job` runs one prompt in a session and waits for it. A run still going at the time limit (the shared 1 hour limit, also used by desktop tasks) is cancelled and reported as timed out, which the job records as failed. The outcome is completed with its text, failed, or cancelled; the hub's job worker writes it to the job's row. The app's Ask AI and Agent-assigned tasks start the same kind of job from a signed-in device; see [AI tasks](ai-assistants.md#ai-tasks).
 
 ## Built (2026-10-08 to 2026-10-09)
 

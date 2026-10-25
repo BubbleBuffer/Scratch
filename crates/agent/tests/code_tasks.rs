@@ -10,7 +10,7 @@ use anyhow::{ensure, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use vault_agent::bubblepaw_core::{
-    Approval, ExecutionMode, Tool, ToolCall, ToolContext, ToolDefinition, ToolResult,
+    Approval, EventKind, ExecutionMode, Tool, ToolCall, ToolContext, ToolDefinition, ToolResult,
 };
 use vault_agent::bubblepaw_runner::provider::ScriptedStep;
 use vault_agent::{Agent, AgentConfig, PermissionMode, TestHooks, ToolPack};
@@ -358,34 +358,83 @@ fn code_task_requires_desktop_tools_and_plain_tasks_keep_working_without_them() 
     );
 }
 
+// Plain tasks have no worktree: Confirm calls are denied while the other tools
+// still run. The script catches each denial so every result comes back in one run.
+const PLAIN_TASK_JS: &str = r#"const attempt = async (run) => { try { return await run(); } catch (e) { return String(e); } };
+await tools.report_progress({message: 'reading notes'});
+return [
+  await tools.read({path: 'tracked.txt'}),
+  await tools.read_page({page: 'Reference'}),
+  await attempt(() => tools.write({path: 'notes-task.txt', content: 'denied'})),
+  await attempt(() => tools.exec({command: 'echo shell > exec-task.txt'})),
+];"#;
+
 #[test]
-fn task_without_a_project_keeps_the_existing_session_project_root() {
-    let f = Fixture::new(None);
-    let agent = f.open(
-        true,
-        ExecutionMode::Native,
-        vec![call(
-            "write",
-            json!({"path":"notes-task.txt","content":"existing behavior"}),
-        )],
-        vec![],
-    );
-    let page = f.vault.create_page(None, "Notes work".into()).unwrap();
-    let plain = tasks::create(&f.vault, "Write a file", &page, None, "agent").unwrap();
-    tasks::claim_next(&f.vault, &f.vault.device_id())
-        .unwrap()
-        .unwrap();
-    let run = agent.run_task(&f.vault, &plain.id).unwrap();
-    assert!(run.ok, "{run:?}");
-    assert_eq!(
-        std::fs::read_to_string(f.repo.join("notes-task.txt")).unwrap(),
-        "existing behavior"
-    );
-    let done = tasks::get(&f.vault, &plain.id).unwrap();
-    assert!(
-        done.project.is_empty() && done.worktree_path.is_empty() && done.worktree_branch.is_empty()
-    );
-    assert!(!f.root.join("data/agent/agent.data/worktrees").exists());
+fn task_without_a_project_denies_writes_and_shell_but_still_reads_and_reports() {
+    for mode in [ExecutionMode::Js, ExecutionMode::Native] {
+        let f = Fixture::new(Some(true));
+        let reference = f.vault.create_page(None, "Reference".into()).unwrap();
+        f.vault
+            .insert_markdown(reference, None, None, true, "Reference body".into())
+            .unwrap();
+        let steps = match mode {
+            ExecutionMode::Js => vec![call("js", json!({"code": PLAIN_TASK_JS}))],
+            _ => vec![
+                call("report_progress", json!({"message": "reading notes"})),
+                call("read", json!({"path": "tracked.txt"})),
+                call("read_page", json!({"page": "Reference"})),
+                call(
+                    "write",
+                    json!({"path": "notes-task.txt", "content": "denied"}),
+                ),
+                call("exec", json!({"command": "echo shell > exec-task.txt"})),
+            ],
+        };
+        let agent = f.open(true, mode, steps, vec![]);
+        let page = f.vault.create_page(None, "Notes work".into()).unwrap();
+        let plain = tasks::create(&f.vault, "Write a file", &page, None, "agent").unwrap();
+        tasks::claim_next(&f.vault, &f.vault.device_id())
+            .unwrap()
+            .unwrap();
+        // Bounded: a regression that asks for approval fails here instead of hanging.
+        let run = agent
+            .run_task_with_limit(&f.vault, &plain.id, std::time::Duration::from_secs(30))
+            .unwrap();
+        assert!(run.ok, "{run:?}");
+        let done = tasks::get(&f.vault, &plain.id).unwrap();
+        assert_eq!(done.status, tasks::DONE);
+        assert_eq!(done.progress, "reading notes");
+        assert!(
+            done.project.is_empty()
+                && done.worktree_path.is_empty()
+                && done.worktree_branch.is_empty()
+        );
+        assert!(!f.repo.join("notes-task.txt").exists());
+        assert!(!f.repo.join("exec-task.txt").exists());
+        assert!(!f.root.join("data/agent/agent.data/worktrees").exists());
+        let state = agent.session_state(&run.session_id).unwrap();
+        assert!(state.pending_approvals.is_empty());
+        let events = agent.events_after(0, Some(&run.session_id)).unwrap();
+        for denied_tool in ["write", "exec"] {
+            assert!(
+                events.events.iter().any(|event| matches!(
+                    &event.kind,
+                    EventKind::ToolFinished { name, result, .. }
+                        if name == denied_tool && result.is_error
+                            && result.content.contains("Denied by the user")
+                )),
+                "{mode:?}: {denied_tool} did not return a denial: {:?}",
+                events.events
+            );
+        }
+        let transcript: String = state.messages.iter().map(|m| m.content.as_str()).collect();
+        assert!(transcript.contains("committed"), "{transcript}");
+        assert!(transcript.contains("Reference body"), "{transcript}");
+        assert!(
+            transcript.matches("Denied by the user").count() >= 2,
+            "{transcript}"
+        );
+    }
 }
 
 #[test]

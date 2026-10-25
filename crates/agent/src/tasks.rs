@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 use anyhow::{bail, ensure, Context, Result};
 use async_trait::async_trait;
 use bubblepaw_core::{
-    Approval, ClientInfo, Harness, Run, RunOptions, Tool, ToolContext, ToolDefinition,
-    ToolRegistry, ToolResult,
+    Approval, ApprovalMode, ClientInfo, Harness, Run, RunOptions, Tool, ToolContext,
+    ToolDefinition, ToolRegistry, ToolResult,
 };
 use serde_json::{json, Value};
 use vault_core::{PropValue, Vault};
@@ -273,8 +273,12 @@ impl Agent {
         self.prepare_code_task(vault, task_id, session)?;
         let model = Some(self.default_model()).filter(|m| !m.trim().is_empty());
         let mut system_prompt = self.run_prompt(session)?;
+        let mut approval = permission_policy(PermissionMode::Bypass);
         if bubblepaw_runner::worktrees::get(&self.store, session)?.is_some() {
             system_prompt.push_str(" This is a code task in an isolated git worktree. File and shell tools are rooted there and Confirm tools run without approval. The worktree and branch are kept for review. The source repository's uncommitted changes were not copied. Stay in this worktree.");
+        } else {
+            approval.confirm = ApprovalMode::Deny;
+            system_prompt.push_str(" This task has no code-task worktree. File writes and shell commands are not available; Confirm-level tools are denied. Read-only tools, vault tools and report_progress remain available within this runner's tool set. Assign the task with a project to enable file writes and shell commands in its worktree.");
         }
         let harness = self.task_harness(task_id, session)?;
         self.runtime.block_on(async {
@@ -286,7 +290,7 @@ impl Agent {
                 session,
                 prompt,
                 RunOptions {
-                    approval: Some(permission_policy(PermissionMode::Bypass)),
+                    approval: Some(approval),
                     system_prompt: Some(system_prompt),
                     model,
                     client: Some(crate::desktop_client()),
