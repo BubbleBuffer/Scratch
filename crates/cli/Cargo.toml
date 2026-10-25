@@ -1,0 +1,24 @@
+[package]
+name = "scratch_cli"
+description = "Runs a desktop vault's AI tasks with the in-app agent, without the app's UI."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+name = "scratch_cli"
+
+[[bin]]
+name = "scratch-cli"
+path = "src/main.rs"
+
+[dependencies]
+vault_core = { path = "../core" }
+vault_agent = { path = "../agent" }
+vault_mcp = { path = "../mcp" }
+anyhow = "1"
+
+[dev-dependencies]
+serde_json = "1"
+tempfile = "3"
