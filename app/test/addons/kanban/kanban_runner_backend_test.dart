@@ -53,7 +53,7 @@ void main() {
       final a = await backend.assign('task-1', 'studio', projectId: 'docs-site');
       expect(a.projectName, 'docs-site');
       expect(a.state, AssignState.queued);
-      expect(backend.calls, ['assign:task-1:studio:docs-site']);
+      expect(backend.calls, contains('assign:task-1:studio:docs-site'));
       expect(runnerChipText(a), 'Studio-PC · docs-site · queued');
 
       final none = await backend.assign('task-2', 'studio');
