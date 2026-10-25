@@ -55,7 +55,7 @@ The build script builds `notes-hub:latest` for `linux/amd64` and saves `target/n
 docker buildx build --platform linux/amd64 --build-context bubblepaw=../BubblePaw-base-agent --file deploy/hub/Dockerfile --tag notes-hub:latest --load .
 ```
 
-The repo is the build context. The read-only sibling BubblePaw checkout enters through the named `bubblepaw` context; the builder lays the repositories out as `/src/notes-app` and `/src/BubblePaw-base-agent` so path dependencies resolve unchanged. Cargo builds `notes_hub` in release mode with `--locked` and BuildKit caches.
+The repo is the build context. Scratch takes `bubblepaw-sdk` and `bubblepaw-mcp` from BubblePaw-Core at tag `v0.2.0` (pinned in `Cargo.lock`), so Cargo fetches them from git and the Rust build needs no sibling checkout. `deploy/hub/Dockerfile` and the `--build-context bubblepaw` line above still copy the pre-v0.2.0 path crates; they do not match this yet and need their own change. Cargo builds `notes_hub` in release mode with `--locked` and BuildKit caches.
 
 Pins: Rust **1.97.1** (`rust:1.97.1-bookworm`), Node **22.18.0** (`node:22.18.0-bookworm-slim`), Bun **1.4.2**, Claude Code **2.1.293**. The Codex CLI was removed from the image on 2026-10-25, with the hub's move to the four [hub models](hub.md#agent-models-and-credentials). Runtime base: `debian:bookworm-slim`. Docker reports **2,387,570,531 bytes** (2.39 GB / 2.22 GiB); `target/notes-hub.tar.gz` is **672,359,162 bytes** (672 MB / 641 MiB). Node, Bun and both CLI version commands passed as `hub`.
 
