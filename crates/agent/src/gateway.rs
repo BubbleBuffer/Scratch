@@ -355,17 +355,26 @@ impl crate::Agent {
                 .bind_session_actor(session, &client.id, format!("oauth:{author}"))?;
         }
         let harness = gateway.harness(self.store.clone(), policy)?;
-        let tool_names = gateway
-            .definitions(&harness, session)?
-            .into_iter()
-            .map(|tool| tool.name)
-            .collect();
+        // The run gate also covers the tools a js call composes. A js call may
+        // therefore reach every tool the gateway registry holds, as it did
+        // before the SDK gate; a direct call may name only the advertised surface.
+        let tool_names = if name == "js" {
+            None
+        } else {
+            Some(
+                gateway
+                    .definitions(&harness, session)?
+                    .into_iter()
+                    .map(|tool| tool.name)
+                    .collect::<Vec<String>>(),
+            )
+        };
         self.runtime.block_on(harness.call_tool(
             session,
             name,
             input,
             RunOptions {
-                tool_names: Some(tool_names),
+                tool_names,
                 client: Some(client),
                 ..RunOptions::default()
             },
