@@ -80,7 +80,7 @@ chmod 600 .env
 
 Edit `.env`: set the real issuer and client ID, and `NOTES_HUB_OIDC_ALLOWED_GROUPS=notes-users`. Leave `NOTES_HUB_OIDC_CLIENT_SECRET` empty for the public provider; set it only for a confidential one (then the hub sends it with HTTP Basic auth). Keep `NOTES_HUB_PUBLIC_URL=https://notes.example.com`. Comma-separated or space-separated lists work. Environment variables override `/data/hub.toml`; keep secrets in `.env` rather than in the wiki or shell command history.
 
-The model settings are optional: `NOTES_HUB_AGENT_MODELS` (the offered list) and `NOTES_HUB_AGENT_DEFAULT_MODEL` (must be on that list, or startup fails). The defaults are the four [hub models](hub.md#agent-models-and-credentials) with `claude-code/claude-sonnet-5-5` as the default. The existing `deploy/hub/smoke.ps1` still checks the former Codex CLI and home directory; it has not been adapted to this image and cannot qualify it unchanged.
+The model settings are optional: `NOTES_HUB_AGENT_MODELS` (the offered list) and `NOTES_HUB_AGENT_DEFAULT_MODEL` (must be on that list, or startup fails). The defaults are the four [hub models](hub.md#agent-models-and-credentials) with `claude-code/claude-sonnet-5-5` as the default.
 
 ### Claude connector
 

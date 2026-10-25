@@ -53,19 +53,16 @@ try {
     Write-Host "PASS health: HTTP 200 notes-hub ($url)"
     $uid = (docker exec $container id -u).Trim()
     Assert ($uid -eq '10001') "Unexpected runtime uid: $uid"
-    docker exec $container sh -c 'test "$HOME" = /data/home && test -f /data/hub.toml && test -d /data/home/.claude && test -d /data/home/.codex && test -d /data/vault && touch /data/home/.claude/smoke-write && touch /data/home/.codex/smoke-write'
+    docker exec $container sh -c 'test "$HOME" = /data/home && test -f /data/hub.toml && test -d /data/home/.claude && test -d /data/vault && touch /data/home/.claude/smoke-write'
     Write-Host 'PASS uid=10001, HOME=/data/home, volume config/vault/CLI homes and writable CLI homes'
     docker exec $container notes-hub --devices
     Write-Host 'PASS notes-hub --devices (empty before pairing)'
-    $pins = @{ claude = '2.1.293'; codex = '0.161.0'; bun = '1.4.2'; node = '22.18.0' }
-    foreach ($cli in @('claude', 'codex', 'bun', 'node')) {
+    $pins = @{ claude = '2.1.293'; bun = '1.4.2'; node = '22.18.0' }
+    foreach ($cli in @('claude', 'bun', 'node')) {
         $version = docker exec $container $cli --version
         Assert (($version -join "`n").Contains($pins[$cli])) "Wrong $cli version: $version"
         Write-Host "PASS $cli --version: $version"
     }
-    $loginHelp = docker exec $container codex login --help
-    Assert (($loginHelp -join "`n").Contains('--device-auth')) 'Pinned Codex lacks --device-auth'
-    Write-Host 'PASS codex login --help supports --device-auth'
     docker exec $container find /data -maxdepth 3 -printf '%u:%g %p\n'
     $token = (docker exec $container notes-hub --config /data/hub.toml --pair test).Trim()
     Assert (![string]::IsNullOrEmpty($token)) 'Emergency pair did not return a token'
@@ -102,7 +99,7 @@ try {
     $devices = docker exec $container notes-hub --devices
     Assert (($devices -join "`n").Contains("test`tlocal-smoke-$suffix")) 'Token did not bind to the test device'
     Write-Host "PASS device binding: $devices"
-    docker exec $container sh -c 'test -f /data/home/.claude/smoke-write && test -f /data/home/.codex/smoke-write'
+    docker exec $container sh -c 'test -f /data/home/.claude/smoke-write'
     Write-Host 'PASS CLI-home writes persisted across test container restart'
     # Wait for the image HEALTHCHECK itself, in addition to the host request.
     $healthStatus = ''
