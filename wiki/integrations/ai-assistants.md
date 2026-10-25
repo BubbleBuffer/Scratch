@@ -45,6 +45,12 @@ An agent connected to the hub can hand a task to the hub's agent and collect the
 
 The states, who can see a job, the limits and what the hub does on restart are in [Jobs](../architecture/hub.md#jobs).
 
+## Hub agent models
+
+The hub's agent offers four models: `claude-code/claude-opus-5-5`, `claude-code/claude-sonnet-5-5` (the default), `claude-code/claude-haiku-5-5` and `opencode/deepseek-v4.1-flash`. In the app, a chat on the hub picks one of them under Settings > AI > Agent > Model, after "Hub default (<model>)". Jobs cannot pick a model: they run on the hub's default. A hub default set in the vault applies only when it is one of the four; otherwise the hub's configured default is used.
+
+The operator sets the list and the default in `[agent]` (`models`, `default_model`, or `NOTES_HUB_AGENT_MODELS` and `NOTES_HUB_AGENT_DEFAULT_MODEL`). The configured default must be listed or startup fails. Set `OPENCODE_API_KEY` for DeepSeek; for Claude, mount the signed-in login directory and set `CLAUDE_CONFIG_DIR`, or provide `CLAUDE_CODE_OAUTH_TOKEN`. Missing credentials fail the run with a variable-naming error. Desktop providers and their default stay unchanged, with OpenCode added when its key is set. See [Agent models and credentials](../architecture/hub.md#agent-models-and-credentials) and [Provider sign-in](../architecture/hub-deploy.md#provider-sign-in-and-checks).
+
 ## Claude connector
 
 **Status:** off by default (the `[mcp_oauth]` settings unset). Not yet verified with a real claude.ai sign-in.

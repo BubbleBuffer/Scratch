@@ -24,7 +24,7 @@ COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
-RUN npm install --global @anthropic-ai/claude-code@2.1.293 @openai/codex@0.161.0 \
+RUN npm install --global @anthropic-ai/claude-code@2.1.293 \
     && npm cache clean --force
 WORKDIR /opt/bubblepaw/claude-code
 COPY --from=bubblepaw extensions/claude-code/package.json extensions/claude-code/bun.lock extensions/claude-code/NOTICE ./
@@ -33,7 +33,7 @@ RUN bun install --production --frozen-lockfile
 COPY --from=builder /out/notes-hub /usr/local/bin/notes-hub
 RUN groupadd --gid 10001 hub \
     && useradd --uid 10001 --gid 10001 --home-dir /data/home --no-create-home hub \
-    && mkdir -p /data/home/.claude /data/home/.codex \
+    && mkdir -p /data/home/.claude \
     && touch /data/hub.toml \
     && chown -R hub:hub /data
 ENV HOME=/data/home \

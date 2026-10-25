@@ -75,7 +75,10 @@ pub struct AgentSection {
     pub execution_mode: vault_agent::bubblepaw_core::ExecutionMode,
     /// Offer JavaScript composition alongside native tools.
     pub enable_js: bool,
-    /// `provider/model`; empty: the agent's built-in default.
+    /// The models the hub offers, `provider/model`, in the order shown.
+    pub models: Vec<String>,
+    /// `provider/model`, one of `models`: the model for runs that name none.
+    /// [`Config::validate`] refuses a default that is not listed.
     pub default_model: String,
     /// The `bun` executable for the Claude Code extension (empty: none).
     pub bun: String,
@@ -99,13 +102,23 @@ const LEGACY_APPROVALS: &str = "notes-hub: [agent] approvals and NOTES_HUB_AGENT
 
 const LEGACY_DEFAULT_HOST: &str = "notes-hub: mcp_agent_default_host and      NOTES_HUB_MCP_AGENT_DEFAULT_HOST are deprecated and ignored (/mcp/agent names the      computer in each call; /mcp/agent?host=<name> pins one); remove them.";
 
+/// The built-in models: three Claude Code models and DeepSeek through OpenCode.
+const DEFAULT_MODELS: [&str; 4] = [
+    "claude-code/claude-opus-5-5",
+    "claude-code/claude-sonnet-5-5",
+    "claude-code/claude-haiku-5-5",
+    "opencode/deepseek-v4.1-flash",
+];
+const DEFAULT_MODEL: &str = "claude-code/claude-sonnet-5-5";
+
 impl Default for AgentSection {
     fn default() -> AgentSection {
         AgentSection {
             enabled: true,
             execution_mode: vault_agent::bubblepaw_core::ExecutionMode::Native,
             enable_js: false,
-            default_model: String::new(),
+            models: DEFAULT_MODELS.map(String::from).into(),
+            default_model: DEFAULT_MODEL.into(),
             bun: String::new(),
             claude_code_extension: String::new(),
             legacy_approvals: false,
@@ -330,6 +343,9 @@ impl Config {
         if let Some(v) = var("AGENT_ENABLE_JS") {
             a.enable_js = boolean("NOTES_HUB_AGENT_ENABLE_JS", &v)?;
         }
+        if let Some(v) = var("AGENT_MODELS") {
+            a.models = list(&v);
+        }
         if let Some(v) = var("AGENT_DEFAULT_MODEL") {
             a.default_model = v;
         }
@@ -378,6 +394,12 @@ impl Config {
         }
         if self.oidc.enabled() && self.oidc.client_id.is_empty() {
             return Err("oidc.client_id is required".into());
+        }
+        if !self.agent.models.contains(&self.agent.default_model) {
+            return Err(format!(
+                "agent.default_model {:?} is not one of agent.models {:?}",
+                self.agent.default_model, self.agent.models
+            ));
         }
         if self.android_package.is_empty() != self.android_sha256_certs.is_empty() {
             return Err("android_package and android_sha256_certs are required together".into());
@@ -572,7 +594,13 @@ mod tests {
         assert!(bad.validate().unwrap_err().contains("required together"));
         bad.android_sha256_certs = vec![FP.into()];
         bad.validate().unwrap();
-        for package in ["notes", "de..notes", "1de.notes", "de.bubble-buffer", "de.notes."] {
+        for package in [
+            "notes",
+            "de..notes",
+            "1de.notes",
+            "de.bubble-buffer",
+            "de.notes.",
+        ] {
             bad.android_package = package.into();
             assert!(
                 bad.validate().unwrap_err().contains("android_package"),
@@ -580,7 +608,10 @@ mod tests {
             );
         }
         bad.android_package = "de.bubblebuffer.notes".into();
-        for cert in ["91:B6", "91B6FA298D52AFE823FED0D7745356E76AA6888E72CE9B16045D94E392E58659"] {
+        for cert in [
+            "91:B6",
+            "91B6FA298D52AFE823FED0D7745356E76AA6888E72CE9B16045D94E392E58659",
+        ] {
             bad.android_sha256_certs = vec![cert.into()];
             assert!(bad.validate().unwrap_err().contains("SHA-256"), "{cert}");
         }
@@ -676,7 +707,7 @@ mod tests {
             r#"
             data_dir = "/data"
             [agent]
-            default_model = "claude-code/haiku"
+            default_model = "claude-code/claude-haiku-5-5"
             "#,
         )
         .unwrap();
@@ -697,7 +728,7 @@ mod tests {
         .unwrap();
         assert!(!c.agent.enabled);
         assert_eq!(c.agent.bun, "/usr/local/bin/bun");
-        assert_eq!(c.agent.default_model, "claude-code/haiku");
+        assert_eq!(c.agent.default_model, "claude-code/claude-haiku-5-5");
         assert_eq!(
             c.agent.execution_mode,
             vault_agent::bubblepaw_core::ExecutionMode::Js
@@ -725,5 +756,85 @@ mod tests {
             .unwrap();
         assert!(c.agent.legacy_approvals);
         assert!(Config::from_toml("[agent]\napprovalz = \"ask\"").is_err());
+    }
+
+    #[test]
+    fn agent_models_defaults_toml_environment_and_validation() {
+        let mut config = Config::from_toml("data_dir = '/tmp/test'").unwrap();
+        assert_eq!(
+            config.agent.models,
+            [
+                "claude-code/claude-opus-5-5",
+                "claude-code/claude-sonnet-5-5",
+                "claude-code/claude-haiku-5-5",
+                "opencode/deepseek-v4.1-flash",
+            ]
+        );
+        assert_eq!(config.agent.default_model, "claude-code/claude-sonnet-5-5");
+        config.validate().unwrap();
+
+        config = Config::from_toml(
+            "data_dir = '/tmp/test'\n[agent]\n\
+             models = ['claude-code/claude-haiku-5-5', 'opencode/deepseek-v4.1-flash']\n\
+             default_model = 'opencode/deepseek-v4.1-flash'",
+        )
+        .unwrap();
+        assert_eq!(
+            config.agent.models,
+            [
+                "claude-code/claude-haiku-5-5",
+                "opencode/deepseek-v4.1-flash"
+            ]
+        );
+        assert_eq!(config.agent.default_model, "opencode/deepseek-v4.1-flash");
+        config.validate().unwrap();
+
+        config
+            .apply_env(|key| match key {
+                "NOTES_HUB_AGENT_MODELS" => Some(
+                    "claude-code/claude-opus-5-5, claude-code/claude-sonnet-5-5 \
+                     opencode/deepseek-v4.1-flash"
+                        .into(),
+                ),
+                "NOTES_HUB_AGENT_DEFAULT_MODEL" => Some("claude-code/claude-opus-5-5".into()),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            config.agent.models,
+            [
+                "claude-code/claude-opus-5-5",
+                "claude-code/claude-sonnet-5-5",
+                "opencode/deepseek-v4.1-flash",
+            ]
+        );
+        assert_eq!(config.agent.default_model, "claude-code/claude-opus-5-5");
+        config.validate().unwrap();
+
+        // A default that is not listed fails, from TOML, the environment, or an empty default.
+        let unlisted = Config::from_toml(
+            "data_dir = '/tmp/test'\n[agent]\ndefault_model = 'claude-code/claude-fable-5-1'",
+        )
+        .unwrap();
+        assert!(unlisted
+            .validate()
+            .unwrap_err()
+            .contains("agent.default_model"));
+        let mut bad = config.clone();
+        bad.apply_env(|key| {
+            (key == "NOTES_HUB_AGENT_DEFAULT_MODEL").then(|| "claude-code/claude-haiku-5-5".into())
+        })
+        .unwrap();
+        assert!(bad.validate().unwrap_err().contains("agent.default_model"));
+        let mut bad = config.clone();
+        bad.apply_env(|key| (key == "NOTES_HUB_AGENT_DEFAULT_MODEL").then(String::new))
+            .unwrap();
+        assert!(bad.validate().unwrap_err().contains("agent.default_model"));
+        // An empty list fails too: the default cannot be on it.
+        let mut bad = config.clone();
+        bad.apply_env(|key| (key == "NOTES_HUB_AGENT_MODELS").then(String::new))
+            .unwrap();
+        assert!(bad.agent.models.is_empty());
+        assert!(bad.validate().unwrap_err().contains("agent.models"));
     }
 }

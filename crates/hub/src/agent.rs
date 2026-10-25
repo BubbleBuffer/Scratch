@@ -89,6 +89,7 @@ pub(crate) struct AgentHost {
     enabled: bool,
     data_dir: PathBuf,
     default_model: String,
+    models: Vec<String>,
     execution_mode: vault_agent::bubblepaw_core::ExecutionMode,
     enable_js: bool,
     bun: String,
@@ -122,6 +123,7 @@ impl AgentHost {
             enabled: a.enabled,
             data_dir: config.data_dir.clone(),
             default_model: a.default_model.clone(),
+            models: a.models.clone(),
             execution_mode: a.execution_mode,
             enable_js: a.enable_js,
             bun: a.bun.clone(),
@@ -177,8 +179,10 @@ impl AgentHost {
         let execution_mode = self.execution_mode;
         let enable_js = self.enable_js;
         let vault = self.vault.clone();
+        let models = self.models.clone();
         let opened = tokio::task::spawn_blocking(move || {
             Agent::open_with_execution(vault, config, execution_mode, enable_js)
+                .and_then(|agent| agent.with_model_allowlist(models))
         })
         .await;
         match opened {
@@ -206,8 +210,10 @@ impl AgentHost {
         let execution_mode = self.execution_mode;
         let enable_js = self.enable_js;
         let vault = self.vault.clone();
+        let models = self.models.clone();
         let opened = tokio::task::spawn_blocking(move || {
             Agent::open_with_execution(vault, config, execution_mode, enable_js)
+                .and_then(|agent| agent.with_model_allowlist(models))
         })
         .await;
         match opened {

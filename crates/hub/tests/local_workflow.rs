@@ -324,6 +324,7 @@ async fn start_hub() -> Hub {
         agent: AgentSection {
             execution_mode: vault_agent::bubblepaw_core::ExecutionMode::Js,
             default_model: "scripted/scripted".into(),
+            models: vec!["scripted/scripted".into()],
             ..AgentSection::default()
         },
         ..Config::default()

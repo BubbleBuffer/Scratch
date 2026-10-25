@@ -42,7 +42,8 @@ A TOML file. Each key can be overridden by `NOTES_HUB_<KEY>` (`NOTES_HUB_OIDC_<K
 | `oidc.allowed_groups` | `[]` | Groups (the ID token's `groups` claim) whose members may sign in. |
 | `oidc.scopes` | `openid email profile`, plus `groups` if `allowed_groups` is set | Scopes asked for. |
 | `agent.enabled` | `true` | Run the agent. Off: `/agent/ws` answers 503. |
-| `agent.default_model` | empty (the agent's default) | `provider/model` for runs that name none and when the vault sets no default model for `hub` (the vault's synced value wins; see [Agent](../integrations/agent.md)). |
+| `agent.models` | the four [models](#agent-models-and-credentials) | The models the hub offers, `provider/model`. Environment: `NOTES_HUB_AGENT_MODELS` (comma or space separated). |
+| `agent.default_model` | `claude-code/claude-sonnet-5-5` | The model for runs that name none; must be one of `agent.models`. Environment: `NOTES_HUB_AGENT_DEFAULT_MODEL`. A vault's synced hub default is used only when it is on `agent.models`; otherwise this value applies (see [Agent](../integrations/agent.md)). |
 | `agent.execution_mode`, `agent.enable_js` | `native`, `false` | Model-facing execution mode (`native` or `js`) and optional JS composition in native mode. Environment: `NOTES_HUB_AGENT_EXECUTION_MODE`, `NOTES_HUB_AGENT_ENABLE_JS`. |
 | `agent.bun`, `agent.claude_code_extension` | empty | The `bun` executable and the Claude Code extension folder (holding `src/main.ts`), for the `claude-code` provider. |
 | `agent.approvals` | removed | Removed 2026-10-21: hub agent runs use Bypass. A config that still has it (or `NOTES_HUB_AGENT_APPROVALS`) loads, ignores it and prints a deprecation line. |
@@ -63,6 +64,24 @@ issuer = "https://auth.example.com/application/o/notes/"
 client_id = "notes-hub"
 allowed_groups = ["notes"]
 ```
+
+### Agent models and credentials
+
+The hub offers four models, set by `[agent] models` (default list shown). Full model IDs pass unchanged to their provider, so a new full ID can be listed without a code change.
+
+| Model | Runs through | Credential, from the hub's environment |
+|---|---|---|
+| `claude-code/claude-opus-5-5` | Claude Code extension (`bun`) | `CLAUDE_CONFIG_DIR` (a Claude login directory) or `CLAUDE_CODE_OAUTH_TOKEN` |
+| `claude-code/claude-sonnet-5-5` (default) | Claude Code extension | same |
+| `claude-code/claude-haiku-5-5` | Claude Code extension | same |
+| `opencode/deepseek-v4.1-flash` | OpenCode | `OPENCODE_API_KEY` |
+
+- `CLAUDE_CONFIG_DIR` names a directory with Claude Code's login files, for example one on the `/data` volume. `CLAUDE_CODE_OAUTH_TOKEN` is the alternative: a token for the account, with no login files.
+- A run whose model has no credential fails with an error that names the variable to set. The agent still opens, and the other models keep working.
+- The default is checked at start: `default_model` must be one of `models`, and an empty list or an unlisted default is a configuration error that names `agent.default_model`.
+- A vault's synced hub default (set in the app) is used only when it is on `models`. A value that is not listed is ignored, and `default_model` applies.
+
+Operator steps for signing in are in [Provider sign-in](hub-deploy.md#provider-sign-in-and-checks).
 
 ## Routes
 
@@ -171,6 +190,7 @@ Outside agents, and the app's Ask AI and Agent-assigned tasks (through a signed-
 
 - **Enabled.** `create` needs `[agent] enabled` (on by default) and is refused otherwise. The Read set can't call `jobs` at all (the tool is not read-only), so a Read token can't create a job.
 - **Pages.** `create` may name a page (`page`, a page id) and a block on it (`after`, a block id). `after` without `page` is an error; an unknown page gives "no such page". A job with a page puts a placeholder in the page, and a completed result replaces the placeholder. Failed, cancelled and interrupted runs keep the placeholder and update its status text; failed and interrupted runs also show the error with a red background. The job reports `page`.
+- **Model.** Jobs cannot pick a model. A run uses the hub's default: the vault's hub default when it is on `[agent] models`, otherwise `[agent] default_model` ([models](#agent-models-and-credentials)).
 - **Tool set.** A run gets the caller's tool set, narrowed by the hub runner's set (Settings > AI > Agent > Tools, with Run AI on: Hub). A device's jobs have no set of their own and get the hub runner's set (`tool_sets.hub`, default Everything). `create` with `tools` narrows it further; asking for more than the caller's own set is refused. The run never asks for approval and has no tools outside its set.
 - **Engine.** The hub keeps one job engine per tool set: an `Agent` opened with `AgentConfig.tool_set`, which registers exactly that set's vault tools, in Bypass, with its sessions under `<data_dir>/jobs/<set>/`. There is no plan or approval step. Each run is `Agent::run_job`, with the time limit below.
 - **Storage.** A job is a row of the "AI tasks" database. The storage is [crates/mcp/src/jobs.rs](../../crates/mcp/src/jobs.rs), over the database code in [crates/mcp/src/tasks.rs](../../crates/mcp/src/tasks.rs). The row's text properties are `node` (`hub`), `owner`, `tools`, `session` and `finished`; the row body holds the result. An older database gains these properties and the `cancelled` and `interrupted` statuses on first use (`tasks::migrate_schema`). New rows always name a concrete runner: `hub` or a desktop device id. Desktops claim rows pinned to their own device id and legacy rows whose `node` is empty; they never claim `hub` rows. The named runner sees rows through normal vault sync; the hub does not dispatch them to devices.

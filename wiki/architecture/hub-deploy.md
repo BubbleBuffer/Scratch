@@ -57,7 +57,7 @@ docker buildx build --platform linux/amd64 --build-context bubblepaw=../BubblePa
 
 The repo is the build context. The read-only sibling BubblePaw checkout enters through the named `bubblepaw` context; the builder lays the repositories out as `/src/notes-app` and `/src/BubblePaw-base-agent` so path dependencies resolve unchanged. Cargo builds `notes_hub` in release mode with `--locked` and BuildKit caches.
 
-Pins: Rust **1.97.1** (`rust:1.97.1-bookworm`), Node **22.18.0** (`node:22.18.0-bookworm-slim`), Bun **1.4.2**, Claude Code **2.1.293**, Codex CLI **0.161.0**. Runtime base: `debian:bookworm-slim`. Docker reports **2,387,570,531 bytes** (2.39 GB / 2.22 GiB); `target/notes-hub.tar.gz` is **672,359,162 bytes** (672 MB / 641 MiB). Node, Bun and both CLI version commands passed as `hub`.
+Pins: Rust **1.97.1** (`rust:1.97.1-bookworm`), Node **22.18.0** (`node:22.18.0-bookworm-slim`), Bun **1.4.2**, Claude Code **2.1.293**. The Codex CLI was removed from the image on 2026-10-25, with the hub's move to the four [hub models](hub.md#agent-models-and-credentials). Runtime base: `debian:bookworm-slim`. Docker reports **2,387,570,531 bytes** (2.39 GB / 2.22 GiB); `target/notes-hub.tar.gz` is **672,359,162 bytes** (672 MB / 641 MiB). Node, Bun and both CLI version commands passed as `hub`.
 
 The following transfer commands are for the lead to run; the build script does not deploy. For example, first create `/home/networking/notes-hub` on the VPS using the lead's normal access, then send the archive and text kit using **Windows OpenSSH**:
 
@@ -79,6 +79,8 @@ chmod 600 .env
 ```
 
 Edit `.env`: set the real issuer and client ID, and `NOTES_HUB_OIDC_ALLOWED_GROUPS=notes-users`. Leave `NOTES_HUB_OIDC_CLIENT_SECRET` empty for the public provider; set it only for a confidential one (then the hub sends it with HTTP Basic auth). Keep `NOTES_HUB_PUBLIC_URL=https://notes.example.com`. Comma-separated or space-separated lists work. Environment variables override `/data/hub.toml`; keep secrets in `.env` rather than in the wiki or shell command history.
+
+The model settings are optional: `NOTES_HUB_AGENT_MODELS` (the offered list) and `NOTES_HUB_AGENT_DEFAULT_MODEL` (must be on that list, or startup fails). The defaults are the four [hub models](hub.md#agent-models-and-credentials) with `claude-code/claude-sonnet-5-5` as the default.
 
 ### Claude connector
 
@@ -164,10 +166,14 @@ From `/home/networking/notes-hub`, sign in as the default non-root container use
 ```sh
 docker compose exec -it hub claude
 # At Claude Code's prompt: /login
-docker compose exec -it hub codex login --device-auth
 ```
 
-Follow the CLI's browser/device instructions from the lead's browser. Codex device code login must be enabled in account security settings or workspace permissions; see [official Codex authentication documentation](https://learn.chatgpt.com/docs/auth). The pinned binary's help confirms `--device-auth`; actual sign-in remains unverified. Sign-ins persist under `/data/home`, including `.claude` and `.codex`. The image sets `NOTES_HUB_AGENT_BUN=/usr/local/bin/bun` and `NOTES_HUB_AGENT_CLAUDE_CODE_EXTENSION=/opt/bubblepaw/claude-code`; `vault_agent` checks that extension directory and appends `src/main.ts`.
+Follow the CLI's browser instructions from the lead's browser. The interactive sign-in persists under `/data/home/.claude`, which is the default for the hub's `HOME`. The hub's models need credentials from its environment, set in `.env` (`chmod 600`) like the OIDC secret; a run without one fails naming the variable:
+
+- Claude models: `CLAUDE_CONFIG_DIR`, a directory mounted in the container with Claude Code's `.credentials.json` and login files, or `CLAUDE_CODE_OAUTH_TOKEN`, a token for the account. The default container login directory under `HOME` also works. Prefer one credential source; an inherited token can override the directory login.
+- DeepSeek (`opencode/deepseek-v4.1-flash`): `OPENCODE_API_KEY`.
+
+After an interactive sign-in or replacing login files, restart the hub (`docker compose restart hub`), since the agent checks credential availability at start. After changing `.env`, recreate it with `docker compose up -d` to load the new environment. Keep the values out of the wiki and shell history. The image sets `NOTES_HUB_AGENT_BUN=/usr/local/bin/bun` and `NOTES_HUB_AGENT_CLAUDE_CODE_EXTENSION=/opt/bubblepaw/claude-code`; `vault_agent` checks that extension directory and appends `src/main.ts`.
 
 ```sh
 docker compose ps
@@ -260,9 +266,9 @@ The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Dock
   - `/mcp` without a token returns 401, and with a foreign Origin returns 403 (2026-10-14).
   - `/auth/start` returns a 302 to Authentik with PKCE S256.
   - `/agent/ws` without a token returns 401.
-  - The agent opened on start (default model `codex/gpt-6-luna`).
+  - The agent opened on start (2026-10-14 default model `codex/gpt-6-luna`; from 2026-10-25 the default is `claude-code/claude-sonnet-5-5`, see [hub models](hub.md#agent-models-and-credentials)).
 - Still to do:
-  - Provider sign-ins in the container (`docker compose exec -it hub claude`, `codex login`).
+  - Provider sign-ins in the container (`docker compose exec -it hub claude`, or the credential variables in [Provider sign-in](#provider-sign-in-and-checks)).
   - A full browser login.
   - A real phone login, vault sync and agent turn. The app-side browser login UI is committed (`a806fbb`); Android agent wiring is on `mobile-agent` ([state and phone steps](mobile-agent.md)).
 

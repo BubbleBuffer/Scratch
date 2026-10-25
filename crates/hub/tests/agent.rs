@@ -71,6 +71,7 @@ async fn env_with(prepare: impl FnOnce(&std::path::Path)) -> Env {
         agent: AgentSection {
             enable_js: true,
             default_model: "scripted/scripted".into(),
+            models: vec!["scripted/scripted".into(), "scripted/vault-pick".into()],
             ..AgentSection::default()
         },
         ..Config::default()
@@ -442,6 +443,8 @@ async fn sessions_scripts_events_and_a_syncing_peer() {
     assert!(list.iter().any(|x| x.id == s.id && x.title == "Hub chat"));
     let models: Vec<w::AgentModel> = get(c.call("models", Value::Null).await.unwrap());
     assert!(models.iter().any(|m| m.id == "scripted/scripted"));
+    assert!(models.iter().all(|m| !m.id.starts_with("codex/")), "{models:?}");
+    assert_eq!(models.len(), 2, "only the configured allowlist is offered");
 
     c.call("subscribe", Value::Null).await.unwrap();
     let run: w::AgentRunRecord = get(
@@ -765,6 +768,15 @@ async fn runs_without_a_model_use_the_vault_default_for_hub() {
     );
     let models: Vec<w::AgentModel> = get(c.call("models", Value::Null).await.unwrap());
     assert!(models.iter().any(|m| m.id == "scripted/vault-pick"), "{models:?}");
+
+    peer.set_agent_default_model("hub".into(), Some("codex/disallowed".into())).unwrap();
+    sync(&client).await;
+    assert_eq!(run_model(&mut c, None).await, "scripted/scripted", "disallowed synced default: config default");
+    let models: Vec<w::AgentModel> = get(c.call("models", Value::Null).await.unwrap());
+    assert!(models.iter().all(|m| !m.id.starts_with("codex/")), "{models:?}");
+    let s: w::AgentSession = get(c.call("create_session", json!({"title": "Rejected model"})).await.unwrap());
+    let error = c.call("send", json!({"session_id": s.id, "text": "hello", "model": "codex/disallowed"})).await.unwrap_err();
+    assert!(error.message.contains("agent.models"), "{error:?}");
 
     peer.set_agent_default_model("hub".into(), None).unwrap();
     sync(&client).await;

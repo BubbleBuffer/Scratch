@@ -4,8 +4,8 @@
 //!   outside the vault (`agent/agent.sqlite` is the legacy store file).
 //! - The default model surface is BubblePaw's `js` tool. Hosts can opt into
 //!   native entrypoints; vault and history tools remain composable inside JS.
-//! - Providers: `codex` (Codex sign-in), `claude-code` (the Bun extension, when
-//!   configured) and, for tests only, `scripted`.
+//! - Providers: desktop `codex`, `claude-code` (the Bun extension), `opencode`
+//!   (when `OPENCODE_API_KEY` is set) and, for tests only, `scripted`.
 //! - The agent owns its own Tokio runtime, so callers can stay on plain threads.
 //!
 //! See wiki/integrations/agent.md, build step 3.
@@ -46,8 +46,8 @@ use bubblepaw_core::{
 use bubblepaw_runner::artifacts::ArtifactStore;
 use bubblepaw_runner::codemode::CodeMode;
 use bubblepaw_runner::provider::{
-    ExtensionConfig, ExtensionProvider, ProviderRegistry, ResponsesProvider, ScriptedProvider,
-    ScriptedStep,
+    ChatCompletionsProvider, ExtensionConfig, ExtensionProvider, ProviderRegistry,
+    ResponsesProvider, ScriptedProvider, ScriptedStep,
 };
 use bubblepaw_runner::runtime_note::RuntimeNotes;
 use bubblepaw_runner::summarization::{cached_context_window, SummarizingContext, SummaryConfig};
@@ -62,6 +62,7 @@ pub use vault_tools::outline;
 /// The default model when the device setting is empty: Codex with the
 /// BubblePaw runner's default model.
 pub const DEFAULT_MODEL: &str = "codex/gpt-6-luna";
+pub const HUB_DEFAULT_MODEL: &str = "claude-code/claude-sonnet-5-5";
 const CODEX_URL: &str = "https://chatgpt.com/backend-api/codex";
 
 /// Which application hosts the agent; clients discover this through host_info.
@@ -415,6 +416,8 @@ pub struct Agent {
     /// The configured default (`AgentConfig::default_model`, else
     /// [`DEFAULT_MODEL`]); a hub host prefers the vault's default for `hub`.
     default_model: String,
+    /// Hub policy, shared by model discovery, chats, tasks and jobs.
+    model_allowlist: Option<Vec<String>>,
     /// The runner whose vault default model applies to runs without one:
     /// `hub` on a hub host. Desktop hosts get the model from the app, which
     /// resolves the device override and the vault value itself.
@@ -597,18 +600,20 @@ impl Agent {
         let surfaces = Surfaces::new(&tools, execution_mode, enable_js)?;
 
         let default_model = if config.default_model.trim().is_empty() {
-            DEFAULT_MODEL.to_string()
+            match config.host_kind {
+                HostKind::Desktop => DEFAULT_MODEL,
+                HostKind::Hub => HUB_DEFAULT_MODEL,
+            }
+            .to_string()
         } else {
             config.default_model.trim().to_string()
         };
-        let codex_home = codex_home();
+        let codex_home = (config.host_kind == HostKind::Desktop)
+            .then(codex_home)
+            .flatten();
         let models_cache = codex_home
             .as_ref()
             .map(|home| home.join("models_cache.json"));
-        let mut registry = ProviderRegistry::new(
-            "codex",
-            codex_provider(codex_home.as_deref(), models_cache.as_deref()),
-        );
         let claude_detection = claude::detect(
             config.bun_path.as_deref(),
             config.claude_code_dir.as_deref(),
@@ -631,11 +636,37 @@ impl Agent {
                     cwd: Some(dir.clone()),
                     env: Default::default(),
                 }));
-                registry.insert("claude-code", extension.clone())?;
                 Some(extension)
             }
             _ => None,
         };
+        let claude_provider: Arc<dyn Provider> = match &extension {
+            Some(extension) => extension.clone(),
+            None => Arc::new(Unavailable(
+                "Claude Code unavailable: configure NOTES_HUB_AGENT_BUN and \
+                 NOTES_HUB_AGENT_CLAUDE_CODE_EXTENSION, and supply CLAUDE_CONFIG_DIR \
+                 (mounted Claude Code login) or CLAUDE_CODE_OAUTH_TOKEN"
+                    .into(),
+            )),
+        };
+        let mut registry = if config.host_kind == HostKind::Hub {
+            let provider = if claude_credentials_available(|key| std::env::var_os(key)) {
+                claude_provider
+            } else {
+                Arc::new(Unavailable(CLAUDE_CREDENTIAL_ERROR.into()))
+            };
+            ProviderRegistry::new("claude-code", provider).with_strict_routes()
+        } else {
+            let mut registry = ProviderRegistry::new(
+                "codex",
+                codex_provider(codex_home.as_deref(), models_cache.as_deref()),
+            );
+            if extension.is_some() {
+                registry.insert("claude-code", claude_provider)?;
+            }
+            registry
+        };
+        register_opencode(&mut registry, std::env::var("OPENCODE_API_KEY").ok())?;
         if let Some((steps, final_text)) = config.test.scripted {
             registry.insert(
                 "scripted",
@@ -766,6 +797,7 @@ impl Agent {
             claude_detection,
             vault,
             default_model,
+            model_allowlist: None,
             vault_default_runner: (config.host_kind == HostKind::Hub)
                 .then_some(vault_core::AGENT_RUNNER_HUB),
             system_prompt,
@@ -848,17 +880,52 @@ impl Agent {
     }
 
     /// The model of runs that name none. On a hub: the vault's default
-    /// model for `hub`, else the configured `[agent] default_model`, else
-    /// [`DEFAULT_MODEL`]. On a desktop host: the configured default.
+    /// model for `hub` if allowed, else the configured `[agent] default_model`,
+    /// else [`HUB_DEFAULT_MODEL`]. On a desktop host: the configured default.
     pub fn default_model(&self) -> String {
         self.vault_default_model()
             .unwrap_or_else(|| self.default_model.clone())
     }
 
+    /// Applies the hub's configured model policy before exposing the engine.
+    pub fn with_model_allowlist(mut self, models: Vec<String>) -> Result<Self> {
+        ensure!(
+            self.vault_default_runner.is_some(),
+            "model allowlist requires a hub host"
+        );
+        ensure!(
+            models.contains(&self.default_model),
+            "agent.default_model {:?} must be in agent.models",
+            self.default_model
+        );
+        self.model_allowlist = Some(models);
+        Ok(self)
+    }
+
+    fn model_allowed(&self, model: &str) -> bool {
+        self.model_allowlist
+            .as_ref()
+            .is_none_or(|models| models.iter().any(|m| m == model))
+    }
+
+    fn check_model(&self, model: &str) -> Result<()> {
+        ensure!(
+            self.model_allowed(model),
+            "model {model:?} is not allowed by agent.models"
+        );
+        if model.starts_with("opencode/") && self.providers.get("opencode").is_none() {
+            anyhow::bail!("OpenCode unavailable: set OPENCODE_API_KEY");
+        }
+        Ok(())
+    }
+
     fn vault_default_model(&self) -> Option<String> {
         let runner = self.vault_default_runner?;
         match self.vault.agent_defaults() {
-            Ok(defaults) => defaults.model_for(runner).map(str::to_owned),
+            Ok(defaults) => defaults
+                .model_for(runner)
+                .filter(|m| self.model_allowed(m))
+                .map(str::to_owned),
             Err(error) => {
                 eprintln!("agent defaults unreadable: {error}");
                 None
@@ -870,9 +937,21 @@ impl Agent {
         &self.claude_detection
     }
 
-    /// Every provider's models as `provider/model`, the default model first.
-    /// Starts the Claude Code extension on first call so its models are known.
+    /// The hub's allowlist, or every desktop provider's models as `provider/model`.
+    /// The default comes first. Desktop discovery starts the Claude Code extension.
     pub fn models(&self) -> Vec<ModelInfo> {
+        if let Some(allowed) = &self.model_allowlist {
+            let default_model = self.default_model();
+            let mut models = allowed.clone();
+            models.sort_by_key(|id| id != &default_model);
+            return models
+                .into_iter()
+                .map(|id| ModelInfo {
+                    name: id.clone(),
+                    id,
+                })
+                .collect();
+        }
         if let Some(extension) = &self.extension {
             if extension.models().is_empty() {
                 let _ = self.runtime.block_on(async {
@@ -881,6 +960,13 @@ impl Agent {
             }
         }
         let mut models = self.providers.models();
+        if self.providers.get("opencode").is_some() {
+            // The chat-completions transport does not report a model catalog.
+            models.push(ModelInfo {
+                id: "opencode/deepseek-v4.1-flash".into(),
+                name: "DeepSeek V4.1 Flash".into(),
+            });
+        }
         let default_model = self.default_model();
         if !models.iter().any(|m| m.id == default_model) {
             models.insert(
@@ -1064,6 +1150,12 @@ impl Agent {
             .filter(|m| !m.trim().is_empty())
             .or_else(|| self.vault_default_model());
         let model = self.replay_model(session, model)?;
+        let model = if self.model_allowlist.is_some() {
+            Some(model.unwrap_or_else(|| self.default_model()))
+        } else {
+            model
+        };
+        self.check_model(model.as_deref().unwrap_or(&self.default_model))?;
         let _context = self.runtime.enter();
         let options = RunOptions {
             approval: Some(self.current_policy()),
@@ -1366,6 +1458,54 @@ fn execution_prompt(mode: bubblepaw_core::ExecutionMode, enable_js: bool) -> Str
         prompt.push_str(" The optional js tool composes async tools.* calls; its description defines its API, state lifecycle and limits.");
     }
     prompt
+}
+
+const CLAUDE_CREDENTIAL_ERROR: &str = "Claude Code sign-in unavailable: set CLAUDE_CONFIG_DIR \
+    to a mounted Claude Code login directory, or set CLAUDE_CODE_OAUTH_TOKEN";
+
+fn claude_credentials_available(get: impl Fn(&str) -> Option<std::ffi::OsString>) -> bool {
+    if get("CLAUDE_CODE_OAUTH_TOKEN")
+        .is_some_and(|token| !token.to_string_lossy().trim().is_empty())
+    {
+        return true;
+    }
+    let dir = get("CLAUDE_CONFIG_DIR")
+        .map(PathBuf::from)
+        .or_else(|| get("HOME").map(|home| PathBuf::from(home).join(".claude")));
+    dir.is_some_and(|dir| dir.join(".credentials.json").is_file())
+}
+
+/// BubblePaw's built-in OpenCode transport at the workspace's pinned revision.
+/// Taking the key as an argument keeps credential-presence tests process-local.
+fn register_opencode(registry: &mut ProviderRegistry, key: Option<String>) -> Result<()> {
+    if let Some(key) = key.filter(|key| !key.trim().is_empty()) {
+        let provider = ChatCompletionsProvider::api_key(key, "https://opencode.ai/zen/go/v1")?
+            .with_reasoning_fields(serde_json::json!({
+                "thinking": { "type": "enabled" }, "reasoning_effort": "low"
+            }))?
+            .with_opencode_route();
+        registry.insert("opencode", Arc::new(provider))?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod hub_credential_tests {
+    use super::*;
+
+    #[test]
+    fn claude_accepts_a_token_or_a_mounted_login_directory() {
+        assert!(!claude_credentials_available(|_| None));
+        assert!(claude_credentials_available(|key| {
+            (key == "CLAUDE_CODE_OAUTH_TOKEN").then(|| "synthetic-token".into())
+        }));
+        let root = tempfile::tempdir().unwrap();
+        let get =
+            |key: &str| (key == "CLAUDE_CONFIG_DIR").then(|| root.path().as_os_str().to_owned());
+        assert!(!claude_credentials_available(get));
+        std::fs::write(root.path().join(".credentials.json"), "{}").unwrap();
+        assert!(claude_credentials_available(get));
+    }
 }
 
 fn codex_home() -> Option<PathBuf> {

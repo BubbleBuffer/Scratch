@@ -168,6 +168,7 @@ impl Env {
                 execution_mode: ExecutionMode::Native,
                 enable_js,
                 default_model: "scripted/scripted".into(),
+                models: vec!["scripted/scripted".into()],
                 ..AgentSection::default()
             },
             ..Config::default()
