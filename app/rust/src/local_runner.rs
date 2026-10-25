@@ -71,6 +71,9 @@ impl LocalRunner {
         if data_dir.trim().is_empty() {
             return Self::Failed("the local schedule runner needs a non-empty data folder".into());
         }
+        if let Err(error) = vault_agent::projects::publish_at(&vault, Path::new(&data_dir)) {
+            eprintln!("runner projects could not be published: {error:#}");
+        }
         match Scheduler::open(
             vault.clone(),
             Path::new(&data_dir),

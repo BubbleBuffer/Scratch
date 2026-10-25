@@ -77,6 +77,15 @@ pub struct Task {
     /// Unix epoch milliseconds as stored in the row, empty until reported.
     #[serde(default)]
     pub progress_at: String,
+    /// The project a code task runs in: a project id of its PC runner, empty
+    /// for a task with no project.
+    #[serde(default)]
+    pub project: String,
+    /// The git worktree a code task runs in, empty until its runner makes it.
+    #[serde(default)]
+    pub worktree_branch: String,
+    #[serde(default)]
+    pub worktree_path: String,
     pub created_ms: i64,
     pub updated_ms: i64,
 }
@@ -133,6 +142,11 @@ pub fn schema() -> Vec<PropDef> {
         // (ms since the epoch, as `finished`).
         def("progress", "Progress", PropKind::Text, vec![]),
         def("progress_at", "Progress at", PropKind::Text, vec![]),
+        // A code task's project (a PC runner's project id), and the git
+        // worktree its runner made for it.
+        def("project", "Project", PropKind::Text, vec![]),
+        def("worktree_branch", "Worktree branch", PropKind::Text, vec![]),
+        def("worktree_path", "Worktree path", PropKind::Text, vec![]),
     ]
 }
 
@@ -234,6 +248,9 @@ fn task_of(row: &PageSummary) -> Task {
         error: text(p, "error"),
         progress: text(p, "progress"),
         progress_at: text(p, "progress_at"),
+        project: text(p, "project"),
+        worktree_branch: text(p, "worktree_branch"),
+        worktree_path: text(p, "worktree_path"),
         created_ms: row.created_ms,
         updated_ms: row.updated_ms,
     }
@@ -317,6 +334,30 @@ pub fn create_on(
     node: &str,
 ) -> Result<Task> {
     create_on_with(v, prompt, page, after, runner, node, &[])
+}
+
+/// [`create_on`] for a code task in `project`, a project id that the node's PC
+/// runner lists (checked by [`crate::runners::check_project`] before anything
+/// is written). An empty or blank project is no project, as in [`create_on`].
+/// The project is set before the row is queued.
+pub fn create_for_project(
+    v: &Vault,
+    prompt: &str,
+    page: &PageId,
+    after: Option<&str>,
+    runner: &str,
+    node: &str,
+    project: Option<&str>,
+) -> Result<Task> {
+    let node = if node.is_empty() {
+        v.device_id()
+    } else {
+        node.to_string()
+    };
+    let project = project.map(str::trim).filter(|p| !p.is_empty());
+    crate::runners::check_project(v, &node, project.unwrap_or(""))?;
+    let extra: Vec<(&str, &str)> = project.map(|p| ("project", p)).into_iter().collect();
+    create_on_with(v, prompt, page, after, runner, &node, &extra)
 }
 
 /// [`create_on`] that also sets `extra` properties before the row is queued,
@@ -585,6 +626,12 @@ pub fn recover(v: &Vault, device: &str) -> Result<u32> {
 pub fn retry(v: &Vault, id: &str) -> Result<()> {
     let t = get(v, id)?;
     v.remove_property(t.id.clone(), "error".into())?;
+    if !t.project.is_empty() {
+        // Review metadata belongs to an attempt, not to the reusable row.
+        // Retain the checkout itself; the next run creates a fresh binding.
+        v.remove_property(t.id.clone(), "worktree_branch".into())?;
+        v.remove_property(t.id.clone(), "worktree_path".into())?;
+    }
     // A placeholder replaced by a result is gone: add a new one.
     let has_block = match (&t.page, &t.block) {
         (Some(p), Some(b)) => v

@@ -65,7 +65,7 @@ pub use agent_defaults::{
 };
 pub use ids::{is_page_id, new_id, node_record_id, schedule_occurrence_id};
 pub use mdio::normalize_markdown;
-pub use nodes::{DeviceRecord, DEVICE_ACTIVITY_INTERVAL_MS, RUNNER_ONLINE_WINDOW_MS};
+pub use nodes::{DeviceProject, DeviceRecord, DEVICE_ACTIVITY_INTERVAL_MS, RUNNER_ONLINE_WINDOW_MS};
 /// Roles of the hidden system pages (`role:` in their markdown).
 pub use markdown::ROLES as PAGE_ROLES;
 pub use type_data::ListItem;

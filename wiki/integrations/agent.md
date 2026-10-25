@@ -68,11 +68,48 @@ state derived from last seen.
 
 The bridge exposes `ai_list_runners`, `ai_assign_task`, and `ai_rename_device`
 in [api/ai.rs](../../app/rust/src/api/ai.rs). Assignment accepts a prompt,
-page, optional block and runner id; it reuses slice 1's task creation path,
+page, optional block, runner id and optional `project_id`; it reuses the task creation path,
 creating an AI task row and placeholder pinned before it is queued. Unknown
 runner ids and blocks outside the page are rejected before any task mutation.
 Offline runners accept queued tasks. Rename rejects unknown devices and empty
 names. The Dart `RunnerBackend` adapter remains a separate slice.
+
+### Code tasks on a PC
+
+A project is one of that PC agent's existing projects: its local path is the
+repository, with no separate repository setting. Each PC publishes only project
+`id` and `name` pairs in its hidden Nodes record. The bridged runner list returns
+those choices for each PC; repository paths stay on the owning device.
+
+Task creation and `ai_assign_task` accept an optional `project_id`, saved in the
+AI tasks row's text property `project`. Empty means the existing notes-task
+behavior. A nonempty id must belong to the pinned PC's published project list;
+unknown ids and projects assigned to `hub` are rejected before a row or
+placeholder is created. There is no project picker change in this slice.
+
+Before the agent starts, the PC resolves the project locally and calls
+BubblePaw's existing `worktrees::create(store, repository, session_id)`. It creates
+branch `bp/<session-id>` from that repository's current `HEAD`, checked out at
+`<app-data>/agent/agent.data/worktrees/<session-id>`. The runner saves
+`worktree_branch` and `worktree_path` as text properties on the task row before
+starting the provider. The desktop pack's read, write, edit, search, list and
+shell tools use that worktree as their root and working directory. Project
+switching cannot redirect a bound code-task session. Shell access retains the
+desktop pack's existing capabilities; the working directory is not a sandbox.
+
+The repository must be a git working tree with at least one commit. A non-git
+folder or empty repository fails the task with a clear error; it never runs in
+the original folder instead. Disabled desktop tools on the PC also fail the
+code task. BubblePaw requires its agent data directory to be outside the source
+repository.
+
+Uncommitted changes in the source repository are not included. Confirm-level
+tools, including write, edit and exec, run without approval inside this
+unattended worktree run, using a per-run policy. Chat approval settings and
+ordinary notes tasks keep their existing behavior. Worktrees and branches are
+kept after success, failure or cancellation so the user can inspect and merge
+the work; this runner performs no cleanup. Retry reuses the task row but creates
+a new session, branch and worktree, retaining the previous attempt's work.
 
 ## Agent MCP gateway (`/mcp/agent`)
 

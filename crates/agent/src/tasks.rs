@@ -4,7 +4,7 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Context, Result};
 use async_trait::async_trait;
 use bubblepaw_core::{
     Approval, ClientInfo, Harness, Run, RunOptions, Tool, ToolContext, ToolDefinition,
@@ -73,6 +73,52 @@ impl Tool for ReportProgress {
 }
 
 impl Agent {
+    /// Prepare before admitting the provider: failures are written to the task
+    /// by the same finish path as provider errors. A retry has a new session.
+    fn prepare_code_task(&self, vault: &Vault, task_id: &str, session: &str) -> Result<()> {
+        let task = tasks::get(vault, task_id).map_err(anyhow::Error::msg)?;
+        if task.project.is_empty() {
+            return Ok(());
+        }
+        ensure!(
+            self.host_info.kind == "desktop",
+            "code tasks require a PC runner"
+        );
+        ensure!(
+            task.node == vault.device_id(),
+            "code tasks require a pinned PC runner"
+        );
+        ensure!(
+            self.desktop.is_some(),
+            "desktop tools are disabled on this PC; enable desktop tools to run a code task"
+        );
+        let projects = self.project_store()?;
+        let project = projects
+            .list()
+            .into_iter()
+            .find(|p| p.id == task.project)
+            .with_context(|| format!("unknown project {:?} on this PC", task.project))?;
+        projects.switch(session, &project.id)?;
+        let info = bubblepaw_runner::worktrees::create(
+            &self.store,
+            std::path::Path::new(&project.path),
+            session,
+        )
+        .with_context(|| format!("cannot start code task for project {:?}", project.name))?;
+        tasks::ensure_collection(vault).map_err(anyhow::Error::msg)?;
+        vault.set_property(
+            task_id.into(),
+            "worktree_branch".into(),
+            PropValue::Text(info.branch),
+        )?;
+        vault.set_property(
+            task_id.into(),
+            "worktree_path".into(),
+            PropValue::Text(info.path.to_string_lossy().into_owned()),
+        )?;
+        Ok(())
+    }
+
     /// A separate registry over the same store/runtime preserves chat and MCP
     /// surfaces and cancellation, without ever advertising progress to chats.
     fn task_harness(&self, task: &str, session: &str) -> Result<Harness> {
@@ -224,8 +270,12 @@ impl Agent {
         prompt: &str,
         limit: Duration,
     ) -> Result<Ended> {
+        self.prepare_code_task(vault, task_id, session)?;
         let model = Some(self.default_model()).filter(|m| !m.trim().is_empty());
-        let system_prompt = self.run_prompt(session)?;
+        let mut system_prompt = self.run_prompt(session)?;
+        if bubblepaw_runner::worktrees::get(&self.store, session)?.is_some() {
+            system_prompt.push_str(" This is a code task in an isolated git worktree. File and shell tools are rooted there and Confirm tools run without approval. The worktree and branch are kept for review. The source repository's uncommitted changes were not copied. Stay in this worktree.");
+        }
         let harness = self.task_harness(task_id, session)?;
         self.runtime.block_on(async {
             // Cancelled after the session was saved, before the engine starts.

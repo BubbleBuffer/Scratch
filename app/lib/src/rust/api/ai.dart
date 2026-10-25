@@ -10,7 +10,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'vault.dart';
 
 // These functions are ignored because they are not marked as `pub`: `lock`, `task`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// The default listen address of the app's MCP endpoint.
 String mcpDefaultAddr() => RustLib.instance.api.crateApiAiMcpDefaultAddr();
@@ -34,12 +34,14 @@ Future<AiTask> aiAssignTask({
   required String page,
   String? block,
   required String runnerId,
+  String? projectId,
 }) => RustLib.instance.api.crateApiAiAiAssignTask(
   vault: vault,
   prompt: prompt,
   page: page,
   block: block,
   runnerId: runnerId,
+  projectId: projectId,
 );
 
 /// Renames a device from any copy of the vault. Only its trimmed name changes.
@@ -61,12 +63,14 @@ Future<AiTask> aiCreateTask({
   required String page,
   String? after,
   required String runner,
+  String? projectId,
 }) => RustLib.instance.api.crateApiAiAiCreateTask(
   vault: vault,
   prompt: prompt,
   page: page,
   after: after,
   runner: runner,
+  projectId: projectId,
 );
 
 /// [`ai_create_task`] pinned to this device: only this device claims it
@@ -76,11 +80,13 @@ Future<AiTask> aiCreateTaskHere({
   required String prompt,
   required String page,
   String? after,
+  String? projectId,
 }) => RustLib.instance.api.crateApiAiAiCreateTaskHere(
   vault: vault,
   prompt: prompt,
   page: page,
   after: after,
+  projectId: projectId,
 );
 
 /// Cancels a desktop task that hasn't ended: it is never claimed, and a
@@ -159,6 +165,7 @@ class AiRunner {
   /// Unix epoch milliseconds; absent until a timestamp is known.
   final PlatformInt64? lastSeenMs;
   final bool isThisDevice;
+  final List<AiRunnerProject> projects;
 
   const AiRunner({
     required this.id,
@@ -167,6 +174,7 @@ class AiRunner {
     required this.online,
     this.lastSeenMs,
     required this.isThisDevice,
+    required this.projects,
   });
 
   @override
@@ -176,7 +184,8 @@ class AiRunner {
       kind.hashCode ^
       online.hashCode ^
       lastSeenMs.hashCode ^
-      isThisDevice.hashCode;
+      isThisDevice.hashCode ^
+      projects.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -188,7 +197,8 @@ class AiRunner {
           kind == other.kind &&
           online == other.online &&
           lastSeenMs == other.lastSeenMs &&
-          isThisDevice == other.isThisDevice;
+          isThisDevice == other.isThisDevice &&
+          projects == other.projects;
 }
 
 /// The hub or a PC that uses this vault.
@@ -210,6 +220,25 @@ class AiRunnerList {
           runtimeType == other.runtimeType &&
           runners == other.runners &&
           defaultRunnerId == other.defaultRunnerId;
+}
+
+/// A PC's project choice, without its private local repository path.
+class AiRunnerProject {
+  final String id;
+  final String name;
+
+  const AiRunnerProject({required this.id, required this.name});
+
+  @override
+  int get hashCode => id.hashCode ^ name.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiRunnerProject &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name;
 }
 
 /// An AI task (a row of the "AI tasks" collection).
@@ -246,6 +275,13 @@ class AiTask {
   /// "hub" (a hub job).
   final String node;
 
+  /// An agent project id on the pinned PC; empty for a notes-only task.
+  final String project;
+
+  /// Saved by the runner before the code task starts.
+  final String worktreeBranch;
+  final String worktreePath;
+
   const AiTask({
     required this.id,
     required this.prompt,
@@ -260,6 +296,9 @@ class AiTask {
     required this.createdMs,
     required this.updatedMs,
     required this.node,
+    required this.project,
+    required this.worktreeBranch,
+    required this.worktreePath,
   });
 
   @override
@@ -276,7 +315,10 @@ class AiTask {
       progressAt.hashCode ^
       createdMs.hashCode ^
       updatedMs.hashCode ^
-      node.hashCode;
+      node.hashCode ^
+      project.hashCode ^
+      worktreeBranch.hashCode ^
+      worktreePath.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -295,5 +337,8 @@ class AiTask {
           progressAt == other.progressAt &&
           createdMs == other.createdMs &&
           updatedMs == other.updatedMs &&
-          node == other.node;
+          node == other.node &&
+          project == other.project &&
+          worktreeBranch == other.worktreeBranch &&
+          worktreePath == other.worktreePath;
 }

@@ -2,7 +2,8 @@
 //! node-record page ids are storage details, never task destinations.
 
 use vault_core::{
-    Block, Vault, AGENT_RUNNER_HUB, AGENT_RUNNER_THIS_DEVICE, RUNNER_ONLINE_WINDOW_MS,
+    Block, DeviceProject, Vault, AGENT_RUNNER_HUB, AGENT_RUNNER_THIS_DEVICE,
+    RUNNER_ONLINE_WINDOW_MS,
 };
 
 use crate::{err, jobs, tasks, Result};
@@ -21,6 +22,14 @@ pub struct Runner {
     pub online: bool,
     pub last_seen_ms: Option<i64>,
     pub is_this_device: bool,
+    /// The projects a PC runner has open, as its record publishes them. The
+    /// hub has none.
+    pub projects: Vec<DeviceProject>,
+}
+
+/// Whether a device record's kind is a PC, the only kind that runs code tasks.
+fn is_pc(kind: &str) -> bool {
+    kind == "desktop" || kind == "pc"
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,7 +68,7 @@ pub fn list_at(
         .max();
     let mut pcs: Vec<Runner> = records
         .into_iter()
-        .filter(|r| r.kind == "desktop" || r.kind == "pc")
+        .filter(|r| is_pc(&r.kind))
         .map(|r| Runner {
             is_this_device: r.id == device_id,
             online: is_online(r.last_seen_ms, now_ms),
@@ -67,6 +76,7 @@ pub fn list_at(
             name: r.name,
             kind: RunnerKind::Pc,
             last_seen_ms: r.last_seen_ms,
+            projects: r.projects,
         })
         .collect();
     pcs.sort_by(|a, b| {
@@ -82,6 +92,7 @@ pub fn list_at(
         online: is_online(hub_seen, now_ms),
         last_seen_ms: hub_seen,
         is_this_device: false,
+        projects: Vec::new(),
     }];
     runners.extend(pcs);
 
@@ -104,21 +115,50 @@ pub fn list_at(
     })
 }
 
+/// Checks that a task on `runner_id` may use `project`, a project id, before
+/// anything is written. An empty `project` is always allowed. A project needs a
+/// PC runner whose record lists it: the hub has no projects, and a runner that
+/// is not a PC, or is unknown, or does not list the project, is an error.
+pub fn check_project(v: &Vault, runner_id: &str, project: &str) -> Result<()> {
+    if project.is_empty() {
+        return Ok(());
+    }
+    if runner_id == jobs::NODE_HUB {
+        return err("a hub task cannot use a project");
+    }
+    let records = v.device_records()?;
+    let Some(record) = records.iter().find(|r| r.id == runner_id) else {
+        return err(format!("unknown runner {runner_id:?}"));
+    };
+    if !is_pc(&record.kind) {
+        return err(format!("runner {runner_id:?} is not a PC"));
+    }
+    if !record.projects.iter().any(|p| p.id == project) {
+        return err(format!(
+            "unknown project {project:?} on runner {runner_id:?}"
+        ));
+    }
+    Ok(())
+}
+
 /// Creates a real AI task and its placeholder, pinned before it is queued.
 /// `block` is an optional block in `page`, using the existing creation path's
 /// placement/reuse behavior. Offline runners accept queued assignments.
+/// `project` is a project id of the PC runner (see [`check_project`]); `None`
+/// assigns no project.
 pub fn assign(
     v: &Vault,
     prompt: &str,
     page: &str,
     block: Option<&str>,
     runner_id: &str,
+    project: Option<&str>,
 ) -> Result<tasks::Task> {
     if runner_id != jobs::NODE_HUB
         && !v
             .device_records()?
             .iter()
-            .any(|r| r.id == runner_id && (r.kind == "desktop" || r.kind == "pc"))
+            .any(|r| r.id == runner_id && is_pc(&r.kind))
     {
         return err(format!("unknown runner {runner_id:?}"));
     }
@@ -133,5 +173,5 @@ pub fn assign(
             return err(format!("block {block:?} does not belong to page {page:?}"));
         }
     }
-    tasks::create_on(v, prompt, &page_id, block, "agent", runner_id)
+    tasks::create_for_project(v, prompt, &page_id, block, "agent", runner_id, project)
 }
