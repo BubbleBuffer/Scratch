@@ -16,9 +16,10 @@ class FakeRunnerBackend extends RunnerBackend {
     this.sampleRunning = false,
   }) : now = now ?? DateTime.now();
 
-  /// The demo runners: the hub, Studio-PC (this device and the default),
-  /// Office-PC online, and Laptop offline for two hours. With [sampleRunning],
-  /// the first online assignment runs with sample progress.
+  /// The demo runners: the hub, Studio-PC (this device and the default, with
+  /// two projects), Office-PC online with no projects, and Laptop offline for
+  /// two hours. With [sampleRunning], the first online assignment runs with
+  /// sample progress.
   factory FakeRunnerBackend.demo({DateTime? now, bool sampleRunning = false}) {
     final at = now ?? DateTime.now();
     return FakeRunnerBackend(
@@ -39,6 +40,10 @@ class FakeRunnerBackend extends RunnerBackend {
           lastSeen: at,
           isThisDevice: true,
           isDefault: true,
+          projects: const [
+            RunnerProject(id: 'notes-app', name: 'notes-app'),
+            RunnerProject(id: 'docs-site', name: 'docs-site'),
+          ],
         ),
         Runner(
           id: 'office',
@@ -83,8 +88,16 @@ class FakeRunnerBackend extends RunnerBackend {
   }
 
   @override
-  Future<RunnerAssignment> assign(String taskId, String runnerId) async {
-    calls.add('assign:$taskId:$runnerId');
+  Future<RunnerAssignment> assign(
+    String taskId,
+    String runnerId, {
+    String? projectId,
+  }) async {
+    calls.add(
+      projectId == null
+          ? 'assign:$taskId:$runnerId'
+          : 'assign:$taskId:$runnerId:$projectId',
+    );
     final failure = error;
     if (failure != null) throw RunnerUnavailable(failure);
     Runner? runner;
@@ -92,6 +105,15 @@ class FakeRunnerBackend extends RunnerBackend {
       if (r.id == runnerId) runner = r;
     }
     if (runner == null) throw const RunnerUnavailable('Unknown runner.');
+    String? projectName;
+    if (projectId != null) {
+      for (final p in runner.projects) {
+        if (p.id == projectId) projectName = p.name;
+      }
+      if (projectName == null) {
+        throw const RunnerUnavailable('Unknown project.');
+      }
+    }
     if (runner.online) {
       final sample = sampleRunning && !_sampled;
       if (sample) _sampled = true;
@@ -101,6 +123,7 @@ class FakeRunnerBackend extends RunnerBackend {
         runnerName: runner.name,
         state: sample ? AssignState.running : AssignState.queued,
         progress: sample ? sampleRunnerProgress : null,
+        projectName: projectName,
       );
     }
     final seen = runner.lastSeen;
@@ -111,6 +134,7 @@ class FakeRunnerBackend extends RunnerBackend {
       runnerName: runner.name,
       state: AssignState.waiting,
       reason: '${runner.name} is offline$since',
+      projectName: projectName,
     );
   }
 }

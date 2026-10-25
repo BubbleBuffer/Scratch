@@ -1,6 +1,7 @@
 // The "Run on" picker. Under 700 px it is a bottom sheet; at 700 px and wider
 // it is a popover under the button that opened it. It lists the hub and each
-// PC, marks the default, and assigns the card to the runner chosen.
+// PC, marks the default, and assigns the card to the runner chosen. Under a
+// PC that has projects it also offers a Project choice, None by default.
 
 import 'dart:async';
 
@@ -81,6 +82,10 @@ class _RunnerPicker extends StatefulWidget {
 class _RunnerPickerState extends State<_RunnerPicker> {
   late final Future<List<Runner>> _runners = widget.assignments.runners();
   String? _chosen;
+
+  /// The project of the chosen PC, or null for None. Switching runners resets
+  /// it, so it always belongs to the runner chosen.
+  String? _project;
   bool _busy = false;
   String? _error;
 
@@ -93,6 +98,7 @@ class _RunnerPickerState extends State<_RunnerPicker> {
       final assignment = await widget.assignments.assign(
         widget.taskId,
         runnerId,
+        projectId: _project,
       );
       if (mounted) Navigator.of(context).pop(assignment);
     } catch (e) {
@@ -131,13 +137,23 @@ class _RunnerPickerState extends State<_RunnerPicker> {
             else if (runners.isEmpty)
               const _Notice('No runners are connected.')
             else
-              for (final r in runners)
+              for (final r in runners) ...[
                 _RunnerRow(
                   runner: r,
                   subline: runnerSubline(r, now),
                   selected: r.id == chosen,
-                  onTap: () => setState(() => _chosen = r.id),
+                  onTap: () => setState(() {
+                    if (r.id != chosen) _project = null;
+                    _chosen = r.id;
+                  }),
                 ),
+                if (r.id == chosen && r.projects.isNotEmpty)
+                  _ProjectChoice(
+                    projects: r.projects,
+                    selected: _project,
+                    onTap: (id) => setState(() => _project = id),
+                  ),
+              ],
             if (_error != null) _Notice(_error!),
             Container(
               margin: const EdgeInsets.only(top: 12),
@@ -169,6 +185,110 @@ class _RunnerPickerState extends State<_RunnerPicker> {
           ],
         );
       },
+    );
+  }
+}
+
+/// The Project block under the chosen PC: None, then each project by name.
+class _ProjectChoice extends StatelessWidget {
+  const _ProjectChoice({
+    required this.projects,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final List<RunnerProject> projects;
+
+  /// The chosen project's id, or null for None.
+  final String? selected;
+
+  /// Called with the project's id, or null for None.
+  final ValueChanged<String?> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(40, 0, 0, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 2, 0, 4),
+            child: Text(
+              'Project',
+              style: ts(const TypeSpec(12.5, 17, 600), c.textSecondary),
+            ),
+          ),
+          _ProjectRow(
+            key: const ValueKey('project-row-none'),
+            name: 'None',
+            selected: selected == null,
+            onTap: () => onTap(null),
+          ),
+          for (final p in projects)
+            _ProjectRow(
+              key: ValueKey('project-row-${p.id}'),
+              name: p.name,
+              selected: selected == p.id,
+              onTap: () => onTap(p.id),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One project choice: the name and a radio dot, styled like a runner row.
+class _ProjectRow extends StatelessWidget {
+  const _ProjectRow({
+    super.key,
+    required this.name,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: name,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+          decoration: BoxDecoration(
+            color: selected ? c.bgHover : null,
+            borderRadius: Radii.field,
+            border: Border.all(
+              color: selected ? c.borderStrong : const Color(0x00000000),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ts(const TypeSpec(14, 18, 400), c.textPrimary),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _RadioDot(selected: selected),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

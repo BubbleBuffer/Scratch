@@ -8,9 +8,16 @@ import 'package:flutter/widgets.dart';
 import '../../ui/ui.dart';
 import 'runner_backend.dart';
 
-/// The chip's words: the runner's name, a dot and the state.
-String runnerChipText(RunnerAssignment assignment) =>
-    '${assignment.runnerName} · ${assignment.state.label}';
+/// The chip's words: the runner's name, the project's name when the task has
+/// one, then the state, each after a dot.
+String runnerChipText(RunnerAssignment assignment) {
+  final project = assignment.projectName;
+  return [
+    assignment.runnerName,
+    if (project != null && project.isNotEmpty) project,
+    assignment.state.label,
+  ].join(' · ');
+}
 
 /// The progress line under the chip, or null when there is none to show. It
 /// shows while the run is going and after a failed or cancelled run, where it

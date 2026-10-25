@@ -8,6 +8,14 @@ import 'package:flutter/widgets.dart';
 /// The hub, or a desktop that can run an agent for a task.
 enum RunnerKind { hub, pc }
 
+/// A project on a PC that a task can run in. The hub has none.
+class RunnerProject {
+  const RunnerProject({required this.id, required this.name});
+
+  final String id;
+  final String name;
+}
+
 /// One runner as the picker lists it.
 class Runner {
   const Runner({
@@ -18,6 +26,7 @@ class Runner {
     this.lastSeen,
     this.isThisDevice = false,
     this.isDefault = false,
+    this.projects = const [],
   });
 
   final String id;
@@ -33,6 +42,10 @@ class Runner {
 
   /// True for the runner the user chose as the default in Settings.
   final bool isDefault;
+
+  /// The projects this PC can run a task in. Empty when there are none, and
+  /// always empty for the hub.
+  final List<RunnerProject> projects;
 }
 
 /// Where an assignment stands, as the card's chip words it.
@@ -54,7 +67,9 @@ enum AssignState {
 /// A task's assignment to a runner. [reason] is shown under the chip when
 /// there is one, for example why the task waits. [progress] is the agent's
 /// latest progress line; the chip shows it while the run is going and keeps it
-/// after a failed or cancelled run.
+/// after a failed or cancelled run. [projectName] is the PC project the task
+/// runs in, shown on the chip after the runner's name; null when it runs in
+/// none.
 class RunnerAssignment {
   const RunnerAssignment({
     required this.taskId,
@@ -63,6 +78,7 @@ class RunnerAssignment {
     required this.state,
     this.reason,
     this.progress,
+    this.projectName,
   });
 
   final String taskId;
@@ -73,6 +89,9 @@ class RunnerAssignment {
 
   /// The latest progress text, or null when the agent has reported none.
   final String? progress;
+
+  /// The project's name, or null when the task runs in no project.
+  final String? projectName;
 }
 
 /// The backend could not answer. [reason] is shown as is.
@@ -90,8 +109,13 @@ abstract class RunnerBackend {
   /// The hub first, then each PC, in the order the picker shows them.
   Future<List<Runner>> listRunners();
 
-  /// Assigns the task [taskId] to the runner [runnerId].
-  Future<RunnerAssignment> assign(String taskId, String runnerId);
+  /// Assigns the task [taskId] to the runner [runnerId], in the project
+  /// [projectId] of that runner, or in none when [projectId] is null.
+  Future<RunnerAssignment> assign(
+    String taskId,
+    String runnerId, {
+    String? projectId,
+  });
 
   /// The assignment this backend already knows for [taskId], or null. Chips
   /// read it on every redraw, so it must not call the backend.
@@ -119,9 +143,18 @@ class RunnerAssignments extends ChangeNotifier {
 
   Future<List<Runner>> runners() => backend.listRunners();
 
-  /// Assigns [taskId] to [runnerId] and keeps the answer.
-  Future<RunnerAssignment> assign(String taskId, String runnerId) async {
-    final assignment = await backend.assign(taskId, runnerId);
+  /// Assigns [taskId] to [runnerId], in [projectId] or in none, and keeps the
+  /// answer.
+  Future<RunnerAssignment> assign(
+    String taskId,
+    String runnerId, {
+    String? projectId,
+  }) async {
+    final assignment = await backend.assign(
+      taskId,
+      runnerId,
+      projectId: projectId,
+    );
     record(assignment);
     return assignment;
   }

@@ -9,11 +9,13 @@ abstract interface class AiRunnerBridge {
   /// The hub (when [hubUsable]) and the vault's PCs, with the default marked.
   Future<AiRunnerList> listRunners({required bool hubUsable});
 
-  /// Queues a task about [page] pinned to [runnerId], offline runners too.
+  /// Queues a task about [page] pinned to [runnerId], offline runners too, in
+  /// the runner's project [projectId] or in none.
   Future<AiTask> assign({
     required String prompt,
     required String page,
     required String runnerId,
+    String? projectId,
   });
 
   /// Renames the device [deviceId] to [name] (trimmed by the vault).
@@ -35,12 +37,14 @@ class VaultAiRunnerBridge implements AiRunnerBridge {
     required String prompt,
     required String page,
     required String runnerId,
+    String? projectId,
   }) => vault.run(
     (v) => aiAssignTask(
       vault: v,
       prompt: prompt,
       page: page,
       runnerId: runnerId,
+      projectId: projectId,
     ),
     writes: true,
   );

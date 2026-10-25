@@ -43,6 +43,32 @@ void main() {
       expect(a.reason, 'Laptop is offline (last seen 2 h ago)');
     });
 
+    test('only Studio-PC has projects, and an assignment names the one chosen', () async {
+      final backend = FakeRunnerBackend.demo(now: now);
+      final runners = await backend.listRunners();
+      expect(runners[0].projects, isEmpty, reason: 'the hub has none');
+      expect(runners[1].projects.map((p) => p.name), ['notes-app', 'docs-site']);
+      expect(runners[2].projects, isEmpty, reason: 'Office-PC has none');
+
+      final a = await backend.assign('task-1', 'studio', projectId: 'docs-site');
+      expect(a.projectName, 'docs-site');
+      expect(a.state, AssignState.queued);
+      expect(backend.calls, ['assign:task-1:studio:docs-site']);
+      expect(runnerChipText(a), 'Studio-PC · docs-site · queued');
+
+      final none = await backend.assign('task-2', 'studio');
+      expect(none.projectName, isNull);
+      expect(runnerChipText(none), 'Studio-PC · queued');
+    });
+
+    test('a project the runner does not have is refused', () async {
+      final backend = FakeRunnerBackend.demo(now: now);
+      await expectLater(
+        backend.assign('task-1', 'office', projectId: 'notes-app'),
+        throwsA(isA<RunnerUnavailable>().having((e) => e.reason, 'reason', 'Unknown project.')),
+      );
+    });
+
     test('an unknown runner is refused', () async {
       final backend = FakeRunnerBackend.demo(now: now);
       await expectLater(
@@ -116,6 +142,17 @@ void main() {
         );
         expect(runnerChipText(a), 'Laptop · ${entry.value}');
       }
+    });
+
+    test('names the project after the runner when the task has one', () {
+      const a = RunnerAssignment(
+        taskId: 't',
+        runnerId: 'studio',
+        runnerName: 'Desk PC',
+        state: AssignState.running,
+        projectName: 'notes-app',
+      );
+      expect(runnerChipText(a), 'Desk PC · notes-app · running');
     });
   });
 

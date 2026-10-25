@@ -10,7 +10,7 @@ import 'package:notes_app/ui/tokens.dart';
 import 'package:notes_app/services/addon_services.dart'
     show AiRunnerBridge, AiTask, AiTaskSource;
 import 'package:notes_app/src/rust/api/ai.dart'
-    show AiRunner, AiRunnerKind, AiRunnerList;
+    show AiRunner, AiRunnerKind, AiRunnerList, AiRunnerProject;
 
 import 'kanban_fixture.dart';
 
@@ -29,7 +29,10 @@ AiRunnerList _fleet({String defaultId = 'studio'}) => AiRunnerList(
       isThisDevice: false,
     ),
     AiRunner(
-      projects: const [],
+      projects: const [
+        AiRunnerProject(id: 'notes-app', name: 'notes-app'),
+        AiRunnerProject(id: 'docs-site', name: 'docs-site'),
+      ],
       id: 'studio',
       name: 'Studio-PC',
       kind: AiRunnerKind.pc,
@@ -56,8 +59,9 @@ AiTask _row(
   String node = 'studio',
   String error = '',
   String progress = '',
+  String project = '',
 }) => AiTask(
-  project: '',
+  project: project,
   worktreeBranch: '',
   worktreePath: '',
   id: id,
@@ -95,8 +99,10 @@ class _FakeBridge implements AiRunnerBridge {
     required String prompt,
     required String page,
     required String runnerId,
+    String? projectId,
   }) async {
-    calls.add('assign:$page:$runnerId:${prompt == runnerCardPrompt}');
+    final project = projectId == null ? '' : ':$projectId';
+    calls.add('assign:$page:$runnerId:${prompt == runnerCardPrompt}$project');
     return assigned!;
   }
 
@@ -214,6 +220,59 @@ void main() {
       expect(a.state, AssignState.waiting);
       expect(a.reason, 'Laptop is offline (last seen 2 h ago)');
       expect(source.refreshes, 1);
+    });
+
+    test('lists each PC with its projects, and the hub with none', () async {
+      final backend = RealRunnerBackend(
+        _FakeSource(_FakeBridge(_fleet())),
+        clock: () => _now,
+      );
+      final runners = await backend.listRunners();
+
+      expect(runners[0].projects, isEmpty);
+      expect(runners[1].projects.map((p) => p.id), ['notes-app', 'docs-site']);
+      expect(runners[1].projects.map((p) => p.name), ['notes-app', 'docs-site']);
+      expect(runners[2].projects, isEmpty);
+    });
+
+    test('assign passes the chosen project to the bridge, and the chip names it', () async {
+      final bridge = _FakeBridge(_fleet())
+        ..assigned = _row(
+          't7',
+          'card-d',
+          'queued',
+          node: 'studio',
+          project: 'docs-site',
+        );
+      final source = _FakeSource(bridge);
+      final backend = RealRunnerBackend(source, clock: () => _now);
+      await backend.listRunners();
+
+      final a = await backend.assign('card-d', 'studio', projectId: 'docs-site');
+
+      expect(bridge.calls, contains('assign:card-d:studio:true:docs-site'));
+      expect(a.projectName, 'docs-site');
+      expect(runnerChipText(a), 'Studio-PC · docs-site · queued');
+
+      source.tasks = [bridge.assigned!];
+      expect(backend.current('card-d')!.projectName, 'docs-site');
+    });
+
+    test('a task with no project, or a project the listing lacks, names none', () async {
+      final bridge = _FakeBridge(_fleet())
+        ..assigned = _row('t8', 'card-e', 'queued', node: 'studio');
+      final source = _FakeSource(bridge)
+        ..tasks = [
+          _row('t9', 'card-f', 'queued', node: 'studio', project: 'gone'),
+        ];
+      final backend = RealRunnerBackend(source, clock: () => _now);
+      await backend.listRunners();
+
+      final none = await backend.assign('card-e', 'studio');
+      expect(bridge.calls, contains('assign:card-e:studio:true'));
+      expect(none.projectName, isNull);
+      expect(runnerChipText(none), 'Studio-PC · queued');
+      expect(backend.current('card-f')!.projectName, isNull);
     });
 
     test('a runner list that fails reports the reason as RunnerUnavailable', () async {
