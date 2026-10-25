@@ -7,6 +7,8 @@
 #   scratch-setup-<short sha>      Scratch-Setup-<version>-<short sha>.exe
 #                                  (app/windows/installer/scratch.iss; version from app/pubspec.yaml)
 #   notes-cli-windows-<short sha>  notes.exe from crates/tools (package vault_tools, bin notes)
+#   scratch-cli-windows            scratch-cli.exe from crates/cli (package scratch_cli), the
+#                                  headless AI task runner
 #
 # windows-latest ships Visual Studio 2022 with the ATL component, which
 # flutter_local_notifications_windows needs (atlbase.h).
@@ -97,7 +99,7 @@ jobs:
           retention-days: 7
 
   cli:
-    name: notes cli (windows)
+    name: notes cli and scratch-cli (windows)
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:
@@ -112,8 +114,8 @@ jobs:
         with:
           shared-key: windows-cli
       # The workspace target-dir is set in .cargo/config.toml, so the binary lands in target/.
-      - name: Build notes CLI
-        run: cargo build --release --locked -p vault_tools --bin notes
+      - name: Build notes CLI and scratch-cli
+        run: cargo build --release --locked -p vault_tools --bin notes -p scratch_cli --bin scratch-cli
       - name: Short sha for artifact names
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
@@ -122,5 +124,12 @@ jobs:
         with:
           name: notes-cli-windows-${{ steps.sha.outputs.short }}
           path: target/release/notes.exe
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload scratch-cli.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: scratch-cli-windows
+          path: target/release/scratch-cli.exe
           if-no-files-found: error
           retention-days: 7
