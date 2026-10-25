@@ -83,6 +83,7 @@ async fn env_with(
         trust_proxy: false,
         agent: AgentSection {
             default_model: "scripted/scripted".into(),
+            models: vec!["scripted/scripted".into()],
             ..AgentSection::default()
         },
         job_limits: limits,

@@ -278,7 +278,9 @@ impl Agent {
         limit: Duration,
     ) -> Result<Ended> {
         self.prepare_code_task(vault, task_id, session)?;
-        let model = Some(self.default_model()).filter(|m| !m.trim().is_empty());
+        let selected = self.default_model();
+        self.check_model(&selected)?;
+        let model = Some(selected).filter(|m| !m.trim().is_empty());
         let mut system_prompt = self.run_prompt(session)?;
         system_prompt.push_str(DELEGATED_PROMPT);
         let mut approval = permission_policy(PermissionMode::Bypass);
@@ -375,7 +377,9 @@ impl Agent {
         prompt: &str,
         limit: Duration,
     ) -> Result<JobOutcome> {
-        let model = Some(self.default_model()).filter(|m| !m.trim().is_empty());
+        let selected = self.default_model();
+        self.check_model(&selected)?;
+        let model = Some(selected).filter(|m| !m.trim().is_empty());
         let mut system_prompt = self.run_prompt(session)?;
         system_prompt.push_str(DELEGATED_PROMPT);
         let harness = self.task_harness(task_id, session)?;
