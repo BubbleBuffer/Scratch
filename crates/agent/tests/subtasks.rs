@@ -31,9 +31,10 @@ fn call(name: &'static str, args: Value) -> Call {
     Call { name, args }
 }
 
-/// The todo tool takes the whole list as a bare array.
+/// The todo tool takes the whole list as `{todos: [...]}`; the state it saves
+/// is the bare array.
 fn todo(items: Vec<Value>) -> Call {
-    call("todo", json!(items))
+    call("todo", json!({"todos": items}))
 }
 
 fn item(text: &str, status: &str) -> Value {
@@ -830,12 +831,12 @@ fn only_delegated_runs_see_or_call_todo_and_the_gateway_omits_it() {
     let task_code = r#"
         const found = await tools.$search("select:todo");
         await tools.test_record({names: found.tools.map(t => t.name)});
-        await tools.todo([{text: "Found it", status: "pending"}]);
+        await tools.todo({todos: [{text: "Found it", status: "pending"}]});
     "#;
     let chat_code = r#"
         const found = await tools.$search("select:todo");
         let rejected = false;
-        try { await tools.todo([]); } catch (_) { rejected = true; }
+        try { await tools.todo({todos: []}); } catch (_) { rejected = true; }
         return {names: found.tools.map(t => t.name), rejected};
     "#;
     let agent = open(
