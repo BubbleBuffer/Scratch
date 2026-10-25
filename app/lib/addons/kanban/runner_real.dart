@@ -10,7 +10,8 @@ import 'package:flutter/widgets.dart';
 
 import '../../services/addon_services.dart'
     show AiTask, AiTaskSource;
-import '../../src/rust/api/ai.dart' show AiRunner, AiRunnerKind, AiRunnerList;
+import '../../src/rust/api/ai.dart'
+    show AiRunner, AiRunnerKind, AiRunnerList, AiRunnerProject;
 import 'runner_backend.dart';
 
 /// What an assigned card asks the agent to do with its note.
@@ -92,13 +93,18 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
   }
 
   @override
-  Future<RunnerAssignment> assign(String taskId, String runnerId) async {
+  Future<RunnerAssignment> assign(
+    String taskId,
+    String runnerId, {
+    String? projectId,
+  }) async {
     try {
       if (_runners?.containsKey(runnerId) != true) await _fetch();
       final task = await source.runnerBridge.assign(
         prompt: runnerCardPrompt,
         page: taskId,
         runnerId: runnerId,
+        projectId: projectId,
       );
       await source.refresh();
       return _fromTask(taskId, task) ??
@@ -107,6 +113,7 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
             runnerId: runnerId,
             runnerName: _nameOf(runnerId),
             state: AssignState.queued,
+            projectName: _projectName(runnerId, projectId ?? ''),
           );
     } catch (e) {
       throw RunnerUnavailable('$e');
@@ -121,9 +128,23 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
     lastSeen: _time(r.lastSeenMs?.toInt()),
     isThisDevice: r.isThisDevice,
     isDefault: r.id == defaultId,
+    projects: [
+      for (final p in r.projects) RunnerProject(id: p.id, name: p.name),
+    ],
   );
 
   String _nameOf(String runnerId) => _runners?[runnerId]?.name ?? runnerId;
+
+  /// The name of the project [projectId] on the runner [runnerId], from the
+  /// last listing. Null for no project, or when the listing does not have it.
+  String? _projectName(String runnerId, String projectId) {
+    if (projectId.isEmpty) return null;
+    final projects = _runners?[runnerId]?.projects ?? const <AiRunnerProject>[];
+    for (final p in projects) {
+      if (p.id == projectId) return p.name;
+    }
+    return null;
+  }
 
   DateTime? _time(int? ms) =>
       ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
@@ -141,6 +162,7 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
       state: s.state,
       reason: s.reason,
       progress: _progressOf(t),
+      projectName: _projectName(t.node, t.project),
     );
   }
 

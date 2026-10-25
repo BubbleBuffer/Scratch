@@ -64,6 +64,7 @@ class _FakeBridge implements AiRunnerBridge {
     required String prompt,
     required String page,
     required String runnerId,
+    String? projectId,
   }) => throw UnimplementedError('not used in Settings');
 
   @override

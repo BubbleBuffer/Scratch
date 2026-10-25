@@ -173,4 +173,81 @@ void main() {
     expect(find.byKey(const ValueKey('runner-assign')), findsOneWidget);
     expect(find.text('Office-PC'), findsNothing);
   });
+
+  appTest('a PC with projects shows a Project row, and the task is assigned to the chosen one', (
+    tester,
+  ) async {
+    final backend = FakeRunnerBackend.demo();
+    final f = await pumpApp(
+      tester,
+      mobile: false,
+      runners: RunnerAssignments(backend),
+    );
+    final garden = f.pages['Garden plan']!;
+    await _openBoard(tester, garden);
+    await hoverCard(tester, 'Garden plan');
+    await _openPicker(tester, garden);
+
+    // Studio-PC is the default, so its projects show under it, with None first.
+    expect(find.text('Project'), findsOneWidget);
+    expect(find.byKey(const ValueKey('project-row-none')), findsOneWidget);
+    expect(find.byKey(const ValueKey('project-row-notes-app')), findsOneWidget);
+    expect(find.byKey(const ValueKey('project-row-docs-site')), findsOneWidget);
+
+    await tapAndSettle(tester, find.byKey(const ValueKey('project-row-docs-site')));
+    await tapAndSettle(tester, find.byKey(const ValueKey('runner-assign')));
+
+    expect(backend.calls, contains('assign:$garden:studio:docs-site'));
+    expect(find.text('Run on'), findsNothing, reason: 'the picker closes');
+    expect(find.text('Studio-PC · docs-site · queued'), findsOneWidget);
+  });
+
+  appTest('the hub and a PC without projects show no Project row', (
+    tester,
+  ) async {
+    final backend = FakeRunnerBackend.demo();
+    final f = await pumpApp(
+      tester,
+      mobile: false,
+      runners: RunnerAssignments(backend),
+    );
+    final garden = f.pages['Garden plan']!;
+    await _openBoard(tester, garden);
+    await hoverCard(tester, 'Garden plan');
+    await _openPicker(tester, garden);
+
+    await tapAndSettle(tester, find.byKey(const ValueKey('runner-row-hub')));
+    expect(find.text('Project'), findsNothing);
+    expect(find.byKey(const ValueKey('project-row-none')), findsNothing);
+
+    await tapAndSettle(tester, find.byKey(const ValueKey('runner-row-office')));
+    expect(find.text('Project'), findsNothing);
+    expect(find.byKey(const ValueKey('project-row-none')), findsNothing);
+    expect(find.byKey(const ValueKey('project-row-notes-app')), findsNothing);
+  });
+
+  appTest('switching runners resets the project to None', (tester) async {
+    final backend = FakeRunnerBackend.demo();
+    final f = await pumpApp(
+      tester,
+      mobile: false,
+      runners: RunnerAssignments(backend),
+    );
+    final garden = f.pages['Garden plan']!;
+    await _openBoard(tester, garden);
+    await hoverCard(tester, 'Garden plan');
+    await _openPicker(tester, garden);
+
+    await tapAndSettle(tester, find.byKey(const ValueKey('project-row-notes-app')));
+    await tapAndSettle(tester, find.byKey(const ValueKey('runner-row-office')));
+    await tapAndSettle(tester, find.byKey(const ValueKey('runner-row-studio')));
+    await tapAndSettle(tester, find.byKey(const ValueKey('runner-assign')));
+
+    expect(
+      backend.calls,
+      contains('assign:$garden:studio'),
+      reason: 'back on Studio-PC the project is None again',
+    );
+    expect(find.text('Studio-PC · queued'), findsOneWidget);
+  });
 }
