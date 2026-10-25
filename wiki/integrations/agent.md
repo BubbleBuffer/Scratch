@@ -218,7 +218,7 @@ Jobs started through the hub's `jobs` tool ([Jobs](../architecture/hub.md#jobs))
 
 
    *Rust built 2026-10-08* ([crates/agent](../../crates/agent), bridge [api/agent.rs](../../app/rust/src/api/agent.rs)):
-   - **Crate and runtime:** `vault_agent`, with path dependencies on `bubblepaw-core` and `bubblepaw-runner` in `../BubblePaw-base-agent` (interim, marked in its Cargo.toml) and no `web` feature. It runs a 2-thread tokio runtime of its own (threads `agent-N`).
+   - **Crate and runtime:** `vault_agent`, with git dependencies on `bubblepaw-sdk` and `bubblepaw-mcp` at BubblePaw-Core tag `v0.2.0` (bump the tag to upgrade) and no `web` feature. It runs a 2-thread tokio runtime of its own (threads `agent-N`).
    - **Store and workspace:** `<data_dir>/agent/agent.sqlite`, bound to the code-mode workspace `<data_dir>/agent/workspace`; artifacts in `<data_dir>/agent/artifacts`.
    - **Tools:** one host tool per `vault_tools` definition, called on a blocking thread. search_notes, read_page and create_page are always shown; history tools are on; `js` is the only model tool (checked at open). The runtime note leaves out process commands.
    - **Providers:**
@@ -338,7 +338,7 @@ The in-process test in [local_workflow.rs](../../crates/hub/tests/local_workflow
 
 - SQLite: BubblePaw-base uses rusqlite 0.38, the vault 0.40. Both bundle SQLite, so they cannot link into one binary; BubblePaw moves to 0.40.
 - BubblePaw needs tokio; the app's Rust is plain threads. The harness gets its own runtime thread.
-- The `js` tool reaches other tools through `bubblepaw-core`'s `ToolDispatcher`, so vault tools only need to be registered as ordinary tools.
+- The `js` tool reaches other tools through the SDK's `ToolDispatcher` (`bubblepaw_sdk::tools`), so vault tools only need to be registered as ordinary tools.
 
 ## Known limits
 

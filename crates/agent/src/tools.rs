@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use bubblepaw_core::ToolDispatcher;
-use bubblepaw_core::{Approval, Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult};
-use bubblepaw_runner::tools::{ProcessTools, WorkspaceTools};
+use bubblepaw_sdk::tools::ToolDispatcher;
+use bubblepaw_sdk::approvals::Approval;
+use bubblepaw_sdk::tools::{Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult};
+use bubblepaw_sdk::tools::{ProcessTools, WorkspaceTools};
 use serde_json::Value;
 use vault_core::Vault;
 
@@ -205,7 +206,7 @@ struct RootTools {
 
 pub struct DesktopRuntime {
     projects: Arc<crate::projects::Projects>,
-    store: Option<bubblepaw_core::Store>,
+    store: Option<bubblepaw_sdk::store::Store>,
     roots: std::sync::Mutex<std::collections::HashMap<String, Arc<RootTools>>>,
     handles: std::sync::Mutex<std::collections::HashMap<String, Arc<RootTools>>>,
 }
@@ -215,9 +216,9 @@ impl DesktopRuntime {
     pub(crate) fn current_project(&self, session: &str) -> Result<crate::Project> {
         let mut project = self.projects.current(session)?;
         if let Some(store) = &self.store {
-            if let Some(info) = bubblepaw_runner::worktrees::get(store, session)? {
+            if let Some(info) = bubblepaw_sdk::runner::worktrees::get(store, session)? {
                 project.path =
-                    bubblepaw_runner::worktrees::workspace(store, session, &info.parent_workspace)?
+                    bubblepaw_sdk::runner::worktrees::workspace(store, session, &info.parent_workspace)?
                         .to_string_lossy()
                         .into_owned();
             }
@@ -229,7 +230,7 @@ impl DesktopRuntime {
         self.store
             .as_ref()
             .map(|store| {
-                bubblepaw_runner::worktrees::get(store, session).map(|info| info.is_some())
+                bubblepaw_sdk::runner::worktrees::get(store, session).map(|info| info.is_some())
             })
             .transpose()
             .map(|bound| bound.unwrap_or(false))
@@ -510,7 +511,7 @@ pub(crate) fn register_desktop_tools_recorded(
     projects: Arc<crate::projects::Projects>,
     definition_root: &std::path::Path,
     recording: Option<(Arc<crate::records::Records>, Arc<Vault>)>,
-    store: Option<bubblepaw_core::Store>,
+    store: Option<bubblepaw_sdk::store::Store>,
 ) -> Result<Arc<DesktopRuntime>> {
     let desktop = Arc::new(DesktopRuntime {
         projects,
@@ -638,7 +639,7 @@ mod presentation_tests {
         let records = Arc::new(
             crate::records::Records::open(
                 &dir.path().join("records.sqlite"),
-                bubblepaw_core::Store::in_memory().unwrap(),
+                bubblepaw_sdk::store::Store::in_memory().unwrap(),
             )
             .unwrap(),
         );

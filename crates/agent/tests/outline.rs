@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use vault_agent::bubblepaw_core::{ContextChapter, Message, Role, Store};
+use vault_agent::bubblepaw_sdk::store::{ContextChapter, Message, Role, Store};
 use vault_agent::{read_session_outline, session_outline_at, Agent, AgentConfig, TestHooks};
 use vault_core::Vault;
 use vault_tools::outline::{ChatOutline, OutlineChapter, OutlineSection, OutlineStore};

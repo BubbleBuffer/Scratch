@@ -15,7 +15,7 @@ status: current
 - **BubbleBuffer/Scratch (public)** is the only source repo. Development, CI and pre-alpha releases happen here. Its CI runs on GitHub-hosted runners only.
 - **BubbleBuffer/notes-app (private)** is archived. Scratch is no longer an export of it: `scripts/publish-public.sh` is gone. Runs in the former private repo are cited as "run N in the former private repo".
 - **BubbleBuffer/scratch-ops (private)** holds the private operations: the hub deploy, the APK publishing and the private patterns file (`private-strings.txt`). Its workflows run only on the home build server.
-- **BubblePaw-Core (public)** supplies the agent crates. `crates/agent` and `crates/tools` depend on it by git, pinned to a revision in `Cargo.toml`.
+- **BubblePaw-Core (public)** supplies the agent crates. `crates/agent` and `crates/tools` depend on its `bubblepaw-sdk` crate by git (and `crates/agent` on `bubblepaw-mcp`), pinned to tag `v0.2.0` in `Cargo.toml`. Bump the tag to upgrade.
 - **Licence:** `AGPL-3.0-or-later`, in [LICENSE](../../LICENSE). Bundled third-party code and assets are listed in [THIRD_PARTY.md](../../THIRD_PARTY.md).
 - **Hosts stay out of this repo.** Deploy targets live in scratch-ops. Docs use placeholders such as `notes.example.com`.
 

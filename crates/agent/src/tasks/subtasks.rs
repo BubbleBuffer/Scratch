@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use bubblepaw_core::{EventKind, Harness, HarnessEvent, EVENTS_AFTER_LIMIT};
+use bubblepaw_sdk::events::{EventKind, HarnessEvent};
+use bubblepaw_sdk::harness::{Harness};
+use bubblepaw_sdk::store::{EVENTS_AFTER_LIMIT};
 use tokio::sync::broadcast::error::RecvError;
 use vault_core::Vault;
 use vault_mcp::tasks::{self, SubtaskItem};

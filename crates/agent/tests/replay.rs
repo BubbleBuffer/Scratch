@@ -8,7 +8,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde_json::json;
-use vault_agent::bubblepaw_core::{EventKind, Message, Role, ToolCall};
+use vault_agent::bubblepaw_sdk::events::EventKind;
+use vault_agent::bubblepaw_sdk::store::{Message, Role};
+use vault_agent::bubblepaw_sdk::tools::ToolCall;
 use vault_agent::replay::{self, ReplayStatus};
 use vault_agent::Sent;
 use vault_agent::{session_outline_at, Agent, AgentConfig};
@@ -245,7 +247,7 @@ fn runtime_notices_never_reach_the_app_message_list() {
     send(&agent, &session, "first question");
     wait_idle(&agent, &session);
 
-    let stored = vault_agent::bubblepaw_core::Store::open(
+    let stored = vault_agent::bubblepaw_sdk::store::Store::open(
         fixture.data_dir().join("agent").join("agent.sqlite"),
     )
     .unwrap()
@@ -253,7 +255,7 @@ fn runtime_notices_never_reach_the_app_message_list() {
     .unwrap();
     let notice = |m: &Message| {
         m.role == Role::User
-            && m.origin == Some(vault_agent::bubblepaw_core::MessageOrigin::Generated)
+            && m.origin == Some(vault_agent::bubblepaw_sdk::store::MessageOrigin::Generated)
     };
     assert!(
         stored.iter().any(notice),

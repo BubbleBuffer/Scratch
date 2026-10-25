@@ -782,7 +782,7 @@ mod desktop {
                     "write",
                     serde_json::json!({"path": "from-hub.txt", "content": "hello"}),
                     notes_agent_wire::host::Caller { id: "oauth:test".into(), name: None },
-                    vault_agent::bubblepaw_core::CancellationToken::new(),
+                    vault_agent::bubblepaw_sdk::harness::CancellationToken::new(),
                 )
                 .unwrap();
             assert!(!result.is_error && !result.pending, "{}", result.content);

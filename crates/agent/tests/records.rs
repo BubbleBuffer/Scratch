@@ -244,7 +244,7 @@ fn send_context_is_model_visible_and_transcript_text_is_clean() {
         {
             if matches!(
                 event.kind,
-                vault_agent::bubblepaw_core::EventKind::RunFinished { .. }
+                vault_agent::bubblepaw_sdk::events::EventKind::RunFinished { .. }
             ) {
                 break;
             }

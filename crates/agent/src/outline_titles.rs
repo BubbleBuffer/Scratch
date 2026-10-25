@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use anyhow::Result;
-use bubblepaw_core::Store;
+use bubblepaw_sdk::store::Store;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 use vault_tools::outline::OutlineStore;
 
@@ -53,7 +53,7 @@ pub(crate) fn rename_user(
     path: &Path,
     session: &str,
     title: &str,
-) -> Result<bubblepaw_core::Session> {
+) -> Result<bubblepaw_sdk::store::Session> {
     store.session(session)?;
     let mut conn = policy_connection(path)?;
     let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;

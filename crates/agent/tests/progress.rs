@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::{
-    Approval, ExecutionMode, Tool, ToolCall, ToolContext, ToolDefinition, ToolResult,
-};
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::approvals::{Approval};
+use vault_agent::bubblepaw_sdk::harness::{ExecutionMode};
+use vault_agent::bubblepaw_sdk::tools::{Tool, ToolCall, ToolContext, ToolDefinition, ToolResult};
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
 use vault_agent::{Agent, AgentConfig, PermissionMode, TestHooks, ToolPack};
 use vault_core::{PropValue, Vault};
 use vault_mcp::tasks;
@@ -67,7 +67,6 @@ fn open(
             ..AgentConfig::default()
         },
         mode,
-        false,
     )
     .unwrap()
 }

@@ -491,8 +491,8 @@ dependencies = [
 
 [[package]]
 name = "bubblepaw-core"
-version = "0.1.0"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?rev=2cddf0cd165043d2984a975b2e94932b5a9d325f#2cddf0cd165043d2984a975b2e94932b5a9d325f"
+version = "0.2.0"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.0#4e8e73ec62cbd5f9403dfd8284ec7c4a1577d32b"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -505,20 +505,21 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
+ "tracing",
  "uuid",
  "zstd",
 ]
 
 [[package]]
 name = "bubblepaw-mcp"
-version = "0.1.0"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?rev=2cddf0cd165043d2984a975b2e94932b5a9d325f#2cddf0cd165043d2984a975b2e94932b5a9d325f"
+version = "0.2.0"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.0#4e8e73ec62cbd5f9403dfd8284ec7c4a1577d32b"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
  "bubblepaw-core",
- "libc",
+ "bubblepaw-process",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -527,15 +528,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bubblepaw-process"
+version = "0.2.0"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.0#4e8e73ec62cbd5f9403dfd8284ec7c4a1577d32b"
+dependencies = [
+ "libc",
+ "tokio",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "bubblepaw-runner"
-version = "0.1.0"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?rev=2cddf0cd165043d2984a975b2e94932b5a9d325f#2cddf0cd165043d2984a975b2e94932b5a9d325f"
+version = "0.2.0"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.0#4e8e73ec62cbd5f9403dfd8284ec7c4a1577d32b"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
  "bubblepaw-core",
  "bubblepaw-mcp",
+ "bubblepaw-process",
  "chrono",
  "clap",
  "fs2",
@@ -556,8 +568,20 @@ dependencies = [
  "tokio",
  "toml 0.8.2",
  "tracing",
+ "tracing-subscriber",
  "uuid",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "bubblepaw-sdk"
+version = "0.2.0"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.0#4e8e73ec62cbd5f9403dfd8284ec7c4a1577d32b"
+dependencies = [
+ "anyhow",
+ "bubblepaw-core",
+ "bubblepaw-runner",
+ "tokio",
 ]
 
 [[package]]
@@ -6563,9 +6587,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bubblepaw-core",
  "bubblepaw-mcp",
- "bubblepaw-runner",
+ "bubblepaw-sdk",
  "chrono",
  "futures-core",
  "jiff",
@@ -6637,7 +6660,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
- "bubblepaw-core",
+ "bubblepaw-sdk",
  "chrono",
  "notes_hub",
  "rusqlite",

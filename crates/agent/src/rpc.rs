@@ -17,7 +17,7 @@ use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
-use crate::bubblepaw_core::{CancellationToken, ClientInfo};
+use crate::bubblepaw_sdk::harness::{CancellationToken, ClientInfo};
 use crate::wire::{self, notes_agent_wire as w};
 use crate::Agent;
 

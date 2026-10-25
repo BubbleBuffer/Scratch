@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use bubblepaw_core::{Message, Role, Store};
+use bubblepaw_sdk::store::{Message, Role, Store};
 use rusqlite::Connection;
 use serde_json::json;
 use vault_tools::outline::{self, OutlineStore};

@@ -7,8 +7,11 @@ use std::sync::{
     Arc,
 };
 use vault_agent::{
-    bubblepaw_core::{
-        Approval, ClientInfo, ExecutionMode, Role, Tool, ToolContext, ToolDefinition, ToolResult,
+    bubblepaw_sdk::{
+        approvals::Approval,
+        harness::{ClientInfo, ExecutionMode},
+        store::Role,
+        tools::{Tool, ToolContext, ToolDefinition, ToolResult},
     },
     Agent, AgentConfig, PermissionMode, TestHooks,
 };
@@ -26,7 +29,7 @@ impl Fixture {
     }
 
     fn with_tools(
-        execution: Option<(ExecutionMode, bool)>,
+        execution: Option<ExecutionMode>,
         extra_tools: Vec<Arc<dyn Tool>>,
     ) -> Self {
         let dir = tempfile::tempdir().unwrap();
@@ -44,7 +47,7 @@ impl Fixture {
             ..AgentConfig::default()
         };
         let agent = match execution {
-            Some((mode, js)) => Agent::open_with_execution(vault.clone(), config, mode, js),
+            Some(mode) => Agent::open_with_execution(vault.clone(), config, mode),
             None => Agent::open(vault.clone(), config),
         }
         .unwrap();
@@ -144,74 +147,61 @@ fn default_open_keeps_js_and_discovery_does_not_leave_sessions() {
 
 #[test]
 fn native_and_hybrid_surfaces_come_from_the_enabled_runtime() {
-    for enable_js in [false, true] {
-        let f = Fixture::with_tools(Some((ExecutionMode::Native, enable_js)), Vec::new());
-        let session = f.agent.create_session("native declarations").unwrap();
-        let definitions = f.agent.gateway_tool_definitions(&session.id).unwrap();
-        let names = definitions
-            .iter()
-            .map(|tool| tool.name.as_str())
-            .collect::<Vec<_>>();
-        assert!(names.contains(&"chat_read"), "{names:?}");
-        assert!(names.contains(&"environments"), "{names:?}");
-        assert_eq!(names.contains(&"js"), enable_js, "{names:?}");
-        assert!(!names.contains(&"hosts"), "{names:?}");
-        assert!(!names.contains(&"test_confirm"), "{names:?}");
-        for definition in vault_tools::definitions()
-            .iter()
-            .chain(vault_tools::hidden())
-        {
-            assert!(
-                !names.contains(&definition.name),
-                "{}: {names:?}",
-                definition.name
-            );
-        }
-        for alias in vault_tools::aliases() {
-            assert!(!names.contains(&alias.name), "{}: {names:?}", alias.name);
-        }
-        let discovery = f.agent.gateway_tool_definitions_for_discovery().unwrap();
-        assert_eq!(
-            serde_json::to_value(definitions).unwrap(),
-            serde_json::to_value(discovery).unwrap()
+    let f = Fixture::with_tools(Some(ExecutionMode::Native), Vec::new());
+    let session = f.agent.create_session("native declarations").unwrap();
+    let definitions = f.agent.gateway_tool_definitions(&session.id).unwrap();
+    let names = definitions
+        .iter()
+        .map(|tool| tool.name.as_str())
+        .collect::<Vec<_>>();
+    assert!(names.contains(&"chat_read"), "{names:?}");
+    assert!(names.contains(&"environments"), "{names:?}");
+    assert!(!names.contains(&"js"), "{names:?}");
+    assert!(!names.contains(&"hosts"), "{names:?}");
+    assert!(!names.contains(&"test_confirm"), "{names:?}");
+    for definition in vault_tools::definitions()
+        .iter()
+        .chain(vault_tools::hidden())
+    {
+        assert!(
+            !names.contains(&definition.name),
+            "{}: {names:?}",
+            definition.name
         );
-        assert_eq!(f.agent.sessions().unwrap().len(), 1);
-        if enable_js {
-            // Vault adapters are available only through composition; HTTP owns
-            // their separate MCP schemas (including import arguments).
-            assert_eq!(
-                value(f.js(
-                    &session.id,
-                    json!({"code":"return typeof tools.create_page;"})
-                )),
-                "function"
-            );
-        } else {
-            assert!(
-                f.agent
-                    .gateway_call_as(&session.id, "js", json!({"code":"return 1;"}), client())
-                    .unwrap()
-                    .is_error
-            );
-        }
-        for name in ["hosts", "create_page"] {
-            assert!(
-                f.agent
-                    .gateway_call_as(&session.id, name, json!({}), client())
-                    .unwrap()
-                    .is_error
-            );
-        }
-        f.agent.gateway_close_session(&session.id).unwrap();
-        assert!(f.agent.sessions().unwrap().is_empty());
     }
+    for alias in vault_tools::aliases() {
+        assert!(!names.contains(&alias.name), "{}: {names:?}", alias.name);
+    }
+    let discovery = f.agent.gateway_tool_definitions_for_discovery().unwrap();
+    assert_eq!(
+        serde_json::to_value(definitions).unwrap(),
+        serde_json::to_value(discovery).unwrap()
+    );
+    assert_eq!(f.agent.sessions().unwrap().len(), 1);
+    // Native mode does not offer js, so the gateway refuses a js call.
+    assert!(
+        f.agent
+            .gateway_call_as(&session.id, "js", json!({"code":"return 1;"}), client())
+            .unwrap()
+            .is_error
+    );
+    for name in ["hosts", "create_page"] {
+        assert!(
+            f.agent
+                .gateway_call_as(&session.id, name, json!({}), client())
+                .unwrap()
+                .is_error
+        );
+    }
+    f.agent.gateway_close_session(&session.id).unwrap();
+    assert!(f.agent.sessions().unwrap().is_empty());
 }
 
 #[test]
 fn native_dispatch_is_one_call_and_preserves_errors_and_pending_results() {
     let calls = Arc::new(AtomicUsize::new(0));
     let f = Fixture::with_tools(
-        Some((ExecutionMode::Native, false)),
+        Some(ExecutionMode::Native),
         vec![Arc::new(Probe {
             name: "test_probe",
             calls: calls.clone(),
@@ -281,7 +271,7 @@ fn native_and_nested_js_apply_the_same_exclusions_and_noninteractive_policy() {
             }) as Arc<dyn Tool>
         })
         .collect();
-    let f = Fixture::with_tools(Some((ExecutionMode::Native, true)), tools);
+    let f = Fixture::with_tools(Some(ExecutionMode::Js), tools);
     let session = f.agent.create_session("gateway policy").unwrap();
     let definitions = f.agent.gateway_tool_definitions(&session.id).unwrap();
     for name in excluded.into_iter().chain(["test_confirm"]) {
@@ -291,8 +281,21 @@ fn native_and_nested_js_apply_the_same_exclusions_and_noninteractive_policy() {
             .gateway_call_as(&session.id, name, json!({}), client())
             .unwrap();
         assert!(denied.is_error, "{name}: {denied:?}");
-        let code = format!("return typeof tools.{name};");
-        assert_eq!(value(f.js(&session.id, json!({"code":code}))), "undefined");
+        let code = format!("return '{name}' in tools;");
+        assert_eq!(value(f.js(&session.id, json!({"code":code}))), false);
+        let code = format!(
+            "try {{ await tools.{name}({{}}); return 'ran'; }} catch (error) {{ return 'refused'; }}"
+        );
+        let refused = f.js(&session.id, json!({"code":code}));
+        assert!(refused.is_error || value(refused) == "refused", "{name}");
+    }
+    let listed = value(f.js(
+        &session.id,
+        json!({"code":"return (await tools.$list()).map(t => t.name);"}),
+    ));
+    let listed = listed.as_array().unwrap();
+    for name in excluded.into_iter().chain(["test_confirm"]) {
+        assert!(!listed.iter().any(|tool| tool.as_str() == Some(name)), "{name}");
     }
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert!(f
@@ -302,13 +305,15 @@ fn native_and_nested_js_apply_the_same_exclusions_and_noninteractive_policy() {
         .pending_approvals
         .is_empty());
     f.agent.permission_mode_set(PermissionMode::Bypass).unwrap();
+    // In js mode composed tools are not advertised as definitions; the js help
+    // lists them, so that is where bypass must show up.
     assert!(f
         .agent
-        .gateway_tool_definitions(&session.id)
-        .unwrap()
-        .iter()
-        .any(|tool| tool.name == "test_confirm"));
-    let allowed = f
+        .gateway_js_help(None)
+        .contains("tools.test_confirm("));
+    // A direct call may name only the advertised surface, which in js mode is js
+    // alone, so bypass reaches test_confirm through js composition below.
+    let direct = f
         .agent
         .gateway_call_as(
             &session.id,
@@ -317,8 +322,7 @@ fn native_and_nested_js_apply_the_same_exclusions_and_noninteractive_policy() {
             client(),
         )
         .unwrap();
-    assert_eq!(allowed.content, "confirmed: native allowed");
-    assert!(!allowed.is_error);
+    assert!(direct.is_error, "{direct:?}");
     assert_eq!(
         value(f.js(
             &session.id,
@@ -427,11 +431,14 @@ fn gateway_help_and_discovery_match_the_enabled_host_surface() {
         value(f.js(&session.id, json!({"code":"return await tools.hosts();"}))),
         json!([{"name":"hub","online":true,"default":true}])
     );
-    let found = value(f.js(&session.id, json!({"code": "return {tools:await tools.$list(),exec:typeof tools.exec,ui:typeof tools.ui_open_page};"})));
-    assert_eq!(found["exec"], "undefined");
-    assert_eq!(found["ui"], "undefined");
+    let found = value(f.js(&session.id, json!({"code": "return {tools:await tools.$list(),exec:'exec' in tools,ui:'ui_open_page' in tools};"})));
+    assert_eq!(found["exec"], false);
+    assert_eq!(found["ui"], false);
     let names = found["tools"].as_array().unwrap();
     assert!(names.iter().any(|tool| tool["name"] == "search_notes"));
+    assert!(!names
+        .iter()
+        .any(|tool| tool["name"] == "exec" || tool["name"] == "ui_open_page"));
     assert!(!names
         .iter()
         .any(|tool| tool["name"].as_str().unwrap().starts_with("history_")));
@@ -498,9 +505,18 @@ fn gateway_confirm_visibility_and_dispatch_follow_live_permissions_without_askin
     assert!(!f.agent.gateway_js_help(None).contains("test_confirm"));
     let hidden = value(f.js(
         &session.id,
-        json!({"code":"return typeof tools.test_confirm;"}),
+        json!({"code":"const listed = (await tools.$list()).map(t => t.name); let call = 'ran'; try { await tools.test_confirm({text:'hidden'}); } catch (error) { call = 'refused'; } return {in: 'test_confirm' in tools, listed: listed.includes('test_confirm'), call};"}),
     ));
-    assert_eq!(hidden, "undefined");
+    assert_eq!(
+        hidden,
+        json!({"in":false, "listed":false, "call":"refused"})
+    );
+    assert!(f
+        .agent
+        .session_state(&session.id)
+        .unwrap()
+        .pending_approvals
+        .is_empty());
 }
 
 #[test]

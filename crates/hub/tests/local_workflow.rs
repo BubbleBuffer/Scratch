@@ -39,8 +39,8 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::Message;
 use url::Url;
-use vault_agent::bubblepaw_core::ToolCall;
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::tools::ToolCall;
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
 use vault_agent::TestHooks;
 use vault_core::{new_id, Vault};
 use vault_sync::SyncClient;
@@ -322,7 +322,7 @@ async fn start_hub() -> Hub {
             scopes: None,
         },
         agent: AgentSection {
-            execution_mode: vault_agent::bubblepaw_core::ExecutionMode::Js,
+            execution_mode: vault_agent::bubblepaw_sdk::harness::ExecutionMode::Js,
             default_model: "scripted/scripted".into(),
             models: vec!["scripted/scripted".into()],
             ..AgentSection::default()

@@ -26,7 +26,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tokio::sync::{mpsc, Notify};
 use tokio_tungstenite::tungstenite::Message;
-use vault_agent::bubblepaw_core::{CancellationToken, ClientInfo};
+use vault_agent::bubblepaw_sdk::harness::{CancellationToken, ClientInfo};
 use vault_agent::Agent;
 
 use crate::agent_remote::{host_ws_url, open_device_socket, Socket};

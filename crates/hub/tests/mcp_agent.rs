@@ -20,7 +20,7 @@ use serde_json::{json, Value};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use vault_agent::{bubblepaw_core::ExecutionMode, TestHooks};
+use vault_agent::{bubblepaw_sdk::harness::ExecutionMode, TestHooks};
 use vault_core::new_id;
 
 const CLIENT_ID: &str = "notes-mcp";
@@ -138,10 +138,21 @@ struct Env {
 
 impl Env {
     async fn boot(gateway: bool, agent: bool) -> Self {
-        Self::configured(gateway, agent, true, 64 << 20).await
+        Self::configured(gateway, agent, ExecutionMode::Native, 64 << 20).await
     }
 
-    async fn configured(gateway: bool, agent: bool, enable_js: bool, import_limit: usize) -> Self {
+    /// The same hub with `execution_mode = "js"`: only the `js` and `js_help`
+    /// entrypoints are offered.
+    async fn new_js() -> Self {
+        Self::configured(true, true, ExecutionMode::Js, 64 << 20).await
+    }
+
+    async fn configured(
+        gateway: bool,
+        agent: bool,
+        execution_mode: ExecutionMode,
+        import_limit: usize,
+    ) -> Self {
         let data = TempDir(std::env::temp_dir().join(format!("notes_hub_mcp_agent_{}", new_id())));
         let issuer = MockIssuer::start().await;
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -165,8 +176,7 @@ impl Env {
             },
             agent: AgentSection {
                 enabled: agent,
-                execution_mode: ExecutionMode::Native,
-                enable_js,
+                execution_mode,
                 default_model: "scripted/scripted".into(),
                 models: vec!["scripted/scripted".into()],
                 ..AgentSection::default()
@@ -378,125 +388,106 @@ fn tool_error(reply: &Value) -> String {
 }
 
 #[tokio::test]
-async fn gateway_lists_exact_vault_definitions_and_native_host_schemas_with_optional_js() {
-    for enable_js in [false, true] {
-        let env = Env::configured(true, true, enable_js, 64 << 20).await;
-        let token = env.ann();
-        // Discovery is available before initialize and reflects this host's mode.
-        let reply = env.rpc(&token, None, "tools/list", json!({})).await;
-        let tools = reply["result"]["tools"].as_array().unwrap();
-        let names: BTreeSet<_> = tools
+async fn gateway_lists_exact_vault_definitions_and_native_host_schemas_without_js() {
+    let env = Env::configured(true, true, ExecutionMode::Native, 64 << 20).await;
+    let token = env.ann();
+    // Discovery is available before initialize and reflects this host's mode.
+    let reply = env.rpc(&token, None, "tools/list", json!({})).await;
+    let tools = reply["result"]["tools"].as_array().unwrap();
+    let names: BTreeSet<_> = tools
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        names.len(),
+        tools.len(),
+        "duplicate advertised tools: {reply}"
+    );
+    let vault_definitions = vault_mcp::tools::definitions();
+    for expected in &vault_definitions {
+        let actual = tools
             .iter()
-            .map(|tool| tool["name"].as_str().unwrap())
-            .collect();
+            .find(|tool| tool["name"] == expected["name"])
+            .unwrap();
         assert_eq!(
-            names.len(),
-            tools.len(),
-            "duplicate advertised tools: {reply}"
+            actual, expected,
+            "vault definitions must match /mcp exactly"
         );
-        let vault_definitions = vault_mcp::tools::definitions();
-        for expected in &vault_definitions {
-            let actual = tools
-                .iter()
-                .find(|tool| tool["name"] == expected["name"])
-                .unwrap();
-            assert_eq!(
-                actual, expected,
-                "vault definitions must match /mcp exactly"
-            );
-            assert!(
-                actual["inputSchema"]["properties"].get("host").is_none(),
-                "{actual}"
-            );
-        }
-        let vault_names: BTreeSet<_> =
-            vault_tools::definitions_for(vault_tools::Surface::InAppAgent)
-                .map(|tool| tool.name)
-                .chain(
-                    vault_definitions
-                        .iter()
-                        .map(|tool| tool["name"].as_str().unwrap()),
-                )
-                .collect();
-        let host_tools: Vec<_> = tools
-            .iter()
-            .filter(|tool| !vault_names.contains(tool["name"].as_str().unwrap()))
-            .collect();
-        // Locked to the hub: its runtime tools are listed, the computer picker is not.
-        assert!(!names.contains("hosts"), "{reply}");
-        for required in ["environments", "chat_read"] {
-            assert!(
-                names.contains(required),
-                "missing native host capability {required}: {reply}"
-            );
-        }
-        for name in ["js", "js_help"] {
-            assert_eq!(names.contains(name), enable_js, "{reply}");
-        }
-        for tool in host_tools {
-            let schema = &tool["inputSchema"];
-            assert_eq!(schema["type"], "object", "{tool}");
-            assert!(schema["properties"].get("host").is_none(), "{tool}");
-            assert!(
-                tool["description"]
-                    .as_str()
-                    .is_some_and(|description| !description.is_empty()),
-                "{tool}"
-            );
-        }
-        // These tools are real runtime capabilities, but are not gateway capabilities.
-        for name in &names {
-            assert!(
-                !name.starts_with("history_")
-                    && !name.starts_with("web_")
-                    && !name.starts_with("ui_"),
-                "{reply}"
-            );
-            assert!(
-                !matches!(*name, "web" | "todo" | "question" | "reload"),
-                "{reply}"
-            );
-        }
         assert!(
-            !names.contains("import_markdown"),
-            "hidden tools remain callable but unlisted"
+            actual["inputSchema"]["properties"].get("host").is_none(),
+            "{actual}"
         );
-        // No in-app-only vault adapter may leak as an additional native host tool.
-        for name in vault_names {
-            assert_eq!(
-                tools.iter().filter(|tool| tool["name"] == name).count(),
-                usize::from(vault_definitions.iter().any(|tool| tool["name"] == name)),
-                "{name}: {reply}"
-            );
-        }
-        if enable_js {
-            for (name, expected) in [
-                ("js", vec!["code", "environment", "maxOutputTokens"]),
-                ("js_help", vec!["query"]),
-            ] {
-                let tool = tools.iter().find(|tool| tool["name"] == name).unwrap();
-                let mut properties: Vec<_> = tool["inputSchema"]["properties"]
-                    .as_object()
-                    .unwrap()
-                    .keys()
-                    .map(String::as_str)
-                    .collect();
-                properties.sort_unstable();
-                assert_eq!(properties, expected, "{tool}");
-            }
-        } else {
-            for (name, arguments) in [("js", json!({"code":"return 1;"})), ("js_help", json!({}))] {
-                let denied = env.call(&token, None, name, arguments).await;
-                assert_eq!(denied["error"]["code"], -32602, "{denied}");
-            }
-        }
-        env.stop().await;
     }
+    let vault_names: BTreeSet<_> =
+        vault_tools::definitions_for(vault_tools::Surface::InAppAgent)
+            .map(|tool| tool.name)
+            .chain(
+                vault_definitions
+                    .iter()
+                    .map(|tool| tool["name"].as_str().unwrap()),
+            )
+            .collect();
+    let host_tools: Vec<_> = tools
+        .iter()
+        .filter(|tool| !vault_names.contains(tool["name"].as_str().unwrap()))
+        .collect();
+    // Locked to the hub: its runtime tools are listed, the computer picker is not.
+    assert!(!names.contains("hosts"), "{reply}");
+    for required in ["environments", "chat_read"] {
+        assert!(
+            names.contains(required),
+            "missing native host capability {required}: {reply}"
+        );
+    }
+    for name in ["js", "js_help"] {
+        assert!(!names.contains(name), "{reply}");
+    }
+    for tool in host_tools {
+        let schema = &tool["inputSchema"];
+        assert_eq!(schema["type"], "object", "{tool}");
+        assert!(schema["properties"].get("host").is_none(), "{tool}");
+        assert!(
+            tool["description"]
+                .as_str()
+                .is_some_and(|description| !description.is_empty()),
+            "{tool}"
+        );
+    }
+    // These tools are real runtime capabilities, but are not gateway capabilities.
+    for name in &names {
+        assert!(
+            !name.starts_with("history_")
+                && !name.starts_with("web_")
+                && !name.starts_with("ui_"),
+            "{reply}"
+        );
+        assert!(
+            !matches!(*name, "web" | "todo" | "question" | "reload"),
+            "{reply}"
+        );
+    }
+    assert!(
+        !names.contains("import_markdown"),
+        "hidden tools remain callable but unlisted"
+    );
+    // No in-app-only vault adapter may leak as an additional native host tool.
+    for name in vault_names {
+        assert_eq!(
+            tools.iter().filter(|tool| tool["name"] == name).count(),
+            usize::from(vault_definitions.iter().any(|tool| tool["name"] == name)),
+            "{name}: {reply}"
+        );
+    }
+    for (name, arguments) in [("js", json!({"code":"return 1;"})), ("js_help", json!({}))] {
+        let denied = env.call(&token, None, name, arguments).await;
+        assert_eq!(denied["error"]["code"], -32602, "{denied}");
+    }
+    env.stop().await;
 }
 
 #[tokio::test]
 async fn native_host_calls_require_owned_sessions_and_forward_runtime_validation() {
-    let env = Env::configured(true, true, false, 64 << 20).await;
+    let env = Env::configured(true, true, ExecutionMode::Native, 64 << 20).await;
     let token = env.ann();
     let request = call("environments", json!({"action":"inspect"}));
     let response = env.send(Some(&token), None, request.clone()).await;
@@ -598,7 +589,7 @@ fn normalized_import_report(mut report: Value) -> Value {
 
 #[tokio::test]
 async fn vault_calls_match_notes_mcp_without_a_session_or_available_execution_host() {
-    let env = Env::configured(true, false, false, 8192).await;
+    let env = Env::configured(true, false, ExecutionMode::Native, 8192).await;
     let token = env.ann();
     let notes = format!("{}/mcp", env.base);
     let gateway = format!("{}?host=missing-url-host", env.url);
@@ -731,7 +722,7 @@ async fn vault_calls_match_notes_mcp_without_a_session_or_available_execution_ho
 
 #[tokio::test]
 async fn gateway_preserves_import_only_large_body_allowance() {
-    let env = Env::configured(true, false, false, 12 << 20).await;
+    let env = Env::configured(true, false, ExecutionMode::Native, 12 << 20).await;
     let token = env.ann();
     let archive = archive(&[("intro.md", b"intro"), ("large.txt", &vec![b'x'; 7 << 20])]);
     let mut reports = Vec::new();
@@ -815,7 +806,7 @@ async fn locked_mode_is_pinned_to_its_host() {
 
 #[tokio::test]
 async fn native_js_searches_the_shared_vault_and_attributes_writes() {
-    let env = Env::new().await;
+    let env = Env::new_js().await;
     let token = env.ann();
     let session = env.initialize(&token).await;
     let reply = env
@@ -845,7 +836,7 @@ async fn native_js_searches_the_shared_vault_and_attributes_writes() {
 
 #[tokio::test]
 async fn help_lists_tools_and_searches_signatures_and_documentation_without_a_session() {
-    let env = Env::new().await;
+    let env = Env::new_js().await;
     let token = env.ann();
     let listed = env.call(&token, None, "js_help", json!({})).await;
     let output = success_text(&listed);
@@ -876,7 +867,7 @@ async fn help_lists_tools_and_searches_signatures_and_documentation_without_a_se
 
 #[tokio::test]
 async fn connection_uri_host_is_preserved_by_oauth_challenges_and_resource_metadata() {
-    let env = Env::new().await;
+    let env = Env::new_js().await;
     for suffix in [
         "",
         "?host=hub",
@@ -1012,7 +1003,7 @@ async fn oauth_tokens_and_discovery_are_shared_across_notes_and_agent_connection
 
 #[tokio::test]
 async fn unreachable_hub_reports_its_name_and_available_hosts() {
-    let env = Env::boot(true, false).await;
+    let env = Env::configured(true, false, ExecutionMode::Js, 64 << 20).await;
     let reply = env.call(&env.ann(), None, "js_help", json!({})).await;
     let output = tool_error(&reply);
     assert!(output.contains("hub"), "{output}");
@@ -1182,7 +1173,7 @@ async fn oauth_metadata_challenge_audience_allowlist_and_origins_are_shared_with
 
 #[tokio::test]
 async fn sessions_preserve_state_are_isolated_and_are_bound_to_subject_not_email() {
-    let env = Env::new().await;
+    let env = Env::new_js().await;
     let ann = env.ann();
     // Both identities are allowed, deliberately with the same display email.
     let other_subject = env.token("other-sub", Some("ann@example.com"));
@@ -1236,7 +1227,7 @@ async fn sessions_preserve_state_are_isolated_and_are_bound_to_subject_not_email
 
 #[tokio::test]
 async fn named_environments_and_output_limits_reach_the_native_runtime() {
-    let env = Env::new().await;
+    let env = Env::new_js().await;
     let token = env.ann();
     let first = env.initialize(&token).await;
     let second = env.initialize(&token).await;
@@ -1268,7 +1259,7 @@ async fn named_environments_and_output_limits_reach_the_native_runtime() {
 
 #[tokio::test]
 async fn js_requires_a_live_session_and_delete_closes_only_that_session() {
-    let env = Env::new().await;
+    let env = Env::new_js().await;
     let token = env.ann();
     let request = call("js", json!({"code":"return 7;"}));
     let missing = env.send(Some(&token), None, request.clone()).await;
@@ -1298,7 +1289,7 @@ async fn js_requires_a_live_session_and_delete_closes_only_that_session() {
 
 #[tokio::test]
 async fn deleting_an_active_session_cancels_suspended_js_without_waiting_for_its_gate() {
-    let env = Env::new().await;
+    let env = Env::new_js().await;
     let token = env.ann();
     let active_session = env.initialize(&token).await;
     let other_session = env.initialize(&token).await;

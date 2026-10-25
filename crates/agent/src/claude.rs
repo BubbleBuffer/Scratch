@@ -10,6 +10,7 @@ pub struct ClaudeDetection {
 
 pub fn detect(bun: Option<&Path>, extension: Option<&Path>) -> ClaudeDetection {
     let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));
+    let default_extension = bubblepaw_sdk::claude_code::bundled_dir();
     detect_with(
         bun,
         extension,
@@ -18,7 +19,7 @@ pub fn detect(bun: Option<&Path>, extension: Option<&Path>) -> ClaudeDetection {
         std::env::var_os("NOTES_CLAUDE_CODE_DIR")
             .as_deref()
             .map(Path::new),
-        Path::new(env!("NOTES_DEFAULT_CLAUDE_CODE_DIR")),
+        &default_extension,
     )
 }
 

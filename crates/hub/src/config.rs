@@ -72,9 +72,7 @@ pub struct AgentSection {
     /// Run the agent (default true).
     pub enabled: bool,
     /// The hub advertises native tools by default; desktop agents retain JS.
-    pub execution_mode: vault_agent::bubblepaw_core::ExecutionMode,
-    /// Offer JavaScript composition alongside native tools.
-    pub enable_js: bool,
+    pub execution_mode: vault_agent::bubblepaw_sdk::harness::ExecutionMode,
     /// The models the hub offers, `provider/model`, in the order shown.
     pub models: Vec<String>,
     /// `provider/model`, one of `models`: the model for runs that name none.
@@ -90,6 +88,12 @@ pub struct AgentSection {
     #[doc(hidden)]
     #[serde(rename = "approvals", deserialize_with = "present")]
     pub legacy_approvals: bool,
+    /// Set when a config still has the removed `enable_js` key (or
+    /// `NOTES_HUB_AGENT_ENABLE_JS`). It is ignored: JavaScript is offered by
+    /// `execution_mode = "js"`. [`Config::load`] prints a deprecation line.
+    #[doc(hidden)]
+    #[serde(rename = "enable_js", deserialize_with = "present")]
+    pub legacy_enable_js: bool,
 }
 
 /// Accepts any value: the key is there.
@@ -99,6 +103,9 @@ fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
 
 const LEGACY_APPROVALS: &str = "notes-hub: [agent] approvals and NOTES_HUB_AGENT_APPROVALS \
      are deprecated and ignored (hub agent runs use Bypass); remove them.";
+
+const LEGACY_ENABLE_JS: &str = "notes-hub: [agent] enable_js and NOTES_HUB_AGENT_ENABLE_JS \
+     are deprecated and ignored; set execution_mode = \"js\" for JavaScript, or remove them.";
 
 const LEGACY_DEFAULT_HOST: &str = "notes-hub: mcp_agent_default_host and      NOTES_HUB_MCP_AGENT_DEFAULT_HOST are deprecated and ignored (/mcp/agent names the      computer in each call; /mcp/agent?host=<name> pins one); remove them.";
 
@@ -115,13 +122,13 @@ impl Default for AgentSection {
     fn default() -> AgentSection {
         AgentSection {
             enabled: true,
-            execution_mode: vault_agent::bubblepaw_core::ExecutionMode::Native,
-            enable_js: false,
+            execution_mode: vault_agent::bubblepaw_sdk::harness::ExecutionMode::Native,
             models: DEFAULT_MODELS.map(String::from).into(),
             default_model: DEFAULT_MODEL.into(),
             bun: String::new(),
             claude_code_extension: String::new(),
             legacy_approvals: false,
+            legacy_enable_js: false,
         }
     }
 }
@@ -255,6 +262,9 @@ impl Config {
         if c.agent.legacy_approvals {
             eprintln!("{LEGACY_APPROVALS}");
         }
+        if c.agent.legacy_enable_js {
+            eprintln!("{LEGACY_ENABLE_JS}");
+        }
         if c.mcp_agent_default_host != "hub" {
             eprintln!("{LEGACY_DEFAULT_HOST}");
         }
@@ -331,8 +341,8 @@ impl Config {
         }
         if let Some(v) = var("AGENT_EXECUTION_MODE") {
             a.execution_mode = match v.trim().to_ascii_lowercase().as_str() {
-                "native" => vault_agent::bubblepaw_core::ExecutionMode::Native,
-                "js" => vault_agent::bubblepaw_core::ExecutionMode::Js,
+                "native" => vault_agent::bubblepaw_sdk::harness::ExecutionMode::Native,
+                "js" => vault_agent::bubblepaw_sdk::harness::ExecutionMode::Js,
                 _ => {
                     return Err(format!(
                         "NOTES_HUB_AGENT_EXECUTION_MODE: native or js, not {v:?}"
@@ -340,8 +350,8 @@ impl Config {
                 }
             };
         }
-        if let Some(v) = var("AGENT_ENABLE_JS") {
-            a.enable_js = boolean("NOTES_HUB_AGENT_ENABLE_JS", &v)?;
+        if var("AGENT_ENABLE_JS").is_some() {
+            a.legacy_enable_js = true;
         }
         if let Some(v) = var("AGENT_MODELS") {
             a.models = list(&v);
@@ -714,9 +724,9 @@ mod tests {
         assert!(c.agent.enabled);
         assert_eq!(
             c.agent.execution_mode,
-            vault_agent::bubblepaw_core::ExecutionMode::Native
+            vault_agent::bubblepaw_sdk::harness::ExecutionMode::Native
         );
-        assert!(!c.agent.enable_js);
+        assert!(!c.agent.legacy_enable_js);
         assert!(!c.agent.legacy_approvals);
         c.apply_env(|k| match k {
             "NOTES_HUB_AGENT_ENABLED" => Some("off".into()),
@@ -731,17 +741,25 @@ mod tests {
         assert_eq!(c.agent.default_model, "claude-code/claude-haiku-5-5");
         assert_eq!(
             c.agent.execution_mode,
-            vault_agent::bubblepaw_core::ExecutionMode::Js
+            vault_agent::bubblepaw_sdk::harness::ExecutionMode::Js
         );
-        assert!(c.agent.enable_js);
+        assert!(c.agent.legacy_enable_js);
         assert!(Config::from_toml("[agent]\nexecution_mode = \"invalid\"").is_err());
         assert!(c
             .apply_env(|k| (k == "NOTES_HUB_AGENT_EXECUTION_MODE").then(|| "invalid".into()))
             .is_err());
-        assert!(c
-            .apply_env(|k| (k == "NOTES_HUB_AGENT_ENABLE_JS").then(|| "invalid".into()))
-            .is_err());
         assert!(!c.agent.legacy_approvals);
+    }
+
+    #[test]
+    fn the_removed_enable_js_setting_is_accepted_and_ignored() {
+        let c = Config::from_toml("[agent]\nenable_js = true").unwrap();
+        assert!(c.agent.legacy_enable_js);
+        assert!(c.agent.enabled);
+        let mut c = Config::default();
+        c.apply_env(|k| (k == "NOTES_HUB_AGENT_ENABLE_JS").then(|| "invalid".into()))
+            .unwrap();
+        assert!(c.agent.legacy_enable_js);
     }
 
     #[test]

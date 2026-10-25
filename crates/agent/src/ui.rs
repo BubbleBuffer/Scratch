@@ -1,9 +1,9 @@
 //! Ephemeral actions are only sent when an app explicitly displays this chat.
 use anyhow::{ensure, Result};
 use async_trait::async_trait;
-use bubblepaw_core::{
-    Approval, CancellationToken, Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult,
-};
+use bubblepaw_sdk::approvals::Approval;
+use bubblepaw_sdk::harness::CancellationToken;
+use bubblepaw_sdk::tools::{Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult};
 use notes_agent_wire::UiAction;
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};

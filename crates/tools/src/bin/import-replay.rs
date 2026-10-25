@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use bubblepaw_core::{Message, Role, Store};
+use bubblepaw_sdk::store::{Message, Role, Store};
 use rusqlite::{Connection, OpenFlags};
 use serde_json::Value;
 use vault_tools::harness::{self, Part};

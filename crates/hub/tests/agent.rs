@@ -16,7 +16,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::Message;
-use vault_agent::TestHooks;
+use vault_agent::{bubblepaw_sdk::harness::ExecutionMode, TestHooks};
 use vault_core::{new_id, Vault};
 use vault_sync::SyncClient;
 
@@ -60,6 +60,10 @@ impl Drop for Env {
 }
 
 async fn env_with(prepare: impl FnOnce(&std::path::Path)) -> Env {
+    env_in(ExecutionMode::Native, prepare).await
+}
+
+async fn env_in(execution_mode: ExecutionMode, prepare: impl FnOnce(&std::path::Path)) -> Env {
     let data = TempDir::new("data");
     prepare(&data.0);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -69,7 +73,7 @@ async fn env_with(prepare: impl FnOnce(&std::path::Path)) -> Env {
         data_dir: data.0.clone(),
         trust_proxy: false,
         agent: AgentSection {
-            enable_js: true,
+            execution_mode,
             default_model: "scripted/scripted".into(),
             models: vec!["scripted/scripted".into(), "scripted/vault-pick".into()],
             ..AgentSection::default()
@@ -93,6 +97,11 @@ async fn env_with(prepare: impl FnOnce(&std::path::Path)) -> Env {
 
 async fn env() -> Env {
     env_with(|_| {}).await
+}
+
+/// The `js` tool and `run_script` exist only in JavaScript mode.
+async fn js_env() -> Env {
+    env_in(ExecutionMode::Js, |_| {}).await
 }
 
 /// A JSON-RPC client over one socket.
@@ -428,7 +437,7 @@ async fn unreadable_schedule_state_keeps_sync_up_and_reports_the_runner_error() 
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn sessions_scripts_events_and_a_syncing_peer() {
-    let e = env().await;
+    let e = js_env().await;
     let dir = TempDir::new("peer");
     let peer = dir.open();
     let device = peer.device_id();
@@ -517,7 +526,7 @@ async fn sessions_scripts_events_and_a_syncing_peer() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn approvals_round_trip_over_the_socket() {
-    let e = env().await;
+    let e = js_env().await;
     let token = e.server().hub().pair("laptop").unwrap();
     let mut c = connect(&e.url, &token, "dev-approve").await.unwrap();
     // Lower-level policy/approval RPCs remain functional for explicit callers.

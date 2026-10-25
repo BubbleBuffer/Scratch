@@ -7,10 +7,10 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::{
-    Approval, EventKind, Tool, ToolCall, ToolContext, ToolDefinition, ToolResult,
-};
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::approvals::Approval;
+use vault_agent::bubblepaw_sdk::events::EventKind;
+use vault_agent::bubblepaw_sdk::tools::{Tool, ToolCall, ToolContext, ToolDefinition, ToolResult};
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
 use vault_agent::{
     tasks::{limit_error, session_title, TaskRun, RUN_LIMIT},
     Agent, AgentConfig, Forwarded, PermissionMode, Sent, TestHooks,
@@ -339,6 +339,8 @@ fn ai_task_runs_in_its_own_session_and_writes_back() {
     let t = temp();
     let v = &t.vault;
     let page = v.create_page(None, "Trip".into()).unwrap();
+    // The prompt quotes the page id, a random ULID that can contain "MCP".
+    let page_id = page.clone();
     v.insert_markdown(page.clone(), None, None, true, "Day one".into())
         .unwrap();
     let task = tasks::create(v, "Plan day two", &page, None, vault_agent::tasks::RUNNER).unwrap();
@@ -360,7 +362,7 @@ fn ai_task_runs_in_its_own_session_and_writes_back() {
 
     let session = agent.session_state(&run.session_id).unwrap();
     assert_eq!(session.session.title, "AI task: Plan day two");
-    let prompt = &session.messages[0].content;
+    let prompt = session.messages[0].content.replace(&page_id, "");
     assert!(
         prompt.contains("tools.$search") && !prompt.contains("MCP"),
         "{prompt}"

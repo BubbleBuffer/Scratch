@@ -23,10 +23,11 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use async_trait::async_trait;
-use bubblepaw_core::{
-    CancellationToken, Message, ModelInfo, ModelRequest, ModelResponse, Provider, Role,
-    TextCallback, ToolCall,
-};
+use bubblepaw_sdk::harness::CancellationToken;
+use bubblepaw_sdk::store::{Message, Role};
+use bubblepaw_sdk::core::ModelInfo;
+use bubblepaw_sdk::providers::{ModelRequest, ModelResponse, Provider, TextCallback};
+use bubblepaw_sdk::tools::ToolCall;
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -286,6 +287,7 @@ impl Replay {
             text: step.text,
             tool_calls: calls,
             usage: None,
+            quota: Vec::new(),
             last_request_usage: None,
             provider_state: Some(serde_json::to_value(tag)?),
         })
@@ -303,7 +305,7 @@ impl Replay {
         // tail is the last message that is neither.
         let last = request.messages.iter().rev().find(|message| {
             message.role != Role::System
-                && (message.role != Role::User || bubblepaw_core::is_typed_user(message))
+                && (message.role != Role::User || bubblepaw_sdk::core::is_typed_user(message))
         });
         match last {
             Some(message) if message.role == Role::User => {
@@ -402,7 +404,7 @@ impl Replay {
     /// only what changed, so polling does not bump the outline revision.
     fn sync_outline(
         &self,
-        store: &bubblepaw_core::Store,
+        store: &bubblepaw_sdk::store::Store,
         path: &Path,
         session: &str,
     ) -> Result<()> {

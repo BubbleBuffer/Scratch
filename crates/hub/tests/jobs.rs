@@ -11,8 +11,8 @@ use notes_hub::agent_tokens::{AgentScope, AgentTokens};
 use notes_hub::{AgentSection, Config, JobLimits, Server};
 use reqwest::Client;
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::ToolCall;
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::tools::ToolCall;
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
 use vault_agent::TestHooks;
 use vault_core::{new_id, BlockKind, Vault};
 
