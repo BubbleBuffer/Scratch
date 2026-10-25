@@ -116,6 +116,11 @@ impl GatewayRuntime {
         ))
     }
 
+    /// Registry entries that the surface hides but JS composition may name.
+    fn composed_only_names(&self) -> impl Iterator<Item = String> + '_ {
+        std::iter::once("hosts".to_string()).chain(self.vault_adapters.iter().cloned())
+    }
+
     fn definitions(&self, harness: &Harness, session: &str) -> Result<Vec<ToolDefinition>> {
         Ok(harness
             .effective_tool_definitions(session, &RunOptions::default())?
@@ -355,26 +360,24 @@ impl crate::Agent {
                 .bind_session_actor(session, &client.id, format!("oauth:{author}"))?;
         }
         let harness = gateway.harness(self.store.clone(), policy)?;
-        // The run gate also covers the tools a js call composes. A js call may
-        // therefore reach every tool the gateway registry holds, as it did
-        // before the SDK gate; a direct call may name only the advertised surface.
-        let tool_names = if name == "js" {
-            None
-        } else {
-            Some(
-                gateway
-                    .definitions(&harness, session)?
-                    .into_iter()
-                    .map(|tool| tool.name)
-                    .collect::<Vec<String>>(),
-            )
-        };
+        // The run gate also covers the tools a js call composes. Both direct and
+        // js calls get the advertised surface; a js call also gets the registry
+        // entries the surface hides only for JS composition (vault adapters and
+        // hosts). Everything else, such as excluded or unapproved tools, is refused.
+        let mut tool_names = gateway
+            .definitions(&harness, session)?
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect::<Vec<String>>();
+        if name == "js" {
+            tool_names.extend(gateway.composed_only_names());
+        }
         self.runtime.block_on(harness.call_tool(
             session,
             name,
             input,
             RunOptions {
-                tool_names,
+                tool_names: Some(tool_names),
                 client: Some(client),
                 ..RunOptions::default()
             },

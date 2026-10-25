@@ -281,8 +281,21 @@ fn native_and_nested_js_apply_the_same_exclusions_and_noninteractive_policy() {
             .gateway_call_as(&session.id, name, json!({}), client())
             .unwrap();
         assert!(denied.is_error, "{name}: {denied:?}");
-        let code = format!("return typeof tools.{name};");
-        assert_eq!(value(f.js(&session.id, json!({"code":code}))), "undefined");
+        let code = format!("return '{name}' in tools;");
+        assert_eq!(value(f.js(&session.id, json!({"code":code}))), false);
+        let code = format!(
+            "try {{ await tools.{name}({{}}); return 'ran'; }} catch (error) {{ return 'refused'; }}"
+        );
+        let refused = f.js(&session.id, json!({"code":code}));
+        assert!(refused.is_error || value(refused) == "refused", "{name}");
+    }
+    let listed = value(f.js(
+        &session.id,
+        json!({"code":"return (await tools.$list()).map(t => t.name);"}),
+    ));
+    let listed = listed.as_array().unwrap();
+    for name in excluded.into_iter().chain(["test_confirm"]) {
+        assert!(!listed.iter().any(|tool| tool.as_str() == Some(name)), "{name}");
     }
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert!(f
@@ -417,11 +430,14 @@ fn gateway_help_and_discovery_match_the_enabled_host_surface() {
         value(f.js(&session.id, json!({"code":"return await tools.hosts();"}))),
         json!([{"name":"hub","online":true,"default":true}])
     );
-    let found = value(f.js(&session.id, json!({"code": "return {tools:await tools.$list(),exec:typeof tools.exec,ui:typeof tools.ui_open_page};"})));
-    assert_eq!(found["exec"], "undefined");
-    assert_eq!(found["ui"], "undefined");
+    let found = value(f.js(&session.id, json!({"code": "return {tools:await tools.$list(),exec:'exec' in tools,ui:'ui_open_page' in tools};"})));
+    assert_eq!(found["exec"], false);
+    assert_eq!(found["ui"], false);
     let names = found["tools"].as_array().unwrap();
     assert!(names.iter().any(|tool| tool["name"] == "search_notes"));
+    assert!(!names
+        .iter()
+        .any(|tool| tool["name"] == "exec" || tool["name"] == "ui_open_page"));
     assert!(!names
         .iter()
         .any(|tool| tool["name"].as_str().unwrap().starts_with("history_")));
@@ -488,9 +504,18 @@ fn gateway_confirm_visibility_and_dispatch_follow_live_permissions_without_askin
     assert!(!f.agent.gateway_js_help(None).contains("test_confirm"));
     let hidden = value(f.js(
         &session.id,
-        json!({"code":"return typeof tools.test_confirm;"}),
+        json!({"code":"const listed = (await tools.$list()).map(t => t.name); let call = 'ran'; try { await tools.test_confirm({text:'hidden'}); } catch (error) { call = 'refused'; } return {in: 'test_confirm' in tools, listed: listed.includes('test_confirm'), call};"}),
     ));
-    assert_eq!(hidden, "undefined");
+    assert_eq!(
+        hidden,
+        json!({"in":false, "listed":false, "call":"refused"})
+    );
+    assert!(f
+        .agent
+        .session_state(&session.id)
+        .unwrap()
+        .pending_approvals
+        .is_empty());
 }
 
 #[test]
