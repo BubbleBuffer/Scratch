@@ -684,6 +684,7 @@ impl Agent {
 
         let support_records = records.clone();
         let support_vault = vault.clone();
+        let wrapped_context = context_slot.clone();
         let host = HostBuilder::new(store.clone(), registry)
             .workspace(workspace.clone())
             .tools(tools)
@@ -698,22 +699,20 @@ impl Agent {
                 ))
             })
             .summarize(summary_config)
-            .context(
-                move |mut summary: SummarizingContext| -> Arc<dyn ContextPreparation> {
-                    if let Some((model, cache)) = &model_metadata {
-                        summary = summary.with_model_metadata(model.clone(), cache.clone());
-                    }
-                    let context: Arc<dyn ContextPreparation> = match &desktop_context {
-                        Some(desktop) => Arc::new(DesktopContext {
-                            inner: summary,
-                            desktop: desktop.clone(),
-                        }),
-                        None => Arc::new(summary),
-                    };
-                    let _ = context_slot.set(context.clone());
-                    context
-                },
-            )
+            .context(move |mut summary: SummarizingContext| -> Arc<dyn ContextPreparation> {
+                if let Some((model, cache)) = &model_metadata {
+                    summary = summary.with_model_metadata(model.clone(), cache.clone());
+                }
+                let context: Arc<dyn ContextPreparation> = match &desktop_context {
+                    Some(desktop) => Arc::new(DesktopContext {
+                        inner: summary,
+                        desktop: desktop.clone(),
+                    }),
+                    None => Arc::new(summary),
+                };
+                let _ = wrapped_context.set(context.clone());
+                context
+            })
             .config(harness_config.clone())
             .build()?;
         let _ = base_slot.set(host.tools.clone());

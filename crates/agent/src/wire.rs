@@ -259,7 +259,9 @@ pub fn event(ev: HarnessEvent) -> w::AgentEvent {
         | EventKind::SessionSettled {}
         | EventKind::HostStateChanged { .. }
         | EventKind::ModelRequestStarted {}
-        | EventKind::TextDelta { .. } => {}
+        | EventKind::TextDelta { .. }
+        | EventKind::RunWaitingForQuota { .. }
+        | EventKind::RunQuotaResumed {} => {}
     }
     out
 }
