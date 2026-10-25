@@ -10,7 +10,8 @@ use anyhow::{ensure, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use vault_agent::bubblepaw_core::{
-    Approval, EventKind, ExecutionMode, Tool, ToolCall, ToolContext, ToolDefinition, ToolResult,
+    Approval, ApprovalState, EventKind, ExecutionMode, Tool, ToolCall, ToolContext, ToolDefinition,
+    ToolResult,
 };
 use vault_agent::bubblepaw_runner::provider::ScriptedStep;
 use vault_agent::{Agent, AgentConfig, PermissionMode, TestHooks, ToolPack};
@@ -419,9 +420,10 @@ fn task_without_a_project_denies_writes_and_shell_but_still_reads_and_reports() 
             assert!(
                 events.events.iter().any(|event| matches!(
                     &event.kind,
-                    EventKind::ToolFinished { name, result, .. }
-                        if name == denied_tool && result.is_error
-                            && result.content.contains("Denied by the user")
+                    EventKind::ApprovalRequested { approval }
+                        if approval.tool == denied_tool
+                            && approval.state == ApprovalState::Denied
+                            && approval.reason.as_deref() == Some("policy")
                 )),
                 "{mode:?}: {denied_tool} did not return a denial: {:?}",
                 events.events
