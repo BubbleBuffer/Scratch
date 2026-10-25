@@ -48,11 +48,10 @@ so the app ships the version the hub uses. The script checks for
 exits non-zero and the build stops before packing an installer without the
 provider.
 
-Size: about 360 MB in the Release folder, which is what the installed app
+Size: about 360 MB in the Release folder, which is what an installed app
 grows by. Most of it is Claude Code's dependencies in `node_modules`; the Bun
 binary is the rest. The installer compresses that to about 140 MB
-(`Scratch-Setup-<version>-<sha7>.exe`, measured in the `windows-build` run of
-this change). `scratch.iss` needs no new entries:
+(`Scratch-Setup-<version>-<sha7>.exe`). `scratch.iss` needs no new entries:
 its one `[Files]` line packs the Release folder recursively, and uninstall
 removes every file it installed, these included (no `uninsneveruninstall`
 flag anywhere), so `claude-code\` and `bun\` go with the rest.
