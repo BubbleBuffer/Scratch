@@ -1,12 +1,14 @@
 // Settings > AI: the agent first (an add-on section placed 'top', with "Run
 // AI on" and what that runner uses), then where Ask AI runs (the agent on
 // the hub or on this computer, per "Run AI on"), the vault's MCP endpoint
-// for AI apps, the hub's agent tokens, and the recent tasks with their
-// status. Phones only list tasks: computers answer them.
+// for AI apps, the hub's agent tokens, the names of the computers that run
+// tasks, and the recent tasks with their status. Phones only list tasks:
+// computers answer them.
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../src/rust/api/ai.dart' show AiRunner, AiRunnerKind;
 import '../../state/app_state.dart';
 import '../../ui/ui.dart';
 import '../settings/controls.dart';
@@ -81,6 +83,8 @@ class AiSettingsBody extends StatelessWidget {
             AgentTokensSection(
               top: !m || AiStore.canRun || beforeTasks.isNotEmpty ? 24 : 0,
             ),
+            const SettingsHeading('Runner names', top: 24),
+            _RunnerNames(store: store),
             const SettingsHeading('Recent tasks', top: 24),
             _TaskList(store: store),
           ],
@@ -179,6 +183,160 @@ class _McpSectionState extends State<_McpSection> {
 /// The command that adds the endpoint to Claude Code.
 String claudeAddCommand(String url, String token) =>
     'claude mcp add --transport http notes $url --header "Authorization: Bearer $token"';
+
+/// The computers that can run tasks, each with the name it has in the vault.
+/// Renaming one changes the name the kanban "Run on" picker shows.
+class _RunnerNames extends StatefulWidget {
+  const _RunnerNames({required this.store});
+  final AiStore store;
+
+  @override
+  State<_RunnerNames> createState() => _RunnerNamesState();
+}
+
+class _RunnerNamesState extends State<_RunnerNames> {
+  late Future<List<AiRunner>> _pcs = _load();
+  final _name = TextEditingController();
+  String? _editing;
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  /// The PCs of the vault's runner list (the hub has no name to change).
+  Future<List<AiRunner>> _load() async {
+    final list = await widget.store.runnerBridge.listRunners(
+      hubUsable: widget.store.hubUsable,
+    );
+    return [for (final r in list.runners) if (r.kind == AiRunnerKind.pc) r];
+  }
+
+  void _startEdit(AiRunner r) => setState(() {
+    _editing = r.id;
+    _name.text = r.name;
+    _error = null;
+  });
+
+  Future<void> _save(AiRunner r) async {
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Enter a name.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await widget.store.runnerBridge.rename(deviceId: r.id, name: name);
+      await widget.store.refresh();
+      if (!mounted) return;
+      setState(() {
+        _editing = null;
+        _busy = false;
+        _pcs = _load();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _busy = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return FutureBuilder<List<AiRunner>>(
+      future: _pcs,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return Text(
+            '${snap.error}',
+            key: const ValueKey('runner-names-error'),
+            style: tsRaw(14, 20, 400, c.textSecondary),
+          );
+        }
+        if (!snap.hasData) {
+          return Text(
+            'Loading computers…',
+            style: tsRaw(14, 20, 400, c.textTertiary),
+          );
+        }
+        final pcs = snap.data!;
+        if (pcs.isEmpty) {
+          return Text(
+            'No computers yet.',
+            key: const ValueKey('runner-names-empty'),
+            style: tsRaw(14, 20, 400, c.textTertiary),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final r in pcs) _row(context, r),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _error!,
+                  key: const ValueKey('runner-names-save-error'),
+                  style: tsRaw(14, 20, 400, c.textSecondary),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _row(BuildContext context, AiRunner r) {
+    final c = context.colors;
+    final editing = _editing == r.id;
+    return Padding(
+      key: ValueKey('runner-name-row-${r.id}'),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: editing
+                ? SettingsField(
+                    controller: _name,
+                    placeholder: 'Name',
+                    fieldKey: ValueKey('runner-name-field-${r.id}'),
+                    autofocus: true,
+                    onSubmitted: (_) => _save(r),
+                  )
+                : Text(
+                    r.name,
+                    key: ValueKey('runner-name-${r.id}'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: tsRaw(15, 21, 400, c.textPrimary),
+                  ),
+          ),
+          const SizedBox(width: 8),
+          if (editing)
+            PrimaryButton(
+              key: ValueKey('runner-name-save-${r.id}'),
+              label: 'Save',
+              height: 38,
+              onTap: _busy ? () {} : () => _save(r),
+            )
+          else
+            IconBtn(
+              Ico.compose,
+              key: ValueKey('runner-rename-${r.id}'),
+              tooltip: 'Rename ${r.name}',
+              onTap: () => _startEdit(r),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 class _TaskList extends StatelessWidget {
   const _TaskList({required this.store});

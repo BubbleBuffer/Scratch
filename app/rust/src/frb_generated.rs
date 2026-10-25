@@ -43,7 +43,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1185988593;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -411860073;
 
 // Section: executor
 
@@ -11108,6 +11108,65 @@ fn wire__crate__api__agent__agent_mcp_import_file_impl(
         },
     )
 }
+fn wire__crate__api__ai__ai_assign_task_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ai_assign_task",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_vault = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesVault>,
+            >>::sse_decode(&mut deserializer);
+            let api_prompt = <String>::sse_decode(&mut deserializer);
+            let api_page = <String>::sse_decode(&mut deserializer);
+            let api_block = <Option<String>>::sse_decode(&mut deserializer);
+            let api_runner_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_vault_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_vault, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_vault_guard = Some(api_vault.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_vault_guard = api_vault_guard.unwrap();
+                    let output_ok = crate::api::ai::ai_assign_task(
+                        &*api_vault_guard,
+                        api_prompt,
+                        api_page,
+                        api_block,
+                        api_runner_id,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__ai__ai_cancel_task_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -11430,6 +11489,57 @@ fn wire__crate__api__ai__ai_get_task_impl(
         },
     )
 }
+fn wire__crate__api__ai__ai_list_runners_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ai_list_runners",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_vault = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesVault>,
+            >>::sse_decode(&mut deserializer);
+            let api_hub_usable = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_vault_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_vault, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_vault_guard = Some(api_vault.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_vault_guard = api_vault_guard.unwrap();
+                    let output_ok =
+                        crate::api::ai::ai_list_runners(&*api_vault_guard, api_hub_usable)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__ai__ai_list_tasks_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -11523,6 +11633,61 @@ fn wire__crate__api__ai__ai_recover_tasks_impl(
                     }
                     let api_vault_guard = api_vault_guard.unwrap();
                     let output_ok = crate::api::ai::ai_recover_tasks(&*api_vault_guard)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__ai__ai_rename_device_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ai_rename_device",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_vault = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesVault>,
+            >>::sse_decode(&mut deserializer);
+            let api_device_id = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_vault_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_vault, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_vault_guard = Some(api_vault.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_vault_guard = api_vault_guard.unwrap();
+                    let output_ok = crate::api::ai::ai_rename_device(
+                        &*api_vault_guard,
+                        api_device_id,
+                        api_name,
+                    )?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -12999,6 +13164,50 @@ impl SseDecode for crate::api::agent::AgentUiAction {
     }
 }
 
+impl SseDecode for crate::api::ai::AiRunner {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_kind = <crate::api::ai::AiRunnerKind>::sse_decode(deserializer);
+        let mut var_online = <bool>::sse_decode(deserializer);
+        let mut var_lastSeenMs = <Option<i64>>::sse_decode(deserializer);
+        let mut var_isThisDevice = <bool>::sse_decode(deserializer);
+        return crate::api::ai::AiRunner {
+            id: var_id,
+            name: var_name,
+            kind: var_kind,
+            online: var_online,
+            last_seen_ms: var_lastSeenMs,
+            is_this_device: var_isThisDevice,
+        };
+    }
+}
+
+impl SseDecode for crate::api::ai::AiRunnerKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::ai::AiRunnerKind::Hub,
+            1 => crate::api::ai::AiRunnerKind::Pc,
+            _ => unreachable!("Invalid variant for AiRunnerKind: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::ai::AiRunnerList {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_runners = <Vec<crate::api::ai::AiRunner>>::sse_decode(deserializer);
+        let mut var_defaultRunnerId = <String>::sse_decode(deserializer);
+        return crate::api::ai::AiRunnerList {
+            runners: var_runners,
+            default_runner_id: var_defaultRunnerId,
+        };
+    }
+}
+
 impl SseDecode for crate::api::ai::AiTask {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -13010,6 +13219,8 @@ impl SseDecode for crate::api::ai::AiTask {
         let mut var_status = <String>::sse_decode(deserializer);
         let mut var_device = <String>::sse_decode(deserializer);
         let mut var_error = <String>::sse_decode(deserializer);
+        let mut var_progress = <String>::sse_decode(deserializer);
+        let mut var_progressAt = <String>::sse_decode(deserializer);
         let mut var_createdMs = <i64>::sse_decode(deserializer);
         let mut var_updatedMs = <i64>::sse_decode(deserializer);
         let mut var_node = <String>::sse_decode(deserializer);
@@ -13022,6 +13233,8 @@ impl SseDecode for crate::api::ai::AiTask {
             status: var_status,
             device: var_device,
             error: var_error,
+            progress: var_progress,
+            progress_at: var_progressAt,
             created_ms: var_createdMs,
             updated_ms: var_updatedMs,
             node: var_node,
@@ -13950,6 +14163,18 @@ impl SseDecode for Vec<crate::api::agent::AgentToolCall> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::agent::AgentToolCall>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::ai::AiRunner> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::ai::AiRunner>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -16507,35 +16732,38 @@ fn pde_ffi_dispatcher_primary_impl(
         210 => {
             wire__crate__api__agent__agent_mcp_import_file_impl(port, ptr, rust_vec_len, data_len)
         }
-        211 => wire__crate__api__ai__ai_cancel_task_impl(port, ptr, rust_vec_len, data_len),
-        212 => wire__crate__api__ai__ai_claim_next_impl(port, ptr, rust_vec_len, data_len),
-        213 => wire__crate__api__ai__ai_create_task_impl(port, ptr, rust_vec_len, data_len),
-        214 => wire__crate__api__ai__ai_create_task_here_impl(port, ptr, rust_vec_len, data_len),
-        215 => wire__crate__api__ai__ai_finish_task_impl(port, ptr, rust_vec_len, data_len),
-        216 => wire__crate__api__ai__ai_get_task_impl(port, ptr, rust_vec_len, data_len),
-        217 => wire__crate__api__ai__ai_list_tasks_impl(port, ptr, rust_vec_len, data_len),
-        218 => wire__crate__api__ai__ai_recover_tasks_impl(port, ptr, rust_vec_len, data_len),
-        219 => wire__crate__api__ai__ai_retry_task_impl(port, ptr, rust_vec_len, data_len),
-        220 => {
+        211 => wire__crate__api__ai__ai_assign_task_impl(port, ptr, rust_vec_len, data_len),
+        212 => wire__crate__api__ai__ai_cancel_task_impl(port, ptr, rust_vec_len, data_len),
+        213 => wire__crate__api__ai__ai_claim_next_impl(port, ptr, rust_vec_len, data_len),
+        214 => wire__crate__api__ai__ai_create_task_impl(port, ptr, rust_vec_len, data_len),
+        215 => wire__crate__api__ai__ai_create_task_here_impl(port, ptr, rust_vec_len, data_len),
+        216 => wire__crate__api__ai__ai_finish_task_impl(port, ptr, rust_vec_len, data_len),
+        217 => wire__crate__api__ai__ai_get_task_impl(port, ptr, rust_vec_len, data_len),
+        218 => wire__crate__api__ai__ai_list_runners_impl(port, ptr, rust_vec_len, data_len),
+        219 => wire__crate__api__ai__ai_list_tasks_impl(port, ptr, rust_vec_len, data_len),
+        220 => wire__crate__api__ai__ai_recover_tasks_impl(port, ptr, rust_vec_len, data_len),
+        221 => wire__crate__api__ai__ai_rename_device_impl(port, ptr, rust_vec_len, data_len),
+        222 => wire__crate__api__ai__ai_retry_task_impl(port, ptr, rust_vec_len, data_len),
+        223 => {
             wire__crate__api__agent__ai_run_task_with_agent_impl(port, ptr, rust_vec_len, data_len)
         }
-        221 => wire__crate__api__ai__ai_tasks_collection_impl(port, ptr, rust_vec_len, data_len),
-        224 => wire__crate__api__vault__first_option_in_impl(port, ptr, rust_vec_len, data_len),
-        225 => wire__crate__api__vault__init_app_impl(port, ptr, rust_vec_len, data_len),
-        228 => {
+        224 => wire__crate__api__ai__ai_tasks_collection_impl(port, ptr, rust_vec_len, data_len),
+        227 => wire__crate__api__vault__first_option_in_impl(port, ptr, rust_vec_len, data_len),
+        228 => wire__crate__api__vault__init_app_impl(port, ptr, rust_vec_len, data_len),
+        231 => {
             wire__crate__api__types__page_prefs_data_default_impl(port, ptr, rust_vec_len, data_len)
         }
-        229 => wire__crate__api__types__search_spec_to_query_string_impl(
+        232 => wire__crate__api__types__search_spec_to_query_string_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        231 => wire__crate__api__vault__sha256_hex_impl(port, ptr, rust_vec_len, data_len),
-        232 => wire__crate__api__vault__status_group_impl(port, ptr, rust_vec_len, data_len),
-        233 => wire__crate__api__types__sync_report_default_impl(port, ptr, rust_vec_len, data_len),
-        234 => wire__crate__api__types__sync_status_default_impl(port, ptr, rust_vec_len, data_len),
-        235 => wire__crate__api__vault__version_includes_impl(port, ptr, rust_vec_len, data_len),
+        234 => wire__crate__api__vault__sha256_hex_impl(port, ptr, rust_vec_len, data_len),
+        235 => wire__crate__api__vault__status_group_impl(port, ptr, rust_vec_len, data_len),
+        236 => wire__crate__api__types__sync_report_default_impl(port, ptr, rust_vec_len, data_len),
+        237 => wire__crate__api__types__sync_status_default_impl(port, ptr, rust_vec_len, data_len),
+        238 => wire__crate__api__vault__version_includes_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -16565,11 +16793,11 @@ fn pde_ffi_dispatcher_sync_impl(
         165 => wire__crate__api__vault__NotesVault_root_impl(ptr, rust_vec_len, data_len),
         172 => wire__crate__api__vault__NotesVault_seed_progress_impl(ptr, rust_vec_len, data_len),
         209 => wire__crate__api__agent__agent_markdown_blocks_impl(ptr, rust_vec_len, data_len),
-        222 => wire__crate__api__sync__default_sync_options_impl(ptr, rust_vec_len, data_len),
-        223 => wire__crate__api__clock__device_time_zone_impl(ptr, rust_vec_len, data_len),
-        226 => wire__crate__api__ai__mcp_default_addr_impl(ptr, rust_vec_len, data_len),
-        227 => wire__crate__api__vault__new_id_impl(ptr, rust_vec_len, data_len),
-        230 => wire__crate__api__clock__set_test_clock_impl(ptr, rust_vec_len, data_len),
+        225 => wire__crate__api__sync__default_sync_options_impl(ptr, rust_vec_len, data_len),
+        226 => wire__crate__api__clock__device_time_zone_impl(ptr, rust_vec_len, data_len),
+        229 => wire__crate__api__ai__mcp_default_addr_impl(ptr, rust_vec_len, data_len),
+        230 => wire__crate__api__vault__new_id_impl(ptr, rust_vec_len, data_len),
+        233 => wire__crate__api__clock__set_test_clock_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -17506,6 +17734,62 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::agent::AgentUiAction>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ai::AiRunner {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.kind.into_into_dart().into_dart(),
+            self.online.into_into_dart().into_dart(),
+            self.last_seen_ms.into_into_dart().into_dart(),
+            self.is_this_device.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::ai::AiRunner {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ai::AiRunner> for crate::api::ai::AiRunner {
+    fn into_into_dart(self) -> crate::api::ai::AiRunner {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ai::AiRunnerKind {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Hub => 0.into_dart(),
+            Self::Pc => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::ai::AiRunnerKind {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ai::AiRunnerKind>
+    for crate::api::ai::AiRunnerKind
+{
+    fn into_into_dart(self) -> crate::api::ai::AiRunnerKind {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ai::AiRunnerList {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.runners.into_into_dart().into_dart(),
+            self.default_runner_id.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::ai::AiRunnerList {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ai::AiRunnerList>
+    for crate::api::ai::AiRunnerList
+{
+    fn into_into_dart(self) -> crate::api::ai::AiRunnerList {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::ai::AiTask {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -17517,6 +17801,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::ai::AiTask {
             self.status.into_into_dart().into_dart(),
             self.device.into_into_dart().into_dart(),
             self.error.into_into_dart().into_dart(),
+            self.progress.into_into_dart().into_dart(),
+            self.progress_at.into_into_dart().into_dart(),
             self.created_ms.into_into_dart().into_dart(),
             self.updated_ms.into_into_dart().into_dart(),
             self.node.into_into_dart().into_dart(),
@@ -20063,6 +20349,42 @@ impl SseEncode for crate::api::agent::AgentUiAction {
     }
 }
 
+impl SseEncode for crate::api::ai::AiRunner {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <crate::api::ai::AiRunnerKind>::sse_encode(self.kind, serializer);
+        <bool>::sse_encode(self.online, serializer);
+        <Option<i64>>::sse_encode(self.last_seen_ms, serializer);
+        <bool>::sse_encode(self.is_this_device, serializer);
+    }
+}
+
+impl SseEncode for crate::api::ai::AiRunnerKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::ai::AiRunnerKind::Hub => 0,
+                crate::api::ai::AiRunnerKind::Pc => 1,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::ai::AiRunnerList {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::api::ai::AiRunner>>::sse_encode(self.runners, serializer);
+        <String>::sse_encode(self.default_runner_id, serializer);
+    }
+}
+
 impl SseEncode for crate::api::ai::AiTask {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -20074,6 +20396,8 @@ impl SseEncode for crate::api::ai::AiTask {
         <String>::sse_encode(self.status, serializer);
         <String>::sse_encode(self.device, serializer);
         <String>::sse_encode(self.error, serializer);
+        <String>::sse_encode(self.progress, serializer);
+        <String>::sse_encode(self.progress_at, serializer);
         <i64>::sse_encode(self.created_ms, serializer);
         <i64>::sse_encode(self.updated_ms, serializer);
         <String>::sse_encode(self.node, serializer);
@@ -20779,6 +21103,16 @@ impl SseEncode for Vec<crate::api::agent::AgentToolCall> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::agent::AgentToolCall>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::ai::AiRunner> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::ai::AiRunner>::sse_encode(item, serializer);
         }
     }
 }

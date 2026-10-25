@@ -9,12 +9,14 @@ import '../../state/app_state.dart';
 import '../../state/pages_store.dart';
 import '../../ui/board/board_renderer.dart';
 import '../../ui/board/board_source.dart';
+import '../../services/addon_services.dart' show AddonServices;
 import '../../ui/database/widgets.dart' show showPanel;
 import '../../ui/ui.dart';
 import 'runner_backend.dart';
 import 'runner_chip.dart';
 import 'runner_fake.dart';
 import 'runner_picker.dart';
+import 'runner_real.dart';
 import 'source.dart';
 
 /// A kanban board. [inline] is the compact embed; otherwise the board fills
@@ -75,9 +77,13 @@ class _KanbanBoardState extends State<KanbanBoard> {
         cardBuilder: _card,
       ),
     );
-    // Without a scope above, the SEED_DEMO build gives the board its fake runners.
-    if (RunnerScope.maybeOf(context) != null || !runnerSeedDemo) return board;
-    return RunnerScope(assignments: demoRunnerAssignments, child: board);
+    // Without a scope above, the board uses the agent's runners. The
+    // SEED_DEMO build uses the fake runners instead.
+    if (RunnerScope.maybeOf(context) != null) return board;
+    final assignments = runnerSeedDemo
+        ? demoRunnerAssignments
+        : aiRunnerAssignments(AddonServices().aiTasks(context));
+    return RunnerScope(assignments: assignments, child: board);
   }
 
   /// A card draws its note through the board builder, or its card builder.

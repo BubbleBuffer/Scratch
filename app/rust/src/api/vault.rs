@@ -226,6 +226,7 @@ impl NotesVault {
     pub fn open(root: String, data_dir: Option<String>) -> Result<NotesVault, String> {
         let inner = Arc::new(Vault::open(root).map_err(err)?);
         if cfg!(any(target_os = "windows", target_os = "linux", target_os = "macos")) {
+            inner.publish_device_activity().map_err(err)?;
             poll_mounts(Arc::downgrade(&inner));
         }
         let runner = LocalRunner::open(inner.clone(), data_dir);

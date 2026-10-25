@@ -14,7 +14,7 @@ covers: ["app/**"]
 ## Bridge
 
 - The bridge crate is [app/rust](../../app/rust) (flutter_rust_bridge 2.13). Generated Dart is in `app/lib/src/rust/`.
-- **Regenerating the bindings:** from `app/`, run `flutter_rust_bridge_codegen generate` (codegen 2.13.0; `flutter` must be on PATH, e.g. `export PATH="/c/Users/Admin/flutter/bin:$PATH"` in Git Bash). It rewrites `app/rust/src/frb_generated.rs` and `app/lib/src/rust/**`. Two bridge structs with the same name in different API files clash in Dart, so codegen warns about duplicates.
+- **Regenerating the bindings:** run `bash scripts/regen-bindings.sh` from the repository, or `flutter_rust_bridge_codegen generate` from `app/` (codegen 2.13.0; Flutter/Dart must be on PATH). The generator invokes Rust compiler expansion. Two bridge structs with the same name in different API files clash in Dart, so codegen warns about duplicates. The [runner device list](../integrations/agent.md#runner-device-list-2026-10-24) exposes its list, assignment and rename API through `api/ai.rs`.
 - `NotesVault` is an opaque handle to one open vault. It exposes the whole [core API](core-state.md): pages, trash, favorites, icons and covers, properties, collections, schemas, views and queries, backlinks, attachments, history, the change feed (`poll_changes`, `wait_changes`), markdown import, rescan, the sync hooks and the bench seed.
 - `NotesSync` is the `vault_sync` client for one vault (`sync_once`, `sync_now`, `start`/`stop` of the background loop, `status`, attachment fetching).
 - `NotesHub` is the desktop hub server (`start`, `stop`, `address`, `pair`, `unpair`, `devices`).

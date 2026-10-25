@@ -282,7 +282,8 @@ void main() {
   group('home', () {
     appTest('search filters the list through the core', (tester) async {
       final s = await pumpApp(tester, mobile: false);
-      expect(find.text('All pages · 9'), findsOneWidget);
+      // Nine seeded pages, plus this device's node record (an ordinary page).
+      expect(find.text('All pages · 10'), findsOneWidget);
       expect(find.byKey(const ValueKey('search-field')), findsNothing);
       await expandAllPages(tester);
       await tester.enterText(

@@ -58,7 +58,9 @@ void main() {
       other.client = NotesSync(vault: other.vault.raw, url: url, token: token);
       final first = await real(tester, () => other.client!.syncOnce());
       expect(first.full, isTrue);
-      expect(await real(tester, () => other.vault.pageCount()), tv.pages.length);
+      // Both desktop app opens publish their node record under hidden Nodes.
+      // As before, the records count as pages; the Nodes parent does not.
+      expect(await real(tester, () => other.vault.pageCount()), tv.pages.length + 2);
 
       // Close settings (Escape), then an edit there shows up here.
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);

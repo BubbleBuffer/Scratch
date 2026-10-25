@@ -26,6 +26,54 @@ Delegated AI tasks on the desktop and hub jobs additionally get `report_progress
 
 Each report replaces the row's `progress` text and `progress_at` timestamp (text containing Unix epoch milliseconds, like `finished`). Older AI tasks databases gain both properties through the existing additive schema migration. Only the runner writes progress, which reaches other devices through ordinary vault sync. There is no history or progress event. Done, failed, cancelled and interrupted runs retain the last report and its timestamp; result and placeholder handling are unchanged. See [AI tasks](ai-assistants.md#ai-tasks) and [hub jobs](../architecture/hub.md#jobs).
 
+## Runner device list (2026-10-24)
+
+The Rust runner-picker API lists the hub (`id: hub`) first and the vault's PCs
+after it, sorted by name and device id. Every entry has its human name, kind
+(`hub` or `pc`), online state, optional last-seen time in Unix milliseconds,
+and whether it is this device. The hub remains listed when there is no hub
+record or usable connection. An unknown timestamp means offline.
+
+Device records reuse the existing hidden **Nodes** collection and ordinary
+vault sync. Each is a `node` page at `node_record_id(device)`, with
+`type_data.node.device_id`, `name`, `kind`, and RFC 3339 `last_seen`. The page
+id is a deterministic storage address used by schedules; the runner id is
+the random id in `.vault/device`. AI tasks' `node` property uses the device
+id, or the reserved `hub` value. No second runner identity is introduced.
+
+Opening a desktop app vault publishes its record, defaulting its name to the
+OS hostname. A successful sync refreshes an already published local record
+at most once per minute and sends that update before returning. Storage-only
+vault opens and phone syncs do not register PC runners. Scheduler publication
+merges fields, preserves an existing name, and refreshes at the same interval.
+A presence record alone does not enable scheduled jobs: scheduler registration
+is recognized by its existing `schedule_format` field and still requires opt-in.
+Only the device publishes its activity and scheduler fields; a rename from
+another vault copy changes only the trimmed, nonempty name and page title.
+Renames merge independently from concurrent activity updates.
+
+`vault_core::RUNNER_ONLINE_WINDOW_MS` is **300,000 ms**. A runner is online
+while its last-seen age is less than five minutes; exactly five minutes is
+offline. Future timestamps are treated as fresh for clock skew. Hub presence
+comes from the synced scheduler record whose kind is `hub`; its storage
+device id is normalized to the runner id `hub`.
+
+`vault_mcp::runners` provides listing and assignment. Listing also returns
+`default_runner_id`, following the current app's synced `Run AI on` choice,
+platform default and usable-host fallback. `this_device` resolves to the
+local device id; platforms without a local agent use `hub`. The retired
+per-device override is not applied. The caller supplies whether its hub link
+is usable, matching `AgentStore.usableHosts`; that is separate from online
+state derived from last seen.
+
+The bridge exposes `ai_list_runners`, `ai_assign_task`, and `ai_rename_device`
+in [api/ai.rs](../../app/rust/src/api/ai.rs). Assignment accepts a prompt,
+page, optional block and runner id; it reuses slice 1's task creation path,
+creating an AI task row and placeholder pinned before it is queued. Unknown
+runner ids and blocks outside the page are rejected before any task mutation.
+Offline runners accept queued tasks. Rename rejects unknown devices and empty
+names. The Dart `RunnerBackend` adapter remains a separate slice.
+
 ## Agent MCP gateway (`/mcp/agent`)
 
 **Implemented; deployment and real connector sign-in are not established here.** The separate endpoint `https://notes.example.com/mcp/agent` exposes the vault tools and your computers' tools to an external assistant, in one of two modes (see below). The existing `/mcp` endpoint keeps its vault tools and agent-token behavior. Host tool calls run through BubblePaw's single-tool API (`Harness::call_tool`) without invoking a model or provider; see [gateway runtime](../../crates/agent/src/gateway.rs) and [HTTP adapter](../../crates/hub/src/mcp_agent.rs).

@@ -141,9 +141,10 @@ void main() {
     expect(find.text('The agent stopped with an error.'), findsOneWidget);
   });
 
-  appTest('without a runner scope the card menu has no Assign to Agent entry', (
+  appTest('without a runner scope the card menu uses the agent runners', (
     tester,
   ) async {
+    // No scope given and no SEED_DEMO: the board falls back to AiStore's runners.
     final f = await pumpApp(tester, mobile: false);
     final garden = f.pages['Garden plan']!;
     await _openBoard(tester, garden);
@@ -151,7 +152,7 @@ void main() {
     await tapAndSettle(tester, cardMenuTrigger(garden));
 
     expect(menuItem('Open'), findsOneWidget);
-    expect(menuItem(_assignLabel), findsNothing);
+    expect(menuItem(_assignLabel), findsOneWidget);
   });
 
   appTest('the picker shows the reason when the runners cannot be listed', (

@@ -102,14 +102,14 @@ impl LocalRunner {
         }
     }
 
-    /// The existing record stays identifiable even if local state cannot load.
+    /// The record of this device once it is a schedule registration. A device
+    /// presence record, published on open, is not one. A registration stays
+    /// identifiable even if local state cannot load.
     pub(crate) fn node_id(&self, vault: &Vault) -> Option<String> {
         let id = vault_core::node_record_id(&vault.device_id());
-        vault
-            .load_page(id.clone())
-            .ok()
-            .filter(|page| page.page_type == "node")
-            .map(|_| id)
+        vault_agent::schedules::is_registered(vault, &id)
+            .ok()?
+            .then_some(id)
     }
 
     /// Turns the runner on or off. On: starts the timer if it is not running, and
@@ -251,6 +251,12 @@ mod tests {
             super::LocalRunner::Ready(ready) => ready,
             _ => panic!("the vault has no started local runner"),
         }
+    }
+
+    /// The `node` fields of the record `node` on `vault`.
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    fn node_data(vault: &NotesVault, node: &str) -> serde_json::Value {
+        serde_json::from_str(&vault.type_data(node.into(), "node".into()).unwrap()).unwrap()
     }
 
     fn at(text: &str) -> jiff::Timestamp {
@@ -489,19 +495,20 @@ mod tests {
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     #[test]
-    fn runner_off_on_a_fresh_vault_creates_no_pages() {
+    fn runner_off_on_a_fresh_vault_adds_no_schedule_registration() {
         let root = TempRoot::new();
         let vault = NotesVault::open(
             root.0.join("vault").to_string_lossy().into_owned(),
             Some(root.0.join("state").to_string_lossy().into_owned()),
         )
         .unwrap();
-        assert_eq!(vault.page_count().unwrap(), 0);
+        // App open publishes this device's presence record, and no other page.
+        let node = vault_core::node_record_id(&vault.device_id());
+        assert_eq!(vault.page_count().unwrap(), 1);
         assert_eq!(vault.local_node_id(), None);
-        assert_eq!(vault.find_by_role("nodes".into()).unwrap(), None);
 
         vault.local_runner_set_available(false).unwrap();
-        // A refresh more than six hours later must not publish an off desktop.
+        // A refresh seven hours later must not register an off desktop.
         ready(&vault)
             .scheduler
             .tick_at(
@@ -510,9 +517,50 @@ mod tests {
                     .unwrap(),
             )
             .unwrap();
-        assert_eq!(vault.page_count().unwrap(), 0);
+        assert_eq!(vault.page_count().unwrap(), 1);
         assert_eq!(vault.local_node_id(), None);
-        assert_eq!(vault.find_by_role("nodes".into()).unwrap(), None);
+        let record = node_data(&vault, &node);
+        assert_eq!(record["kind"], "desktop");
+        assert!(record.get("available").is_none());
+        assert!(record.get("schedule_format").is_none());
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    #[test]
+    fn device_presence_becomes_a_schedule_registration_only_when_enabled() {
+        let root = TempRoot::new();
+        let vault_path = root.0.join("vault").to_string_lossy().into_owned();
+        let state = root.0.join("state").to_string_lossy().into_owned();
+        let vault = NotesVault::open(vault_path.clone(), Some(state.clone())).unwrap();
+        let node = vault_core::node_record_id(&vault.device_id());
+        assert_eq!(vault.local_node_id(), None);
+        vault
+            .inner
+            .rename_device(vault.device_id(), "Studio".into())
+            .unwrap();
+
+        vault.local_runner_set_available(true).unwrap();
+        assert_eq!(vault.local_node_id().as_deref(), Some(node.as_str()));
+        let on = node_data(&vault, &node);
+        assert_eq!(on["name"], "Studio");
+        assert_eq!(on["kind"], "desktop");
+        assert_eq!(on["available"], true);
+        assert_eq!(on["schedule_format"], 1);
+
+        // Turning it off keeps the registration, updated and still named.
+        vault.local_runner_set_available(false).unwrap();
+        assert_eq!(vault.local_node_id().as_deref(), Some(node.as_str()));
+        let off = node_data(&vault, &node);
+        assert_eq!(off["name"], "Studio");
+        assert_eq!(off["available"], false);
+        drop(vault);
+
+        // Reopening keeps the registration too, and still does not turn it on.
+        let vault = NotesVault::open(vault_path, Some(state)).unwrap();
+        assert_eq!(vault.local_node_id().as_deref(), Some(node.as_str()));
+        let reopened = node_data(&vault, &node);
+        assert_eq!(reopened["name"], "Studio");
+        assert_eq!(reopened["available"], false);
     }
 
     #[test]
