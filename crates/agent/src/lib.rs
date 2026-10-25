@@ -960,6 +960,13 @@ impl Agent {
             }
         }
         let mut models = self.providers.models();
+        if self.providers.get("opencode").is_some() {
+            // The chat-completions transport does not report a model catalog.
+            models.push(ModelInfo {
+                id: "opencode/deepseek-v4.1-flash".into(),
+                name: "DeepSeek V4.1 Flash".into(),
+            });
+        }
         let default_model = self.default_model();
         if !models.iter().any(|m| m.id == default_model) {
             models.insert(

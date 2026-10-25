@@ -114,6 +114,10 @@ fn provider_environment() {
             .any(|p| p == "opencode"),
         case == "present"
     );
+    assert_eq!(
+        desktop.models().iter().any(|model| model.id == MODELS[3]),
+        case == "present"
+    );
 }
 
 #[test]
