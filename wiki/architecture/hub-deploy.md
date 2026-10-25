@@ -173,7 +173,7 @@ Follow the CLI's browser instructions from the lead's browser. The interactive s
 - Claude models: `CLAUDE_CONFIG_DIR`, a directory mounted in the container with Claude Code's `.credentials.json` and login files, or `CLAUDE_CODE_OAUTH_TOKEN`, a token for the account. The default container login directory under `HOME` also works. Prefer one credential source; an inherited token can override the directory login.
 - DeepSeek (`opencode/deepseek-v4.1-flash`): `OPENCODE_API_KEY`.
 
-Restart the hub after changing `.env` (`docker compose up -d`), since the agent reads its environment at start. Keep the values out of the wiki and shell history. The image sets `NOTES_HUB_AGENT_BUN=/usr/local/bin/bun` and `NOTES_HUB_AGENT_CLAUDE_CODE_EXTENSION=/opt/bubblepaw/claude-code`; `vault_agent` checks that extension directory and appends `src/main.ts`.
+After an interactive sign-in or replacing login files, restart the hub (`docker compose restart hub`), since the agent checks credential availability at start. After changing `.env`, recreate it with `docker compose up -d` to load the new environment. Keep the values out of the wiki and shell history. The image sets `NOTES_HUB_AGENT_BUN=/usr/local/bin/bun` and `NOTES_HUB_AGENT_CLAUDE_CODE_EXTENSION=/opt/bubblepaw/claude-code`; `vault_agent` checks that extension directory and appends `src/main.ts`.
 
 ```sh
 docker compose ps

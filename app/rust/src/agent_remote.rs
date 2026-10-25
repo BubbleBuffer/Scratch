@@ -804,6 +804,7 @@ mod tests {
                 trust_proxy: false,
                 agent: notes_hub::AgentSection {
                     default_model: "scripted/scripted".into(),
+                    models: vec!["scripted/scripted".into()],
                     // Scripts are `js` cells; a hub runs native tools by default.
                     execution_mode: vault_agent::bubblepaw_core::ExecutionMode::Js,
                     ..notes_hub::AgentSection::default()
