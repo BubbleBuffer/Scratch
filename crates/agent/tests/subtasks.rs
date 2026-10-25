@@ -482,6 +482,8 @@ fn a_nested_source_todo_gets_the_subtasks_and_its_siblings_stay_put() {
             "- Outline\n  - [ ] Nested step\n  - Sibling note",
         );
         let source = block_id(&v, &page, "Nested step");
+        let before = v.load_page(page.clone()).unwrap();
+        let sibling = find_text(&before.blocks, "Sibling note").unwrap().clone();
         let task = claim(&v, &page, Some(&source));
         assert_eq!(task.source_block.as_deref(), Some(source.as_str()));
         let calls = [
@@ -522,7 +524,11 @@ fn a_nested_source_todo_gets_the_subtasks_and_its_siblings_stay_put() {
         assert_eq!(subtasks, vec![("Find data", true), ("Write up", false)]);
         let outline = find_text(&doc.blocks, "Outline").unwrap();
         let texts: Vec<&str> = outline.children.iter().map(|c| c.text.as_str()).collect();
-        assert_eq!(texts, vec!["Nested step", "Sibling note"]);
+        assert_eq!(
+            texts,
+            vec!["Nested step", "Finished reading.", "Sibling note"]
+        );
+        assert_eq!(find(&doc.blocks, &sibling.id).unwrap(), &sibling);
     }
 }
 
