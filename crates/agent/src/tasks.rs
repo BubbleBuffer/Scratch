@@ -9,9 +9,10 @@ use std::time::Duration;
 use anyhow::{bail, ensure, Context, Result};
 use async_trait::async_trait;
 use bubblepaw_core::{
-    Approval, ApprovalMode, ClientInfo, Harness, Run, RunOptions, Tool, ToolContext,
+    Approval, ApprovalMode, ClientInfo, Harness, Run, RunOptions, Store, Tool, ToolContext,
     ToolDefinition, ToolRegistry, ToolResult,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use vault_core::{PropValue, Vault};
 use vault_mcp::jobs::NODE_HUB;
@@ -30,7 +31,110 @@ pub const RUN_LIMIT: Duration = Duration::from_secs(60 * 60);
 /// How often a run's wait looks at its task row for a cancel.
 const WATCH_EVERY: Duration = Duration::from_millis(500);
 
-const DELEGATED_PROMPT: &str = " Use report_progress to keep the user informed while working. Plan multi-step work with todo and keep the list current; it appears as subtasks in the note, mirrored by Scratch, so do not write those subtasks yourself.";
+const DELEGATED_PROMPT: &str = " Use report_progress to keep the user informed while working. Plan multi-step work with todo, passing the whole list each time as {\"todos\": [...]}, and keep the list current; it appears as subtasks in the note, mirrored by Scratch, so do not write those subtasks yourself.";
+
+const MAX_TODO_ITEMS: usize = 50;
+const MAX_TODO_TEXT_BYTES: usize = 1024;
+
+/// One item of the todo list, as the model writes it.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct TodoItem {
+    text: String,
+    status: TodoStatus,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum TodoStatus {
+    Pending,
+    InProgress,
+    Done,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TodoInput {
+    todos: Vec<TodoItem>,
+}
+
+/// The delegated run's todo list. The call takes `{todos: [...]}`; the state
+/// it stores is the bare array under `todo`, which the subtask mirror reads.
+/// Only delegated runs register it.
+struct TodoTool {
+    store: Store,
+}
+
+#[async_trait]
+impl Tool for TodoTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "todo".into(),
+            description: "Replace the entire todo list for this task. Returns the saved list; at most 50 items, each with text (nonempty, at most 1024 bytes) and a pending, in_progress or done status. Send {\"todos\": []} to clear it.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "todos": {
+                        "type": "array",
+                        "maxItems": MAX_TODO_ITEMS,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": MAX_TODO_TEXT_BYTES
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["pending", "in_progress", "done"]
+                                }
+                            },
+                            "required": ["text", "status"],
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "required": ["todos"],
+                "additionalProperties": false
+            }),
+            // Session-local bookkeeping has no external effect to replay, so it
+            // stays available in read-only tool sets.
+            read_only: true,
+            approval: Approval::None,
+        }
+    }
+
+    async fn invoke(&self, context: ToolContext, input: Value) -> Result<ToolResult> {
+        if context.cancellation.is_cancelled() {
+            return Ok(ToolResult::error("Execution cancelled"));
+        }
+        Ok(match save_todos(&self.store, &context, input) {
+            Ok(saved) => ToolResult::text(saved.to_string()),
+            Err(error) => ToolResult::error(error.to_string()),
+        })
+    }
+}
+
+/// Validates the whole list, then replaces the run's todo host state with its
+/// bare array. Returns the saved array; a rejected list changes nothing.
+fn save_todos(store: &Store, context: &ToolContext, input: Value) -> Result<Value> {
+    ensure!(input.is_object(), "todo needs an object with a todos array");
+    let input: TodoInput = serde_json::from_value(input)?;
+    ensure!(
+        input.todos.len() <= MAX_TODO_ITEMS,
+        "todo supports at most {MAX_TODO_ITEMS} items"
+    );
+    for item in &input.todos {
+        ensure!(
+            !item.text.trim().is_empty() && item.text.len() <= MAX_TODO_TEXT_BYTES,
+            "todo text must be nonempty and at most {MAX_TODO_TEXT_BYTES} bytes"
+        );
+    }
+    store.update_host_state(&context.session_id, &context.run_id, "todo", |_| {
+        Ok(serde_json::to_value(&input.todos)?)
+    })
+}
 
 /// Only delegated runs register this capability. The row and session come
 /// from the runner, never from model arguments.
@@ -132,10 +236,12 @@ impl Agent {
             task: task.into(),
             session: session.into(),
         });
-        let store = self.store.clone();
+        let todo: Arc<dyn Tool> = Arc::new(TodoTool {
+            store: self.store.clone(),
+        });
         let register = move |mut registry: ToolRegistry| -> Result<ToolRegistry> {
             registry.register_host(progress.clone())?;
-            bubblepaw_runner::todo::register(&mut registry, store.clone())?;
+            registry.register_host(todo.clone())?;
             registry.show_always(["report_progress", "todo"]);
             Ok(registry)
         };
@@ -436,50 +542,213 @@ impl Agent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bubblepaw_core::CancellationToken;
+
+    /// An agent on `host_kind` with a vault and data dir under `dir`.
+    fn open_agent(host_kind: crate::HostKind, dir: &std::path::Path) -> (Arc<Vault>, Agent) {
+        let vault = Arc::new(Vault::open(dir.join("vault").to_string_lossy().into()).unwrap());
+        let agent = Agent::open_with_execution(
+            vault.clone(),
+            crate::AgentConfig {
+                host_kind,
+                packs: if host_kind == crate::HostKind::Desktop {
+                    vec![crate::ToolPack::Desktop { root: dir.into() }]
+                } else {
+                    vec![]
+                },
+                data_dir: dir.join("data"),
+                default_model: "scripted/scripted".into(),
+                bun_path: Some(dir.join("no-bun")),
+                test: crate::TestHooks {
+                    scripted: Some((vec![], "Done.".into())),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            bubblepaw_core::ExecutionMode::Native,
+            false,
+        )
+        .unwrap();
+        (vault, agent)
+    }
+
+    /// A claimed task and a new session, as a delegated run starts with.
+    fn delegated(agent: &Agent, vault: &Vault) -> (String, String) {
+        let page = vault.create_page(None, "Plan".into()).unwrap();
+        let task = tasks::create(vault, "Read", &page, None, RUNNER).unwrap();
+        let session = agent.create_session("Delegated").unwrap();
+        (task.id, session.id)
+    }
+
+    /// Calls the todo tool directly, with its cancellation already set when
+    /// `cancelled` is true.
+    fn call_todo(agent: &Agent, session: &str, cancelled: bool, input: Value) -> ToolResult {
+        let cancellation = CancellationToken::new();
+        if cancelled {
+            cancellation.cancel();
+        }
+        let context = ToolContext {
+            session_id: session.into(),
+            run_id: "todo-test".into(),
+            invocation_id: "todo-test".into(),
+            cancellation,
+            approval: Default::default(),
+        };
+        let tool = TodoTool {
+            store: agent.store.clone(),
+        };
+        agent.runtime.block_on(tool.invoke(context, input)).unwrap()
+    }
+
+    fn stored_todos(agent: &Agent, session: &str) -> Option<Value> {
+        agent.store.host_state(session, "todo").unwrap()
+    }
+
+    fn item(text: &str, status: &str) -> Value {
+        json!({"text": text, "status": status})
+    }
 
     #[test]
     fn desktop_and_hub_task_tool_lists_include_todo_but_chat_and_gateway_do_not() {
         for host_kind in [crate::HostKind::Desktop, crate::HostKind::Hub] {
             let dir = tempfile::tempdir().unwrap();
-            let vault =
-                Arc::new(Vault::open(dir.path().join("vault").to_string_lossy().into()).unwrap());
-            let agent = Agent::open_with_execution(
-                vault.clone(),
-                crate::AgentConfig {
-                    host_kind,
-                    data_dir: dir.path().join("data"),
-                    default_model: "scripted/scripted".into(),
-                    bun_path: Some(dir.path().join("no-bun")),
-                    test: crate::TestHooks {
-                        scripted: Some((vec![], "Done.".into())),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                },
-                bubblepaw_core::ExecutionMode::Native,
-                false,
-            )
-            .unwrap();
-            let page = vault.create_page(None, "Plan".into()).unwrap();
-            let task = tasks::create(&vault, "Read", &page, None, RUNNER).unwrap();
-            let session = agent.create_session("Delegated").unwrap();
-            let delegated = agent.task_harness(&task.id, &session.id).unwrap();
-            let definitions = delegated
-                .effective_tool_definitions(&session.id, &RunOptions::default())
+            let (vault, agent) = open_agent(host_kind, dir.path());
+            let (task, session) = delegated(&agent, &vault);
+            let harness = agent.task_harness(&task, &session).unwrap();
+            let definitions = harness
+                .effective_tool_definitions(&session, &RunOptions::default())
                 .unwrap();
             let todo = definitions.iter().find(|tool| tool.name == "todo").unwrap();
-            assert_eq!(todo.input_schema["type"], "array");
+            assert_eq!(todo.input_schema["type"], "object");
+            assert_eq!(todo.input_schema["required"], json!(["todos"]));
+            assert!(todo.read_only);
             assert!(definitions
                 .iter()
                 .any(|tool| tool.name == "report_progress"));
             let chat = agent
                 .harness
-                .effective_tool_definitions(&session.id, &RunOptions::default())
+                .effective_tool_definitions(&session, &RunOptions::default())
                 .unwrap();
             assert!(!chat.iter().any(|tool| tool.name == "todo"));
-            let gateway = agent.gateway_tool_definitions(&session.id).unwrap();
+            let gateway = agent.gateway_tool_definitions(&session).unwrap();
             assert!(!gateway.iter().any(|tool| tool.name == "todo"));
         }
+    }
+
+    #[test]
+    fn every_delegated_tool_schema_is_an_object_on_desktop_and_hub() {
+        for host_kind in [crate::HostKind::Desktop, crate::HostKind::Hub] {
+            let dir = tempfile::tempdir().unwrap();
+            let (vault, agent) = open_agent(host_kind, dir.path());
+            let (task, session) = delegated(&agent, &vault);
+            let harness = agent.task_harness(&task, &session).unwrap();
+            let definitions = harness
+                .effective_tool_definitions(&session, &RunOptions::default())
+                .unwrap();
+            assert!(!definitions.is_empty());
+            for definition in &definitions {
+                assert_eq!(
+                    definition.input_schema["type"], "object",
+                    "tool {} is not an object schema",
+                    definition.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn todo_rejects_malformed_lists_and_keeps_the_stored_list() {
+        let dir = tempfile::tempdir().unwrap();
+        let (vault, agent) = open_agent(crate::HostKind::Desktop, dir.path());
+        let (_, session) = delegated(&agent, &vault);
+        let first = json!([item("First", "pending")]);
+        let saved =
+            call_todo(&agent, &session, false, json!({"todos": [item("First", "pending")]}));
+        assert!(!saved.is_error, "{}", saved.content);
+        assert_eq!(stored_todos(&agent, &session), Some(first.clone()));
+
+        let malformed = [
+            json!([item("Bare", "pending")]),
+            json!([[]]),
+            json!([[item("Nested bare", "pending")]]),
+            json!(null),
+            json!({}),
+            json!({"todos": [item("Extra", "pending")], "items": []}),
+            json!({"todos": "nope"}),
+            json!({"todos": [{"text": "Missing status"}]}),
+            json!({"todos": [{"status": "pending"}]}),
+            json!({"todos": [item("Blocked", "blocked")]}),
+            json!({"todos": [{"text": "Extra field", "status": "done", "id": 1}]}),
+            json!({"todos": [item("   ", "pending")]}),
+            json!({"todos": [item("Too long", "pending"), item(&"a".repeat(1025), "pending")]}),
+        ];
+        for input in malformed {
+            let result = call_todo(&agent, &session, false, input.clone());
+            assert!(result.is_error, "accepted {input}: {}", result.content);
+            assert_eq!(stored_todos(&agent, &session), Some(first.clone()), "{input}");
+        }
+    }
+
+    #[test]
+    fn todo_counts_items_and_bytes_at_their_limits() {
+        let dir = tempfile::tempdir().unwrap();
+        let (vault, agent) = open_agent(crate::HostKind::Desktop, dir.path());
+        let (_, session) = delegated(&agent, &vault);
+
+        let fifty: Vec<Value> = (0..50).map(|i| item(&format!("Item {i}"), "pending")).collect();
+        let saved = call_todo(&agent, &session, false, json!({"todos": fifty}));
+        assert!(!saved.is_error, "{}", saved.content);
+        assert_eq!(stored_todos(&agent, &session).unwrap().as_array().unwrap().len(), 50);
+
+        let fifty_one: Vec<Value> = (0..51)
+            .map(|i| item(&format!("Item {i}"), "pending"))
+            .collect();
+        let over = call_todo(&agent, &session, false, json!({"todos": fifty_one}));
+        assert!(over.is_error);
+        assert_eq!(over.content, "todo supports at most 50 items");
+        assert_eq!(stored_todos(&agent, &session).unwrap().as_array().unwrap().len(), 50);
+
+        // 512 two-byte characters are exactly 1024 bytes; one more byte is too many.
+        let exact = "é".repeat(512);
+        let saved = call_todo(&agent, &session, false, json!({"todos": [item(&exact, "pending")]}));
+        assert!(!saved.is_error, "{}", saved.content);
+        let long = format!("{exact}a");
+        let too_long =
+            call_todo(&agent, &session, false, json!({"todos": [item(&long, "pending")]}));
+        assert!(too_long.is_error);
+        assert_eq!(
+            too_long.content,
+            "todo text must be nonempty and at most 1024 bytes"
+        );
+    }
+
+    #[test]
+    fn todo_stores_the_bare_array_and_returns_it_and_empty_clears() {
+        let dir = tempfile::tempdir().unwrap();
+        let (vault, agent) = open_agent(crate::HostKind::Desktop, dir.path());
+        let (_, session) = delegated(&agent, &vault);
+        let list = json!([item("Read", "done"), item("Write", "in_progress")]);
+        let saved = call_todo(&agent, &session, false, json!({"todos": list.clone()}));
+        assert!(!saved.is_error, "{}", saved.content);
+        assert_eq!(stored_todos(&agent, &session), Some(list.clone()));
+        assert_eq!(serde_json::from_str::<Value>(&saved.content).unwrap(), list);
+
+        let cleared = call_todo(&agent, &session, false, json!({"todos": []}));
+        assert!(!cleared.is_error, "{}", cleared.content);
+        assert_eq!(cleared.content, "[]");
+        assert_eq!(stored_todos(&agent, &session), Some(json!([])));
+    }
+
+    #[test]
+    fn a_cancelled_todo_call_stores_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let (vault, agent) = open_agent(crate::HostKind::Desktop, dir.path());
+        let (_, session) = delegated(&agent, &vault);
+        let cancelled =
+            call_todo(&agent, &session, true, json!({"todos": [item("Late", "pending")]}));
+        assert!(cancelled.is_error);
+        assert_eq!(cancelled.content, "Execution cancelled");
+        assert_eq!(stored_todos(&agent, &session), None);
     }
 
     #[test]
@@ -488,5 +757,6 @@ mod tests {
         assert!(super::DELEGATED_PROMPT.contains("Plan multi-step work with todo"));
         assert!(super::DELEGATED_PROMPT.contains("keep the list current"));
         assert!(super::DELEGATED_PROMPT.contains("appears as subtasks in the note"));
+        assert!(super::DELEGATED_PROMPT.contains("{\"todos\": [...]}"));
     }
 }
