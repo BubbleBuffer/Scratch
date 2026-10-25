@@ -11137,6 +11137,7 @@ fn wire__crate__api__ai__ai_assign_task_impl(
             let api_page = <String>::sse_decode(&mut deserializer);
             let api_block = <Option<String>>::sse_decode(&mut deserializer);
             let api_runner_id = <String>::sse_decode(&mut deserializer);
+            let api_project_id = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -11160,6 +11161,7 @@ fn wire__crate__api__ai__ai_assign_task_impl(
                         api_page,
                         api_block,
                         api_runner_id,
+                        api_project_id,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -11295,6 +11297,7 @@ fn wire__crate__api__ai__ai_create_task_impl(
             let api_page = <String>::sse_decode(&mut deserializer);
             let api_after = <Option<String>>::sse_decode(&mut deserializer);
             let api_runner = <String>::sse_decode(&mut deserializer);
+            let api_project_id = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -11318,6 +11321,7 @@ fn wire__crate__api__ai__ai_create_task_impl(
                         api_page,
                         api_after,
                         api_runner,
+                        api_project_id,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -11353,6 +11357,7 @@ fn wire__crate__api__ai__ai_create_task_here_impl(
             let api_prompt = <String>::sse_decode(&mut deserializer);
             let api_page = <String>::sse_decode(&mut deserializer);
             let api_after = <Option<String>>::sse_decode(&mut deserializer);
+            let api_project_id = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -11375,6 +11380,7 @@ fn wire__crate__api__ai__ai_create_task_here_impl(
                         api_prompt,
                         api_page,
                         api_after,
+                        api_project_id,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -13173,6 +13179,7 @@ impl SseDecode for crate::api::ai::AiRunner {
         let mut var_online = <bool>::sse_decode(deserializer);
         let mut var_lastSeenMs = <Option<i64>>::sse_decode(deserializer);
         let mut var_isThisDevice = <bool>::sse_decode(deserializer);
+        let mut var_projects = <Vec<crate::api::ai::AiRunnerProject>>::sse_decode(deserializer);
         return crate::api::ai::AiRunner {
             id: var_id,
             name: var_name,
@@ -13180,6 +13187,7 @@ impl SseDecode for crate::api::ai::AiRunner {
             online: var_online,
             last_seen_ms: var_lastSeenMs,
             is_this_device: var_isThisDevice,
+            projects: var_projects,
         };
     }
 }
@@ -13208,6 +13216,18 @@ impl SseDecode for crate::api::ai::AiRunnerList {
     }
 }
 
+impl SseDecode for crate::api::ai::AiRunnerProject {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        return crate::api::ai::AiRunnerProject {
+            id: var_id,
+            name: var_name,
+        };
+    }
+}
+
 impl SseDecode for crate::api::ai::AiTask {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -13224,6 +13244,9 @@ impl SseDecode for crate::api::ai::AiTask {
         let mut var_createdMs = <i64>::sse_decode(deserializer);
         let mut var_updatedMs = <i64>::sse_decode(deserializer);
         let mut var_node = <String>::sse_decode(deserializer);
+        let mut var_project = <String>::sse_decode(deserializer);
+        let mut var_worktreeBranch = <String>::sse_decode(deserializer);
+        let mut var_worktreePath = <String>::sse_decode(deserializer);
         return crate::api::ai::AiTask {
             id: var_id,
             prompt: var_prompt,
@@ -13238,6 +13261,9 @@ impl SseDecode for crate::api::ai::AiTask {
             created_ms: var_createdMs,
             updated_ms: var_updatedMs,
             node: var_node,
+            project: var_project,
+            worktree_branch: var_worktreeBranch,
+            worktree_path: var_worktreePath,
         };
     }
 }
@@ -14175,6 +14201,18 @@ impl SseDecode for Vec<crate::api::ai::AiRunner> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::ai::AiRunner>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::ai::AiRunnerProject> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::ai::AiRunnerProject>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -17743,6 +17781,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::ai::AiRunner {
             self.online.into_into_dart().into_dart(),
             self.last_seen_ms.into_into_dart().into_dart(),
             self.is_this_device.into_into_dart().into_dart(),
+            self.projects.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -17790,6 +17829,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ai::AiRunnerList>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ai::AiRunnerProject {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::ai::AiRunnerProject
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ai::AiRunnerProject>
+    for crate::api::ai::AiRunnerProject
+{
+    fn into_into_dart(self) -> crate::api::ai::AiRunnerProject {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::ai::AiTask {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -17806,6 +17866,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::ai::AiTask {
             self.created_ms.into_into_dart().into_dart(),
             self.updated_ms.into_into_dart().into_dart(),
             self.node.into_into_dart().into_dart(),
+            self.project.into_into_dart().into_dart(),
+            self.worktree_branch.into_into_dart().into_dart(),
+            self.worktree_path.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -20358,6 +20421,7 @@ impl SseEncode for crate::api::ai::AiRunner {
         <bool>::sse_encode(self.online, serializer);
         <Option<i64>>::sse_encode(self.last_seen_ms, serializer);
         <bool>::sse_encode(self.is_this_device, serializer);
+        <Vec<crate::api::ai::AiRunnerProject>>::sse_encode(self.projects, serializer);
     }
 }
 
@@ -20385,6 +20449,14 @@ impl SseEncode for crate::api::ai::AiRunnerList {
     }
 }
 
+impl SseEncode for crate::api::ai::AiRunnerProject {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+    }
+}
+
 impl SseEncode for crate::api::ai::AiTask {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -20401,6 +20473,9 @@ impl SseEncode for crate::api::ai::AiTask {
         <i64>::sse_encode(self.created_ms, serializer);
         <i64>::sse_encode(self.updated_ms, serializer);
         <String>::sse_encode(self.node, serializer);
+        <String>::sse_encode(self.project, serializer);
+        <String>::sse_encode(self.worktree_branch, serializer);
+        <String>::sse_encode(self.worktree_path, serializer);
     }
 }
 
@@ -21113,6 +21188,16 @@ impl SseEncode for Vec<crate::api::ai::AiRunner> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::ai::AiRunner>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::ai::AiRunnerProject> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::ai::AiRunnerProject>::sse_encode(item, serializer);
         }
     }
 }

@@ -4,6 +4,8 @@
 //! like the calendar page (`index.rs` `NOT_TEMPLATE`): it is left out of
 //! lists, search, counts and agenda. Its records are ordinary pages of type
 //! `node`, so `type:node` search and listing the Nodes page find them.
+use std::collections::HashSet;
+
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -20,6 +22,9 @@ const ROLE_PAGE: &str = "nodes";
 const PAGE_TYPE: &str = "node";
 // The record's fields live under this add-on key of the page's type data.
 const ADDON: &str = "node";
+// The record's projects, an array of `{id, name}`. Only publish_device_projects
+// writes them, so no other write path can drop or replace them.
+const PROJECTS: &str = "projects";
 
 /// A runner counts as online while its device's last heartbeat is this recent.
 pub const RUNNER_ONLINE_WINDOW_MS: i64 = 300_000;
@@ -40,11 +45,69 @@ pub struct DeviceRecord {
     pub kind: String,
     /// The last heartbeat, from the record's RFC 3339 `last_seen`.
     pub last_seen_ms: Option<i64>,
+    /// The projects this device has open, for a task's project. Empty when the
+    /// device has published none.
+    #[serde(default)]
+    pub projects: Vec<DeviceProject>,
+}
+
+/// A project a device has open, as its record publishes it: the id and the
+/// display name only, never the project's path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeviceProject {
+    pub id: String,
+    pub name: String,
+}
+
+/// The stored form of `projects`: `{id, name}` entries in the order given. An
+/// id must not be blank or repeated. A blank name is stored as the id.
+fn project_entries(projects: &[DeviceProject]) -> Result<Value> {
+    let mut seen = HashSet::new();
+    let mut entries = Vec::with_capacity(projects.len());
+    for project in projects {
+        let id = project.id.trim();
+        if id.is_empty() {
+            return Err(invalid("a project needs an id"));
+        }
+        if !seen.insert(id) {
+            return Err(invalid(format!("project {id:?} is listed twice")));
+        }
+        let name = project.name.trim();
+        let name = if name.is_empty() { id } else { name };
+        entries.push(json!({ "id": id, "name": name }));
+    }
+    Ok(Value::Array(entries))
+}
+
+/// The projects a record stores. Entries without a usable id are skipped.
+fn parse_projects(value: Option<&Value>) -> Vec<DeviceProject> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            let id = entry.get("id")?.as_str()?.trim();
+            if id.is_empty() {
+                return None;
+            }
+            let name = entry
+                .get("name")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or(id);
+            Some(DeviceProject {
+                id: id.to_owned(),
+                name: name.to_owned(),
+            })
+        })
+        .collect()
 }
 
 /// Writes the record's title, type and `node` fields, changing only what
-/// differs. A `node` key the record no longer has is removed. Other add-on data
-/// on the page is left alone.
+/// differs. A `node` key the record no longer has is removed, except
+/// `projects`, which the record keeps. Other add-on data on the page is left
+/// alone.
 fn apply_record(doc: &mut PageDoc, name: &str, fields: &Map<String, Value>) -> Result<()> {
     if doc.meta().title != name {
         doc.set_title(name)?;
@@ -56,7 +119,7 @@ fn apply_record(doc: &mut PageDoc, name: &str, fields: &Map<String, Value>) -> R
         .and_then(Value::as_object)
         .into_iter()
         .flat_map(|m| m.keys())
-        .filter(|k| !fields.contains_key(*k))
+        .filter(|k| k.as_str() != PROJECTS && !fields.contains_key(*k))
         .cloned()
         .collect();
     for key in stale {
@@ -147,6 +210,11 @@ impl Vault {
         if fields.get("device_id").and_then(Value::as_str) != Some(device.as_str()) {
             return Err(invalid("the node record's device_id does not match"));
         }
+        if fields.contains_key(PROJECTS) {
+            return Err(invalid(
+                "projects are published with publish_device_projects",
+            ));
+        }
         let name = match fields.get("name").and_then(Value::as_str) {
             Some(name) if !name.trim().is_empty() => name.to_owned(),
             _ => return Err(invalid("a node record needs a name")),
@@ -204,6 +272,11 @@ impl Vault {
         {
             return Err(invalid("the node record's device_id does not match"));
         }
+        if fields.contains_key(PROJECTS) {
+            return Err(invalid(
+                "projects are published with publish_device_projects",
+            ));
+        }
         let name = match fields.remove("name") {
             None => hostname(),
             Some(Value::String(name)) if !name.trim().is_empty() => name.trim().to_owned(),
@@ -248,6 +321,21 @@ impl Vault {
         self.publish_device_activity_at(now_ms())
     }
 
+    /// Publishes the projects this vault's device has open, replacing the
+    /// record's list. Each entry is an id and a name. Heartbeats and merges keep
+    /// the list. A record that does not exist yet is created without a
+    /// heartbeat, so it stays offline. Returns whether the record changed.
+    pub fn publish_device_projects(&self, projects: Vec<DeviceProject>) -> Result<bool> {
+        let device = self.device_id();
+        let entries = project_entries(&projects)?;
+        let _guard = lock(&self.inner.nodes);
+        let name = hostname();
+        let defaults = object(json!({ "name": name, "kind": DEFAULT_KIND }));
+        let updates = object(json!({ "device_id": device, "projects": entries }));
+        let (_, changed) = self.merge_record_locked(&device, &name, &defaults, &updates)?;
+        Ok(changed)
+    }
+
     /// Every device that has a node record, by name then id. Reading never
     /// creates the Nodes page.
     pub fn device_records(&self) -> Result<Vec<DeviceRecord>> {
@@ -277,6 +365,7 @@ impl Vault {
                 name: text("name").map_or(meta.title, str::to_owned),
                 kind: text("kind").unwrap_or(DEFAULT_KIND).to_owned(),
                 last_seen_ms: parse_last_seen(node.and_then(|n| n.get("last_seen"))),
+                projects: parse_projects(node.and_then(|n| n.get(PROJECTS))),
             });
         }
         devices.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.id.cmp(&b.id)));

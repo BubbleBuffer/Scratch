@@ -24,6 +24,7 @@ class _FakeBridge implements AiRunnerBridge {
     defaultRunnerId: 'studio',
     runners: [
       AiRunner(
+        projects: const [],
         id: 'hub',
         name: 'Hub',
         kind: AiRunnerKind.hub,
@@ -32,6 +33,7 @@ class _FakeBridge implements AiRunnerBridge {
         isThisDevice: false,
       ),
       AiRunner(
+        projects: const [],
         id: 'studio',
         name: names['studio']!,
         kind: AiRunnerKind.pc,
@@ -40,6 +42,7 @@ class _FakeBridge implements AiRunnerBridge {
         isThisDevice: true,
       ),
       AiRunner(
+        projects: const [],
         id: 'laptop',
         name: names['laptop']!,
         kind: AiRunnerKind.pc,

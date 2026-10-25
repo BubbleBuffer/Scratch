@@ -39,15 +39,25 @@ impl NotesMcp {
     #[frb(sync)]
     pub fn new(vault: &NotesVault) -> NotesMcp {
         let root = vault.inner.root();
-        NotesMcp { vault: vault.inner.clone(), root, http: Mutex::new(None), addr: Mutex::new(String::new()) }
+        NotesMcp {
+            vault: vault.inner.clone(),
+            root,
+            http: Mutex::new(None),
+            addr: Mutex::new(String::new()),
+        }
     }
 
     /// Starts serving on `addr` (restarts if running) and returns the URL.
     pub fn start(&self, addr: String) -> Result<String, String> {
         self.stop();
         let token = endpoint::token(&self.root).map_err(err)?;
-        let http = McpHttp::serve(&addr, Arc::new(McpServer::new(self.vault.clone())), token, HttpOptions::default())
-            .map_err(err)?;
+        let http = McpHttp::serve(
+            &addr,
+            Arc::new(McpServer::new(self.vault.clone())),
+            token,
+            HttpOptions::default(),
+        )
+        .map_err(err)?;
         let url = http.url();
         endpoint::write_endpoint(&self.root, &url).map_err(err)?;
         *lock(&self.addr) = addr;
@@ -113,6 +123,11 @@ pub struct AiTask {
     /// Where it runs: "" (any desktop), a device id (only that device) or
     /// "hub" (a hub job).
     pub node: String,
+    /// An agent project id on the pinned PC; empty for a notes-only task.
+    pub project: String,
+    /// Saved by the runner before the code task starts.
+    pub worktree_branch: String,
+    pub worktree_path: String,
 }
 
 fn task(t: tasks::Task) -> AiTask {
@@ -130,6 +145,9 @@ fn task(t: tasks::Task) -> AiTask {
         created_ms: t.created_ms,
         updated_ms: t.updated_ms,
         node: t.node,
+        project: t.project,
+        worktree_branch: t.worktree_branch,
+        worktree_path: t.worktree_path,
     }
 }
 
@@ -138,6 +156,13 @@ fn task(t: tasks::Task) -> AiTask {
 pub enum AiRunnerKind {
     Hub,
     Pc,
+}
+
+/// A PC's project choice, without its private local repository path.
+#[derive(Debug, Clone)]
+pub struct AiRunnerProject {
+    pub id: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -150,6 +175,7 @@ pub struct AiRunner {
     /// Unix epoch milliseconds; absent until a timestamp is known.
     pub last_seen_ms: Option<i64>,
     pub is_this_device: bool,
+    pub projects: Vec<AiRunnerProject>,
 }
 
 #[derive(Debug, Clone)]
@@ -162,21 +188,37 @@ pub struct AiRunnerList {
 /// usable hub link, as AgentStore.usableHosts does; online is independently
 /// derived from the synced last-seen timestamp and the five-minute window.
 pub fn ai_list_runners(vault: &NotesVault, hub_usable: bool) -> Result<AiRunnerList, String> {
-    let local = cfg!(any(target_os = "windows", target_os = "linux", target_os = "macos"));
+    let local = cfg!(any(
+        target_os = "windows",
+        target_os = "linux",
+        target_os = "macos"
+    ));
     let list = runners::list(&vault.inner, hub_usable, local).map_err(err)?;
     Ok(AiRunnerList {
         default_runner_id: list.default_runner_id,
-        runners: list.runners.into_iter().map(|r| AiRunner {
-            id: r.id,
-            name: r.name,
-            kind: match r.kind {
-                runners::RunnerKind::Hub => AiRunnerKind::Hub,
-                runners::RunnerKind::Pc => AiRunnerKind::Pc,
-            },
-            online: r.online,
-            last_seen_ms: r.last_seen_ms,
-            is_this_device: r.is_this_device,
-        }).collect(),
+        runners: list
+            .runners
+            .into_iter()
+            .map(|r| AiRunner {
+                id: r.id,
+                name: r.name,
+                kind: match r.kind {
+                    runners::RunnerKind::Hub => AiRunnerKind::Hub,
+                    runners::RunnerKind::Pc => AiRunnerKind::Pc,
+                },
+                online: r.online,
+                last_seen_ms: r.last_seen_ms,
+                is_this_device: r.is_this_device,
+                projects: r
+                    .projects
+                    .into_iter()
+                    .map(|p| AiRunnerProject {
+                        id: p.id,
+                        name: p.name,
+                    })
+                    .collect(),
+            })
+            .collect(),
     })
 }
 
@@ -188,9 +230,18 @@ pub fn ai_assign_task(
     page: String,
     block: Option<String>,
     runner_id: String,
+    project_id: Option<String>,
 ) -> Result<AiTask, String> {
-    runners::assign(&vault.inner, &prompt, &page, block.as_deref(), &runner_id)
-        .map(task).map_err(err)
+    runners::assign(
+        &vault.inner,
+        &prompt,
+        &page,
+        block.as_deref(),
+        &runner_id,
+        project_id.as_deref(),
+    )
+    .map(task)
+    .map_err(err)
 }
 
 /// Renames a device from any copy of the vault. Only its trimmed name changes.
@@ -206,9 +257,20 @@ pub fn ai_create_task(
     page: String,
     after: Option<String>,
     runner: String,
+    project_id: Option<String>,
 ) -> Result<AiTask, String> {
     let v = &vault.inner;
-    tasks::create_on(v, &prompt, &page, after.as_deref(), &runner, &v.device_id()).map(task).map_err(err)
+    tasks::create_for_project(
+        v,
+        &prompt,
+        &page,
+        after.as_deref(),
+        &runner,
+        &v.device_id(),
+        project_id.as_deref(),
+    )
+    .map(task)
+    .map_err(err)
 }
 
 /// [`ai_create_task`] pinned to this device: only this device claims it
@@ -218,9 +280,20 @@ pub fn ai_create_task_here(
     prompt: String,
     page: String,
     after: Option<String>,
+    project_id: Option<String>,
 ) -> Result<AiTask, String> {
     let v = &vault.inner;
-    tasks::create_on(v, &prompt, &page, after.as_deref(), "", &v.device_id()).map(task).map_err(err)
+    tasks::create_for_project(
+        v,
+        &prompt,
+        &page,
+        after.as_deref(),
+        "",
+        &v.device_id(),
+        project_id.as_deref(),
+    )
+    .map(task)
+    .map_err(err)
 }
 
 /// Cancels a desktop task that hasn't ended: it is never claimed, and a
@@ -232,7 +305,11 @@ pub fn ai_cancel_task(vault: &NotesVault, id: String) -> Result<bool, String> {
 
 /// The newest tasks first.
 pub fn ai_list_tasks(vault: &NotesVault, limit: u32) -> Result<Vec<AiTask>, String> {
-    Ok(tasks::list(&vault.inner, limit).map_err(err)?.into_iter().map(task).collect())
+    Ok(tasks::list(&vault.inner, limit)
+        .map_err(err)?
+        .into_iter()
+        .map(task)
+        .collect())
 }
 
 pub fn ai_get_task(vault: &NotesVault, id: String) -> Result<AiTask, String> {
@@ -262,12 +339,20 @@ pub fn ai_retry_task(vault: &NotesVault, id: String) -> Result<(), String> {
 
 /// Writes the result back: on success `text` (markdown) replaces the
 /// placeholder; on failure `text` is the error.
-pub fn ai_finish_task(vault: &NotesVault, id: String, ok: bool, text: String) -> Result<(), String> {
+pub fn ai_finish_task(
+    vault: &NotesVault,
+    id: String,
+    ok: bool,
+    text: String,
+) -> Result<(), String> {
     let r = if ok { Ok(text) } else { Err(text) };
     tasks::finish(&vault.inner, &id, r).map_err(err)
 }
 
-#[cfg(all(test, any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+#[cfg(all(
+    test,
+    any(target_os = "windows", target_os = "linux", target_os = "macos")
+))]
 mod runner_tests {
     use super::*;
 
@@ -275,12 +360,15 @@ mod runner_tests {
     fn stored_progress_reaches_task_get_and_list() {
         struct Temp(std::path::PathBuf);
         impl Drop for Temp {
-            fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
         }
-        let dir = Temp(std::env::temp_dir().join(format!("bridge_progress_{}", vault_core::new_id())));
+        let dir =
+            Temp(std::env::temp_dir().join(format!("bridge_progress_{}", vault_core::new_id())));
         let vault = NotesVault::open(dir.0.to_string_lossy().into_owned(), None).unwrap();
         let page = vault.inner.create_page(None, "Plan".into()).unwrap();
-        let queued = ai_create_task_here(&vault, "Summarize".into(), page, None).unwrap();
+        let queued = ai_create_task_here(&vault, "Summarize".into(), page, None, None).unwrap();
         assert_eq!(queued.progress, "");
         assert_eq!(queued.progress_at, "");
         let unset = ai_get_task(&vault, queued.id.clone()).unwrap();
@@ -290,16 +378,23 @@ mod runner_tests {
         assert_eq!(running.id, queued.id);
         tasks::report_progress(&vault.inner, &running.id, "  Reading the plan  ").unwrap();
         let stored = vault.inner.load_page(running.id.clone()).unwrap();
-        let stored_at = stored.properties.iter().find_map(|p| match (&*p.key, &p.value) {
-            ("progress_at", vault_core::PropValue::Text(value)) => Some(value.clone()),
-            _ => None,
-        }).unwrap();
+        let stored_at = stored
+            .properties
+            .iter()
+            .find_map(|p| match (&*p.key, &p.value) {
+                ("progress_at", vault_core::PropValue::Text(value)) => Some(value.clone()),
+                _ => None,
+            })
+            .unwrap();
         assert!(stored_at.parse::<i64>().unwrap() > 0);
         let fetched = ai_get_task(&vault, running.id.clone()).unwrap();
         assert_eq!(fetched.progress, "Reading the plan");
         assert_eq!(fetched.progress_at, stored_at);
-        let listed = ai_list_tasks(&vault, 10).unwrap().into_iter()
-            .find(|t| t.id == running.id).unwrap();
+        let listed = ai_list_tasks(&vault, 10)
+            .unwrap()
+            .into_iter()
+            .find(|t| t.id == running.id)
+            .unwrap();
         assert_eq!(listed.progress, fetched.progress);
         assert_eq!(listed.progress_at, fetched.progress_at);
     }
@@ -308,9 +403,12 @@ mod runner_tests {
     fn app_open_registers_a_runner_and_picker_calls_reach_real_storage() {
         struct Temp(std::path::PathBuf);
         impl Drop for Temp {
-            fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
         }
-        let dir = Temp(std::env::temp_dir().join(format!("bridge_runners_{}", vault_core::new_id())));
+        let dir =
+            Temp(std::env::temp_dir().join(format!("bridge_runners_{}", vault_core::new_id())));
         let root = dir.0.to_string_lossy().into_owned();
         let vault = NotesVault::open(root.clone(), None).unwrap();
         let id = vault.device_id();
@@ -324,9 +422,52 @@ mod runner_tests {
         assert!(list.runners[1].last_seen_ms.is_some());
         assert!(!list.runners[1].name.trim().is_empty());
         ai_rename_device(&vault, id.clone(), "  Studio PC  ".into()).unwrap();
+        vault
+            .inner
+            .publish_device_projects(vec![vault_core::DeviceProject {
+                id: "project-1".into(),
+                name: "Project one".into(),
+            }])
+            .unwrap();
+        let list = ai_list_runners(&vault, false).unwrap();
+        assert!(list.runners[0].projects.is_empty());
+        assert_eq!(list.runners[1].projects[0].id, "project-1");
+        assert_eq!(list.runners[1].projects[0].name, "Project one");
         let page = vault.inner.create_page(None, "Plan".into()).unwrap();
-        let task = ai_assign_task(&vault, "Summarize".into(), page, None, id.clone()).unwrap();
+        let before = vault.inner.load_page(page.clone()).unwrap().blocks;
+        assert!(ai_assign_task(
+            &vault,
+            "Code".into(),
+            page.clone(),
+            None,
+            "hub".into(),
+            Some("project-1".into())
+        )
+        .unwrap_err()
+        .contains("hub"));
+        assert!(ai_assign_task(
+            &vault,
+            "Code".into(),
+            page.clone(),
+            None,
+            id.clone(),
+            Some("missing".into())
+        )
+        .unwrap_err()
+        .contains("unknown project"));
+        assert_eq!(vault.inner.load_page(page.clone()).unwrap().blocks, before);
+        let task = ai_assign_task(
+            &vault,
+            "Summarize".into(),
+            page,
+            None,
+            id.clone(),
+            Some("project-1".into()),
+        )
+        .unwrap();
         assert_eq!(task.node, id);
+        assert_eq!(task.project, "project-1");
+        assert!(task.worktree_branch.is_empty() && task.worktree_path.is_empty());
         assert_eq!(ai_get_task(&vault, task.id).unwrap().status, tasks::QUEUED);
         vault.inner.flush().unwrap();
         drop(vault);

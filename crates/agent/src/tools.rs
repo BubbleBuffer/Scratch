@@ -205,10 +205,36 @@ struct RootTools {
 
 pub struct DesktopRuntime {
     projects: Arc<crate::projects::Projects>,
+    store: Option<bubblepaw_core::Store>,
     roots: std::sync::Mutex<std::collections::HashMap<String, Arc<RootTools>>>,
     handles: std::sync::Mutex<std::collections::HashMap<String, Arc<RootTools>>>,
 }
 impl DesktopRuntime {
+    /// A task's durable BubblePaw binding wins over the session's project.
+    /// This also keeps later tools rooted correctly after reopening the agent.
+    pub(crate) fn current_project(&self, session: &str) -> Result<crate::Project> {
+        let mut project = self.projects.current(session)?;
+        if let Some(store) = &self.store {
+            if let Some(info) = bubblepaw_runner::worktrees::get(store, session)? {
+                project.path =
+                    bubblepaw_runner::worktrees::workspace(store, session, &info.parent_workspace)?
+                        .to_string_lossy()
+                        .into_owned();
+            }
+        }
+        Ok(project)
+    }
+
+    fn is_worktree(&self, session: &str) -> Result<bool> {
+        self.store
+            .as_ref()
+            .map(|store| {
+                bubblepaw_runner::worktrees::get(store, session).map(|info| info.is_some())
+            })
+            .transpose()
+            .map(|bound| bound.unwrap_or(false))
+    }
+
     fn root(&self, project: &crate::Project) -> Result<Arc<RootTools>> {
         let mut roots = self.roots.lock().unwrap();
         if let Some(root) = roots.get(&project.path) {
@@ -254,7 +280,7 @@ struct DesktopTool {
 }
 impl DesktopTool {
     fn target(&self, session: &str, input: &Value) -> Result<(Arc<RootTools>, crate::Project)> {
-        let project = self.desktop.projects.current(session)?;
+        let project = self.desktop.current_project(session)?;
         if matches!(self.source, "read" | "write" | "edit" | "search" | "list") {
             if let Some(path) = input.get("path").and_then(Value::as_str) {
                 check_project_path(&project, path)?;
@@ -364,7 +390,7 @@ impl Tool for DesktopTool {
 }
 
 struct ProjectTool {
-    projects: Arc<crate::projects::Projects>,
+    desktop: Arc<DesktopRuntime>,
     name: &'static str,
 }
 #[async_trait]
@@ -407,6 +433,12 @@ impl Tool for ProjectTool {
         }
     }
     async fn invoke(&self, context: ToolContext, input: Value) -> Result<ToolResult> {
+        anyhow::ensure!(
+            !matches!(self.name, "project_switch" | "project_open")
+                || !self.desktop.is_worktree(&context.session_id)?,
+            "a code task stays in its assigned worktree; its project cannot be changed"
+        );
+        let projects = &self.desktop.projects;
         let string = |key: &str| {
             input
                 .get(key)
@@ -415,14 +447,15 @@ impl Tool for ProjectTool {
         };
         let value = match self.name {
             "project_list" => {
-                serde_json::json!({"projects": self.projects.list(), "current":self.projects.current(&context.session_id)?})
+                serde_json::json!({"projects": projects.list(), "current":self.desktop.current_project(&context.session_id)?})
             }
-            "project_current" => serde_json::to_value(self.projects.current(&context.session_id)?)?,
-            "project_switch" => serde_json::to_value(
-                self.projects
-                    .switch(&context.session_id, string("project")?)?,
-            )?,
-            "project_open" => serde_json::to_value(self.projects.open_project(
+            "project_current" => {
+                serde_json::to_value(self.desktop.current_project(&context.session_id)?)?
+            }
+            "project_switch" => {
+                serde_json::to_value(projects.switch(&context.session_id, string("project")?)?)?
+            }
+            "project_open" => serde_json::to_value(projects.open_project(
                 &context.session_id,
                 string("path")?,
                 input.get("name").map(|_| string("name")).transpose()?,
@@ -470,16 +503,18 @@ pub fn register_desktop_tools(
     projects: Arc<crate::projects::Projects>,
     definition_root: &std::path::Path,
 ) -> Result<Arc<DesktopRuntime>> {
-    register_desktop_tools_recorded(registry, projects, definition_root, None)
+    register_desktop_tools_recorded(registry, projects, definition_root, None, None)
 }
 pub(crate) fn register_desktop_tools_recorded(
     registry: &mut ToolRegistry,
     projects: Arc<crate::projects::Projects>,
     definition_root: &std::path::Path,
     recording: Option<(Arc<crate::records::Records>, Arc<Vault>)>,
+    store: Option<bubblepaw_core::Store>,
 ) -> Result<Arc<DesktopRuntime>> {
     let desktop = Arc::new(DesktopRuntime {
         projects,
+        store,
         roots: Default::default(),
         handles: Default::default(),
     });
@@ -520,7 +555,7 @@ pub(crate) fn register_desktop_tools_recorded(
         "project_open",
     ] {
         let tool: Arc<dyn Tool> = Arc::new(ProjectTool {
-            projects: desktop.projects.clone(),
+            desktop: desktop.clone(),
             name,
         });
         registry.register_host(match &recording {

@@ -3,7 +3,7 @@
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use vault_core::{
-    new_id, node_record_id, version_includes, Vault, DEVICE_ACTIVITY_INTERVAL_MS,
+    new_id, node_record_id, version_includes, DeviceProject, Vault, DEVICE_ACTIVITY_INTERVAL_MS,
     RUNNER_ONLINE_WINDOW_MS,
 };
 
@@ -289,4 +289,74 @@ fn remote_rename_and_local_heartbeat_converge_without_losing_either() {
             "the heartbeat survives the rename"
         );
     }
+}
+
+fn app(id: &str, name: &str) -> DeviceProject {
+    DeviceProject {
+        id: id.into(),
+        name: name.into(),
+    }
+}
+
+#[test]
+fn projects_publish_only_id_and_name_and_survive_heartbeats_and_merges() {
+    let dir = TempDir::new();
+    let v = dir.vault("a");
+    let device = v.device_id();
+    // A projects-only publish creates the record without a heartbeat.
+    assert!(v
+        .publish_device_projects(vec![app("app", "  App  "), app("notes", " ")])
+        .unwrap());
+    assert_eq!(v.device_records().unwrap()[0].last_seen_ms, None);
+    assert_eq!(
+        node_data(&v, &device)["projects"],
+        json!([{ "id": "app", "name": "App" }, { "id": "notes", "name": "notes" }]),
+        "only id and name are published, and a blank name is the id"
+    );
+    let listed = vec![app("app", "App"), app("notes", "notes")];
+    assert_eq!(v.device_records().unwrap()[0].projects, listed);
+    assert!(!v
+        .publish_device_projects(vec![app("app", "App"), app("notes", "notes")])
+        .unwrap());
+
+    // Heartbeats, scheduler merges and a full record write keep the list.
+    assert!(v.publish_device_activity_at(MINUTE).unwrap());
+    v.merge_node_record(
+        device.clone(),
+        json!({ "device_id": device, "available": true }).to_string(),
+    )
+    .unwrap();
+    v.write_node_record(
+        device.clone(),
+        json!({ "device_id": device, "name": "Desk", "kind": "desktop" }).to_string(),
+    )
+    .unwrap();
+    assert_eq!(v.device_records().unwrap()[0].projects, listed);
+
+    // Only publish_device_projects writes the list, and it refuses bad lists.
+    assert!(v
+        .write_node_record(
+            device.clone(),
+            json!({ "device_id": device, "name": "Desk", "projects": [] }).to_string(),
+        )
+        .is_err());
+    assert!(v
+        .merge_node_record(device.clone(), json!({ "projects": [] }).to_string())
+        .is_err());
+    assert!(v.publish_device_projects(vec![app(" ", "Blank")]).is_err());
+    assert!(v
+        .publish_device_projects(vec![app("app", "A"), app("app", "B")])
+        .is_err());
+    assert_eq!(v.device_records().unwrap()[0].projects, listed);
+
+    // Another vault that receives the record sees its projects too.
+    let b = dir.vault("b");
+    push(&v, &b);
+    let seen = b
+        .device_records()
+        .unwrap()
+        .into_iter()
+        .find(|r| r.id == device)
+        .unwrap();
+    assert_eq!(seen.projects, listed);
 }

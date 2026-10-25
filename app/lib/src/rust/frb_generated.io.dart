@@ -265,6 +265,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiRunnerList dco_decode_ai_runner_list(dynamic raw);
 
   @protected
+  AiRunnerProject dco_decode_ai_runner_project(dynamic raw);
+
+  @protected
   AiTask dco_decode_ai_task(dynamic raw);
 
   @protected
@@ -561,6 +564,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AiRunner> dco_decode_list_ai_runner(dynamic raw);
+
+  @protected
+  List<AiRunnerProject> dco_decode_list_ai_runner_project(dynamic raw);
 
   @protected
   List<AiTask> dco_decode_list_ai_task(dynamic raw);
@@ -1172,6 +1178,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiRunnerList sse_decode_ai_runner_list(SseDeserializer deserializer);
 
   @protected
+  AiRunnerProject sse_decode_ai_runner_project(SseDeserializer deserializer);
+
+  @protected
   AiTask sse_decode_ai_task(SseDeserializer deserializer);
 
   @protected
@@ -1544,6 +1553,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AiRunner> sse_decode_list_ai_runner(SseDeserializer deserializer);
+
+  @protected
+  List<AiRunnerProject> sse_decode_list_ai_runner_project(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<AiTask> sse_decode_list_ai_task(SseDeserializer deserializer);
@@ -2263,6 +2277,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_ai_runner_list(AiRunnerList self, SseSerializer serializer);
 
   @protected
+  void sse_encode_ai_runner_project(
+    AiRunnerProject self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_ai_task(AiTask self, SseSerializer serializer);
 
   @protected
@@ -2741,6 +2761,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_ai_runner(List<AiRunner> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_ai_runner_project(
+    List<AiRunnerProject> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_ai_task(List<AiTask> self, SseSerializer serializer);

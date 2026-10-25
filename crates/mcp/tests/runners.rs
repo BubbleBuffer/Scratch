@@ -2,7 +2,8 @@ use std::{fs, path::PathBuf};
 
 use serde_json::json;
 use vault_core::{
-    new_id, node_record_id, BlockKind, BlockOp, NewBlock, Vault, RUNNER_ONLINE_WINDOW_MS,
+    new_id, node_record_id, BlockKind, BlockOp, DeviceProject, NewBlock, Vault,
+    RUNNER_ONLINE_WINDOW_MS,
 };
 use vault_mcp::{runners, tasks};
 
@@ -147,7 +148,8 @@ fn assignment_creates_a_real_task_pinned_to_the_chosen_offline_pc() {
         }],
     )
     .unwrap();
-    let task = runners::assign(&v, "Summarize this", &page, Some(&block), "chosen-pc").unwrap();
+    let task =
+        runners::assign(&v, "Summarize this", &page, Some(&block), "chosen-pc", None).unwrap();
     assert_eq!(task.node, "chosen-pc");
     assert_eq!(task.status, tasks::QUEUED);
     assert_eq!(task.runner, "agent");
@@ -166,7 +168,7 @@ fn assignment_accepts_hub_without_a_record_and_desktops_cannot_claim_it() {
     let t = Temp::new();
     let v = t.open();
     let page = v.create_page(None, "Plan".into()).unwrap();
-    let task = runners::assign(&v, "Plan it", &page, None, "hub").unwrap();
+    let task = runners::assign(&v, "Plan it", &page, None, "hub", None).unwrap();
     assert_eq!(task.node, "hub");
     assert!(tasks::claim_next(&v, &v.device_id()).unwrap().is_none());
 }
@@ -179,9 +181,83 @@ fn invalid_destinations_and_blocks_do_not_create_rows_or_placeholders() {
     let page = v.create_page(None, "Plan".into()).unwrap();
     let before = v.load_page(page.clone()).unwrap();
     for id in ["", "missing", &node_record_id(&v.device_id())] {
-        assert!(runners::assign(&v, "Plan it", &page, None, id).is_err());
+        assert!(runners::assign(&v, "Plan it", &page, None, id, None).is_err());
     }
-    assert!(runners::assign(&v, "Plan it", &page, Some("missing-block"), &v.device_id()).is_err());
+    let me = v.device_id();
+    assert!(runners::assign(&v, "Plan it", &page, Some("missing-block"), &me, None).is_err());
     assert_eq!(v.load_page(page).unwrap(), before);
     assert_eq!(tasks::collection(&v).unwrap(), None);
+}
+
+fn project(id: &str, name: &str) -> DeviceProject {
+    DeviceProject {
+        id: id.into(),
+        name: name.into(),
+    }
+}
+
+#[test]
+fn a_pc_lists_its_projects_and_the_hub_has_none() {
+    let t = Temp::new();
+    let v = t.open();
+    let me = v.device_id();
+    record(&v, &me, "Work PC", "desktop", Some(SEEN_TEXT));
+    v.publish_device_projects(vec![project("app", "App")])
+        .unwrap();
+    let list = runners::list_at(&v, true, true, SEEN).unwrap();
+    assert!(list.runners[0].projects.is_empty());
+    assert_eq!(list.runners[1].projects, vec![project("app", "App")]);
+}
+
+#[test]
+fn project_checks_reject_the_hub_non_pcs_and_unlisted_projects() {
+    let t = Temp::new();
+    let v = t.open();
+    let me = v.device_id();
+    record(&v, &me, "Work PC", "desktop", Some(SEEN_TEXT));
+    v.publish_device_projects(vec![project("app", "App")])
+        .unwrap();
+    assert!(runners::check_project(&v, "hub", "").is_ok());
+    assert!(runners::check_project(&v, &me, "").is_ok());
+    assert!(runners::check_project(&v, &me, "app").is_ok());
+    assert!(runners::check_project(&v, "hub", "app").is_err());
+    assert!(runners::check_project(&v, &me, "missing").is_err());
+    assert!(runners::check_project(&v, "no-such-pc", "app").is_err());
+
+    // A record that is not a PC runs no project tasks.
+    record(&v, &me, "Work PC", "hub", Some(SEEN_TEXT));
+    assert!(runners::check_project(&v, &me, "app").is_err());
+}
+
+#[test]
+fn a_project_task_is_queued_with_its_project_and_invalid_ones_write_nothing() {
+    let t = Temp::new();
+    let v = t.open();
+    let me = v.device_id();
+    record(&v, &me, "Work PC", "desktop", Some(SEEN_TEXT));
+    v.publish_device_projects(vec![project("app", "App")])
+        .unwrap();
+    let page = v.create_page(None, "Plan".into()).unwrap();
+    let before = v.load_page(page.clone()).unwrap();
+
+    for (runner, id) in [
+        ("hub", "app"),
+        (me.as_str(), "missing"),
+        ("no-such-pc", "app"),
+    ] {
+        assert!(runners::assign(&v, "Fix it", &page, None, runner, Some(id)).is_err());
+    }
+    assert!(tasks::create_for_project(&v, "Fix it", &page, None, "", "hub", Some("app")).is_err());
+    assert!(tasks::list(&v, 50).unwrap().is_empty());
+    assert_eq!(v.load_page(page.clone()).unwrap(), before);
+
+    let task = runners::assign(&v, "Fix it", &page, None, &me, Some(" app ")).unwrap();
+    assert_eq!(task.project, "app");
+    assert_eq!(task.node, me);
+    assert_eq!(task.status, tasks::QUEUED);
+    assert_eq!(tasks::get(&v, &task.id).unwrap(), task);
+
+    let plain = runners::assign(&v, "Plain", &page, None, &me, None).unwrap();
+    assert_eq!(plain.project, "");
+    assert_eq!(tasks::list(&v, 50).unwrap().len(), 2);
 }

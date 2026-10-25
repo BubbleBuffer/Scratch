@@ -20,6 +20,29 @@ struct State {
 pub struct Projects {
     file: PathBuf,
     state: Mutex<State>,
+    publisher: Option<std::sync::Arc<vault_core::Vault>>,
+}
+
+fn published(projects: &[Project]) -> Vec<vault_core::DeviceProject> {
+    projects
+        .iter()
+        .map(|p| vault_core::DeviceProject {
+            id: p.id.clone(),
+            name: p.name.clone(),
+        })
+        .collect()
+}
+
+/// Publish an existing device's projects even when its desktop tools are off
+/// or its agent has not been opened. Local repository paths never enter sync.
+pub fn publish_at(vault: &vault_core::Vault, data_dir: &Path) -> Result<()> {
+    let file = data_dir.join("agent/projects.json");
+    if file.exists() {
+        let state: State = serde_json::from_slice(&std::fs::read(&file)?)
+            .with_context(|| format!("read {}", file.display()))?;
+        vault.publish_device_projects(published(&state.projects))?;
+    }
+    Ok(())
 }
 
 pub(crate) fn save_json(path: &Path, value: &impl Serialize) -> Result<()> {
@@ -52,7 +75,19 @@ impl Projects {
         Ok(Self {
             file,
             state: Mutex::new(state),
+            publisher: None,
         })
+    }
+
+    pub(crate) fn open_for_device(
+        file: PathBuf,
+        seed: &Path,
+        vault: std::sync::Arc<vault_core::Vault>,
+    ) -> Result<Self> {
+        let mut projects = Self::open(file, seed)?;
+        vault.publish_device_projects(published(&projects.list()))?;
+        projects.publisher = Some(vault);
+        Ok(projects)
     }
     fn update<T>(&self, f: impl FnOnce(&mut State) -> Result<T>) -> Result<T> {
         let mut guard = self.state.lock().unwrap();
@@ -60,6 +95,9 @@ impl Projects {
         let out = f(&mut next)?;
         save_json(&self.file, &next)?;
         *guard = next;
+        if let Some(vault) = &self.publisher {
+            vault.publish_device_projects(published(&guard.projects))?;
+        }
         Ok(out)
     }
     pub fn list(&self) -> Vec<Project> {

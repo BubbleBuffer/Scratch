@@ -20,6 +20,7 @@ AiRunnerList _fleet({String defaultId = 'studio'}) => AiRunnerList(
   defaultRunnerId: defaultId,
   runners: [
     AiRunner(
+      projects: const [],
       id: 'hub',
       name: 'Hub',
       kind: AiRunnerKind.hub,
@@ -28,6 +29,7 @@ AiRunnerList _fleet({String defaultId = 'studio'}) => AiRunnerList(
       isThisDevice: false,
     ),
     AiRunner(
+      projects: const [],
       id: 'studio',
       name: 'Studio-PC',
       kind: AiRunnerKind.pc,
@@ -36,6 +38,7 @@ AiRunnerList _fleet({String defaultId = 'studio'}) => AiRunnerList(
       isThisDevice: true,
     ),
     AiRunner(
+      projects: const [],
       id: 'laptop',
       name: 'Laptop',
       kind: AiRunnerKind.pc,
@@ -54,6 +57,9 @@ AiTask _row(
   String error = '',
   String progress = '',
 }) => AiTask(
+  project: '',
+  worktreeBranch: '',
+  worktreePath: '',
   id: id,
   prompt: runnerCardPrompt,
   page: page,
