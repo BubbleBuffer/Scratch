@@ -126,22 +126,29 @@ void main() {
       'capture appends dated task then paragraph to one daily note on $form',
       (tester) async {
         final f = await pumpApp(tester, mobile: mobile, empty: true);
+        // The feedback and its Open link last four seconds of fake time.
+        // settle advances fake time while it waits for native writes and
+        // agenda reloads, which under CI load can outlast them, so wait for
+        // the capture in real time with zero-length pumps instead.
+        final feedback = find.text("Added to today's note · ");
+        Future<void> captured() async {
+          final saved = Stopwatch()..start();
+          while ((tester.widget<EditableText>(capture).controller.text
+                      .isNotEmpty ||
+                  feedback.evaluate().isEmpty) &&
+              saved.elapsed < const Duration(seconds: 10)) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 1)),
+            );
+            await tester.pump();
+          }
+          expect(tester.widget<EditableText>(capture).controller.text, isEmpty);
+          expect(feedback, findsOneWidget);
+        }
+
         await tester.enterText(capture, '🌱 Plant a tree');
         await tester.testTextInput.receiveAction(TextInputAction.done);
-        // Observe the four-second feedback before settle advances fake time
-        // while waiting for native writes and agenda reloads under CI load.
-        final feedback = find.text("Added to today's note · ");
-        final saved = Stopwatch()..start();
-        while ((tester.widget<EditableText>(capture).controller.text.isNotEmpty ||
-                feedback.evaluate().isEmpty) &&
-            saved.elapsed < const Duration(seconds: 10)) {
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 1)),
-          );
-          await tester.pump();
-        }
-        expect(tester.widget<EditableText>(capture).controller.text, isEmpty);
-        expect(feedback, findsOneWidget);
+        await captured();
         await settleUntil(
           tester,
           () => f.app.agenda.items.any((i) => i.title == '🌱 Plant a tree'),
@@ -174,9 +181,12 @@ void main() {
         await tapAndSettle(tester, key('capture-note'));
         await tester.enterText(capture, 'An idea for later');
         await tester.testTextInput.receiveAction(TextInputAction.done);
-        await settleUntil(
-          tester,
-          () => tester.widget<EditableText>(capture).controller.text.isEmpty,
+        await captured();
+        // Open while the feedback still shows; the checks below settle.
+        await tapAndSettle(tester, key('capture-open'));
+        expect(
+          tester.widget<EditableText>(key('page-title')).controller.text,
+          'Tuesday 6 October 2026',
         );
         page = await pageOf(tester, id);
         final idea = page.blocks.singleWhere(
@@ -199,11 +209,6 @@ void main() {
           (v) => v.run((r) => r.findByRole(role: 'journal')),
         );
         expect((await core(tester, (v) => v.listChildren(journal))).length, 1);
-        await tapAndSettle(tester, key('capture-open'));
-        expect(
-          tester.widget<EditableText>(key('page-title')).controller.text,
-          'Tuesday 6 October 2026',
-        );
       },
     );
 
