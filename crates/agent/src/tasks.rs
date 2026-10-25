@@ -1,8 +1,10 @@
 //! AI tasks run by the agent (runner value `agent`).
 
+mod subtasks;
+
 use std::pin::pin;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::{bail, ensure, Context, Result};
 use async_trait::async_trait;
@@ -16,6 +18,7 @@ use vault_mcp::jobs::NODE_HUB;
 use vault_mcp::tasks::{self, PromptTools, Task, CANCELLED};
 
 use crate::{permission_policy, Agent, PermissionMode};
+use subtasks::TodoMirror;
 
 /// The runner value of AI tasks run by the desktop agent.
 pub const RUNNER: &str = "agent";
@@ -26,6 +29,8 @@ pub const RUN_LIMIT: Duration = Duration::from_secs(60 * 60);
 
 /// How often a run's wait looks at its task row for a cancel.
 const WATCH_EVERY: Duration = Duration::from_millis(500);
+
+const DELEGATED_PROMPT: &str = " Use report_progress to keep the user informed while working. Plan multi-step work with todo and keep the list current; it appears as subtasks in the note, mirrored by Scratch, so do not write those subtasks yourself.";
 
 /// Only delegated runs register this capability. The row and session come
 /// from the runner, never from model arguments.
@@ -127,16 +132,18 @@ impl Agent {
             task: task.into(),
             session: session.into(),
         });
+        let store = self.store.clone();
         let register = move |mut registry: ToolRegistry| -> Result<ToolRegistry> {
             registry.register_host(progress.clone())?;
-            registry.show_always(["report_progress"]);
+            bubblepaw_runner::todo::register(&mut registry, store.clone())?;
+            registry.show_always(["report_progress", "todo"]);
             Ok(registry)
         };
         let mut config = self.task_harness_config.clone();
         let tools = register(self.base_tools.clone())?;
         if let Some(resolve) = config.registry_resolver.take() {
             config.registry_resolver = Some(Arc::new(move || {
-                register(resolve()).expect("delegated progress tool name is reserved")
+                register(resolve()).expect("delegated tool names are reserved")
             }));
         }
         Ok(Harness::new(
@@ -273,6 +280,7 @@ impl Agent {
         self.prepare_code_task(vault, task_id, session)?;
         let model = Some(self.default_model()).filter(|m| !m.trim().is_empty());
         let mut system_prompt = self.run_prompt(session)?;
+        system_prompt.push_str(DELEGATED_PROMPT);
         let mut approval = permission_policy(PermissionMode::Bypass);
         if bubblepaw_runner::worktrees::get(&self.store, session)?.is_some() {
             system_prompt.push_str(" This is a code task in an isolated git worktree. File and shell tools are rooted there and Confirm tools run without approval. The worktree and branch are kept for review. The source repository's uncommitted changes were not copied. Stay in this worktree.");
@@ -281,12 +289,14 @@ impl Agent {
             system_prompt.push_str(" This task has no code-task worktree. File writes and shell commands are not available; Confirm-level tools are denied. Read-only tools, vault tools and report_progress remain available within this runner's tool set. Assign the task with a project to enable file writes and shell commands in its worktree.");
         }
         let harness = self.task_harness(task_id, session)?;
+        let mut mirror = TodoMirror::new(self.vault.clone(), task_id, session, &harness);
         self.runtime.block_on(async {
             // Cancelled after the session was saved, before the engine starts.
             if is_cancelled(vault, task_id) {
                 return Ok(Ended::Cancelled);
             }
-            harness.start(
+            let mut events = harness.subscribe();
+            let run = harness.start(
                 session,
                 prompt,
                 RunOptions {
@@ -297,23 +307,35 @@ impl Agent {
                     ..RunOptions::default()
                 },
             )?;
-            let mut wait = pin!(harness.wait_for_idle(session));
-            let started = Instant::now();
+            mirror.run_id = run.id;
+            let mut wait = pin!(tokio::time::timeout(limit, harness.wait_for_idle(session)));
+            let mut watch = tokio::time::interval(WATCH_EVERY);
+            watch.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            let mut events_open = true;
             loop {
-                let left = limit.saturating_sub(started.elapsed());
-                match tokio::time::timeout(left.min(WATCH_EVERY), wait.as_mut()).await {
-                    Ok(run) => return Ok(Ended::Run(run?)),
-                    Err(_) => {
-                        let cancelled = is_cancelled(vault, task_id);
-                        if cancelled || started.elapsed() >= limit {
-                            self.cancel_as(session, crate::desktop_client());
-                            let _ = wait.as_mut().await;
-                            return Ok(if cancelled {
-                                Ended::Cancelled
-                            } else {
-                                Ended::Limit
-                            });
+                tokio::select! {
+                    outcome = wait.as_mut() => {
+                        mirror.drain(&harness).await;
+                        match outcome {
+                            Ok(run) => return Ok(Ended::Run(run?)),
+                            Err(_) => {
+                                self.cancel_as(session, crate::desktop_client());
+                                let _ = harness.wait_for_idle(session).await;
+                                mirror.drain(&harness).await;
+                                return Ok(Ended::Limit);
+                            }
                         }
+                    }
+                    _ = watch.tick() => {
+                        if is_cancelled(vault, task_id) {
+                            self.cancel_as(session, crate::desktop_client());
+                            let _ = harness.wait_for_idle(session).await;
+                            mirror.drain(&harness).await;
+                            return Ok(Ended::Cancelled);
+                        }
+                    }
+                    event = events.recv(), if events_open => {
+                        events_open = mirror.on_event(event, &harness).await;
                     }
                 }
             }
@@ -354,10 +376,13 @@ impl Agent {
         limit: Duration,
     ) -> Result<JobOutcome> {
         let model = Some(self.default_model()).filter(|m| !m.trim().is_empty());
-        let system_prompt = self.run_prompt(session)?;
+        let mut system_prompt = self.run_prompt(session)?;
+        system_prompt.push_str(DELEGATED_PROMPT);
         let harness = self.task_harness(task_id, session)?;
+        let mut mirror = TodoMirror::new(self.vault.clone(), task_id, session, &harness);
         self.runtime.block_on(async {
-            harness.start(
+            let mut events = harness.subscribe();
+            let run = harness.start(
                 session,
                 prompt,
                 RunOptions {
@@ -368,7 +393,19 @@ impl Agent {
                     ..RunOptions::default()
                 },
             )?;
-            match tokio::time::timeout(limit, harness.wait_for_idle(session)).await {
+            mirror.run_id = run.id;
+            let mut wait = pin!(tokio::time::timeout(limit, harness.wait_for_idle(session)));
+            let mut events_open = true;
+            let outcome = loop {
+                tokio::select! {
+                    outcome = wait.as_mut() => break outcome,
+                    event = events.recv(), if events_open => {
+                        events_open = mirror.on_event(event, &harness).await;
+                    }
+                }
+            };
+            mirror.drain(&harness).await;
+            match outcome {
                 Ok(run) => {
                     let run = run?;
                     Ok(match run.status.as_str() {
@@ -384,9 +421,68 @@ impl Agent {
                 Err(_) => {
                     self.harness.cancel_from(session, Some(job_client()));
                     let _ = self.harness.wait_for_idle(session).await;
+                    mirror.drain(&harness).await;
                     Ok(JobOutcome::TimedOut)
                 }
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn desktop_and_hub_task_tool_lists_include_todo_but_chat_and_gateway_do_not() {
+        for host_kind in [crate::HostKind::Desktop, crate::HostKind::Hub] {
+            let dir = tempfile::tempdir().unwrap();
+            let vault =
+                Arc::new(Vault::open(dir.path().join("vault").to_string_lossy().into()).unwrap());
+            let agent = Agent::open_with_execution(
+                vault.clone(),
+                crate::AgentConfig {
+                    host_kind,
+                    data_dir: dir.path().join("data"),
+                    default_model: "scripted/scripted".into(),
+                    bun_path: Some(dir.path().join("no-bun")),
+                    test: crate::TestHooks {
+                        scripted: Some((vec![], "Done.".into())),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                bubblepaw_core::ExecutionMode::Native,
+                false,
+            )
+            .unwrap();
+            let page = vault.create_page(None, "Plan".into()).unwrap();
+            let task = tasks::create(&vault, "Read", &page, None, RUNNER).unwrap();
+            let session = agent.create_session("Delegated").unwrap();
+            let delegated = agent.task_harness(&task.id, &session.id).unwrap();
+            let definitions = delegated
+                .effective_tool_definitions(&session.id, &RunOptions::default())
+                .unwrap();
+            let todo = definitions.iter().find(|tool| tool.name == "todo").unwrap();
+            assert_eq!(todo.input_schema["type"], "array");
+            assert!(definitions
+                .iter()
+                .any(|tool| tool.name == "report_progress"));
+            let chat = agent
+                .harness
+                .effective_tool_definitions(&session.id, &RunOptions::default())
+                .unwrap();
+            assert!(!chat.iter().any(|tool| tool.name == "todo"));
+            let gateway = agent.gateway_tool_definitions(&session.id).unwrap();
+            assert!(!gateway.iter().any(|tool| tool.name == "todo"));
+        }
+    }
+
+    #[test]
+    fn delegated_prompt_explains_the_mirrored_task_list() {
+        assert!(super::DELEGATED_PROMPT.contains("report_progress"));
+        assert!(super::DELEGATED_PROMPT.contains("Plan multi-step work with todo"));
+        assert!(super::DELEGATED_PROMPT.contains("keep the list current"));
+        assert!(super::DELEGATED_PROMPT.contains("appears as subtasks in the note"));
     }
 }

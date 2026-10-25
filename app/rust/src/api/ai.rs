@@ -469,6 +469,42 @@ mod runner_tests {
         assert_eq!(task.project, "project-1");
         assert!(task.worktree_branch.is_empty() && task.worktree_path.is_empty());
         assert_eq!(ai_get_task(&vault, task.id).unwrap().status, tasks::QUEUED);
+
+        // The existing block argument carries the assignment source. Keep
+        // placement and source identity together without a second bridge field.
+        let page = vault.inner.create_page(None, "Todo plan".into()).unwrap();
+        let source = vault_core::new_id();
+        vault
+            .inner
+            .apply(
+                page.clone(),
+                vec![vault_core::BlockOp::Insert {
+                    parent: None,
+                    after: None,
+                    block: vault_core::NewBlock {
+                        id: source.clone(),
+                        kind: vault_core::BlockKind::Todo,
+                        text: "Prepare the plan".into(),
+                        marks: vec![],
+                        checked: false,
+                    },
+                }],
+            )
+            .unwrap();
+        for runner in [id.clone(), "hub".into()] {
+            let assigned = ai_assign_task(
+                &vault,
+                "Prepare the plan".into(),
+                page.clone(),
+                Some(source.clone()),
+                runner,
+                None,
+            )
+            .unwrap();
+            let stored = tasks::get(&vault.inner, &assigned.id).unwrap();
+            assert_eq!(stored.source_block.as_deref(), Some(source.as_str()));
+            assert_ne!(stored.block.as_deref(), Some(source.as_str()));
+        }
         vault.inner.flush().unwrap();
         drop(vault);
         let reopened = NotesVault::open(root, None).unwrap();

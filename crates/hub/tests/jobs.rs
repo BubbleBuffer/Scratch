@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use vault_agent::bubblepaw_core::ToolCall;
 use vault_agent::bubblepaw_runner::provider::ScriptedStep;
 use vault_agent::TestHooks;
-use vault_core::{new_id, Vault};
+use vault_core::{new_id, BlockKind, Vault};
 
 struct TempDir(PathBuf);
 
@@ -769,4 +769,81 @@ async fn any_device_cancels_a_device_job_but_agents_do_not_see_it() {
     assert_eq!(cancelled["status"], "cancelled", "{cancelled}");
     let md = page_markdown(env.vault(), &page);
     assert!(md.contains("AI task cancelled"), "{md}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_job_leaves_its_todo_subtasks_nested_under_its_placeholder() {
+    // Three todo replacements, then the final reply. Each replacement mirrors
+    // into the placeholder; the run drains them before the job completes.
+    // The todo tool takes the whole list as a bare array.
+    let todo = |items: Value| call("todo", items);
+    let env = env(
+        steps(vec![
+            todo(json!([
+                {"text": "Read the notes", "status": "pending"},
+                {"text": "Draft", "status": "pending"}
+            ])),
+            todo(json!([
+                {"text": "Read the notes", "status": "done"},
+                {"text": "Draft", "status": "in_progress"}
+            ])),
+            todo(json!([
+                {"text": "Read the notes", "status": "done"},
+                {"text": "Draft", "status": "done"},
+                {"text": "Publish", "status": "pending"}
+            ])),
+        ]),
+        "All done.",
+    )
+    .await;
+    let vault = env.vault().clone();
+    let (page, first) = std::thread::spawn(move || {
+        let page = vault.create_page(None, "Writing plan".into()).unwrap();
+        let ids = vault
+            .insert_markdown(page.clone(), None, None, true, "First line".into())
+            .unwrap();
+        (page, ids[0].clone())
+    })
+    .join()
+    .unwrap();
+    let job = env
+        .device_jobs(
+            "laptop",
+            json!({"action":"create", "prompt":"Write the post",
+                   "page":page, "after":first}),
+        )
+        .await
+        .unwrap();
+    let id = job["id"].as_str().unwrap().to_string();
+    let done = env.device_finished("laptop", &id).await;
+    assert_eq!(done["status"], "completed", "{done}");
+    assert_eq!(done["result"], "All done.", "{done}");
+
+    let vault = env.vault().clone();
+    let doc = std::thread::spawn(move || vault.load_page(page).unwrap())
+        .join()
+        .unwrap();
+    assert_eq!(doc.blocks[0].text, "First line");
+    let at = doc
+        .blocks
+        .iter()
+        .position(|b| b.text.starts_with("AI task done"))
+        .unwrap_or_else(|| panic!("no placeholder left"));
+    assert_eq!(at, 1, "placeholder moved");
+    let subtasks: Vec<(String, bool)> = doc.blocks[at]
+        .children
+        .iter()
+        .filter(|c| c.kind == BlockKind::Todo)
+        .map(|c| (c.text.clone(), c.checked))
+        .collect();
+    assert_eq!(
+        subtasks,
+        vec![
+            ("Read the notes".to_string(), true),
+            ("Draft".to_string(), true),
+            ("Publish".to_string(), false),
+        ]
+    );
+    // The final reply goes after the placeholder, not inside it.
+    assert_eq!(doc.blocks[at + 1].text, "All done.");
 }

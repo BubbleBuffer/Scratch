@@ -3307,6 +3307,24 @@ impl Vault {
         self.inner.edit(&id, |doc| doc.apply(&ops))
     }
 
+    /// Applies a reconciliation only if the block tree still matches the
+    /// snapshot used to plan it. The comparison shares the edit lock with
+    /// the write, so a concurrent user edit cannot be overwritten or deleted
+    /// by operations planned against an older tree.
+    pub fn apply_if_blocks_match(
+        &self,
+        id: PageId,
+        expected: &[Block],
+        ops: Vec<BlockOp>,
+    ) -> Result<()> {
+        self.inner.edit(&id, |doc| {
+            if doc.blocks().as_slice() != expected {
+                return Err(invalid("the page blocks changed during reconciliation"));
+            }
+            doc.apply(&ops)
+        })
+    }
+
     /// Waits until every change so far is written to the Loro snapshots,
     /// markdown files and index. Returns the last background write error, if
     /// any. Call it before the app is suspended or quits.

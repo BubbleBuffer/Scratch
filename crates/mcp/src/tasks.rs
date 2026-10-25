@@ -22,6 +22,9 @@
 //! - A running task can report its progress ([`report_progress`]). Only the
 //!   row's latest message and its time change; the status and placeholder
 //!   stay as they are, and the last report stays when the task ends.
+//! - A run's todo list is mirrored into the page as nested todos (see
+//!   [`subtasks`]): under the task's source todo, or under its placeholder
+//!   when it has none.
 
 use serde::{Deserialize, Serialize};
 use vault_core::{
@@ -30,6 +33,13 @@ use vault_core::{
 };
 
 use crate::{err, Result};
+
+mod subtasks;
+
+#[cfg(test)]
+mod source_tests;
+
+pub use subtasks::{begin_subtasks, mirror_subtasks, SubtaskItem};
 
 /// The page property that marks the tasks database.
 pub const MARKER: &str = "ai.tasks";
@@ -58,6 +68,11 @@ pub struct Task {
     pub page: Option<PageId>,
     /// The placeholder block in that page.
     pub block: Option<String>,
+    /// The todo block the run's subtasks nest under instead of the
+    /// placeholder: set when the task was asked after a todo (see
+    /// [`create_on_with`]).
+    #[serde(default)]
+    pub source_block: Option<String>,
     /// `agent` (the BubblePaw agent) or empty. Rows from before 2026-10-22
     /// may name a removed runner (`claude`, `codex`, `deepseek`); the agent
     /// answers them like any other.
@@ -147,6 +162,10 @@ pub fn schema() -> Vec<PropDef> {
         def("project", "Project", PropKind::Text, vec![]),
         def("worktree_branch", "Worktree branch", PropKind::Text, vec![]),
         def("worktree_path", "Worktree path", PropKind::Text, vec![]),
+        // The todo the subtasks nest under (empty: the placeholder), and the
+        // run's subtask tracking (see [`subtasks`]).
+        def("source_block", "Source block", PropKind::Text, vec![]),
+        def("subtask_blocks", "Subtask blocks", PropKind::Text, vec![]),
     ]
 }
 
@@ -236,11 +255,13 @@ fn task_of(row: &PageSummary) -> Task {
             _ => None,
         });
     let block = Some(text(p, "block")).filter(|b| !b.is_empty());
+    let source_block = Some(text(p, "source_block")).filter(|b| !b.is_empty());
     Task {
         id: row.id.clone(),
         prompt: text(p, "prompt"),
         page,
         block,
+        source_block,
         runner: text(p, "runner"),
         node: text(p, "node"),
         status: text(p, "status"),
@@ -294,6 +315,7 @@ fn placeholder_text(status: &str, prompt: &str) -> String {
         FAILED => "AI task failed",
         CANCELLED => "AI task cancelled",
         INTERRUPTED => "AI task interrupted",
+        DONE => "AI task done",
         _ => "AI task",
     };
     format!("{what}: {}", first_line(prompt, 100))
@@ -311,7 +333,8 @@ fn find<'a>(blocks: &'a [Block], id: &str) -> Option<&'a Block> {
 
 /// Creates a task about `page`. The placeholder goes after block `after`
 /// (an empty paragraph there becomes the placeholder), or at the end of
-/// the page. `runner` may be empty (the desktop's default).
+/// the page. A todo named by `after` also becomes the source for the run's
+/// nested subtasks. `runner` may be empty (the desktop's default).
 pub fn create(
     v: &Vault,
     prompt: &str,
@@ -362,6 +385,7 @@ pub fn create_for_project(
 
 /// [`create_on`] that also sets `extra` properties before the row is queued,
 /// so a claim never sees the row without them (a job's owner and tools).
+/// `source_block` in `extra` selects a todo independently of placement.
 pub(crate) fn create_on_with(
     v: &Vault,
     prompt: &str,
@@ -376,6 +400,8 @@ pub(crate) fn create_on_with(
         return err("the task needs a prompt");
     }
     let target = v.load_page(page.clone())?;
+    // Checked before anything is written.
+    let source = source_todo(&target.blocks, after, extra)?;
     let coll = ensure_collection(v)?;
     // The placeholder.
     let text = placeholder_text(QUEUED, prompt);
@@ -450,11 +476,18 @@ pub(crate) fn create_on_with(
         node.to_string()
     };
     v.set_property(row.clone(), "node".into(), PropValue::Text(node))?;
-    for (key, value) in extra {
+    for (key, value) in extra.iter().filter(|(k, _)| *k != "source_block") {
         v.set_property(
             row.clone(),
             key.to_string(),
             PropValue::Text(value.to_string()),
+        )?;
+    }
+    if let Some(source) = source {
+        v.set_property(
+            row.clone(),
+            "source_block".into(),
+            PropValue::Text(source),
         )?;
     }
     v.set_property(row.clone(), "prompt".into(), PropValue::Text(prompt.into()))?;
@@ -473,6 +506,29 @@ pub(crate) fn create_on_with(
         PropValue::Select(QUEUED.into()),
     )?;
     get(v, &row)
+}
+
+/// The source todo of a task created after `after`: the `source_block` in
+/// `extra` if given, else `after` when it is a todo. Anything else is no
+/// source. A given source must be a todo of the page.
+fn source_todo(
+    blocks: &[Block],
+    after: Option<&str>,
+    extra: &[(&str, &str)],
+) -> Result<Option<String>> {
+    let is_todo = |id: &str| find(blocks, id).is_some_and(|b| b.kind == BlockKind::Todo);
+    let given = extra
+        .iter()
+        .find(|(k, _)| *k == "source_block")
+        .map(|(_, id)| id.trim())
+        .filter(|id| !id.is_empty());
+    let Some(id) = given.or_else(|| after.filter(|a| is_todo(*a))) else {
+        return Ok(None);
+    };
+    if !is_todo(id) {
+        return err(format!("source block {id:?} is not a todo of the page"));
+    }
+    Ok(Some(id.to_string()))
 }
 
 fn parent_of(blocks: &[Block], parent: Option<&str>, id: &str) -> Option<Option<String>> {
@@ -738,7 +794,9 @@ pub fn report_progress(v: &Vault, id: &str, message: &str) -> Result<()> {
 
 /// Writes a finished task's result `md` into its page: in place of the
 /// placeholder, or at the end when the placeholder is gone. An empty result
-/// removes the placeholder (the agent edited the vault itself).
+/// removes the placeholder (the agent edited the vault itself). A placeholder
+/// with children (the run's subtasks, see [`subtasks`]) stays: it is labelled
+/// done and the result goes after it, so the subtasks stay nested under it.
 pub(crate) fn write_result(v: &Vault, t: &Task, md: &str) -> Result<()> {
     let md = md.trim().to_string();
     let Some(page) = &t.page else {
@@ -747,15 +805,29 @@ pub(crate) fn write_result(v: &Vault, t: &Task, md: &str) -> Result<()> {
     let Ok(p) = v.load_page(page.clone()) else {
         return Ok(());
     };
-    let placeholder = t.block.as_deref().filter(|b| find(&p.blocks, b).is_some());
-    match (placeholder, md.is_empty()) {
-        (Some(b), _) => {
-            v.replace_markdown(page.clone(), vec![b.to_string()], md)?;
+    let placeholder = t.block.as_deref().and_then(|b| find(&p.blocks, b));
+    match placeholder {
+        Some(b) if !b.children.is_empty() => {
+            v.apply(
+                page.clone(),
+                vec![BlockOp::SetText {
+                    id: b.id.clone(),
+                    text: placeholder_text(DONE, &t.prompt),
+                    marks: vec![],
+                }],
+            )?;
+            if !md.is_empty() {
+                let parent = parent_of(&p.blocks, None, &b.id).flatten();
+                v.insert_markdown(page.clone(), parent, Some(b.id.clone()), false, md)?;
+            }
         }
-        (None, false) => {
+        Some(b) => {
+            v.replace_markdown(page.clone(), vec![b.id.clone()], md)?;
+        }
+        None if !md.is_empty() => {
             v.insert_markdown(page.clone(), None, None, true, md)?;
         }
-        (None, true) => {}
+        None => {}
     }
     Ok(())
 }
