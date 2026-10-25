@@ -102,7 +102,7 @@ jobs:
           cargo build --release --locked -p notes_bridge
       - name: Build BubblePaw fake extension
         working-directory: BubblePaw-Core
-        run: cargo build -p bubblepaw-runner --bin bubblepaw-fake-extension
+        run: cargo build -p bubblepaw-runner --features test-fixtures --bin bubblepaw-fake-extension
       - name: flutter pub get
         working-directory: scratch/app
         run: |
