@@ -7,10 +7,10 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::{
-    Approval, EventKind, Tool, ToolCall, ToolContext, ToolDefinition, ToolResult,
-};
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::approvals::Approval;
+use vault_agent::bubblepaw_sdk::events::EventKind;
+use vault_agent::bubblepaw_sdk::tools::{Tool, ToolCall, ToolContext, ToolDefinition, ToolResult};
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
 use vault_agent::{
     tasks::{limit_error, session_title, TaskRun, RUN_LIMIT},
     Agent, AgentConfig, Forwarded, PermissionMode, Sent, TestHooks,

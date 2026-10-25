@@ -7,8 +7,11 @@ use std::sync::{
     Arc,
 };
 use vault_agent::{
-    bubblepaw_core::{
-        Approval, ClientInfo, ExecutionMode, Role, Tool, ToolContext, ToolDefinition, ToolResult,
+    bubblepaw_sdk::{
+        approvals::Approval,
+        harness::{ClientInfo, ExecutionMode},
+        store::Role,
+        tools::{Tool, ToolContext, ToolDefinition, ToolResult},
     },
     Agent, AgentConfig, PermissionMode, TestHooks,
 };
@@ -26,7 +29,7 @@ impl Fixture {
     }
 
     fn with_tools(
-        execution: Option<(ExecutionMode, bool)>,
+        execution: Option<ExecutionMode>,
         extra_tools: Vec<Arc<dyn Tool>>,
     ) -> Self {
         let dir = tempfile::tempdir().unwrap();
@@ -44,7 +47,7 @@ impl Fixture {
             ..AgentConfig::default()
         };
         let agent = match execution {
-            Some((mode, js)) => Agent::open_with_execution(vault.clone(), config, mode, js),
+            Some(mode) => Agent::open_with_execution(vault.clone(), config, mode),
             None => Agent::open(vault.clone(), config),
         }
         .unwrap();
@@ -144,74 +147,61 @@ fn default_open_keeps_js_and_discovery_does_not_leave_sessions() {
 
 #[test]
 fn native_and_hybrid_surfaces_come_from_the_enabled_runtime() {
-    for enable_js in [false, true] {
-        let f = Fixture::with_tools(Some((ExecutionMode::Native, enable_js)), Vec::new());
-        let session = f.agent.create_session("native declarations").unwrap();
-        let definitions = f.agent.gateway_tool_definitions(&session.id).unwrap();
-        let names = definitions
-            .iter()
-            .map(|tool| tool.name.as_str())
-            .collect::<Vec<_>>();
-        assert!(names.contains(&"chat_read"), "{names:?}");
-        assert!(names.contains(&"environments"), "{names:?}");
-        assert_eq!(names.contains(&"js"), enable_js, "{names:?}");
-        assert!(!names.contains(&"hosts"), "{names:?}");
-        assert!(!names.contains(&"test_confirm"), "{names:?}");
-        for definition in vault_tools::definitions()
-            .iter()
-            .chain(vault_tools::hidden())
-        {
-            assert!(
-                !names.contains(&definition.name),
-                "{}: {names:?}",
-                definition.name
-            );
-        }
-        for alias in vault_tools::aliases() {
-            assert!(!names.contains(&alias.name), "{}: {names:?}", alias.name);
-        }
-        let discovery = f.agent.gateway_tool_definitions_for_discovery().unwrap();
-        assert_eq!(
-            serde_json::to_value(definitions).unwrap(),
-            serde_json::to_value(discovery).unwrap()
+    let f = Fixture::with_tools(Some(ExecutionMode::Native), Vec::new());
+    let session = f.agent.create_session("native declarations").unwrap();
+    let definitions = f.agent.gateway_tool_definitions(&session.id).unwrap();
+    let names = definitions
+        .iter()
+        .map(|tool| tool.name.as_str())
+        .collect::<Vec<_>>();
+    assert!(names.contains(&"chat_read"), "{names:?}");
+    assert!(names.contains(&"environments"), "{names:?}");
+    assert!(!names.contains(&"js"), "{names:?}");
+    assert!(!names.contains(&"hosts"), "{names:?}");
+    assert!(!names.contains(&"test_confirm"), "{names:?}");
+    for definition in vault_tools::definitions()
+        .iter()
+        .chain(vault_tools::hidden())
+    {
+        assert!(
+            !names.contains(&definition.name),
+            "{}: {names:?}",
+            definition.name
         );
-        assert_eq!(f.agent.sessions().unwrap().len(), 1);
-        if enable_js {
-            // Vault adapters are available only through composition; HTTP owns
-            // their separate MCP schemas (including import arguments).
-            assert_eq!(
-                value(f.js(
-                    &session.id,
-                    json!({"code":"return typeof tools.create_page;"})
-                )),
-                "function"
-            );
-        } else {
-            assert!(
-                f.agent
-                    .gateway_call_as(&session.id, "js", json!({"code":"return 1;"}), client())
-                    .unwrap()
-                    .is_error
-            );
-        }
-        for name in ["hosts", "create_page"] {
-            assert!(
-                f.agent
-                    .gateway_call_as(&session.id, name, json!({}), client())
-                    .unwrap()
-                    .is_error
-            );
-        }
-        f.agent.gateway_close_session(&session.id).unwrap();
-        assert!(f.agent.sessions().unwrap().is_empty());
     }
+    for alias in vault_tools::aliases() {
+        assert!(!names.contains(&alias.name), "{}: {names:?}", alias.name);
+    }
+    let discovery = f.agent.gateway_tool_definitions_for_discovery().unwrap();
+    assert_eq!(
+        serde_json::to_value(definitions).unwrap(),
+        serde_json::to_value(discovery).unwrap()
+    );
+    assert_eq!(f.agent.sessions().unwrap().len(), 1);
+    // Native mode does not offer js, so the gateway refuses a js call.
+    assert!(
+        f.agent
+            .gateway_call_as(&session.id, "js", json!({"code":"return 1;"}), client())
+            .unwrap()
+            .is_error
+    );
+    for name in ["hosts", "create_page"] {
+        assert!(
+            f.agent
+                .gateway_call_as(&session.id, name, json!({}), client())
+                .unwrap()
+                .is_error
+        );
+    }
+    f.agent.gateway_close_session(&session.id).unwrap();
+    assert!(f.agent.sessions().unwrap().is_empty());
 }
 
 #[test]
 fn native_dispatch_is_one_call_and_preserves_errors_and_pending_results() {
     let calls = Arc::new(AtomicUsize::new(0));
     let f = Fixture::with_tools(
-        Some((ExecutionMode::Native, false)),
+        Some(ExecutionMode::Native),
         vec![Arc::new(Probe {
             name: "test_probe",
             calls: calls.clone(),
@@ -281,7 +271,7 @@ fn native_and_nested_js_apply_the_same_exclusions_and_noninteractive_policy() {
             }) as Arc<dyn Tool>
         })
         .collect();
-    let f = Fixture::with_tools(Some((ExecutionMode::Native, true)), tools);
+    let f = Fixture::with_tools(Some(ExecutionMode::Js), tools);
     let session = f.agent.create_session("gateway policy").unwrap();
     let definitions = f.agent.gateway_tool_definitions(&session.id).unwrap();
     for name in excluded.into_iter().chain(["test_confirm"]) {

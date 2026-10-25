@@ -276,11 +276,11 @@ The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Dock
 
 The hub image is built and deployed from the private scratch-ops repo. The former private repo's `hub-image.yml` is retired; see the history bullet.
 
-- **Repos:** `BubbleBuffer/Scratch` (public) is the source. `BubbleBuffer/scratch-ops` (private) holds the `hub-deploy` workflow, the VPS deploy key and the private patterns. The hub image takes the BubblePaw-Core revision that `Cargo.lock` pins.
+- **Repos:** `BubbleBuffer/Scratch` (public) is the source. `BubbleBuffer/scratch-ops` (private) holds the `hub-deploy` workflow, the VPS deploy key and the private patterns. The hub image takes the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.2.0`.
 - **Trigger:** by hand, from scratch-ops:
   `gh workflow run hub-deploy.yml -R BubbleBuffer/scratch-ops -f ref=<tag> -f dry_run=false`
   `dry_run=true` runs the build without the deploy.
-- **Build:** the workflow builds the image from Scratch at `ref`, with the BubblePaw-Core revision that `Cargo.lock` pins, and pushes `ghcr.io/bubblebuffer/scratch-hub:<sha>`. The package is private. The workflow runs on the home build server, not on GitHub-hosted runners.
+- **Build:** the workflow builds the image from Scratch at `ref`, with the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.2.0`, and pushes `ghcr.io/bubblebuffer/scratch-hub:<sha>`. The package is private. The workflow runs on the home build server, not on GitHub-hosted runners.
 - **Deploy:** the workflow connects to the VPS with a key whose `authorized_keys` entry is `restrict,command="/opt/notes-hub/deploy.sh"`, so it can run nothing else. The 40-character commit sha goes as the command and a GHCR token on stdin. [deploy.sh](../../deploy/hub/deploy.sh):
   - logs in to GHCR in a temporary `DOCKER_CONFIG`, so no lasting token sits on the VPS
   - pulls `ghcr.io/bubblebuffer/scratch-hub:<sha>`, keeps the current `notes-hub:latest` as `notes-hub:previous` and retags the new image as `notes-hub:latest`

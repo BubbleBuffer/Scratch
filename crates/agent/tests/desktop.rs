@@ -4,7 +4,8 @@ use std::sync::{mpsc, Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::{EventKind, ToolRegistry};
+use vault_agent::bubblepaw_sdk::events::EventKind;
+use vault_agent::bubblepaw_sdk::tools::ToolRegistry;
 use vault_agent::{Agent, AgentConfig, Forwarded, HostKind, PermissionMode, ToolPack};
 use vault_core::Vault;
 
@@ -291,7 +292,7 @@ fn desktop_tools_are_always_shown_with_the_host_approval_policy() {
             "write" | "edit" | "exec" | "project_switch" | "project_open"
         );
         assert_eq!(
-            definition.approval == vault_agent::bubblepaw_core::Approval::Confirm,
+            definition.approval == vault_agent::bubblepaw_sdk::approvals::Approval::Confirm,
             needs_approval
         );
     }

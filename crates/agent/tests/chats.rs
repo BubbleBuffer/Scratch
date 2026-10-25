@@ -3,7 +3,8 @@ use std::time::{Duration, Instant};
 
 use notes_agent_wire::{ContextChat, MessageContext};
 use serde_json::Value;
-use vault_agent::bubblepaw_core::{EventKind, Message, Role};
+use vault_agent::bubblepaw_sdk::events::EventKind;
+use vault_agent::bubblepaw_sdk::store::{Message, Role};
 use vault_agent::{Agent, AgentConfig, Forwarded, HostKind, TestHooks};
 use vault_core::Vault;
 
@@ -49,7 +50,7 @@ impl Fixture {
             is_error: false,
             created_at: "2026-10-09T00:00:00Z".into(),
         };
-        vault_agent::bubblepaw_core::Store::open(self.dir.path().join("data/agent/agent.sqlite"))
+        vault_agent::bubblepaw_sdk::store::Store::open(self.dir.path().join("data/agent/agent.sqlite"))
             .unwrap()
             .append_batch(&[message])
             .unwrap();

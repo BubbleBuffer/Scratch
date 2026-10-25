@@ -806,7 +806,7 @@ mod tests {
                     default_model: "scripted/scripted".into(),
                     models: vec!["scripted/scripted".into()],
                     // Scripts are `js` cells; a hub runs native tools by default.
-                    execution_mode: vault_agent::bubblepaw_core::ExecutionMode::Js,
+                    execution_mode: vault_agent::bubblepaw_sdk::harness::ExecutionMode::Js,
                     ..notes_hub::AgentSection::default()
                 },
                 ..notes_hub::Config::default()

@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use vault_agent::bubblepaw_core::{Message, Role, Store};
+use vault_agent::bubblepaw_sdk::store::{Message, Role, Store};
 use vault_agent::{
     close_outline_chapter_at, session_outline_at, session_outline_revision_at,
     upsert_outline_chapter_at, upsert_outline_section_at, Agent, AgentConfig, TestHooks,

@@ -26,7 +26,7 @@ use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use vault_agent::bubblepaw_core::ClientInfo;
+use vault_agent::bubblepaw_sdk::harness::ClientInfo;
 use vault_agent::rpc::Dispatcher;
 use vault_agent::wire::notes_agent_wire as w;
 use vault_agent::{Agent, AgentConfig, HostKind, PermissionMode, TestHooks};
@@ -90,8 +90,7 @@ pub(crate) struct AgentHost {
     data_dir: PathBuf,
     default_model: String,
     models: Vec<String>,
-    execution_mode: vault_agent::bubblepaw_core::ExecutionMode,
-    enable_js: bool,
+    execution_mode: vault_agent::bubblepaw_sdk::harness::ExecutionMode,
     bun: String,
     claude_code_extension: String,
     vault: Arc<Vault>,
@@ -125,7 +124,6 @@ impl AgentHost {
             default_model: a.default_model.clone(),
             models: a.models.clone(),
             execution_mode: a.execution_mode,
-            enable_js: a.enable_js,
             bun: a.bun.clone(),
             claude_code_extension: a.claude_code_extension.clone(),
             vault,
@@ -177,11 +175,10 @@ impl AgentHost {
             ..self.config()
         };
         let execution_mode = self.execution_mode;
-        let enable_js = self.enable_js;
         let vault = self.vault.clone();
         let models = self.models.clone();
         let opened = tokio::task::spawn_blocking(move || {
-            Agent::open_with_execution(vault, config, execution_mode, enable_js)
+            Agent::open_with_execution(vault, config, execution_mode)
                 .and_then(|agent| agent.with_model_allowlist(models))
         })
         .await;
@@ -208,11 +205,10 @@ impl AgentHost {
         }
         let config = self.config();
         let execution_mode = self.execution_mode;
-        let enable_js = self.enable_js;
         let vault = self.vault.clone();
         let models = self.models.clone();
         let opened = tokio::task::spawn_blocking(move || {
-            Agent::open_with_execution(vault, config, execution_mode, enable_js)
+            Agent::open_with_execution(vault, config, execution_mode)
                 .and_then(|agent| agent.with_model_allowlist(models))
         })
         .await;

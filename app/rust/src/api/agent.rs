@@ -1129,7 +1129,7 @@ mod outline_tests {
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     #[test]
     fn a_local_outline_matches_the_agent_reader() {
-        use vault_agent::bubblepaw_core::Store;
+        use vault_agent::bubblepaw_sdk::store::Store;
         use vault_agent::outline::{OutlineChapter as Chapter, OutlineSection as Section};
         use vault_agent::outline::{OutlineStore, FILE_NAME};
 

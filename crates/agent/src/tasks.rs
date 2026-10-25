@@ -8,10 +8,11 @@ use std::time::Duration;
 
 use anyhow::{bail, ensure, Context, Result};
 use async_trait::async_trait;
-use bubblepaw_core::{
-    Approval, ApprovalMode, ClientInfo, Harness, Run, RunOptions, Store, Tool, ToolContext,
-    ToolDefinition, ToolRegistry, ToolResult,
-};
+use bubblepaw_sdk::approvals::{Approval, ApprovalMode};
+use bubblepaw_sdk::harness::{ClientInfo, Harness, RunOptions};
+use bubblepaw_sdk::core::{Run};
+use bubblepaw_sdk::store::{Store};
+use bubblepaw_sdk::tools::{Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use vault_core::{PropValue, Vault};
@@ -208,7 +209,7 @@ impl Agent {
             .find(|p| p.id == task.project)
             .with_context(|| format!("unknown project {:?} on this PC", task.project))?;
         projects.switch(session, &project.id)?;
-        let info = bubblepaw_runner::worktrees::create(
+        let info = bubblepaw_sdk::runner::worktrees::create(
             &self.store,
             std::path::Path::new(&project.path),
             session,
@@ -390,7 +391,7 @@ impl Agent {
         let mut system_prompt = self.run_prompt(session)?;
         system_prompt.push_str(DELEGATED_PROMPT);
         let mut approval = permission_policy(PermissionMode::Bypass);
-        if bubblepaw_runner::worktrees::get(&self.store, session)?.is_some() {
+        if bubblepaw_sdk::runner::worktrees::get(&self.store, session)?.is_some() {
             system_prompt.push_str(" This is a code task in an isolated git worktree. File and shell tools are rooted there and Confirm tools run without approval. The worktree and branch are kept for review. The source repository's uncommitted changes were not copied. Stay in this worktree.");
         } else {
             approval.confirm = ApprovalMode::Deny;
@@ -542,7 +543,7 @@ impl Agent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bubblepaw_core::CancellationToken;
+    use bubblepaw_sdk::harness::CancellationToken;
 
     /// An agent on `host_kind` with a vault and data dir under `dir`.
     fn open_agent(host_kind: crate::HostKind, dir: &std::path::Path) -> (Arc<Vault>, Agent) {
@@ -565,8 +566,7 @@ mod tests {
                 },
                 ..Default::default()
             },
-            bubblepaw_core::ExecutionMode::Native,
-            false,
+            bubblepaw_sdk::harness::ExecutionMode::Native,
         )
         .unwrap();
         (vault, agent)

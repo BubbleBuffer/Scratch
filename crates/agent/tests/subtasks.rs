@@ -8,11 +8,12 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::{
-    Approval, EventKind, ExecutionMode, Role, Tool, ToolCall, ToolContext, ToolDefinition,
-    ToolResult,
-};
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::approvals::{Approval};
+use vault_agent::bubblepaw_sdk::events::{EventKind};
+use vault_agent::bubblepaw_sdk::harness::{ExecutionMode};
+use vault_agent::bubblepaw_sdk::store::{Role};
+use vault_agent::bubblepaw_sdk::tools::{Tool, ToolCall, ToolContext, ToolDefinition, ToolResult};
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
 use vault_agent::{Agent, AgentConfig, PermissionMode, TestHooks, ToolPack};
 use vault_core::{new_id, Block, BlockKind, BlockOp, PropValue, Vault};
 use vault_mcp::tasks::{self, Task};
@@ -330,7 +331,6 @@ fn open(
             ..AgentConfig::default()
         },
         mode,
-        false,
     )
     .unwrap()
 }

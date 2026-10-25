@@ -69,7 +69,6 @@ async fn env_with(prepare: impl FnOnce(&std::path::Path)) -> Env {
         data_dir: data.0.clone(),
         trust_proxy: false,
         agent: AgentSection {
-            enable_js: true,
             default_model: "scripted/scripted".into(),
             models: vec!["scripted/scripted".into(), "scripted/vault-pick".into()],
             ..AgentSection::default()

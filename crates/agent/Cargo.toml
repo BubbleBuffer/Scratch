@@ -14,13 +14,12 @@ vault_core = { path = "../core" }
 vault_tools = { path = "../tools" }
 vault_mcp = { path = "../mcp" }
 notes_agent_wire = { path = "../agent_wire" }
-# BubblePaw crates from the public BubbleBuffer/BubblePaw-Core repository,
-# pinned to one revision (the hub image and CI read it from Cargo.lock).
-# The runner's `web` feature stays off.
-bubblepaw-core = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
-bubblepaw-runner = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
+# BubblePaw's SDK and MCP client, from the public BubbleBuffer/BubblePaw-Core
+# repository at tag v0.2.0 (bump the tag to upgrade). The SDK's `web` feature
+# stays off.
+bubblepaw-sdk = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.0" }
 # The desktop agent's MCP client (servers from `<data dir>/mcp.toml`).
-bubblepaw-mcp = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
+bubblepaw-mcp = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.0" }
 anyhow = "1"
 async-trait = "0.1"
 futures-core = "0.3"

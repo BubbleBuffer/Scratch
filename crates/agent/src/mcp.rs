@@ -17,7 +17,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use bubblepaw_core::ToolRegistry;
+use bubblepaw_sdk::tools::ToolRegistry;
 pub use bubblepaw_mcp::{McpHost, McpServerSettings, McpSettings};
 use serde::Deserialize;
 use vault_core::Vault;
