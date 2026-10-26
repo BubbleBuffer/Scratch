@@ -221,6 +221,7 @@ Outside agents, and the app's Ask AI and Agent-assigned tasks (through a signed-
 - Viewer and share pages are sent with a strict CSP (no scripts on share pages, the viewer's one script by nonce, `frame-ancestors 'none'`), `noindex` and no-referrer. Share tokens are 192 random bits; a token reaches only its page and that page's attachments ([Sharing](../integrations/sharing.md)).
 - The OIDC HTTP client follows no redirects (as `openidconnect` requires) and times out after 15 s.
 - The token for a login is written at the callback. If its code is never redeemed, the entry stays until the device logs in again or is unpaired.
+- **Clients behind TLS-inspecting proxies.** The app trusts a hub certificate the device cannot verify only after the user trusts it in Settings. Sync, the agent socket (`/agent/ws`) and the host relay (`/host/ws`) all use that one trust ([Trusted certificates](sync-state.md#trusted-certificates-2026-10-19)). The trusted issuing CA is an anchor for that hub's origin only, with full hostname and validity checks, so a proxy that re-mints the hub's leaf keeps working. The hub itself needs no change.
 - An email in `allowed_users` matches whether or not the issuer marks it verified (Authentik sends `email_verified: false` by default). Prefer `allowed_groups` or a `sub`: an email match is only safe while nobody else can set that email in Authentik (no self-enrollment or editable emails).
 
 ## Tests

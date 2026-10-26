@@ -9,6 +9,7 @@
 // - revoking from the trusted list removes the pin and reconnects.
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show Text;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
 import 'package:notes_app/features/sync/cert_trust.dart';
@@ -86,7 +87,7 @@ void main() {
     expect(pin.chain.map((c) => c.sha256), [leafSha, caSha]);
     expect(hubs.calls.last.$1, hubUrl);
     expect(hubs.calls.last.$2, [leafSha]);
-    expect(sync.trusted, [leafSha]);
+    expect([for (final t in sync.trusted) t.sha256], [leafSha]);
     expect(sync.untrustedCertificate, isFalse);
     expect(sync.phase.$1, SyncPhase.synced);
     await sync.disconnect();
@@ -111,7 +112,58 @@ void main() {
     expect(hubs.calls.last.$2, [leafSha]);
     expect(key('connect-error'), findsNothing);
     expect(key('cert-pin-https://hub.home-lab.example.test:8443'), findsOneWidget);
+    // The issuer the hub sent is kept and passed on as this origin's anchor.
+    final pin = s.trustedCertificates.lookup(hubUrl)!;
+    expect(pin.issuerDer, caDer);
+    expect(pin.issuerSha256, caSha);
+    final passed = hubs.trust.last.single;
+    expect(passed.origin, 'https://hub.home-lab.example.test:8443');
+    expect(passed.issuerDer, caDer);
     await sync.disconnect();
+  });
+
+  appTest('trusted certificates name the issuing CA; an entry saved before issuers were kept still shows',
+      (tester) async {
+    await pumpApp(tester, mobile: false);
+    final s = AppSettings.read(homeContext(tester));
+    const origin = 'https://notes.corp.example.test:443';
+    // The settings shape from before issuers were kept: no issuerDer.
+    final old = TrustedCertificates.fromJson({
+      origin: {
+        'sha256': '05:3B:4F:48:4C:22:${leafSha.substring(18)}',
+        'subject': 'CN=notes.corp.example.test',
+        'issuer': 'CN=Example Proxy CA,O=Example Corp,OU=Network Security',
+        'notBeforeMs': validFrom,
+        'notAfterMs': validUntil,
+        'trustedAtMs': validFrom,
+        'chain': [],
+      },
+      'https://hub.example.test:443': {
+        'sha256': leafSha,
+        'subject': 'CN=hub.example.test',
+        'issuer': 'O=No Name Inc',
+        'notAfterMs': validUntil,
+        'trustedAtMs': validFrom,
+      },
+    });
+    expect(old.lookup(origin)!.issuerDer, isNull);
+    s.update((s) => s.trustedCertificates = old);
+    await tapAndSettle(tester, key('sidebar-settings'));
+    await tapAndSettle(tester, key('settings-nav-sync'));
+    await tester.ensureVisible(key('cert-pin-$origin'));
+    await settle(tester);
+
+    expect(textOf(tester, 'cert-pin-title-$origin'), 'Example Proxy CA');
+    expect(textOf(tester, 'cert-pin-org-$origin'), 'Example Corp · Network Security');
+    final detail = tester.widget<Text>(key('cert-pin-detail-$origin')).textSpan!.toPlainText();
+    expect(detail, 'for notes.corp.example.test · 05:3B:4F:48:4C:22… · valid until Mar 1, 2027');
+
+    // No CN: the host stays the title, as before.
+    const other = 'https://hub.example.test:443';
+    expect(textOf(tester, 'cert-pin-title-$other'), 'hub.example.test');
+    expect(key('cert-pin-org-$other'), findsNothing);
+    final otherDetail = tester.widget<Text>(key('cert-pin-detail-$other')).textSpan!.toPlainText();
+    expect(otherDetail, 'AB:CD:EF:01:23:45… · valid until Mar 1, 2027');
   });
 
   appTest('a changed certificate brings the prompt back', (tester) async {

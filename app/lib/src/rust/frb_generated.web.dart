@@ -635,6 +635,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<HitMove> dco_decode_list_hit_move(dynamic raw);
 
   @protected
+  List<Uint8List> dco_decode_list_list_prim_u_8_strict(dynamic raw);
+
+  @protected
   List<MatchedFilterValue> dco_decode_list_matched_filter_value(dynamic raw);
 
   @protected
@@ -699,6 +702,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<TrashedPage> dco_decode_list_trashed_page(dynamic raw);
+
+  @protected
+  List<TrustedHubCertificate> dco_decode_list_trusted_hub_certificate(
+    dynamic raw,
+  );
 
   @protected
   List<VaultAgentModel> dco_decode_list_vault_agent_model(dynamic raw);
@@ -795,6 +803,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<CertificateInfo>? dco_decode_opt_list_certificate_info(dynamic raw);
+
+  @protected
+  List<Uint8List>? dco_decode_opt_list_list_prim_u_8_strict(dynamic raw);
 
   @protected
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
@@ -912,6 +923,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TrashedPage dco_decode_trashed_page(dynamic raw);
+
+  @protected
+  TrustedHubCertificate dco_decode_trusted_hub_certificate(dynamic raw);
 
   @protected
   TypeDataListItem dco_decode_type_data_list_item(dynamic raw);
@@ -1665,6 +1679,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<HitMove> sse_decode_list_hit_move(SseDeserializer deserializer);
 
   @protected
+  List<Uint8List> sse_decode_list_list_prim_u_8_strict(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<MatchedFilterValue> sse_decode_list_matched_filter_value(
     SseDeserializer deserializer,
   );
@@ -1743,6 +1762,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<TrashedPage> sse_decode_list_trashed_page(SseDeserializer deserializer);
+
+  @protected
+  List<TrustedHubCertificate> sse_decode_list_trusted_hub_certificate(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<VaultAgentModel> sse_decode_list_vault_agent_model(
@@ -1869,6 +1893,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<Uint8List>? sse_decode_opt_list_list_prim_u_8_strict(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
@@ -1986,6 +2015,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TrashedPage sse_decode_trashed_page(SseDeserializer deserializer);
+
+  @protected
+  TrustedHubCertificate sse_decode_trusted_hub_certificate(
+    SseDeserializer deserializer,
+  );
 
   @protected
   TypeDataListItem sse_decode_type_data_list_item(SseDeserializer deserializer);
@@ -2916,6 +2950,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_hit_move(List<HitMove> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_list_prim_u_8_strict(
+    List<Uint8List> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_matched_filter_value(
     List<MatchedFilterValue> self,
     SseSerializer serializer,
@@ -3023,6 +3063,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_trashed_page(
     List<TrashedPage> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_trusted_hub_certificate(
+    List<TrustedHubCertificate> self,
     SseSerializer serializer,
   );
 
@@ -3186,6 +3232,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_list_list_prim_u_8_strict(
+    List<Uint8List>? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_list_prim_u_8_strict(
     Uint8List? self,
     SseSerializer serializer,
@@ -3325,6 +3377,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_trashed_page(TrashedPage self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_trusted_hub_certificate(
+    TrustedHubCertificate self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_type_data_list_item(

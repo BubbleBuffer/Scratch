@@ -341,7 +341,24 @@ impl SyncClient {
         token: &str,
         trusted: Vec<String>,
     ) -> SyncClient {
-        let trust = Trust::new(&trusted);
+        SyncClient::with_trust(vault, url, token, Trust::new(&trusted))
+    }
+
+    /// Like [`SyncClient::new`], also accepting a hub whose certificate has
+    /// an unknown issuer when one of `trusted` vouches for it: the issuer
+    /// stored for the hub's origin (a re-minted leaf from the same CA is
+    /// accepted too), or the end entity's SHA-256 (see `tls`).
+    pub fn with_trusted_certificates(
+        vault: Arc<Vault>,
+        url: &str,
+        token: &str,
+        trusted: Vec<tls::TrustedCertificate>,
+    ) -> SyncClient {
+        let trust = Trust::for_hub(url, &trusted);
+        SyncClient::with_trust(vault, url, token, trust)
+    }
+
+    fn with_trust(vault: Arc<Vault>, url: &str, token: &str, trust: Arc<Trust>) -> SyncClient {
         SyncClient {
             http: Http {
                 url: url.trim_end_matches('/').to_string(),
@@ -373,6 +390,12 @@ impl SyncClient {
             .trust
             .chain()
             .map(|c| tls::CertificateInfo::chain(&c))
+    }
+
+    /// The same chain as DER (leaf first), for keeping its issuer when the
+    /// user trusts it.
+    pub fn untrusted_certificate_der(&self) -> Option<Vec<Vec<u8>>> {
+        self.http.trust.chain()
     }
 
     /// Syncs with the hub until both have every change: sends local

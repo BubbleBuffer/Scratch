@@ -78,21 +78,32 @@ class SyncStore extends ChangeNotifier {
   /// null when idle.
   (int, int)? attachmentProgress;
 
-  /// The fingerprints the client accepts for an unknown-issuer certificate
-  /// (the pin for [hubUrl]'s origin), while connected.
-  List<String> trusted = const [];
+  /// What the client accepts for an unknown-issuer certificate (the pin
+  /// for [hubUrl]'s origin: its leaf fingerprint and issuer), while
+  /// connected.
+  List<TrustedHubCertificate> trusted = const [];
 
   /// The chain (leaf first) the hub presented when the last sync failed
   /// with an untrusted certificate; null otherwise.
   List<CertificateInfo>? untrustedChain;
 
+  /// The same chain as DER, leaf first (null with [untrustedChain]).
+  List<Uint8List>? untrustedChainDer;
+
+  /// The DER of the certificate that issued the untrusted leaf, when the
+  /// hub sent it (kept with the pin when the user trusts it).
+  Uint8List? get untrustedIssuerDer {
+    final d = untrustedChainDer;
+    return d != null && d.length > 1 ? d[1] : null;
+  }
+
   /// Builds the client; tests replace it with a fake.
   @visibleForTesting
-  static NotesSync Function(NotesVault vault, String url, String token, List<String> trusted) clientFactory =
-      _newClient;
+  static NotesSync Function(NotesVault vault, String url, String token, List<TrustedHubCertificate> trusted)
+      clientFactory = _newClient;
 
-  static NotesSync _newClient(NotesVault vault, String url, String token, List<String> trusted) =>
-      NotesSync.withTrusted(vault: vault, url: url, token: token, trusted: trusted);
+  static NotesSync _newClient(NotesVault vault, String url, String token, List<TrustedHubCertificate> trusted) =>
+      NotesSync.withTrustedCertificates(vault: vault, url: url, token: token, trusted: trusted);
 
   bool get connected => _client != null;
   bool get hosting => hubAddress != null;
@@ -137,9 +148,10 @@ class SyncStore extends ChangeNotifier {
   // ---- client ----
 
   /// Starts syncing with the hub at [url] using a pairing [token]. The hub
-  /// may present a certificate with an unknown issuer whose SHA-256
-  /// fingerprint is in [trusted].
-  Future<void> connect(String url, String token, {SyncOptions? options, List<String> trusted = const []}) async {
+  /// may present a certificate with an unknown issuer that [trusted]
+  /// vouches for (its issuer, or its SHA-256 fingerprint).
+  Future<void> connect(String url, String token,
+      {SyncOptions? options, List<TrustedHubCertificate> trusted = const []}) async {
     await disconnect();
     final c = clientFactory(vault.raw, url, token, trusted);
     _client = c;
@@ -155,7 +167,7 @@ class SyncStore extends ChangeNotifier {
 
   /// Reconnects the current client (same hub, token and options) accepting
   /// [trusted] instead, so trusting or revoking a certificate applies now.
-  Future<void> reconnect({required List<String> trusted}) async {
+  Future<void> reconnect({required List<TrustedHubCertificate> trusted}) async {
     final url = hubUrl, token = _token;
     if (_client == null || url == null || token == null) return;
     await connect(url, token, options: _options, trusted: trusted);
@@ -170,6 +182,7 @@ class SyncStore extends ChangeNotifier {
     _options = null;
     trusted = const [];
     untrustedChain = null;
+    untrustedChainDer = null;
     hubUrl = null;
     if (c != null) {
       await c.stop();
@@ -194,7 +207,9 @@ class SyncStore extends ChangeNotifier {
     final s = c.status();
     if (s != status) {
       status = s;
-      untrustedChain = isUntrustedCertificateError(s.lastError) ? c.untrustedCertificate() : null;
+      final untrusted = isUntrustedCertificateError(s.lastError);
+      untrustedChain = untrusted ? c.untrustedCertificate() : null;
+      untrustedChainDer = untrusted ? c.untrustedCertificateDer() : null;
       notifyListeners();
     }
   }

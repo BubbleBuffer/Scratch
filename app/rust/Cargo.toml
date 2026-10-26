@@ -16,7 +16,8 @@ vault_sync = { path = "../../crates/sync" }
 vault_mcp = { path = "../../crates/mcp" }
 vault_tools = { path = "../../crates/tools" }
 # The agent's wire format and the hub client (agent_remote.rs), on every
-# target: tokio-tungstenite with rustls (ring, webpki roots, no native-tls).
+# target: tokio-tungstenite with rustls (ring, no native-tls), verifying with
+# vault_sync::tls (webpki roots plus the certificates the user trusted).
 notes_agent_wire = { path = "../../crates/agent_wire" }
 serde = "1"
 serde_json = "1"
@@ -44,6 +45,8 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_Shel
 
 [dev-dependencies]
 notes_hub = { path = "../../crates/hub" }
+# Test certificates for the hub sockets' TLS trust (agent_remote.rs).
+rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

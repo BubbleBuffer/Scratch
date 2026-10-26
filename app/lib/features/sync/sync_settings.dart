@@ -395,9 +395,14 @@ class _ConnectSettingsState extends State<ConnectSettings> {
     final url = _failedUrl, chain = _failedChain();
     if (url == null || chain.isEmpty) return false;
     final fp = untrustedFingerprintOf(_error) ?? chain.first.sha256;
-    if (!await confirmTrustCertificate(context, host: serverHostOf(url), fingerprint: fp)) return false;
+    final sync = context.read<SyncStore>();
+    final issuerDer = sync.hubUrl == url && sync.untrustedChain != null ? sync.untrustedIssuerDer : null;
+    if (!await confirmTrustCertificate(context, host: serverHostOf(url), fingerprint: fp, issuer: chain.first.issuer)) {
+      return false;
+    }
     if (!mounted) return false;
-    await trustCertificate(this.context.read<SyncStore>(), AppSettings.read(this.context), url, chain, fingerprint: fp);
+    await trustCertificate(this.context.read<SyncStore>(), AppSettings.read(this.context), url, chain,
+        fingerprint: fp, issuerDer: issuerDer);
     if (mounted) await _connect();
     return true;
   }
@@ -576,6 +581,36 @@ class TrustedCertificatesSettings extends StatelessWidget {
     );
   }
 
+  /// The row's text: the issuing CA's CN, its O · OU, then `for HOST ·
+  /// FINGERPRINT · valid until …`. An issuer without a CN keeps the
+  /// host as the title.
+  Widget _pinSummary(BuildContext context, String origin, PinnedCertificate pin) {
+    final c = context.colors;
+    final m = context.mobile;
+    final host = serverHostOf(origin);
+    final name = pin.issuerName;
+    final cn = name.cn;
+    final org = [?name.o, ?name.ou].join(' · ');
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(cn ?? host,
+          key: ValueKey('cert-pin-title-$origin'), style: tsRaw(m ? 16 : 14, 20, 500, c.textPrimary)),
+      if (cn != null && org.isNotEmpty) ...[
+        const SizedBox(height: 2),
+        Text(org, key: ValueKey('cert-pin-org-$origin'), style: tsRaw(12, 16, 400, c.textSecondary)),
+      ],
+      const SizedBox(height: 2),
+      Text.rich(
+        key: ValueKey('cert-pin-detail-$origin'),
+        TextSpan(children: [
+          if (cn != null) TextSpan(text: 'for $host · '),
+          TextSpan(text: shortFingerprint(pin.sha256), style: ts(const TypeSpec(12, 16, 400), c.textSecondary, mono: true)),
+          if (pin.notAfterMs > 0) TextSpan(text: ' · valid until ${formatCertDate(pin.notAfterMs)}'),
+        ]),
+        style: tsRaw(12, 16, 400, c.textSecondary),
+      ),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -599,19 +634,7 @@ class TrustedCertificatesSettings extends StatelessWidget {
                 onTap: () => _open(context, origin, pin),
                 radius: Radii.md,
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(serverHostOf(origin), style: tsRaw(m ? 16 : 14, 20, 500, c.textPrimary)),
-                  const SizedBox(height: 2),
-                  Text.rich(
-                    TextSpan(children: [
-                      TextSpan(
-                          text: shortFingerprint(pin.sha256),
-                          style: ts(const TypeSpec(12, 16, 400), c.textSecondary, mono: true)),
-                      if (pin.notAfterMs > 0) TextSpan(text: ' · valid until ${formatCertDate(pin.notAfterMs)}'),
-                    ]),
-                    style: tsRaw(12, 16, 400, c.textSecondary),
-                  ),
-                ]),
+                child: _pinSummary(context, origin, pin),
               ),
             ),
             const SizedBox(width: 8),

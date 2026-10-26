@@ -15,6 +15,11 @@
 //   [setMcpServers] applies a change to the running engine at once, without
 //   reconnecting (the list is not part of [HostRelayConfig.key]).
 // - Settings shows the connection state while it is open ([watchStatus]).
+// - Its TLS trusts the certificates this device trusts for the hub
+//   ([HostRelayConfig.trusted], like sync). Trusting or revoking one gives
+//   the running relay the new list (`hostRelaySetTrust`): its next attempt
+//   uses it, and a relay waiting to retry tries again at once. It is not
+//   part of [HostRelayConfig.key], so the engine is not reopened.
 //
 // [AgentStore] owns one link per vault and calls [sync] when settings change.
 
@@ -25,6 +30,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/debounce.dart';
 import '../../core/paths.dart';
 import '../../src/rust/api/agent.dart';
+import '../../src/rust/api/types.dart' show TrustedHubCertificate;
 
 /// What the relay runs with, or null when it should not run.
 class HostRelayConfig {
@@ -34,9 +40,17 @@ class HostRelayConfig {
     required this.token,
     required this.open,
     required this.key,
+    this.trusted = const [],
+    this.trustKey = '',
   });
 
   final String url, device, token;
+
+  /// What this device trusts for the hub beyond the public roots.
+  final List<TrustedHubCertificate> trusted;
+
+  /// Changes whenever [trusted] changes.
+  final String trustKey;
 
   /// Opens the relay's engine.
   final Future<NotesAgent> Function() open;
@@ -53,6 +67,14 @@ class HostRelayLink {
 
   NotesAgent? _agent;
   String _key = '';
+
+  /// The trust the running relay was last given.
+  List<TrustedHubCertificate> _trusted = const [];
+  String _trustKey = '';
+
+  /// Tests: stands in for the engine's `hostRelaySetTrust`.
+  @visibleForTesting
+  static Future<void> Function(List<TrustedHubCertificate> trusted)? debugSetTrust;
   Future<void> _work = Future.value();
   final _debounce = Debounce();
   bool _closed = false;
@@ -84,6 +106,7 @@ class HostRelayLink {
     final key = config?.key ?? '';
     if (key == _key) {
       _debounce.cancel();
+      if (config != null) _setTrust(config);
       return;
     }
     void apply() {
@@ -111,10 +134,13 @@ class HostRelayLink {
     NotesAgent? agent;
     try {
       agent = await config.open();
+      _trusted = config.trusted;
+      _trustKey = config.trustKey;
       await agent.hostRelayStart(
         url: config.url,
         device: config.device,
         token: config.token,
+        trusted: config.trusted,
       );
       if (_closed) {
         await agent.hostRelayStop();
@@ -141,6 +167,28 @@ class HostRelayLink {
       AppLog.info('host relay failed to stop: $e');
     }
     agent.dispose();
+  }
+
+  // ------------------------------- TLS trust
+
+  /// Gives the running relay [config]'s trust when it changed (the user
+  /// trusted or revoked a certificate); a relay starting now gets it from
+  /// [_apply].
+  void _setTrust(HostRelayConfig config) {
+    if (config.trustKey == _trustKey) return;
+    _trustKey = config.trustKey;
+    _trusted = config.trusted;
+    _work = _work.then((_) async {
+      final agent = _agent;
+      if (_closed || (agent == null && debugSetTrust == null)) return;
+      final trusted = _trusted;
+      try {
+        final debug = debugSetTrust;
+        await (debug != null ? debug(trusted) : agent!.hostRelaySetTrust(trusted: trusted));
+      } catch (e) {
+        AppLog.info('host relay trust: $e');
+      }
+    });
   }
 
   // ------------------------------- MCP servers

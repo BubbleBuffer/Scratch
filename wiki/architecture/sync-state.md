@@ -99,16 +99,27 @@ Plain HTTP on the tiny_http hub (Tailscale provides transport security); HTTPS t
 
 ## Trusted certificates (2026-10-19)
 
-- `crates/sync/src/tls.rs` gives the sync client its own rustls connector with a pinning verifier. It first runs the normal webpki check with the bundled roots, so publicly trusted hubs behave as before.
-- If that check fails with an unknown issuer (self-signed or private CA), the verifier accepts the certificate only when the SHA-256 of the leaf matches a pinned fingerprint. Any other failure (expired, wrong name under a known issuer) is never overridable. Handshake signatures are always verified.
-- Pins are exact leaf fingerprints, so a changed certificate fails again and the app asks again.
+- `crates/sync/src/tls.rs` (`vault_sync::tls`) has the one trust type and verifier shared by every hub client (2026-10-26):
+  - sync (`SyncClient`, over ureq);
+  - the remote agent's WebSocket (`/agent/ws`, `app/rust/src/agent_remote.rs`, used by the agent add-on and the schedule engine);
+  - the host relay (`/host/ws`, `app/rust/src/host_relay.rs`).
+  The MCP proxy (`crates/mcp/src/proxy.rs`) only talks to the app on 127.0.0.1 without TLS, so it needs none.
+- The verifier first runs the normal webpki check with the bundled roots, so publicly trusted hubs behave as before.
+- If that check fails with an unknown issuer (self-signed, a private CA or a TLS-inspecting proxy), the certificate is accepted when either holds:
+  - **CA anchor, scoped per origin.** The trusted entry for the URL's origin (`scheme://host:port`, ws mapped to http and wss to https) carries the DER of the certificate that issued the leaf. That certificate is an extra trust anchor for this origin only, with full webpki verification: chain, hostname and validity. So the trust survives a proxy re-minting the leaf. `Trust::for_hub(url, entries)` drops the anchors of every other origin, and the verifier also checks the server name against the origin's host. A stored anchor never vouches for another host or port.
+  - **Leaf pin.** The SHA-256 of the leaf matches a pinned fingerprint (the fallback, and all that entries saved before 2026-10-26 have).
+- Any other failure (expired, wrong name under a known issuer) is never overridable. Handshake signatures are always verified.
+- A leaf-only pin is exact, so a changed certificate fails again and the app asks again.
 - Without a matching pin the request fails with `SyncError::UntrustedCertificate { sha256 }`, shown as `untrusted certificate: AB:CD:…`. `SyncClient::untrusted_certificate()` returns the presented chain (leaf first) as `CertificateInfo` (subject, issuer, validity, SHA-256, serial, self-signed), parsed with `x509-parser`.
-- `SyncClient::with_trusted(vault, url, token, fingerprints)` takes the pins; the bridge mirrors it as `NotesSync.withTrusted` and `untrustedCertificate()`. The Rust side stores nothing: the app keeps the pins per server origin in its device settings.
+- `SyncClient::with_trusted(vault, url, token, fingerprints)` takes leaf pins only; `SyncClient::with_trusted_certificates(vault, url, token, Vec<TrustedCertificate>)` takes the full trust (`origin`, `sha256`, `issuer_der`). `untrusted_certificate_der()` returns the presented chain as DER, so the app can keep the issuer. The bridge mirrors them as `NotesSync.withTrustedCertificates`, `untrustedCertificateDer()` and the FRB struct `TrustedHubCertificate`. `NotesAgent.connect`, `hostRelayStart` and `hostRelaySetTrust` take the same list. The Rust side stores nothing: the app keeps the trust per server origin in its device settings.
+- **A running host relay** keeps its trust list in shared state and builds the verifier anew on each connection attempt. `hostRelaySetTrust` (called by `HostRelayLink` when the trust for the hub changes) replaces the list and wakes a relay waiting to retry, which then tries again at once with the new trust and a reset backoff; no app restart. A socket that is already open stays open after a revoke until it drops. The remote agent and the schedule engine include the trust in their connection keys, so they reconnect with it.
 - ureq 3.4.2 has no hook for a custom verifier, so `tls.rs` carries a minimal copy of ureq's rustls connector (MIT/Apache-2.0) and `crates/sync/Cargo.toml` pins `ureq = "=3.4.2"`. HTTP CONNECT proxies still work; SOCKS proxies are not supported by the sync client.
-- **App:** `app/lib/features/sync/cert_trust.dart` keeps the pins in `settings.json` (`trustedCertificates`, per device, not synced), keyed by server origin (`scheme://host:port`, lowercased, default port filled in), with the certificate details and the date trusted. Every `NotesSync` is built with `withTrusted` and the pin for its URL's origin.
+- **App:** `app/lib/features/sync/cert_trust.dart` keeps the pins in `settings.json` (`trustedCertificates`, per device, not synced), keyed by server origin (`scheme://host:port`, lowercased, default port filled in), with the certificate details and the date trusted. When the hub sent an issuer, the pin also keeps `issuerDer` (base64) and `issuerSha256`; both fields are optional, so older settings load unchanged and give a leaf pin only. `TrustedCertificates.trustFor(url)` gives every hub client (`NotesSync`, the agent, the host relay, the schedule engine) the entry for its URL's origin.
 - An `untrusted certificate:` error is shown as a sync error, not offline. The sync indicator popover, the connect status and the first-connect error say the certificate can't be verified (or that it changed since it was trusted) and offer "View certificate" and a smaller "Trust certificate". Trusting asks for confirmation with the host and fingerprint, saves the pin and reconnects.
 - `certificate_view.dart` shows subject, issuer, validity (marked "Expired" in text), SHA-256 with copy, serial, self-signed, and the chain leaf first, with one action: trust, or revoke for a pinned one. Sync settings list the trusted certificates with revoke; revoking removes the pin and reconnects.
+- The list names each certificate by its issuing CA: the issuer's CN as the title, `O · OU` below, then "for <host> · <fingerprint> · valid until …". An issuer without a CN keeps the host as the title, as before. The trust prompt names the CA the same way ("accept certificates for <host> issued by <CN> (<O · OU>)").
 - `crates/sync/tests/tls.rs` runs the hub behind a rustls front with rcgen certificates and covers: untrusted self-signed hub, pinned hub syncing between two devices, changed certificate, pin format, and a private CA chain.
+- The `hub_trust_*` unit tests in `crates/sync/src/tls.rs` and `app/rust/src/agent_remote.rs` run in-memory rustls handshakes (no network) with an rcgen private CA: the anchor accepts a re-minted leaf for the same host (also under a root), rejects a leaf for another host or another origin and an expired leaf, a leaf-only pin still works, and the WebSocket connector for `/agent/ws` and `/host/ws` uses the same trust.
 
 ## Conflicts
 
@@ -162,7 +173,7 @@ Release build, Windows desktop under load from other jobs, hub and client in one
 ## Known limits
 
 - The tiny_http hub has no TLS: use it only on a trusted network such as Tailscale. `notes-hub` runs behind a TLS proxy.
-- Certificate pins apply to sync only. The agent's WebSocket to the hub (`app/rust/src/agent_remote.rs`) still uses plain webpki roots, so it cannot reach a hub with a self-signed or private-CA certificate.
+- Trusted certificates apply to every hub client: sync, the agent's WebSocket and the host relay (since 2026-10-26).
 - Client delta state is in memory; each app start does one full version compare.
 - The hub's delta relies on its in-memory feed. After a hub restart, or more than 10,000 hub changes since a client's last sync, that client does a full compare.
 - The fsync that protects peer-id reuse covers files written in the last 120 s and does not sync directory entries. A crash right after an export could, in theory, still lose ops that another device has, and the device would then reuse their counters.

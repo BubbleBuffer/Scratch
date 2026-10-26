@@ -3469,6 +3469,7 @@ dependencies = [
  "jiff",
  "notes_agent_wire",
  "notes_hub",
+ "rcgen",
  "reqwest 0.12.28",
  "rustls",
  "rustls-platform-verifier",
