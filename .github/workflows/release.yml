@@ -103,6 +103,15 @@ jobs:
           # Windows file versions are numeric, so the pre-release part stays out here.
           flutter build windows --release \
             --build-name=${{ needs.meta.outputs.numeric }} --build-number=${{ needs.meta.outputs.code }}
+      # The app and scratch-cli find Claude Code as a `claude-code` folder and
+      # `bun\bun.exe` beside the executable, so ship both in the Release folder
+      # the installer packs. Bun is the hub's version (deploy/hub/Dockerfile).
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Bundle Claude Code
+        shell: pwsh
+        run: ./app/windows/installer/bundle-claude-code.ps1 -ReleaseDir ./app/build/windows/x64/runner/Release
       - name: Build installer
         working-directory: app
         run: |

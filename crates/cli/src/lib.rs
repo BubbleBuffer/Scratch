@@ -184,17 +184,24 @@ fn open_agent(
         .ok_or_else(|| anyhow!("cannot find the user's home directory"))?;
     // Claude Code as the app finds it: NOTES_CLAUDE_CODE_DIR, else the
     // app's saved Bun and extension paths (beside the vault, then in the
-    // app's data folder), else Bun on PATH and the bundled extension.
+    // app's data folder), else Bun on PATH and the extension bundled with
+    // the app. Resolved here because this executable lives outside the app
+    // folder: the bundle sits beside it or in the installed app folder
+    // (claude::detect_installed). The result is what the agent opens with.
     let mut settings_dirs = vec![data_dir(vault_dir)];
     settings_dirs.extend(app_data_dir());
     let (bun_path, claude_code_dir) = vault_agent::claude::app_overrides(&settings_dirs);
+    let claude = vault_agent::claude::detect_installed(
+        bun_path.as_deref(),
+        claude_code_dir.as_deref(),
+    );
     let config = AgentConfig {
         host_kind: HostKind::Desktop,
         packs: vec![ToolPack::Desktop { root: home }],
         data_dir: data_dir(vault_dir),
         default_model: model,
-        bun_path,
-        claude_code_dir,
+        bun_path: claude.bun_path,
+        claude_code_dir: claude.claude_code_dir,
         permission_mode: PermissionMode::Bypass,
         test: hooks.map(|make| make()).unwrap_or_default(),
         tool_set: None,

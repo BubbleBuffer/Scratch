@@ -14,6 +14,37 @@ built on. Dart and Rust package licences ship with the packages themselves.
 - Licence: dual MIT or Apache-2.0, Copyright 2022 Matej Knopp. The full text
   is in [`app/rust_builder/cargokit/LICENSE`](app/rust_builder/cargokit/LICENSE).
 
+## Claude Code runtime
+
+The Windows app folder, and so the installer, also ships the BubblePaw
+`claude-code` extension with its production dependencies (`claude-code\`)
+and Bun (`bun\bun.exe`), beside `notes.exe`. Both are installed copies on
+disk, not linked into the app's own code; see the "Claude Code bundle"
+section of [wiki/architecture/windows-install.md](wiki/architecture/windows-install.md#claude-code-bundle)
+for the layout and size.
+
+- **Bun**, Windows x64 binary `bun\bun.exe`, MIT licence,
+  Copyright (c) 2025 Bun contributors
+  (https://github.com/oven-sh/bun/blob/main/LICENSE.md).
+- **The BubblePaw `claude-code` extension** (`claude-code\`), MIT as its
+  `package.json` declares, from
+  https://github.com/BubbleBuffer/BubblePaw-Core (`extensions/claude-code`, at
+  the BubblePaw-Core commit `Cargo.lock` pins). Its `NOTICE` ships with it:
+  parts are adapted from pi-claude-bridge
+  (https://github.com/elidickinson/pi-claude-bridge), MIT, Copyright (c) 2026
+  Eli Dickinson.
+- **The extension's production dependencies**, installed in
+  `claude-code\node_modules\`:
+  - `@anthropic-ai/claude-agent-sdk`, which brings Claude Code itself (the
+    `claude` command, about 290 MB, with the
+    `@anthropic-ai/claude-agent-sdk-win32-x64` native package). Anthropic's
+    own terms apply rather than an open-source licence: see
+    https://code.claude.com/docs/en/legal-and-compliance. Its licence file
+    sits in its `node_modules` folder.
+  - `@modelcontextprotocol/sdk` and `cc-session-io`, and their transitive
+    dependencies, each package carrying its own licence file in
+    `node_modules`.
+
 ## Fonts
 
 Bundled in `app/assets/fonts/` under the SIL Open Font License 1.1. They are
