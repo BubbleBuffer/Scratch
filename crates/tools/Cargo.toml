@@ -32,9 +32,10 @@ url = "2"
 base64 = "0.22"
 tar = "0.4"
 tempfile = "3"
-# The BubblePaw SDK at tag v0.2.1, as in crates/agent; the import CLI creates
-# sessions through its Store.
-bubblepaw-sdk = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.1" }
+# BubblePaw's core crate at tag v0.2.1 (the same tag as crates/agent); the
+# import CLI creates sessions through its Store. Not the SDK: that pulls in the
+# runner and QuickJS, which don't build for Android, and this crate builds there.
+bubblepaw-core = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.1" }
 
 [dev-dependencies]
 notes_hub = { path = "../hub" }
