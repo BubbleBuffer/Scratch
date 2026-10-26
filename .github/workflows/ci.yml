@@ -70,7 +70,7 @@ jobs:
           path: scratch
           persist-credentials: false
       # The agent tests run BubblePaw's fake extension. Build it from the
-      # BubblePaw-Core commit that Cargo.lock pins for the v0.2.1 tag.
+      # BubblePaw-Core commit that Cargo.lock pins for its tag.
       - name: BubblePaw-Core revision
         id: core
         working-directory: scratch
