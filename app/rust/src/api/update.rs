@@ -78,15 +78,26 @@ fn block_on<T>(f: impl std::future::Future<Output = T>) -> Result<T, String> {
 /// Lists the releases on GitHub and picks the one to offer a build tagged
 /// [current_tag] (rules: crate::updater::pick_update). When nothing is
 /// offered, earlier downloads in [updates_dir] are deleted.
-pub fn update_check(current_tag: String, include_nightly: bool, updates_dir: String) -> UpdateCheck {
-    let failed = |status, message: String| UpdateCheck { status, release: None, message: Some(message) };
+pub fn update_check(
+    current_tag: String,
+    include_nightly: bool,
+    updates_dir: String,
+) -> UpdateCheck {
+    let failed = |status, message: String| UpdateCheck {
+        status,
+        release: None,
+        message: Some(message),
+    };
     if current_tag.is_empty() {
         return failed(UpdateCheckStatus::Unsupported, "Development build".into());
     }
     #[cfg(not(windows))]
     {
         let _ = (include_nightly, updates_dir);
-        failed(UpdateCheckStatus::Unsupported, "Updates are only available on Windows".into())
+        failed(
+            UpdateCheckStatus::Unsupported,
+            "Updates are only available on Windows".into(),
+        )
     }
     #[cfg(windows)]
     {
@@ -99,7 +110,10 @@ pub fn update_check(current_tag: String, include_nightly: bool, updates_dir: Str
             Ok(Ok(r)) => r,
             Ok(Err(UpdateError::Offline(e))) => return failed(UpdateCheckStatus::Offline, e),
             Ok(Err(UpdateError::RateLimited)) => {
-                return failed(UpdateCheckStatus::RateLimited, UpdateError::RateLimited.to_string())
+                return failed(
+                    UpdateCheckStatus::RateLimited,
+                    UpdateError::RateLimited.to_string(),
+                )
             }
             Ok(Err(e)) => return failed(UpdateCheckStatus::Failed, e.to_string()),
             Err(e) => return failed(UpdateCheckStatus::Failed, e),
@@ -107,7 +121,11 @@ pub fn update_check(current_tag: String, include_nightly: bool, updates_dir: Str
         let dir = std::path::Path::new(&updates_dir);
         let Some(r) = updater::pick_update(&releases, &current_tag, include_nightly) else {
             updater::prune_updates_dir(dir, None);
-            return UpdateCheck { status: UpdateCheckStatus::UpToDate, release: None, message: None };
+            return UpdateCheck {
+                status: UpdateCheckStatus::UpToDate,
+                release: None,
+                message: None,
+            };
         };
         // pick_update only returns releases with both assets.
         let installer = updater::installer_asset(r).expect("candidate has an installer");
@@ -116,7 +134,11 @@ pub fn update_check(current_tag: String, include_nightly: bool, updates_dir: Str
             status: UpdateCheckStatus::Available,
             release: Some(UpdateRelease {
                 tag: r.tag_name.clone(),
-                name: r.name.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| r.tag_name.clone()),
+                name: r
+                    .name
+                    .clone()
+                    .filter(|n| !n.is_empty())
+                    .unwrap_or_else(|| r.tag_name.clone()),
                 published_at: r.published_at.clone().unwrap_or_default(),
                 notes_url: r.html_url.clone(),
                 nightly: updater::is_nightly(&r.tag_name),
@@ -170,7 +192,10 @@ pub fn update_download(
         });
         DOWNLOADING.store(false, Ordering::SeqCst);
         match result {
-            Ok(Ok((path, sha256))) => Ok(DownloadedUpdate { path: path.to_string_lossy().into_owned(), sha256 }),
+            Ok(Ok((path, sha256))) => Ok(DownloadedUpdate {
+                path: path.to_string_lossy().into_owned(),
+                sha256,
+            }),
             Ok(Err(e)) => Err(e.to_string()),
             Err(e) => Err(e),
         }
@@ -197,6 +222,7 @@ pub fn update_install(path: String, sha256: String) -> Result<(), String> {
     }
     #[cfg(windows)]
     {
-        crate::updater::launch_installer(std::path::Path::new(&path), &sha256).map_err(|e| e.to_string())
+        crate::updater::launch_installer(std::path::Path::new(&path), &sha256)
+            .map_err(|e| e.to_string())
     }
 }

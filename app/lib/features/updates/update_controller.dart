@@ -94,6 +94,9 @@ class UpdateController extends ChangeNotifier {
   final UpdateBackend backend;
   final DateTime Function() _now;
 
+  /// The controller's clock (injectable for tests).
+  DateTime now() => _now();
+
   UpdatePhase phase;
   DateTime? checkedAt;
 

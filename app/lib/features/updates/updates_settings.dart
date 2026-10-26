@@ -36,9 +36,9 @@ String updateStatusText(UpdateController u, {DateTime? now}) {
   final r = u.release;
   return switch (u.phase) {
     UpdatePhase.development => 'Development build: updates are off.',
-    UpdatePhase.idle => u.checkedAt == null ? 'Not checked yet.' : 'Checked ${_checkedAt(u.checkedAt!, now ?? DateTime.now())}.',
+    UpdatePhase.idle => u.checkedAt == null ? 'Not checked yet.' : 'Checked ${_checkedAt(u.checkedAt!, now ?? u.now())}.',
     UpdatePhase.checking => 'Checking for updates…',
-    UpdatePhase.upToDate => 'Up to date. Checked ${_checkedAt(u.checkedAt!, now ?? DateTime.now())}.',
+    UpdatePhase.upToDate => 'Up to date. Checked ${_checkedAt(u.checkedAt!, now ?? u.now())}.',
     UpdatePhase.available => 'Version ${_version(r!.tag)} is available.',
     UpdatePhase.downloading => u.progress == null
         ? 'Downloading version ${_version(r!.tag)}…'

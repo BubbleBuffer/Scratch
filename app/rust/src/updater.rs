@@ -67,7 +67,9 @@ pub enum UpdateError {
     /// SHA256SUMS.txt has no line for the installer.
     MissingChecksum(String),
     /// The download's SHA-256 differs from SHA256SUMS.txt; the file was deleted.
-    Mismatch { file: String },
+    Mismatch {
+        file: String,
+    },
     /// The installer's publisher was rejected ([verify_publisher]).
     Publisher(String),
     Install(String),
@@ -83,7 +85,10 @@ impl fmt::Display for UpdateError {
             Self::BadResponse(e) => write!(f, "Unexpected answer from GitHub ({e})"),
             Self::MissingChecksum(name) => write!(f, "{SUMS_NAME} has no checksum for {name}"),
             Self::Mismatch { file } => {
-                write!(f, "The download of {file} was corrupted (checksum mismatch) and was deleted")
+                write!(
+                    f,
+                    "The download of {file} was corrupted (checksum mismatch) and was deleted"
+                )
             }
             Self::Publisher(e) => write!(f, "The installer's publisher was not accepted ({e})"),
             Self::Install(e) => write!(f, "Couldn't start the installer ({e})"),
@@ -131,8 +136,9 @@ pub fn sums_asset(release: &Release) -> Option<&Asset> {
 
 /// Assets are fetched only from this repository's release downloads.
 pub fn is_release_download_url(url: &str) -> bool {
-    url.strip_prefix(DOWNLOAD_PREFIX)
-        .is_some_and(|rest| !rest.is_empty() && !rest.contains(['?', '#', '\\']) && !rest.contains(".."))
+    url.strip_prefix(DOWNLOAD_PREFIX).is_some_and(|rest| {
+        !rest.is_empty() && !rest.contains(['?', '#', '\\']) && !rest.contains("..")
+    })
 }
 
 fn published(release: &Release) -> Option<jiff::Timestamp> {
@@ -174,7 +180,7 @@ pub fn parse_sha256sums(text: &str) -> HashMap<String, String> {
     let mut sums = HashMap::new();
     for line in text.lines() {
         let line = line.trim_end_matches('\r');
-        let Some((hash, rest)) = line.split_once(|c: char| c == ' ' || c == '\t') else {
+        let Some((hash, rest)) = line.split_once([' ', '\t']) else {
             continue;
         };
         if hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -215,7 +221,10 @@ pub fn verify_file(path: &Path, expected: &str) -> Result<(), UpdateError> {
         Ok(())
     } else {
         Err(UpdateError::Mismatch {
-            file: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+            file: path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
         })
     }
 }
@@ -236,7 +245,9 @@ pub fn finish_download(
     let part = partial_path(dir, installer_name);
     if !actual.eq_ignore_ascii_case(expected) {
         let _ = fs::remove_file(&part);
-        return Err(UpdateError::Mismatch { file: installer_name.to_owned() });
+        return Err(UpdateError::Mismatch {
+            file: installer_name.to_owned(),
+        });
     }
     let target = dir.join(installer_name);
     if target.exists() {
@@ -249,13 +260,19 @@ pub fn finish_download(
 /// Deletes everything in [dir] except the file named [keep] (best effort):
 /// only the latest download is kept.
 pub fn prune_updates_dir(dir: &Path, keep: Option<&str>) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         if keep.is_some_and(|k| entry.file_name() == k) {
             continue;
         }
         let path = entry.path();
-        let _ = if path.is_dir() { fs::remove_dir_all(&path) } else { fs::remove_file(&path) };
+        let _ = if path.is_dir() {
+            fs::remove_dir_all(&path)
+        } else {
+            fs::remove_file(&path)
+        };
     }
 }
 
@@ -283,7 +300,11 @@ pub const INSTALLER_ARGS: &str = "/SILENT";
 /// starts it as a normal, visible process. The caller exits the app next.
 #[cfg(windows)]
 pub fn launch_installer(installer: &Path, sha256: &str) -> Result<(), UpdateError> {
-    if !installer.file_name().and_then(|n| n.to_str()).is_some_and(is_installer_name) {
+    if !installer
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(is_installer_name)
+    {
         return Err(UpdateError::Install("not a Scratch installer".into()));
     }
     verify_file(installer, sha256)?;
@@ -391,14 +412,24 @@ pub mod net {
         parse_releases(&resp.text().await.map_err(net_err)?)
     }
 
-    async fn fetch_sums(client: &reqwest::Client, url: &str) -> Result<HashMap<String, String>, UpdateError> {
-        let resp = client.get(url).timeout(Duration::from_secs(30)).send().await.map_err(net_err)?;
+    async fn fetch_sums(
+        client: &reqwest::Client,
+        url: &str,
+    ) -> Result<HashMap<String, String>, UpdateError> {
+        let resp = client
+            .get(url)
+            .timeout(Duration::from_secs(30))
+            .send()
+            .await
+            .map_err(net_err)?;
         if !resp.status().is_success() {
             return Err(status_err(&resp));
         }
         let bytes = resp.bytes().await.map_err(net_err)?;
         if bytes.len() > SUMS_MAX_BYTES {
-            return Err(UpdateError::BadResponse(format!("{SUMS_NAME} is too large")));
+            return Err(UpdateError::BadResponse(format!(
+                "{SUMS_NAME} is too large"
+            )));
         }
         Ok(parse_sha256sums(&String::from_utf8_lossy(&bytes)))
     }
@@ -507,7 +538,8 @@ mod tests {
     }
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("scratch-update-test-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("scratch-update-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -537,12 +569,18 @@ mod tests {
     #[test]
     fn update_stable_channel_skips_nightlies_and_drafts() {
         // prealpha.12 is a draft, the nightlies are filtered out.
-        assert_eq!(pick("v0.1.0-prealpha.10", false).as_deref(), Some("v0.1.0-prealpha.11"));
+        assert_eq!(
+            pick("v0.1.0-prealpha.10", false).as_deref(),
+            Some("v0.1.0-prealpha.11")
+        );
     }
 
     #[test]
     fn update_nightly_channel_takes_newest_by_published_at() {
-        assert_eq!(pick("v0.1.0-prealpha.10", true).as_deref(), Some("v0.1.0-nightly.20261027"));
+        assert_eq!(
+            pick("v0.1.0-prealpha.10", true).as_deref(),
+            Some("v0.1.0-nightly.20261027")
+        );
     }
 
     #[test]
@@ -557,20 +595,35 @@ mod tests {
         // nightly channel turned off: nothing newer to offer.
         assert_eq!(pick("v0.1.0-nightly.20261027", false), None);
         // On an older nightly, the newer stable pre-release is offered.
-        assert_eq!(pick("v0.1.0-nightly.20261024", false).as_deref(), Some("v0.1.0-prealpha.11"));
-        assert_eq!(pick("v0.1.0-nightly.20261024", true).as_deref(), Some("v0.1.0-nightly.20261027"));
+        assert_eq!(
+            pick("v0.1.0-nightly.20261024", false).as_deref(),
+            Some("v0.1.0-prealpha.11")
+        );
+        assert_eq!(
+            pick("v0.1.0-nightly.20261024", true).as_deref(),
+            Some("v0.1.0-nightly.20261027")
+        );
     }
 
     #[test]
     fn update_unlisted_tag_gets_newest_candidate() {
-        assert_eq!(pick("v0.0.1-prealpha.1", false).as_deref(), Some("v0.1.0-prealpha.11"));
-        assert_eq!(pick("v0.0.1-prealpha.1", true).as_deref(), Some("v0.1.0-nightly.20261027"));
+        assert_eq!(
+            pick("v0.0.1-prealpha.1", false).as_deref(),
+            Some("v0.1.0-prealpha.11")
+        );
+        assert_eq!(
+            pick("v0.0.1-prealpha.1", true).as_deref(),
+            Some("v0.1.0-nightly.20261027")
+        );
     }
 
     #[test]
     fn update_draft_own_release_does_not_anchor() {
         // The running tag only exists as a draft: treated as unlisted.
-        assert_eq!(pick("v0.1.0-prealpha.12", false).as_deref(), Some("v0.1.0-prealpha.11"));
+        assert_eq!(
+            pick("v0.1.0-prealpha.12", false).as_deref(),
+            Some("v0.1.0-prealpha.11")
+        );
     }
 
     #[test]
@@ -589,7 +642,9 @@ mod tests {
         assert!(is_release_download_url(
             "https://github.com/BubbleBuffer/Scratch/releases/download/v1/Scratch-Setup-1.exe"
         ));
-        assert!(!is_release_download_url("https://example.com/Scratch-Setup-1.exe"));
+        assert!(!is_release_download_url(
+            "https://example.com/Scratch-Setup-1.exe"
+        ));
         assert!(!is_release_download_url(
             "https://github.com/BubbleBuffer/Scratch/releases/download/../../other/x.exe"
         ));
@@ -606,7 +661,10 @@ mod tests {
         let sums = parse_sha256sums(&text);
         assert_eq!(sums.len(), 2);
         assert_eq!(sums["Scratch-Setup-0.1.0-prealpha.11.exe"], a);
-        assert_eq!(sums["scratch-0.1.0-prealpha.11-android-arm64.apk"], "b".repeat(64));
+        assert_eq!(
+            sums["scratch-0.1.0-prealpha.11-android-arm64.apk"],
+            "b".repeat(64)
+        );
     }
 
     #[test]
@@ -618,7 +676,10 @@ mod tests {
         let abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
         assert_eq!(sha256_file(&file).unwrap(), abc);
         assert!(verify_file(&file, &abc.to_uppercase()).is_ok());
-        assert!(matches!(verify_file(&file, &"0".repeat(64)), Err(UpdateError::Mismatch { .. })));
+        assert!(matches!(
+            verify_file(&file, &"0".repeat(64)),
+            Err(UpdateError::Mismatch { .. })
+        ));
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -647,7 +708,11 @@ mod tests {
         let path = finish_download(&dir, name, &actual, &actual).unwrap();
         assert_eq!(path, dir.join(name));
         prune_updates_dir(&dir, Some(name));
-        let left: Vec<_> = fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name()).collect();
+        let left: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name())
+            .collect();
         assert_eq!(left, vec![std::ffi::OsString::from(name)]);
         assert!(verify_file(&path, &actual).is_ok());
         let _ = fs::remove_dir_all(&dir);
