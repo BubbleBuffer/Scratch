@@ -25,6 +25,7 @@ import '../addons/agent/api.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/sync/conflicts.dart' show ConflictRailGroup;
 import '../features/trash/trash_panel.dart';
+import '../features/updates/updates_settings.dart' show UpdateRailRow;
 import '../state/app_state.dart';
 import '../state/tree_store.dart';
 import '../state/pages_store.dart';
@@ -695,6 +696,7 @@ class _SidebarState extends State<Sidebar> {
                       ),
                     ),
                     const ConflictRailGroup(),
+                    const UpdateRailRow(),
                     const SizedBox(height: 4),
                     Row(
                       children: [

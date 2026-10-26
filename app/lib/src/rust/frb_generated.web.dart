@@ -11,6 +11,7 @@ import 'api/ai.dart';
 import 'api/clock.dart';
 import 'api/sync.dart';
 import 'api/types.dart';
+import 'api/update.dart';
 import 'api/vault.dart';
 
 import 'dart:async';
@@ -389,6 +390,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt dco_decode_box_autoadd_u_64(dynamic raw);
 
   @protected
+  UpdateRelease dco_decode_box_autoadd_update_release(dynamic raw);
+
+  @protected
   VaultAgentDefaults dco_decode_box_autoadd_vault_agent_defaults(dynamic raw);
 
   @protected
@@ -465,6 +469,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DateMarkRef dco_decode_date_mark_ref(dynamic raw);
+
+  @protected
+  DownloadedUpdate dco_decode_downloaded_update(dynamic raw);
 
   @protected
   ExternalSearchRow dco_decode_external_search_row(dynamic raw);
@@ -784,6 +791,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
 
   @protected
+  UpdateRelease? dco_decode_opt_box_autoadd_update_release(dynamic raw);
+
+  @protected
   List<CertificateInfo>? dco_decode_opt_list_certificate_info(dynamic raw);
 
   @protected
@@ -917,6 +927,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void dco_decode_unit(dynamic raw);
+
+  @protected
+  UpdateCheck dco_decode_update_check(dynamic raw);
+
+  @protected
+  UpdateCheckStatus dco_decode_update_check_status(dynamic raw);
+
+  @protected
+  UpdateProgress dco_decode_update_progress(dynamic raw);
+
+  @protected
+  UpdateRelease dco_decode_update_release(dynamic raw);
 
   @protected
   BigInt dco_decode_usize(dynamic raw);
@@ -1336,6 +1358,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
+  UpdateRelease sse_decode_box_autoadd_update_release(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   VaultAgentDefaults sse_decode_box_autoadd_vault_agent_defaults(
     SseDeserializer deserializer,
   );
@@ -1426,6 +1453,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DateMarkRef sse_decode_date_mark_ref(SseDeserializer deserializer);
+
+  @protected
+  DownloadedUpdate sse_decode_downloaded_update(SseDeserializer deserializer);
 
   @protected
   ExternalSearchRow sse_decode_external_search_row(
@@ -1829,6 +1859,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
+  UpdateRelease? sse_decode_opt_box_autoadd_update_release(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<CertificateInfo>? sse_decode_opt_list_certificate_info(
     SseDeserializer deserializer,
   );
@@ -1966,6 +2001,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
+
+  @protected
+  UpdateCheck sse_decode_update_check(SseDeserializer deserializer);
+
+  @protected
+  UpdateCheckStatus sse_decode_update_check_status(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  UpdateProgress sse_decode_update_progress(SseDeserializer deserializer);
+
+  @protected
+  UpdateRelease sse_decode_update_release(SseDeserializer deserializer);
 
   @protected
   BigInt sse_decode_usize(SseDeserializer deserializer);
@@ -2486,6 +2535,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_update_release(
+    UpdateRelease self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_vault_agent_defaults(
     VaultAgentDefaults self,
     SseSerializer serializer,
@@ -2607,6 +2662,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_date_mark_ref(DateMarkRef self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_downloaded_update(
+    DownloadedUpdate self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_external_search_row(
@@ -3113,6 +3174,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_update_release(
+    UpdateRelease? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_list_certificate_info(
     List<CertificateInfo>? self,
     SseSerializer serializer,
@@ -3276,6 +3343,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_update_check(UpdateCheck self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_update_check_status(
+    UpdateCheckStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_update_progress(
+    UpdateProgress self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_update_release(UpdateRelease self, SseSerializer serializer);
 
   @protected
   void sse_encode_usize(BigInt self, SseSerializer serializer);

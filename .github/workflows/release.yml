@@ -60,6 +60,10 @@ jobs:
             echo "::error::tag '$TAG' is not v<major>.<minor>.<patch>[-<pre-release>]"
             exit 1
           fi
+          if [[ $TAG == *-nightly.* ]]; then
+            echo "::error::nightly tags are published by nightly.yml, not by this workflow"
+            exit 1
+          fi
           numeric=${BASH_REMATCH[1]}
           version=${TAG#v}
           prerelease=false
@@ -96,36 +100,15 @@ jobs:
           channel: stable
           flutter-version: 3.47.5
           cache: true
-      - name: flutter build windows --release
-        working-directory: app
-        run: |
-          flutter pub get
-          # Windows file versions are numeric, so the pre-release part stays out here.
-          flutter build windows --release \
-            --build-name=${{ needs.meta.outputs.numeric }} --build-number=${{ needs.meta.outputs.code }}
-      # The app and scratch-cli find Claude Code as a `claude-code` folder and
-      # `bun\bun.exe` beside the executable, so ship both in the Release folder
-      # the installer packs. Bun is the hub's version (deploy/hub/Dockerfile).
+      # Bun for the bundled Claude Code (the hub's version, deploy/hub/Dockerfile).
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
-      - name: Bundle Claude Code
-        shell: pwsh
-        run: ./app/windows/installer/bundle-claude-code.ps1 -ReleaseDir ./app/build/windows/x64/runner/Release
-      - name: Build installer
-        working-directory: app
+      # The app (with its release tag built in for the updater) and the
+      # installer; nightly.yml uses the same script.
+      - name: Build app and installer
         run: |
-          iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
-          if [ ! -x "$iscc" ]; then
-            choco install innosetup --no-progress -y
-          fi
-          out="$(cygpath -w "$PWD/build/windows/installer")"
-          src="$(cygpath -w "$PWD/build/windows/x64/runner/Release")"
-          MSYS_NO_PATHCONV=1 "$iscc" /Q "/DAppVersion=${{ needs.meta.outputs.numeric }}" \
-            "/DVersionText=${{ needs.meta.outputs.version }}" "/DSha7=${GITHUB_SHA::7}" \
-            "/DSourceDir=$src" "/DOutputDir=$out" "$(cygpath -w windows/installer/scratch.iss)"
-          mkdir -p ../dist
-          mv build/windows/installer/Scratch-Setup-*.exe "../dist/Scratch-Setup-${{ needs.meta.outputs.version }}.exe"
+          bash scripts/build-windows-installer.sh "${{ needs.meta.outputs.tag }}" "${{ needs.meta.outputs.numeric }}" "${{ needs.meta.outputs.code }}" dist
       - name: Build notes CLI
         run: |
           cargo build --release --locked -p vault_tools --bin notes

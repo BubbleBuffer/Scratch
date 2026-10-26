@@ -28,10 +28,19 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 webpki-roots = "1"
 # The schedule format (crates/agent/src/schedules/format.rs) compiles here on every target.
 anyhow = "1"
+# Updates (src/updater.rs): verifying the installer against SHA256SUMS.txt.
+sha2 = "0.10"
 
 # The desktop agent (api/agent.rs); other targets get "not available" bodies.
 [target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
 vault_agent = { path = "../../crates/agent" }
+
+# Updates (src/updater.rs): GitHub over HTTPS trusting the Windows certificate
+# store, and ShellExecute for the installer. Windows only.
+[target.'cfg(windows)'.dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+rustls-platform-verifier = "0.6"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [dev-dependencies]
 notes_hub = { path = "../../crates/hub" }
