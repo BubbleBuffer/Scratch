@@ -75,7 +75,7 @@ jobs:
         id: core
         working-directory: scratch
         run: |
-          rev=$(grep -oE 'BubblePaw-Core\?tag=v0\.2\.0#[0-9a-f]{40}' Cargo.lock | head -1 | cut -d'#' -f2)
+          rev=$(grep -oE 'BubblePaw-Core\?tag=v[0-9.]+#[0-9a-f]{40}' Cargo.lock | head -1 | cut -d'#' -f2)
           test -n "$rev"
           echo "rev=$rev" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
