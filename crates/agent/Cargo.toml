@@ -17,9 +17,9 @@ notes_agent_wire = { path = "../agent_wire" }
 # BubblePaw's SDK and MCP client, from the public BubbleBuffer/BubblePaw-Core
 # repository at tag v0.2.0 (bump the tag to upgrade). The SDK's `web` feature
 # stays off.
-bubblepaw-sdk = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.0" }
+bubblepaw-sdk = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.1" }
 # The desktop agent's MCP client (servers from `<data dir>/mcp.toml`).
-bubblepaw-mcp = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.0" }
+bubblepaw-mcp = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.1" }
 anyhow = "1"
 async-trait = "0.1"
 futures-core = "0.3"

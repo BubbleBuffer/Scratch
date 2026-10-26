@@ -70,12 +70,12 @@ jobs:
           path: scratch
           persist-credentials: false
       # The agent tests run BubblePaw's fake extension. Build it from the
-      # BubblePaw-Core commit that Cargo.lock pins for the v0.2.0 tag.
+      # BubblePaw-Core commit that Cargo.lock pins for its tag.
       - name: BubblePaw-Core revision
         id: core
         working-directory: scratch
         run: |
-          rev=$(grep -oE 'BubblePaw-Core\?tag=v0\.2\.0#[0-9a-f]{40}' Cargo.lock | head -1 | cut -d'#' -f2)
+          rev=$(grep -oE 'BubblePaw-Core\?tag=v[0-9.]+#[0-9a-f]{40}' Cargo.lock | head -1 | cut -d'#' -f2)
           test -n "$rev"
           echo "rev=$rev" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
