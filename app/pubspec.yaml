@@ -9,11 +9,7 @@ environment:
 dependencies:
   app_links: 7.2.2
   # UI tokens and primitives from agent-kit (wiki/architecture/agent-kit.md).
-  bb_tokens:
-    git:
-      url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: v0.1.0
-      path: packages/bb_tokens
+  # bb_tokens comes with bb_ui; don't declare it here.
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git

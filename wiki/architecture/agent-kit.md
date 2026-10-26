@@ -29,14 +29,9 @@ The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same f
 
 ## The pin
 
-`app/pubspec.yaml` declares both packages as git dependencies on one tag:
+`app/pubspec.yaml` declares `bb_ui` as a git dependency on a tag:
 
 ```yaml
-  bb_tokens:
-    git:
-      url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: v0.1.0
-      path: packages/bb_tokens
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
@@ -44,12 +39,12 @@ The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same f
       path: packages/bb_ui
 ```
 
-`bb_ui` depends on `bb_tokens` by a relative path inside the kit repo; pub resolves that to the same git package, so both entries agree. `pubspec.lock` records the tag's commit as `resolved-ref`.
+`bb_tokens` comes with it: `bb_ui` depends on it by a relative path inside the kit repo, which pub resolves at the tag's commit. Scratch reaches the tokens through `package:bb_ui/tokens.dart` (that is what `ui/tokens.dart` re-exports), so it does not declare `bb_tokens` itself. Declaring it with `ref: v0.1.0` fails version solving: pub pins the transitive copy to the commit and the direct one to the tag name, and treats them as different sources. `pubspec.lock` records the tag's commit as `resolved-ref`.
 
 ## Bumping it
 
 1. Release the kit first: merge the change there with CI green and push an annotated tag `vX.Y.Z` (see the kit's `docs/package-layout.md`).
-2. In Scratch, change `ref:` in both entries to the new tag, run `flutter pub get` in `app/`, and commit `pubspec.yaml` and `pubspec.lock` together.
+2. In Scratch, change `ref:` to the new tag, run `flutter pub get` in `app/`, and commit `pubspec.yaml` and `pubspec.lock` together.
 3. If the kit changed anything visible, the pull request shows before/after screenshots and updates the goldens on purpose.
 
-To try an unreleased kit change, point both entries at a branch or commit for a draft pull request, or use `dependency_overrides` with local `path:` entries; never merge either.
+To try an unreleased kit change, point `ref:` at a branch or commit for a draft pull request, or use `dependency_overrides` with local `path:` entries; never merge either.
