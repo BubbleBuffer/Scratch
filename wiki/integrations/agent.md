@@ -218,7 +218,7 @@ Jobs started through the hub's `jobs` tool ([Jobs](../architecture/hub.md#jobs))
 
 
    *Rust built 2026-10-08* ([crates/agent](../../crates/agent), bridge [api/agent.rs](../../app/rust/src/api/agent.rs)):
-   - **Crate and runtime:** `vault_agent`, with git dependencies on `bubblepaw-sdk` and `bubblepaw-mcp` at BubblePaw-Core tag `v0.2.0` (bump the tag to upgrade) and no `web` feature. It runs a 2-thread tokio runtime of its own (threads `agent-N`).
+   - **Crate and runtime:** `vault_agent`, with git dependencies on `bubblepaw-sdk` and `bubblepaw-mcp` at BubblePaw-Core tag `v0.2.1` (bump the tag to upgrade) and no `web` feature. It runs a 2-thread tokio runtime of its own (threads `agent-N`).
    - **Store and workspace:** `<data_dir>/agent/agent.sqlite`, bound to the code-mode workspace `<data_dir>/agent/workspace`; artifacts in `<data_dir>/agent/artifacts`.
    - **Tools:** one host tool per `vault_tools` definition, called on a blocking thread. search_notes, read_page and create_page are always shown; history tools are on; `js` is the only model tool (checked at open). The runtime note leaves out process commands.
    - **Providers:**

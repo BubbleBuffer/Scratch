@@ -55,7 +55,7 @@ The build script builds `notes-hub:latest` for `linux/amd64` and saves `target/n
 docker buildx build --platform linux/amd64 --build-context bubblepaw=../BubblePaw-base-agent --file deploy/hub/Dockerfile --tag notes-hub:latest --load .
 ```
 
-The repo is the build context. Scratch takes `bubblepaw-sdk` and `bubblepaw-mcp` from BubblePaw-Core at tag `v0.2.0` (pinned in `Cargo.lock`), so Cargo fetches them from git and the Rust build needs no sibling checkout. `deploy/hub/Dockerfile` and the `--build-context bubblepaw` line above still copy the pre-v0.2.0 path crates; they do not match this yet and need their own change. Cargo builds `notes_hub` in release mode with `--locked` and BuildKit caches.
+The repo is the build context. Scratch takes `bubblepaw-sdk` and `bubblepaw-mcp` from BubblePaw-Core at tag `v0.2.1` (pinned in `Cargo.lock`), so Cargo fetches them from git and the Rust build needs no sibling checkout. `deploy/hub/Dockerfile` and the `--build-context bubblepaw` line above still copy the pre-v0.2.0 path crates; they do not match this yet and need their own change. Cargo builds `notes_hub` in release mode with `--locked` and BuildKit caches.
 
 Pins: Rust **1.97.1** (`rust:1.97.1-bookworm`), Node **22.18.0** (`node:22.18.0-bookworm-slim`), Bun **1.4.2**, Claude Code **2.1.293**. The Codex CLI was removed from the image on 2026-10-25, with the hub's move to the four [hub models](hub.md#agent-models-and-credentials). Runtime base: `debian:bookworm-slim`. Docker reports **2,387,570,531 bytes** (2.39 GB / 2.22 GiB); `target/notes-hub.tar.gz` is **672,359,162 bytes** (672 MB / 641 MiB). Node, Bun and both CLI version commands passed as `hub`.
 
@@ -276,11 +276,11 @@ The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Dock
 
 The hub image is built and deployed from the private scratch-ops repo. The former private repo's `hub-image.yml` is retired; see the history bullet.
 
-- **Repos:** `BubbleBuffer/Scratch` (public) is the source. `BubbleBuffer/scratch-ops` (private) holds the `hub-deploy` workflow, the VPS deploy key and the private patterns. The hub image takes the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.2.0`.
+- **Repos:** `BubbleBuffer/Scratch` (public) is the source. `BubbleBuffer/scratch-ops` (private) holds the `hub-deploy` workflow, the VPS deploy key and the private patterns. The hub image takes the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.2.1`.
 - **Trigger:** by hand, from scratch-ops:
   `gh workflow run hub-deploy.yml -R BubbleBuffer/scratch-ops -f ref=<tag> -f dry_run=false`
   `dry_run=true` runs the build without the deploy.
-- **Build:** the workflow builds the image from Scratch at `ref`, with the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.2.0`, and pushes `ghcr.io/bubblebuffer/scratch-hub:<sha>`. The package is private. The workflow runs on the home build server, not on GitHub-hosted runners.
+- **Build:** the workflow builds the image from Scratch at `ref`, with the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.2.1`, and pushes `ghcr.io/bubblebuffer/scratch-hub:<sha>`. The package is private. The workflow runs on the home build server, not on GitHub-hosted runners.
 - **Deploy:** the workflow connects to the VPS with a key whose `authorized_keys` entry is `restrict,command="/opt/notes-hub/deploy.sh"`, so it can run nothing else. The 40-character commit sha goes as the command and a GHCR token on stdin. [deploy.sh](../../deploy/hub/deploy.sh):
   - logs in to GHCR in a temporary `DOCKER_CONFIG`, so no lasting token sits on the VPS
   - pulls `ghcr.io/bubblebuffer/scratch-hub:<sha>`, keeps the current `notes-hub:latest` as `notes-hub:previous` and retags the new image as `notes-hub:latest`
