@@ -54,4 +54,10 @@ class CommandRegistry {
       };
 }
 
-final commandRegistry = CommandRegistry();
+/// The app's commands. Creating it points [AppTooltip]'s shortcut hints at it.
+final commandRegistry = _showShortcutsInTooltips(CommandRegistry());
+
+CommandRegistry _showShortcutsInTooltips(CommandRegistry registry) {
+  AppTooltip.commandShortcuts = (id) => registry.of(id)?.shortcuts;
+  return registry;
+}

@@ -12,6 +12,7 @@ These pages describe how the app works now. Plans, proposals and decisions are i
 <!-- wiki:children -->
 - [Add-ons](addons.md): The app as a thin shell plus a shared kit, every feature an isolated add-on registering types, blocks, views, commands, codecs, search sources and agent tools; enforced in CI.
 - [Add-on reference](../addons/index.md): Board and database registrations, files and dependencies.
+- [agent-kit dependency](agent-kit.md): Scratch's UI tokens and notes-free primitives come from the public agent-kit repo (bb_tokens, bb_ui), pinned to a git tag; the old ui/ files re-export them; how to bump the pin.
 - [Android agent through the Hub](mobile-agent.md): Hub-only mobile agent, authenticated vault sync, local acceptance tests and the phone sign-in steps.
 - [Android release](android-release.md): How Android builds are numbered, signed and published: a Scratch release is built on GitHub, release-signed on the home Linux box, and published to the owner's private F-Droid repo.
 - [The Flutter app (state)](app-state.md): The built Flutter app: bridge, layers, change feed, stores, registries, UI kit, shells, sync and settings, databases, tests on the real core, CI in the former private repo on its self-hosted runner (until 2026-10-22), known gaps. (partial)
