@@ -181,20 +181,29 @@ Future<void> setPrefetch(SyncStore sync, AppSettings s, bool on) async {
   }
 }
 
-/// The certificate fingerprints this device trusts for [url]'s origin.
-List<String> trustedFor(AppSettings s, String url) => s.trustedCertificates.fingerprintsFor(url);
+/// What this device trusts for [url]'s origin, for every hub client (sync,
+/// the agent and the host relay).
+List<TrustedHubCertificate> trustedFor(AppSettings s, String url) => s.trustedCertificates.trustFor(url);
 
 /// Trusts [chain] (leaf first; [fingerprint] is the leaf's) for [url]'s
 /// origin, replacing an earlier pin, and reconnects the current client if
-/// it syncs with that origin.
+/// it syncs with that origin. [issuerDer] is the DER of `chain[1]` when the
+/// hub sent it: that issuer is then trusted for this origin. The agent and
+/// the host relay pick the change up from the settings.
 Future<void> trustCertificate(
   SyncStore sync,
   AppSettings s,
   String url,
   List<CertDetails> chain, {
   String? fingerprint,
+  Uint8List? issuerDer,
 }) async {
-  final pin = PinnedCertificate.of(chain, fingerprint: fingerprint, trustedAtMs: clockNow().millisecondsSinceEpoch);
+  final pin = PinnedCertificate.of(
+    chain,
+    fingerprint: fingerprint,
+    trustedAtMs: clockNow().millisecondsSinceEpoch,
+    issuerDer: issuerDer,
+  );
   s.update((s) => s.trustedCertificates.add(url, pin));
   await _reconnectFor(sync, s, url);
 }

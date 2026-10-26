@@ -63,7 +63,7 @@ mod client;
 mod encoding;
 mod hub;
 pub mod open;
-mod tls;
+pub mod tls;
 pub mod wire;
 
 use std::fmt;

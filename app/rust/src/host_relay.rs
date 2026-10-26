@@ -13,6 +13,10 @@
 //!   drop) closes the socket, cancels running calls and ends the sessions.
 //! - [`HostRelay::status`] tells the app where it is, with the last error
 //!   (the hub's answer when it refuses the socket).
+//! - TLS trusts what the device trusts for the hub (`vault_sync::tls`: the
+//!   issuer anchored for the hub's origin, leaf pins). [`HostRelay::set_trust`]
+//!   replaces it while running: each connection attempt reads it, and a
+//!   relay waiting to retry tries again at once.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,6 +32,8 @@ use tokio::sync::{mpsc, Notify};
 use tokio_tungstenite::tungstenite::Message;
 use vault_agent::bubblepaw_sdk::harness::{CancellationToken, ClientInfo};
 use vault_agent::Agent;
+
+use vault_sync::tls::{Trust, TrustedCertificate};
 
 use crate::agent_remote::{host_ws_url, open_device_socket, Socket};
 
@@ -146,6 +152,10 @@ struct Shared {
     url: String,
     device: String,
     token: String,
+    /// The device's trusted hub certificates, read on each attempt.
+    trusted: Mutex<Vec<TrustedCertificate>>,
+    /// Cuts a retry wait short (the trust changed).
+    retry_now: Notify,
     stopped: AtomicBool,
     stop: Notify,
     status: Mutex<RelayStatus>,
@@ -163,18 +173,22 @@ pub(crate) struct HostRelay {
 
 impl HostRelay {
     /// Starts connecting to the hub at `base` (its base URL) as `device`
-    /// with its device token. Fails only for a URL that is not http(s).
+    /// with its device token, trusting `trusted` beyond the public roots.
+    /// Fails only for a URL that is not http(s).
     pub(crate) fn start(
         host: Arc<dyn RelayHost>,
         base: &str,
         device: &str,
         token: &str,
+        trusted: Vec<TrustedCertificate>,
     ) -> Result<HostRelay, String> {
         let shared = Arc::new(Shared {
             host,
             url: host_ws_url(base)?,
             device: device.to_owned(),
             token: token.to_owned(),
+            trusted: Mutex::new(trusted),
+            retry_now: Notify::new(),
             stopped: AtomicBool::new(false),
             stop: Notify::new(),
             status: Mutex::new(RelayStatus::CONNECTING),
@@ -192,6 +206,14 @@ impl HostRelay {
             shared,
             runtime: Some(runtime),
         })
+    }
+
+    /// Replaces the trusted certificates (the user trusted or revoked one).
+    /// The next attempt uses them; a relay waiting to retry tries again now.
+    /// An open socket stays open.
+    pub(crate) fn set_trust(&self, trusted: Vec<TrustedCertificate>) {
+        *self.shared.trusted.lock().unwrap() = trusted;
+        self.shared.retry_now.notify_one();
     }
 
     /// Where the relay is now, with the last connection error.
@@ -234,12 +256,18 @@ fn stopped(shared: &Shared) -> bool {
     shared.stopped.load(Ordering::SeqCst)
 }
 
+/// The TLS trust for the next attempt.
+fn trust(shared: &Shared) -> Arc<Trust> {
+    Trust::for_hub(&shared.url, &shared.trusted.lock().unwrap())
+}
+
 async fn run(shared: Arc<Shared>) {
     let mut backoff = BACKOFF_FIRST;
     while !stopped(&shared) {
+        let trust = trust(&shared);
         let opened = tokio::select! {
             _ = shared.stop.notified() => break,
-            opened = open_device_socket(&shared.url, &shared.device, &shared.token) => opened,
+            opened = open_device_socket(&shared.url, &shared.device, &shared.token, trust) => opened,
         };
         match opened {
             Ok(socket) => {
@@ -260,6 +288,10 @@ async fn run(shared: Arc<Shared>) {
         }
         tokio::select! {
             _ = shared.stop.notified() => break,
+            _ = shared.retry_now.notified() => {
+                backoff = BACKOFF_FIRST;
+                continue;
+            }
             _ = tokio::time::sleep(backoff) => {}
         }
         backoff = (backoff * 2).min(BACKOFF_MAX);
@@ -511,6 +543,8 @@ mod tests {
             url: String::new(),
             device: String::new(),
             token: String::new(),
+            trusted: Mutex::new(Vec::new()),
+            retry_now: Notify::new(),
             stopped: AtomicBool::new(false),
             stop: Notify::new(),
             status: Mutex::new(RelayStatus::CONNECTING),
@@ -589,7 +623,7 @@ mod tests {
         };
 
         let fake = Arc::new(Fake::default());
-        let mut relay = HostRelay::start(fake.clone(), &url, "dev-pc", &token).unwrap();
+        let mut relay = HostRelay::start(fake.clone(), &url, "dev-pc", &token, Vec::new()).unwrap();
         wait(1);
         assert!(relay.connected());
         relay.stop();
@@ -600,7 +634,7 @@ mod tests {
 
         // A replaced token is refused; the relay keeps retrying, not connecting,
         // and reports the hub's answer.
-        let refused = HostRelay::start(fake, &url, "dev-pc", "not-the-token").unwrap();
+        let refused = HostRelay::start(fake, &url, "dev-pc", "not-the-token", Vec::new()).unwrap();
         let status = wait_retrying(&refused);
         let error = status.error.unwrap_or_default();
         assert!(error.contains("the hub refused this device"), "{error}");
@@ -634,7 +668,7 @@ mod tests {
             .unwrap()
             .port();
         let url = format!("http://127.0.0.1:{port}");
-        let mut relay = HostRelay::start(Arc::new(Fake::default()), &url, "pc", "t").unwrap();
+        let mut relay = HostRelay::start(Arc::new(Fake::default()), &url, "pc", "t", Vec::new()).unwrap();
         let status = wait_retrying(&relay);
         let error = status.error.unwrap_or_default();
         assert!(error.starts_with("hub unreachable"), "{error}");
@@ -651,6 +685,8 @@ mod tests {
             url: String::new(),
             device: String::new(),
             token: String::new(),
+            trusted: Mutex::new(Vec::new()),
+            retry_now: Notify::new(),
             stopped: AtomicBool::new(false),
             stop: Notify::new(),
             status: Mutex::new(RelayStatus::CONNECTING),

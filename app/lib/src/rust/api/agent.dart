@@ -75,14 +75,19 @@ abstract class NotesAgent implements RustOpaqueInterface {
   /// the first connection fails. Later drops reconnect with backoff and
   /// push a `gap` event; calls while disconnected fail with "hub
   /// unreachable". `close_events` (or dropping it) closes the socket.
+  ///
+  /// `trusted`: the device's trusted hub certificates, as for
+  /// `NotesSync::with_trusted_certificates`.
   static Future<NotesAgent> connect({
     required String url,
     required String device,
     required String token,
+    required List<TrustedHubCertificate> trusted,
   }) => RustLib.instance.api.crateApiAgentNotesAgentConnect(
     url: url,
     device: device,
     token: token,
+    trusted: trusted,
   );
 
   Future<AgentSession> createSession({required String title});
@@ -109,15 +114,26 @@ abstract class NotesAgent implements RustOpaqueInterface {
   /// Capabilities of the connected host.
   Future<AgentHostInfo> hostInfo();
 
+  /// Gives the running host relay the device's trusted hub certificates
+  /// after the user trusted or revoked one: its next connection attempt
+  /// uses them, and a relay waiting to retry tries again at once. A no-op
+  /// when no relay runs.
+  Future<void> hostRelaySetTrust({
+    required List<TrustedHubCertificate> trusted,
+  });
+
   /// "Let the hub use this computer": keeps one socket open to the hub at
   /// `url` (`/host/ws`) as device `device` with its device token, so
   /// `/mcp/agent?host=<this device's name>` runs this agent's tools here
   /// (desktop pack included, no approval prompts). Restarts a running
   /// relay; drops reconnect with backoff. Fails on a hub connection.
+  /// `trusted`: the device's trusted hub certificates, as for
+  /// `NotesSync::with_trusted_certificates`.
   Future<void> hostRelayStart({
     required String url,
     required String device,
     required String token,
+    required List<TrustedHubCertificate> trusted,
   });
 
   /// The PC host relay's connection state ("off" when not started).

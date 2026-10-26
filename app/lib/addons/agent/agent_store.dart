@@ -47,6 +47,7 @@ import '../../src/rust/api/vault.dart' as bridge
     show VaultAgentDefaults, VaultAgentModel;
 import '../../state/app_state.dart';
 import 'dev_replay.dart';
+import '../../src/rust/api/types.dart' show TrustedHubCertificate;
 import 'host_relay_link.dart';
 import 'agent_chat_prefs.dart';
 import 'agent_search_source.dart';
@@ -329,6 +330,11 @@ class AgentStore extends ChangeNotifier {
       (_appFromFile ??= AppSettings.load(
         File('${_folder()}${Platform.pathSeparator}settings.json'),
       ));
+
+  /// What this device trusts for the hub at [url] beyond the public roots
+  /// (Settings > Sync > Trusted certificates), as sync does.
+  List<TrustedHubCertificate> _hubTrust(String url) =>
+      _appSettings().trustedCertificates.trustFor(url);
 
   /// The vault's hub when the agent can run there (null: it cannot).
   HubLink? get hubLink =>
@@ -992,6 +998,7 @@ class AgentStore extends ChangeNotifier {
         url: hub.url,
         device: vault.deviceId,
         token: hub.token,
+        trusted: _hubTrust(hub.url),
       );
       if (_disposed || !identical(agent, _agent) || visibleSessionId != id) {
         await connection.closeEvents();
@@ -1079,6 +1086,8 @@ class AgentStore extends ChangeNotifier {
       host,
       hub?.url,
       hub?.token,
+      // Trusting or revoking the hub's certificate reconnects with it.
+      hub == null ? '' : _appSettings().trustedCertificates.trustKeyFor(hub.url),
       resolvedModel(AgentHost.local).model ?? '',
       settings.agentBunPath.trim(),
       settings.agentClaudeCodeDir.trim(),
@@ -1126,6 +1135,8 @@ class AgentStore extends ChangeNotifier {
       url: hub.url,
       device: vault.deviceId,
       token: hub.token,
+      trusted: _hubTrust(hub.url),
+      trustKey: app.trustedCertificates.trustKeyFor(hub.url),
       open: () => NotesAgent.open(
         vault: vault.raw,
         dataDir: dataDir,
@@ -1338,6 +1349,7 @@ class AgentStore extends ChangeNotifier {
             url: hub.url,
             device: vault.deviceId,
             token: hub.token,
+            trusted: _hubTrust(hub.url),
           )
         : NotesAgent.open(
             vault: vault.raw,

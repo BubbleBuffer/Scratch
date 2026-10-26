@@ -14,7 +14,7 @@
 use flutter_rust_bridge::frb;
 
 use crate::agent_impl::Inner;
-use crate::api::types::FlatBlock;
+use crate::api::types::{FlatBlock, TrustedHubCertificate};
 use crate::api::vault::NotesVault;
 use crate::frb_generated::StreamSink;
 
@@ -736,9 +736,17 @@ impl NotesAgent {
     /// the first connection fails. Later drops reconnect with backoff and
     /// push a `gap` event; calls while disconnected fail with "hub
     /// unreachable". `close_events` (or dropping it) closes the socket.
-    pub fn connect(url: String, device: String, token: String) -> Result<NotesAgent, String> {
+    ///
+    /// `trusted`: the device's trusted hub certificates, as for
+    /// `NotesSync::with_trusted_certificates`.
+    pub fn connect(
+        url: String,
+        device: String,
+        token: String,
+        trusted: Vec<TrustedHubCertificate>,
+    ) -> Result<NotesAgent, String> {
         Ok(NotesAgent {
-            inner: Inner::connect(url, device, token)?,
+            inner: Inner::connect(url, device, token, TrustedHubCertificate::to_sync(trusted))?,
             data_dir: None,
         })
     }
@@ -748,8 +756,26 @@ impl NotesAgent {
     /// `/mcp/agent?host=<this device's name>` runs this agent's tools here
     /// (desktop pack included, no approval prompts). Restarts a running
     /// relay; drops reconnect with backoff. Fails on a hub connection.
-    pub fn host_relay_start(&self, url: String, device: String, token: String) -> Result<(), String> {
-        self.inner.host_relay_start(url, device, token)
+    /// `trusted`: the device's trusted hub certificates, as for
+    /// `NotesSync::with_trusted_certificates`.
+    pub fn host_relay_start(
+        &self,
+        url: String,
+        device: String,
+        token: String,
+        trusted: Vec<TrustedHubCertificate>,
+    ) -> Result<(), String> {
+        self.inner
+            .host_relay_start(url, device, token, TrustedHubCertificate::to_sync(trusted))
+    }
+
+    /// Gives the running host relay the device's trusted hub certificates
+    /// after the user trusted or revoked one: its next connection attempt
+    /// uses them, and a relay waiting to retry tries again at once. A no-op
+    /// when no relay runs.
+    pub fn host_relay_set_trust(&self, trusted: Vec<TrustedHubCertificate>) {
+        self.inner
+            .host_relay_set_trust(TrustedHubCertificate::to_sync(trusted))
     }
 
     /// Stops the host relay: the socket closes and running calls are

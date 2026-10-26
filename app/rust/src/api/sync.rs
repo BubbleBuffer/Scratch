@@ -62,6 +62,35 @@ impl NotesSync {
         }
     }
 
+    /// Like `with_trusted`, with the device's trusted certificates: the
+    /// issuer stored for this hub's origin is a trust anchor for it (a
+    /// re-minted leaf from the same CA is accepted), and each leaf
+    /// fingerprint is accepted as with `with_trusted`.
+    #[frb(sync)]
+    pub fn with_trusted_certificates(
+        vault: &NotesVault,
+        url: String,
+        token: String,
+        trusted: Vec<TrustedHubCertificate>,
+    ) -> NotesSync {
+        NotesSync {
+            client: Arc::new(SyncClient::with_trusted_certificates(
+                vault.inner.clone(),
+                &url,
+                &token,
+                TrustedHubCertificate::to_sync(trusted),
+            )),
+            background: Mutex::new(None),
+        }
+    }
+
+    /// The same chain as `untrusted_certificate`, as DER (leaf first), so
+    /// the issuer can be kept when the user trusts it.
+    #[frb(sync)]
+    pub fn untrusted_certificate_der(&self) -> Option<Vec<Vec<u8>>> {
+        self.client.untrusted_certificate_der()
+    }
+
     /// The chain (leaf first) of the last handshake that failed with an
     /// untrusted certificate; cleared by the next successful request.
     #[frb(sync)]

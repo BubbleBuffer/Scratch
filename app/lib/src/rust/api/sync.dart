@@ -75,6 +75,10 @@ abstract class NotesSync implements RustOpaqueInterface {
   /// untrusted certificate; cleared by the next successful request.
   List<CertificateInfo>? untrustedCertificate();
 
+  /// The same chain as `untrusted_certificate`, as DER (leaf first), so
+  /// the issuer can be kept when the user trusts it.
+  List<Uint8List>? untrustedCertificateDer();
+
   /// Like `new`, also accepting a hub whose certificate has an unknown
   /// issuer (self-signed or a private CA) when its SHA-256 fingerprint is
   /// in `trusted` (hex in any case, with or without `:`). A sync against an
@@ -86,6 +90,22 @@ abstract class NotesSync implements RustOpaqueInterface {
     required String token,
     required List<String> trusted,
   }) => RustLib.instance.api.crateApiSyncNotesSyncWithTrusted(
+    vault: vault,
+    url: url,
+    token: token,
+    trusted: trusted,
+  );
+
+  /// Like `with_trusted`, with the device's trusted certificates: the
+  /// issuer stored for this hub's origin is a trust anchor for it (a
+  /// re-minted leaf from the same CA is accepted), and each leaf
+  /// fingerprint is accepted as with `with_trusted`.
+  static NotesSync withTrustedCertificates({
+    required NotesVault vault,
+    required String url,
+    required String token,
+    required List<TrustedHubCertificate> trusted,
+  }) => RustLib.instance.api.crateApiSyncNotesSyncWithTrustedCertificates(
     vault: vault,
     url: url,
     token: token,
