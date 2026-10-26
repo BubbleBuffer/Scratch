@@ -25,7 +25,7 @@ fn run_tasks_once_finishes_a_created_task_and_mirrors_its_todos() {
 
     let hooks = || {
         scripted(
-            "await tools.todo({todos: [{text: 'Find data', status: 'done'}, {text: 'Write up', status: 'pending'}]});",
+            "await tools.todo({items: [{text: 'Find data', status: 'done'}, {text: 'Write up', status: 'pending'}]});",
             "Report planned.",
         )
     };

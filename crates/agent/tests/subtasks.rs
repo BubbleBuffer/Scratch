@@ -32,10 +32,10 @@ fn call(name: &'static str, args: Value) -> Call {
     Call { name, args }
 }
 
-/// The todo tool takes the whole list as `{todos: [...]}`; the state it saves
+/// The todo tool takes the whole list as `{items: [...]}`; the state it saves
 /// is the bare array.
 fn todo(items: Vec<Value>) -> Call {
-    call("todo", json!({"todos": items}))
+    call("todo", json!({"items": items}))
 }
 
 fn item(text: &str, status: &str) -> Value {
@@ -831,12 +831,12 @@ fn only_delegated_runs_see_or_call_todo_and_the_gateway_omits_it() {
     let task_code = r#"
         const found = await tools.$search("select:todo");
         await tools.test_record({names: found.tools.map(t => t.name)});
-        await tools.todo({todos: [{text: "Found it", status: "pending"}]});
+        await tools.todo({items: [{text: "Found it", status: "pending"}]});
     "#;
     let chat_code = r#"
         const found = await tools.$search("select:todo");
         let rejected = false;
-        try { await tools.todo({todos: []}); } catch (_) { rejected = true; }
+        try { await tools.todo({items: []}); } catch (_) { rejected = true; }
         return {names: found.tools.map(t => t.name), rejected};
     "#;
     let agent = open(
@@ -913,4 +913,58 @@ fn the_read_tool_set_keeps_todo_for_a_task() {
     assert_eq!(seen.len(), 1, "{seen:?}");
     assert_eq!(seen[0]["matched"], json!(true), "{}", seen[0]);
     assert_eq!(saved_lists(&agent, &run.session_id).len(), 1);
+}
+
+#[test]
+fn upstream_todo_items_mirror_as_nested_todos_under_the_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let v = vault(&dir);
+    let page = page_with(&v, "Plan", "- [ ] Write the report\n\nBackground");
+    let source = block_id(&v, &page, "Write the report");
+    let task = claim(&v, &page, Some(&source));
+    // BubblePaw's todo tool takes {items: [...]}; the run's saved state is the
+    // bare array, which the mirror turns into nested to-dos under the source.
+    let calls = [
+        call(
+            "todo",
+            json!({"items": [item("Outline", "done"), item("Draft", "pending")]}),
+        ),
+        call(
+            "test_mirror",
+            json!({"expect": [checked("Outline", true), checked("Draft", false)]}),
+        ),
+    ];
+    let probe = Probe::default();
+    let agent = open(
+        dir.path(),
+        v.clone(),
+        ExecutionMode::Native,
+        script(ExecutionMode::Native, &calls),
+        fixtures(&v, &task.id, &probe),
+        None,
+    );
+    let run = agent.run_task(&v, &task.id).unwrap();
+    assert!(run.ok, "{run:?}");
+    assert_clean(&agent, &run.session_id);
+    assert_eq!(
+        saved_lists(&agent, &run.session_id),
+        vec![json!([item("Outline", "done"), item("Draft", "pending")])]
+    );
+    let seen = observed(&probe, "test_mirror");
+    assert_eq!(seen.len(), 1, "{seen:?}");
+    assert_eq!(seen[0]["matched"], json!(true), "{}", seen[0]);
+
+    let doc = v.load_page(page.clone()).unwrap();
+    let source_now = find(&doc.blocks, &source).unwrap();
+    let todos: Vec<(String, bool)> = source_now
+        .children
+        .iter()
+        .filter(|c| c.kind == BlockKind::Todo)
+        .map(|c| (c.text.clone(), c.checked))
+        .collect();
+    assert_eq!(
+        todos,
+        vec![("Outline".to_string(), true), ("Draft".to_string(), false)]
+    );
+    assert_eq!(tasks::get(&v, &task.id).unwrap().status, tasks::DONE);
 }

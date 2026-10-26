@@ -776,9 +776,9 @@ async fn any_device_cancels_a_device_job_but_agents_do_not_see_it() {
 async fn a_job_leaves_its_todo_subtasks_nested_under_its_placeholder() {
     // Three todo replacements, then the final reply. Each replacement mirrors
     // into the placeholder; the run drains them before the job completes.
-    // The todo tool takes the whole list as {todos: [...]}; the saved state is
+    // The todo tool takes the whole list as {items: [...]}; the saved state is
     // the bare array the mirror reads.
-    let todo = |items: Value| call("todo", json!({"todos": items}));
+    let todo = |items: Value| call("todo", json!({"items": items}));
     let env = env(
         steps(vec![
             todo(json!([
