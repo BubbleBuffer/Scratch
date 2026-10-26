@@ -32,9 +32,9 @@ url = "2"
 base64 = "0.22"
 tar = "0.4"
 tempfile = "3"
-# The BubblePaw SDK at tag v0.2.1, as in crates/agent; the import CLI creates
+# The BubblePaw SDK at tag v0.2.2, as in crates/agent; the import CLI creates
 # sessions through its Store.
-bubblepaw-sdk = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.1" }
+bubblepaw-sdk = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.2.2" }
 
 [dev-dependencies]
 notes_hub = { path = "../hub" }
