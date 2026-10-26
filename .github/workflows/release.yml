@@ -135,7 +135,7 @@ jobs:
           name: release-windows
           path: dist/*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   linux-cli:
     name: linux cli
@@ -162,7 +162,7 @@ jobs:
           name: release-linux-cli
           path: dist/*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   android:
     name: android apk (arm64)
@@ -245,7 +245,7 @@ jobs:
           name: release-android
           path: dist/*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   publish:
     name: publish release

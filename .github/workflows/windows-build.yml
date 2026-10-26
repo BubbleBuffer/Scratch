@@ -2,7 +2,12 @@
 # GitHub-hosted windows-latest runners. Artifacts only: nothing is released
 # or deployed.
 #
-# Artifacts, kept 7 days:
+# Push and pull-request runs only check that everything builds. The large
+# per-commit artifacts are uploaded only on a manual run (workflow_dispatch)
+# and kept 1 day, because they filled the account's artifact storage quota.
+# Releases come from release.yml.
+#
+# Artifacts:
 #   notes-windows-<short sha>      app/build/windows/x64/runner/Release (downloads as a zip)
 #   scratch-setup-<short sha>      Scratch-Setup-<version>-<short sha>.exe
 #                                  (app/windows/installer/scratch.iss; version from app/pubspec.yaml)
@@ -77,12 +82,13 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - name: Upload Release folder
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: notes-windows-${{ steps.sha.outputs.short }}
           path: app/build/windows/x64/runner/Release
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
       # Inno Setup 6 ships on windows-latest; choco installs it if the image ever drops it.
       - name: Build installer
         id: installer
@@ -102,12 +108,13 @@ jobs:
           ls -l build/windows/installer
           echo "file=build/windows/installer/Scratch-Setup-$version-${{ steps.sha.outputs.short }}.exe" >> "$GITHUB_OUTPUT"
       - name: Upload installer
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: scratch-setup-${{ steps.sha.outputs.short }}
           path: app/${{ steps.installer.outputs.file }}
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   cli:
     name: notes cli and scratch-cli (windows)
@@ -131,16 +138,17 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - name: Upload notes.exe
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: notes-cli-windows-${{ steps.sha.outputs.short }}
           path: target/release/notes.exe
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
       - name: Upload scratch-cli.exe
         uses: actions/upload-artifact@v4
         with:
           name: scratch-cli-windows
           path: target/release/scratch-cli.exe
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
