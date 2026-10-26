@@ -56,7 +56,8 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 ; Close a running Scratch through the Restart Manager before files are replaced.
-; It is not restarted by the Restart Manager; the finish page offers "Launch Scratch".
+; It is not restarted by the Restart Manager; [Run] launches it (finish page, or
+; directly after a silent update).
 CloseApplications=yes
 RestartApplications=no
 
@@ -83,4 +84,9 @@ Root: HKCU; Subkey: "Software\Classes\notes\DefaultIcon"; ValueType: string; Val
 Root: HKCU; Subkey: "Software\Classes\notes\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""
 
 [Run]
+; Interactive install: the finish page offers "Launch Scratch".
 Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
+; Silent install (/SILENT): the app's "Restart to update" starts the installer
+; this way and then closes itself, so Scratch opens again once files are replaced.
+; See wiki/architecture/windows-install.md, "Updates".
+Filename: "{app}\{#AppExe}"; Flags: nowait skipifnotsilent

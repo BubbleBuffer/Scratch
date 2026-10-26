@@ -21,13 +21,14 @@ status: current
 
 ## CI workflows
 
-All workflows run on GitHub-hosted runners. Every workflow sets top-level `permissions: contents: read`; only the release publish job asks for `contents: write`.
+All workflows run on GitHub-hosted runners. Every workflow sets top-level `permissions: contents: read`; only the release and nightly publish jobs ask for `contents: write`.
 
 | Workflow | Runs on | What it does |
 |---|---|---|
 | `ci` | pushes to `main`, pull requests (forks included), manual | Rust: fmt (report only), clippy, `cargo test --workspace`. Flutter: analyze, add-on import check, generated bindings check, fast test tier (goldens excluded). |
 | `windows-build` | pushes to `main`, pull requests, manual | Windows app, installer and `notes` CLI as 7-day artifacts. Nothing is released. |
 | `release` | tag push `v*`, or manual dispatch with an existing tag | Builds the release assets and creates the GitHub release. See below. |
+| `nightly` | daily 02:30 UTC, manual | The Windows installer of `main` as a nightly pre-release, when `main` moved. See [Nightly builds](#nightly-builds). |
 | `private strings` | pushes, pull requests, manual | Runs `scripts/check-private-strings.sh`. See below. |
 
 ## Private strings check
@@ -63,10 +64,22 @@ The tag must look like `v<major>.<minor>.<patch>` with an optional `-<pre-releas
 
 The Android versionCode is the build time in epoch minutes, so each release is newer than the last. The GitHub APK is not release-signed; see below.
 
+## Nightly builds
+
+Added 2026-10-26. [.github/workflows/nightly.yml](../../.github/workflows/nightly.yml) feeds the Windows app's "Include nightly builds" channel ([Windows installer, Updates](windows-install.md#updates)).
+
+- **When.** Daily at 02:30 UTC, and by hand (`gh workflow run nightly.yml`; `-f force=true` builds an unchanged `main`). It skips when `main`'s HEAD is the commit of the newest nightly, or when today's tag already exists.
+- **Tag.** `v<base>-nightly.<YYYYMMDD>`. `<base>` is the version core of the newest non-nightly release (`v0.1.0-prealpha.11` gives `0.1.0`). `gh release create` creates the tag on `main`'s HEAD.
+- **Build.** The same script as release.yml (`scripts/build-windows-installer.sh`), so the nightly embeds its tag for the updater.
+- **Assets.** `Scratch-Setup-<base>-nightly.<YYYYMMDD>.exe` and `SHA256SUMS.txt` only, with no APK and no CLI. The release is a pre-release and never "latest".
+- **Pruning.** Nightly releases beyond the newest 7 are deleted together with their tags. Only tags containing `-nightly.` are touched.
+- **No recursion.** The tag is pushed with `GITHUB_TOKEN`, which starts no other workflows, so `release.yml` doesn't run for it. `release.yml` also refuses `-nightly.` tags.
+- **scratch-ops `apk-publish`.** It takes the single newest non-draft release by `created_at`, with no filter on tags or assets. It checks out that tag, then builds and publishes an APK from it. Unless it learns to skip `-nightly.` tags, it would publish every nightly to F-Droid. It would also miss a real release that a nightly follows before its next poll. Fix it in scratch-ops before `nightly.yml` is merged.
+
 ## How the APK reaches F-Droid
 
 1. A Scratch release is published (above).
-2. The scratch-ops `apk-publish` workflow polls Scratch releases every 30 minutes and downloads the arm64 APK.
+2. The scratch-ops `apk-publish` workflow polls Scratch releases every 30 minutes and takes the newest one. It checks out its tag and builds the arm64 APK itself; it does not download the release asset.
 3. The home Linux box release-signs it with `apk-publish notes` and publishes it to the private F-Droid repo. The signing key never leaves that box.
 4. A marker tag `apk-published/<tag>` records that the release is done.
 
