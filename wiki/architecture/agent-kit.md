@@ -1,14 +1,14 @@
 ---
 type: topic
 layer: state
-summary: "Scratch's UI tokens and notes-free primitives live in the public agent-kit repo (bb_tokens, bb_ui); Scratch pins a tag through git, its ui/ files re-export them, and how to bump the pin."
+summary: "Scratch consumes UI tokens and primitives from bb-ui and the optional chat pane from agent-kit; repository pins, compatibility and release updates."
 parent: "[[architecture/index]]"
 status: current
 ---
 
 # agent-kit dependency
 
-Since 2026-10-26, Scratch's design tokens and its notes-free UI primitives live in [BubbleBuffer/agent-kit](https://github.com/BubbleBuffer/agent-kit), a public Dart pub workspace shared with BubblePaw Desktop. Scratch's look is the kit's default.
+Scratch's design tokens and notes-free UI primitives come from [BubbleBuffer/bb-ui](https://github.com/BubbleBuffer/bb-ui), shared with BubblePaw Desktop. They were originally extracted into agent-kit on 2026-10-26. The separate [BubbleBuffer/agent-kit](https://github.com/BubbleBuffer/agent-kit) repository owns the agent-chat packages. Scratch's look is the UI packages' default.
 
 ## What comes from the kit
 
@@ -29,26 +29,26 @@ The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same f
 
 ## The pin
 
-`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to the commit of kit tag `v0.4.0` (`f1663dd`), because pub cannot take a tag ref for these path-based git packages:
+`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui's `v0.4.0` tag. Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
 
 ```yaml
   bb_ui:
     git:
-      url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: f1663dd9c6e8c9383543652e6fffde9165500a16
+      url: https://github.com/BubbleBuffer/bb-ui
+      ref: v0.4.0
       path: packages/bb_ui
 ```
 
-`bb_tokens` comes with it: `bb_ui` depends on it by a relative path inside the kit repo, which pub resolves at the tag's commit. Scratch reaches the tokens through `package:bb_ui/tokens.dart` (that is what `ui/tokens.dart` re-exports), so it does not declare `bb_tokens` itself. Declaring it with `ref: v0.1.0` fails version solving: pub pins the transitive copy to the commit and the direct one to the tag name, and treats them as different sources. `pubspec.lock` records the tag's commit as `resolved-ref`.
+`bb_tokens` comes with it: `bb_ui` depends on it by a relative path inside bb-ui, which pub resolves at the tag's commit. Scratch reaches the tokens through `package:bb_ui/tokens.dart` (that is what `ui/tokens.dart` re-exports), so it does not declare `bb_tokens` itself. Declaring it directly with a tag ref conflicts with the transitive copy's commit ref: pub treats them as different sources. The generated `pubspec.lock` records each resolved commit as `resolved-ref`.
 
 ## Bumping it
 
-1. Release the kit first: merge the change there with CI green and push an annotated tag `vX.Y.Z` (see the kit's `docs/package-layout.md`).
-2. In Scratch, change `ref:` to the new tag, run `flutter pub get` in `app/`, and commit `pubspec.yaml` and `pubspec.lock` together.
+1. Release bb-ui first when its packages change: merge with CI green and push an annotated tag. Update agent-kit's bb_ui dependency to that exact URL, ref and path, then release agent-kit with an annotated tag (see its `docs/package-layout.md`).
+2. In Scratch, match bb_ui's declaration to agent-kit's, and pin both `agent_kit` and `agent_kit_core` to the full commit SHA of the new agent-kit tag. Run `flutter pub get` in `app/` on the build host, then commit `pubspec.yaml` and the generated `pubspec.lock` together. Run analyze, add-on boundaries and the kit backend tests there; require CI green.
 3. If the kit changed anything visible, the pull request shows before/after screenshots and updates the goldens on purpose.
 
 To try an unreleased kit change, point `ref:` at a branch or commit for a draft pull request, or use `dependency_overrides` with local `path:` entries; never merge either.
 
 ## The dev pane's packages
 
-The Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) uses `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. All three kit packages (`bb_ui`, `agent_kit`, `agent_kit_core`) are pinned to the commit of kit tag `v0.4.0` (`f1663dd`) and move together at each bump: move them to the next tag's commit. `agent_kit` depends on `bb_ui` by path, so pub resolves it as git at that commit and a tag ref on the direct dependency fails version solving.
+The Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) uses `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.5.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
