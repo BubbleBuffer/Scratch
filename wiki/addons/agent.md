@@ -42,6 +42,6 @@ Mapping gaps (Scratch concept dropped or reduced):
 - Only pending approvals are in a snapshot (no resolved history, no diff). Queued inputs, plan, children, jobs, questions, reasoning text and the context meter do not exist in Scratch; usage holds the last run's token counts only.
 - Tool rows are grouped per assistant message, with output cut at 4000 characters; the target is guessed from common argument names. Page edits become file-edit items; an undone edit shows only after a reload.
 - The workspace is the project name; branch and worktree do not exist.
-- The port has no capability for sending, cancelling or approving, so those commands report `steer` as the missing capability.
+- Send, cancel, approval and chat creation are not declared; their commands report the corresponding missing capability. The pane derives its read-only controls from those declarations.
 
 Tests: `app/test/addons/agent/kit_backend_test.dart` (synthetic sessions: mapping, events, unsupported commands, and the kit pane drawing a chat).
