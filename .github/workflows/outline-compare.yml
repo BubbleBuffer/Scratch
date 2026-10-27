@@ -82,6 +82,22 @@ jobs:
           echo "compared $(wc -l < base.sha) images; differing: $(find out/base -name '*.png' | wc -l)"
           grep -E '^[0-9:]+ \+[0-9]+' base.log | tail -1
           grep -E '^[0-9:]+ \+[0-9]+' head.log | tail -1
+      - name: Geometry of the chat rows on both sides
+        env:
+          NOTES_BRIDGE_LIB: ${{ github.workspace }}/head/target/release/libnotes_bridge.so
+          NOTES_FAKE_EXTENSION: ${{ github.workspace }}/BubblePaw-Core/target/debug/bubblepaw-fake-extension
+        run: |
+          for side in base head; do
+            f=$side/app/test/zz_geometry_test.dart
+            cp $side/app/test/agent_outline_widget_test.dart $f
+            sed -i '1i import "dart:io";' $f
+            sed -i '$ d' $f
+            cat head/.github/outline-geometry.snippet >> $f
+            (cd $side/app && GEOM_OUT=$GITHUB_WORKSPACE/geom_$side.txt flutter test --concurrency=1 --plain-name "geometry dump" test/zz_geometry_test.dart > ../../geom_$side.log 2>&1 || true)
+            tail -5 geom_$side.log
+          done
+          wc -l geom_base.txt geom_head.txt
+          diff geom_base.txt geom_head.txt && echo "GEOMETRY IDENTICAL" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -92,3 +108,7 @@ jobs:
             head.log
             base.sha
             head.sha
+            geom_base.txt
+            geom_head.txt
+            geom_base.log
+            geom_head.log

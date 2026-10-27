@@ -1,0 +1,67 @@
+
+  appTest('geometry dump', (tester) async {
+    await pumpApp(tester, mobile: false, empty: true);
+    final store = await openAgentStore(tester);
+    await _seed(tester, store);
+    final out = StringBuffer();
+    String r(Finder f) {
+      if (f.evaluate().isEmpty) return 'none';
+      final a = tester.getTopLeft(f.first), b = tester.getBottomRight(f.first);
+      return '${a.dx.toStringAsFixed(1)},${a.dy.toStringAsFixed(1)} - ${b.dx.toStringAsFixed(1)},${b.dy.toStringAsFixed(1)}';
+    }
+
+    Future<void> pump(bool panel, double width) async {
+      await tester.pumpWidget(
+        NotesShell(
+          forceDark: false,
+          navigatorKey: GlobalKey<NavigatorState>(),
+          wrap: (child) => AppScope(state: current.app, child: child),
+          home: Center(
+            child: SizedBox(
+              width: width,
+              height: 650,
+              child: AgentChat(store: store, panel: panel),
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+    }
+
+    for (final (panel, width) in [(false, 1100.0), (true, 420.0)]) {
+      for (final outlined in [true, false]) {
+        await pump(panel, width);
+        _install(store, outlined: outlined);
+        await settle(tester);
+        out.writeln('== panel=$panel width=$width outlined=$outlined');
+        out.writeln('chat ${r(find.byType(AgentChat))}');
+        out.writeln('strip ${r(key('outline-where'))}');
+        out.writeln('card0 ${r(key('outline-chapter-c0'))}');
+        if (outlined) {
+          await tapAndSettle(tester, key('outline-card-show-c0'));
+          out.writeln('card0 shown ${r(key('outline-chapter-c0'))}');
+          await tapAndSettle(tester, key('outline-where'));
+          out.writeln('contents ${r(key('outline-contents'))}');
+          await tester.tapAt(const Offset(2, 2));
+          await settle(tester);
+        }
+        final users = find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('agent-msg-u'),
+        );
+        for (final e in users.evaluate().take(3)) {
+          out.writeln(
+            'user ${(e.widget.key! as ValueKey<String>).value} ${r(find.byWidget(e.widget))}',
+          );
+        }
+        final turns = find.byType(AgentTurnView).evaluate().take(2);
+        for (final e in turns) {
+          out.writeln('turn ${r(find.byWidget(e.widget))}');
+        }
+      }
+    }
+    File(Platform.environment['GEOM_OUT'] ?? '/tmp/geom.txt')
+        .writeAsStringSync(out.toString());
+  });
+}
