@@ -13,19 +13,13 @@ import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/core/models.dart';
 
 import 'agent_test.dart' show openAgentStore;
+import 'cert_helpers.dart' show homeContext;
 import 'harness.dart';
 import 'search_hits_fixture.dart';
 import 'sync_helpers.dart' show real;
 
-/// A context below an Overlay (Overlay.of looks at ancestors), as a toast needs.
-BuildContext _overlayContext(WidgetTester tester) => tester.element(
-  find
-      .descendant(
-        of: find.byType(Overlay).first,
-        matching: find.byWidgetPredicate((_) => true),
-      )
-      .first,
-);
+/// A context under the app's Overlay, as a toast needs (the home screen's).
+BuildContext _overlayContext(WidgetTester tester) => homeContext(tester);
 
 void main() {
   setUpAll(initCore);

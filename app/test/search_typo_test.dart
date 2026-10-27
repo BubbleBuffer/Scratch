@@ -1,9 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:notes_app/shell/search.dart';
 
 import 'harness.dart';
+import 'search_hits_fixture.dart' show shownHits;
 
 void main() {
   setUpAll(initCore);
@@ -38,12 +38,7 @@ void main() {
       hint.textSpan!.toPlainText().toLowerCase(),
       'showing results for tomato',
     );
-    expect(
-      tester
-          .widgetList<SearchResultRow>(find.byType(SearchResultRow))
-          .every((row) => row.hit.fuzzy),
-      isTrue,
-    );
+    expect(shownHits(tester).every((hit) => hit.fuzzy), isTrue);
 
     final exact = (await tester.runAsync(() async {
       // A substring hit leaves the query word absent from the vocabulary,
@@ -56,12 +51,10 @@ void main() {
     await settle(tester);
     await tester.enterText(field, 'tomatoe');
     await settle(tester);
-    final rows = tester.widgetList<SearchResultRow>(
-      find.byType(SearchResultRow),
-    );
-    expect(rows.first.hit.id, exact);
-    expect(rows.first.hit.fuzzy, isFalse);
-    expect(rows.any((row) => row.hit.fuzzy), isTrue);
+    final rows = shownHits(tester);
+    expect(rows.first.id, exact);
+    expect(rows.first.fuzzy, isFalse);
+    expect(rows.any((hit) => hit.fuzzy), isTrue);
     expect(find.byKey(hintKey), findsNothing);
 
     await tester.enterText(field, 'tomato');
