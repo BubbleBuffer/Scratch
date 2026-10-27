@@ -1,9 +1,10 @@
 // The type filter chips of the search panel: All, Pages and one per registered
 // source, plus a removable chip for each other `type:` value in the query.
+// The pills are bb_ui's; this file decides which chips a query shows.
 
+import 'package:bb_ui/search.dart' as bb;
 import 'package:flutter/widgets.dart';
 
-import '../ui/ui.dart';
 import 'addons.dart';
 import 'search_groups.dart';
 
@@ -47,13 +48,11 @@ class SearchTypeChips extends StatelessWidget {
     final dynamicValues = matchesFixed
         ? const <String>[]
         : (active.toList()..sort());
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
+    return bb.SearchTypeChips(
+      chips: [
         for (final (id, label, types) in fixed)
-          _TypeChip(
-            key: ValueKey('search-type-$id'),
+          bb.SearchTypeChip(
+            id: id,
             label: label,
             selected: types.isEmpty
                 ? active.isEmpty
@@ -67,8 +66,8 @@ class SearchTypeChips extends StatelessWidget {
             },
           ),
         for (final value in dynamicValues)
-          _TypeChip(
-            key: ValueKey('search-type-value-$value'),
+          bb.SearchTypeChip(
+            id: 'value-$value',
             label: typeChipLabel(value),
             selected: true,
             removable: true,
@@ -85,64 +84,3 @@ class SearchTypeChips extends StatelessWidget {
 
 bool _sameTypes(Set<String> a, Set<String> b) =>
     a.length == b.length && a.containsAll(b);
-
-class _TypeChip extends StatelessWidget {
-  const _TypeChip({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.removable = false,
-  });
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  /// Whether the chip ends with a close mark (its tap removes the value).
-  final bool removable;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final ty = context.type;
-    final m = context.mobile;
-    final ink = selected ? c.bgPrimary : c.textSecondary;
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        // No alignment here: an aligned Container fills the Wrap's width, and
-        // each chip would then take its own row.
-        child: Container(
-          constraints: BoxConstraints(minHeight: m ? Layout.minTapTarget : 24),
-          padding: EdgeInsets.symmetric(horizontal: m ? 12 : 10),
-          decoration: BoxDecoration(
-            color: selected ? c.textPrimary : null,
-            border: Border.all(color: selected ? c.textPrimary : c.border),
-            borderRadius: Radii.pill,
-          ),
-          // Centred at the content's own width, so the pill keeps its minimum
-          // height without stretching across the Wrap.
-          child: Center(
-            widthFactor: 1,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: ts(m ? ty.ui : ty.uiSmall, ink, weight: 500),
-                ),
-                if (removable) ...[
-                  const SizedBox(width: 4),
-                  Icon20(Ico.close, size: 12, color: ink),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

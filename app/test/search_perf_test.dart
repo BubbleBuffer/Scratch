@@ -23,6 +23,7 @@ import 'package:notes_app/state/app_state.dart';
 import 'package:notes_app/ui/ui.dart';
 
 import 'harness.dart' show finishAsync, initCore, loadFonts, resetTestClock;
+import 'search_hits_fixture.dart' show shownHits;
 
 const _pages = 10000;
 const _query = 'apple';
@@ -198,10 +199,7 @@ Future<List<double>> _typeQuery(
       if (mentions) {
         expect(_key('mention-page-${probe.last.first.id}'), findsOneWidget);
       } else {
-        final first = tester
-            .widgetList<SearchResultRow>(find.byType(SearchResultRow))
-            .first;
-        expect(first.hit.id, probe.last.first.id);
+        expect(shownHits(tester).first.id, probe.last.first.id);
       }
       if (round >= 0) samples.add(watch.elapsedMicroseconds / 1000);
     }

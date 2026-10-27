@@ -29,13 +29,13 @@ The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same f
 
 ## The pin
 
-`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui's `v0.4.0` tag. Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
+`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui's `v0.5.0` tag. Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
 
 ```yaml
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/bb-ui
-      ref: v0.4.0
+      ref: v0.5.0
       path: packages/bb_ui
 ```
 
@@ -51,7 +51,7 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The dev pane's packages
 
-The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.7.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.7.1`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
 
 ## The chat outline
 
@@ -61,4 +61,4 @@ The kit reads its tokens through `BbThemeScope`. `NotesShell` wraps the app in o
 
 ## Search widgets
 
-The search UI is shared by the Ctrl+K overlay, the mobile search screen and home's inline results. `app/lib/shell/search_widgets.dart` only re-exports three files: `search_result_widgets.dart` (result rows, highlighted text, group headers and the grouped list), `search_type_chips.dart` (the `type:` chips) and `search_panel_body.dart` (the overlay body and its keyboard selection). Rows from registered sources are opaque to them: a hit's `target` is read only by the source that wrote it, and `openChatHit` (`addons/agent/chat_search.dart`) is the Agent source's open. `ChatSearchTarget` (`chat_search_target.dart`) reads and writes that JSON and imports nothing from navigation. `test/search_open_contract_test.dart` pins the open contract: a malformed target says why, an anchored hit asks for its range with the hit's labels, and a chat the agent does not have is reported.
+The search presentation is bb_ui's (`package:bb_ui/search.dart`, imported as `bb`): `SearchPanel` (field, filter slot, arrow and Enter selection, notes), `SearchResultsList`, `SearchResultRow`, `SearchGroupHeader`, `HighlightedText` and `SearchTypeChips` over neutral `SearchResult`, `SearchResultSection` and `SearchTypeChip` models, with `termHighlights` for the marked ranges. Scratch keeps the mapping and the data. It is shared by the Ctrl+K overlay, the mobile search screen and home's inline results through `app/lib/shell/search_widgets.dart`, which re-exports three files: `search_result_widgets.dart` (`searchResultOf` maps a `Hit` to a `bb.SearchResult`: title tone, page icon and path or the source's icon, highlights; plus the Hit-typed `SearchResultRow` and `SearchResultsList` adapters that map a picked result back to its `Hit`), `search_type_chips.dart` (which `type:` chips a query shows, drawn by bb) and `search_panel_body.dart` (a thin wrapper around `bb.SearchPanel` that keeps the `type:` rewrite). The shared list builds all result models up front instead of one per visible row. Rows from registered sources are opaque to them: a hit's `target` is read only by the source that wrote it, and `openChatHit` (`addons/agent/chat_search.dart`) is the Agent source's open. `ChatSearchTarget` (`chat_search_target.dart`) reads and writes that JSON and imports nothing from navigation. `test/search_open_contract_test.dart` pins the open contract: a malformed target says why, an anchored hit asks for its range with the hit's labels, and a chat the agent does not have is reported.

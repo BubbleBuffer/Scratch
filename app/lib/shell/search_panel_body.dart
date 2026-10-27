@@ -1,13 +1,12 @@
-// The desktop search overlay's content: the field, the type chips, the grouped
-// results and the explanation lines. The body owns its keyboard selection.
+// The desktop search overlay's content: bb_ui's search panel over the vault's
+// hits, with Scratch's type chips and the `type:` rewrite behind them.
 
 import 'dart:async';
 
-import 'package:flutter/services.dart';
+import 'package:bb_ui/search.dart' as bb;
 import 'package:flutter/widgets.dart';
 
 import '../core/models.dart';
-import '../ui/ui.dart';
 import 'search_groups.dart';
 import 'search_result_widgets.dart';
 import 'search_type_chips.dart';
@@ -56,33 +55,6 @@ class SearchPanelBody extends StatefulWidget {
 }
 
 class _SearchPanelBodyState extends State<SearchPanelBody> {
-  late final _focus = FocusNode(onKeyEvent: _key);
-  int _active = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focus.requestFocus();
-    });
-  }
-
-  @override
-  void didUpdateWidget(SearchPanelBody old) {
-    super.didUpdateWidget(old);
-    // A new result list starts at the first row, as the overlay always did.
-    if (!identical(old.hits, widget.hits)) _active = 0;
-  }
-
-  @override
-  void dispose() {
-    _focus.dispose();
-    super.dispose();
-  }
-
-  List<Hit> get _order =>
-      flattenSections(groupSearchHits(widget.hits ?? const []));
-
   Future<void> _setTypes(Set<String> types) async {
     final text = widget.controller.text;
     final next = await widget.rewriteTypes(text, types);
@@ -95,109 +67,35 @@ class _SearchPanelBodyState extends State<SearchPanelBody> {
     widget.onQueryChanged(next);
   }
 
-  KeyEventResult _key(FocusNode _, KeyEvent e) {
-    if (e is! KeyDownEvent && e is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    final hits = _order;
-    final k = e.logicalKey;
-    if (k == LogicalKeyboardKey.arrowDown && hits.isNotEmpty) {
-      setState(() => _active = (_active + 1) % hits.length);
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.arrowUp && hits.isNotEmpty) {
-      setState(() => _active = (_active - 1 + hits.length) % hits.length);
-      return KeyEventResult.handled;
-    }
-    if ((k == LogicalKeyboardKey.enter ||
-            k == LogicalKeyboardKey.numpadEnter) &&
-        hits.isNotEmpty) {
-      widget.onPick(hits[_active.clamp(0, hits.length - 1)]);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    final ty = context.type;
     final hits = widget.hits;
-    final correction = widget.correction;
-    final sections = groupSearchHits(hits ?? const []);
-    Widget note(String s) => Padding(
-      padding: const EdgeInsets.all(16),
-      child: Text(s, style: ts(ty.ui, c.textTertiary, weight: 400)),
-    );
-    return Column(
+    final shown = hits == null
+        ? null
+        : searchSectionsOf(context, groupSearchHits(hits), terms: widget.terms);
+    final sections = shown?.$1;
+    final hitOf = shown?.$2;
+    return bb.SearchPanel(
       key: const ValueKey('search-overlay'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: SearchField(
-            fieldKey: const ValueKey('search-overlay-field'),
-            controller: widget.controller,
-            focusNode: _focus,
-            onChanged: widget.onQueryChanged,
-            placeholder: widget.mixed ? 'Search pages and chats…' : null,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          child: SearchTypeChips(
-            active: widget.activeTypes,
-            onPick: (types) => unawaited(_setTypes(types)),
-          ),
-        ),
-        HLine(color: c.divider),
-        Expanded(
-          child: hits == null
-              ? note(
-                  widget.mixed
-                      ? 'Search page titles, text and chats.'
-                      : 'Search page titles and text.',
-                )
-              : hits.isEmpty
-              ? note('No results')
-              : SearchResultsList(
-                  sections: sections,
-                  mobile: false,
-                  active: _active.clamp(0, hits.length - 1),
-                  terms: widget.terms,
-                  padding: const EdgeInsets.all(6),
-                  onPick: widget.onPick,
-                ),
-        ),
-        if (widget.narrowed)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Text(
-              'Showing title matches — keep typing to search page text',
-              key: const ValueKey('search-narrowed-hint'),
-              style: ts(ty.uiSmall, c.textTertiary, weight: 400),
-            ),
-          ),
-        if (correction != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(text: 'Showing results for '),
-                  TextSpan(
-                    text: correction,
-                    style: const TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                ],
-              ),
-              key: const ValueKey('search-correction-hint'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: ts(ty.uiSmall, c.textTertiary, weight: 400),
-            ),
-          ),
-      ],
+      controller: widget.controller,
+      fieldKey: const ValueKey('search-overlay-field'),
+      placeholder: widget.mixed ? 'Search pages and chats…' : null,
+      onQueryChanged: widget.onQueryChanged,
+      onPick: (result) => widget.onPick(hitOf![result]!),
+      sections: sections,
+      filters: SearchTypeChips(
+        active: widget.activeTypes,
+        onPick: (types) => unawaited(_setTypes(types)),
+      ),
+      idleNote: widget.mixed
+          ? 'Search page titles, text and chats.'
+          : 'Search page titles and text.',
+      narrowedNote: widget.narrowed
+          ? 'Showing title matches — keep typing to search page text'
+          : null,
+      correction: widget.correction,
+      // A new result list starts at the first row, as the overlay always did.
+      selectionResetKey: widget.hits,
     );
   }
 }
