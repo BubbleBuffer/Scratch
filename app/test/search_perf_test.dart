@@ -18,7 +18,6 @@ import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/features/reminders/backends.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
 import 'package:notes_app/shell/app_shell.dart';
-import 'package:notes_app/shell/search.dart';
 import 'package:notes_app/state/app_state.dart';
 import 'package:notes_app/ui/ui.dart';
 
