@@ -13,7 +13,7 @@ dependencies:
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: a3ded63280d3ed82622b547b198e2a245ba3b35f
+      ref: f1663dd9c6e8c9383543652e6fffde9165500a16
       path: packages/bb_ui
   device_info_plus: ^13.3.0
   file_picker: ^13.1.0
@@ -28,17 +28,18 @@ dependencies:
   url_launcher: 6.3.3
   notes_bridge:
     path: rust_builder
-  # The shared agent kit, pinned to a commit on its main. Only the dev pane
-  # (addons/agent/kit_*.dart) uses it.
+  # The shared agent kit, pinned to the commit of kit tag v0.4.0 (f1663dd):
+  # pub cannot take a tag ref for these path-based git packages. Only the dev
+  # pane (addons/agent/kit_*.dart) uses it.
   agent_kit:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: a3ded63280d3ed82622b547b198e2a245ba3b35f
+      ref: f1663dd9c6e8c9383543652e6fffde9165500a16
       path: packages/agent_kit
   agent_kit_core:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: a3ded63280d3ed82622b547b198e2a245ba3b35f
+      ref: f1663dd9c6e8c9383543652e6fffde9165500a16
       path: packages/agent_kit_core
 
 dev_dependencies:
