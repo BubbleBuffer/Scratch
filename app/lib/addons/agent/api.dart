@@ -8,7 +8,6 @@ export 'agent_composer.dart';
 export 'agent_markdown.dart';
 export 'agent_mcp_settings.dart';
 export 'agent_outline.dart';
-export 'agent_outline_view.dart';
 export 'agent_panel.dart';
 export 'agent_screen.dart';
 export 'agent_search_source.dart';

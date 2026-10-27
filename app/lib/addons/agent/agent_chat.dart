@@ -1,20 +1,28 @@
 import '../../services/addon_services.dart';
 
+import 'package:agent_kit/agent_kit.dart'
+    show
+        ItemRow,
+        OutlineAction,
+        OutlineControllerContents,
+        OutlineChapter,
+        OutlineList,
+        OutlineSection,
+        OutlineWhereStrip,
+        outlineSegments,
+        outlineStripColors;
 import 'package:flutter/widgets.dart';
 
-import '../../ui/anchored_list.dart';
 import '../../ui/ui.dart';
 import 'add_to_note.dart';
 import 'agent_composer.dart';
 import 'agent_outline.dart';
-import 'agent_outline_view.dart';
 import 'agent_store.dart';
 import 'agent_transcript.dart';
 import 'chat_reader_controller.dart';
 import 'chat_reference.dart';
 import 'chat_transcript_view.dart';
 import 'dev_replay.dart';
-import 'outline_read_state.dart';
 
 const agentEmptyLine =
     'Ask the agent to find, summarize, write or reorganize pages in this vault. Its edits show in page history like your own.';
@@ -37,23 +45,15 @@ class AgentChat extends StatefulWidget {
 }
 
 class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
-  /// What the reader has folded, opened and collapsed in the outline.
-  late final OutlineReadState _read;
-
-  /// Where the reader is, and how they move through the transcript.
+  /// Where the reader is, and how they move through the transcript. It holds
+  /// the outline's folds and jumps.
   late final ChatReaderController _reader;
 
   @override
   void initState() {
     super.initState();
-    _read = OutlineReadState(
-      vsync: this,
-      mounted: () => mounted,
-      update: setState,
-      pinTop: () => _reader.list.pinTop(),
-    );
     _reader = ChatReaderController(
-      read: _read,
+      vsync: this,
       store: () => widget.store,
       presentation: () => _presentation,
       mounted: () => mounted,
@@ -75,7 +75,6 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
   @override
   void dispose() {
     widget.store.showSession(false);
-    _read.dispose();
     _reader.dispose();
     super.dispose();
   }
@@ -84,39 +83,23 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
   AgentPresentation get _presentation =>
       widget.panel ? AgentPresentation.dock : AgentPresentation.screen;
 
-  /// Opens the contents sheet; a tap there reveals the chapter or section.
-  void _openContents() {
-    showOutlineContents(
-      context,
-      outline: _reader.outline,
-      where: _reader.where.value,
-      onChapter: _reader.openChapter,
-      onSection: (chapter, section) => _reader.jump(
-        section.first,
-        section.last,
-        sectionKey: 'sec:${section.id}',
-      ),
-    );
-  }
-
-  void _chapterMenu(ChapterView chapter) {
-    showOutlineMenu(
-      context,
-      actions: [('Add to note…', Ico.plus, () => _addToNote(chapter, null))],
-    );
-  }
-
-  void _sectionMenu(ChapterView chapter, SectionView section) {
-    showOutlineMenu(
-      context,
-      actions: [('Add to note…', Ico.plus, () => _addToNote(chapter, section))],
-    );
-  }
+  /// What the outline's menus and open cards offer for a chapter, or for one
+  /// of its sections.
+  List<OutlineAction> _menuActions(
+    OutlineChapter chapter,
+    OutlineSection? section,
+  ) => [
+    OutlineAction(
+      label: 'Add to note…',
+      icon: Ico.plus,
+      onSelected: () => _addToNote(chapter, section),
+    ),
+  ];
 
   /// Adds the chapter, or its section, to a note through the reference sheet.
-  /// The outline keeps its own view types, so the raw chapter from the store
+  /// The kit's outline keeps its own types, so the raw chapter from the store
   /// is found by id.
-  void _addToNote(ChapterView chapter, SectionView? section) {
+  void _addToNote(OutlineChapter chapter, OutlineSection? section) {
     final store = widget.store;
     final sessionId = store.openId;
     final raw = store.outline.chapters
@@ -161,13 +144,10 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
       final c = context.colors;
       if (_reader.stateFor != store.openId) {
         _reader.stateFor = store.openId;
-        _read.reset();
         _reader.reset();
       }
       final messages = store.state?.messages ?? const <AgentMessage>[];
-      final outline = store.outline.chapters.isEmpty
-          ? OutlineView.empty
-          : OutlineView.of(store.outline, messages: messages);
+      final outline = kitOutline(store.outline, messages: messages);
       final changed = !identical(_reader.rawOutline, store.outline);
       final sent =
           messages.length > _reader.lastMessages &&
@@ -185,21 +165,21 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
       final plainTop = !_reader.indexed && !outline.isEmpty
           ? _reader.plainTop()
           : null;
+      final fold = _reader.controller.fold;
       if (plainTop != null && !_reader.plainAtEnd) {
         // An already-closed chapter arriving around the reader stays open.
-        final item = _reader.layout!.rows
+        final previous = _reader.controller.layout!;
+        final item = previous.rows
             .whereType<ItemRow>()
             .where(
               (r) =>
-                  'item:${_reader.layout!.firstMessageFor(r.item.id) ?? r.item.id.split('#').first}' ==
+                  'item:${previous.firstAnchorFor(r.itemId) ?? r.itemId.split('#').first}' ==
                   plainTop.key,
             )
             .firstOrNull;
         final msg =
             _reader.readingAnchor?.id ??
-            (item == null
-                ? null
-                : _reader.layout!.firstMessageFor(item.item.id));
+            (item == null ? null : previous.firstAnchorFor(item.itemId));
         final position = msg == null
             ? -1
             : messages.indexWhere((m) => m.id == msg);
@@ -207,20 +187,11 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
           final a = messages.indexWhere((m) => m.id == chapter.first);
           final b = messages.indexWhere((m) => m.id == chapter.last);
           if (!chapter.ongoing && a >= 0 && a <= position && b >= position) {
-            _read.shown[chapter.first] = true;
-            _read.deferred.add(chapter.first);
+            fold.shown[chapter.first] = true;
+            fold.deferred.add(chapter.first);
           }
         }
       }
-      // The anchor is measured after layout; walking children during build is
-      // unsafe while the lazy transcript is replacing its rows.
-      _read.closeFolds(
-        outline,
-        _reader.chaptersInView(),
-        messages,
-        _reader.readingAnchor?.id,
-      );
-      _reader.outline = outline;
       final messageIds = [for (final m in messages) m.id];
       final segments = outlineSegments(outline, messageIds);
       final anchors = <String, String>{};
@@ -232,22 +203,23 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
         anchorOf: anchors,
         segmentOf: segments.isEmpty ? null : segments,
       );
-      final layout = OutlineLayout.build(
+      final itemOf = {for (final item in items) item.id: item};
+      // The anchor is measured after layout; walking children during build is
+      // unsafe while the lazy transcript is replacing its rows.
+      _reader.controller.sync(
         outline: outline,
-        items: items,
-        messageIds: messageIds,
+        itemIds: [for (final item in items) item.id],
+        anchorIds: messageIds,
         anchorOf: anchors,
-        folded: _read.hidden,
+        topAnchorId: _reader.readingAnchor?.id,
       );
-      _reader.layout = layout;
-      _read.rekey(layout, outline);
       final wasIndexed = _reader.indexed;
       _reader.indexed =
           _reader.indexed ||
           !outline.isEmpty ||
           store.pendingFor(_presentation) != null;
       if (_reader.indexed && !wasIndexed && plainTop != null) {
-        final index = _read.indexOfKey(plainTop.key);
+        final index = fold.indexOfKey(plainTop.key);
         if (index != null) {
           _reader.restore = (
             index: index,
@@ -265,22 +237,11 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
         );
       }
       _reader.scheduleReaderMeasure();
-      if (!outline.isEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _reader.refreshWhere();
-        });
-      }
       _reader.maybeTakePending();
       final rows = ChatTranscriptView(
         context: this.context,
         store: store,
         reader: _reader,
-        read: _read,
-        onChapterMenu: _chapterMenu,
-        onSectionMenu: _sectionMenu,
-        onAddToNote: _addToNote,
-        onExpandedChanged: (first, open) =>
-            setState(() => _read.expanded[first] = open),
       );
       // Android stays in Hub mode; signed-out chat offers browser sign-in.
       final signIn = store.requiresHubSignIn;
@@ -348,18 +309,24 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
               ),
             )
           : _reader.indexed
-          ? AnchoredList(
-              controller: _reader.list,
-              itemCount: layout.rows.length,
+          ? OutlineList(
+              controller: _reader.controller,
               padding: padding,
-              onVisibleRangeChanged: _reader.onVisible,
-              keyOf: (i) =>
-                  i < _read.stableKeys.length ? _read.stableKeys[i] : null,
-              indexOf: _read.indexOfKey,
               initialIndex: _reader.restore?.index,
               initialY: _reader.restore?.y ?? 0,
               initialGlobalY: _reader.restore?.globalY,
-              itemBuilder: (context, i) => rows.rowView(layout.rows[i]),
+              itemBuilder: (context, row) => switch (itemOf[row.itemId]) {
+                final item? => rows.itemView(item),
+                null => const SizedBox.shrink(),
+              },
+              chapterActions: (chapter) => _menuActions(chapter, null),
+              sectionActions: _menuActions,
+              cardActions: (chapter) => [
+                OutlineAction(
+                  label: 'Add to note',
+                  onSelected: () => _addToNote(chapter, null),
+                ),
+              ],
             )
           : ListView.builder(
               key: _reader.plainViewport,
@@ -417,12 +384,9 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
                 ),
               if (!outline.isEmpty)
                 OutlineWhereStrip(
-                  where: _reader.where,
-                  onTap: _openContents,
-                  colors: {
-                    for (var i = 0; i < outline.chapters.length; i++)
-                      outline.chapters[i].id: outlineColor(context, i),
-                  },
+                  where: _reader.controller.where,
+                  onTap: () => _reader.controller.showContents(context),
+                  colors: outlineStripColors(context, outline),
                 ),
               Expanded(
                 child: NotificationListener<ScrollNotification>(
