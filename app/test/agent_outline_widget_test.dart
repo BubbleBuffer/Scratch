@@ -3,13 +3,13 @@
 // sections. Goldens for the folded card and the contents, in both themes.
 // Baselines live under goldens/outline and are made with --update-goldens.
 
+import 'package:agent_kit/agent_kit.dart' show AnchoredList, OutlineFlash;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/shell/app_shell.dart';
 import 'package:notes_app/src/rust/api/agent.dart';
 import 'package:notes_app/state/app_state.dart';
-import 'package:notes_app/ui/anchored_list.dart';
 
 import 'agent_test.dart' show openAgentStore;
 import 'harness.dart';

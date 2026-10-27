@@ -1,3 +1,4 @@
+import 'package:agent_kit/agent_kit.dart' as kit;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
@@ -40,24 +41,29 @@ void main() {
     testWidgets('chat sentence chapter folded $tag', (tester) async {
       await tester.pumpWidget(
         themed(
-          OutlineChapterCard(
-            chapter: OutlineView.of(ChatOutline(chapters: [chapter]))
-                .chapters
-                .first,
-            color: const Color(0xffdd925b),
-            messagesShown: false,
-            onToggleMessages: () {},
-            onAddToNote: () {},
-            onOpenSection: (_) {},
+          kit.BbThemeScope(
+            brightness: dark ? Brightness.dark : Brightness.light,
+            child: kit.OutlineChapterCard(
+              chapter: kitOutline(ChatOutline(chapters: [chapter]))
+                  .chapters
+                  .first,
+              color: const Color(0xffdd925b),
+              messagesShown: false,
+              onToggleMessages: () {},
+              actions: [
+                kit.OutlineAction(label: 'Add to note', onSelected: () {}),
+              ],
+              onOpenSection: (_) {},
+            ),
           ),
           dark: dark,
         ),
       );
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('BubblePlay headless cursor'), findsOneWidget);
-      expect(find.byType(DecisionLine), findsNothing);
+      expect(find.textContaining('◆'), findsNothing);
       await expectLater(
-        find.byType(OutlineChapterCard),
+        find.byType(kit.OutlineChapterCard),
         matchesGoldenFile(
           'goldens/outline-polish/chat-chapter-folded-$tag.png',
         ),
@@ -111,7 +117,7 @@ void main() {
       );
     });
     testWidgets('full width where strip $tag', (tester) async {
-      final where = ValueNotifier<OutlineWhere>((
+      final where = ValueNotifier<kit.OutlineWhere>((
         chapter: 'BubblePlay headless cursor',
         section: 'Mouse Keys fix',
         chapterId: 'cursor',
@@ -120,10 +126,13 @@ void main() {
       var taps = 0;
       await tester.pumpWidget(
         themed(
-          OutlineWhereStrip(
-            where: where,
-            colors: const {'cursor': Color(0xffdd925b)},
-            onTap: () => taps++,
+          kit.BbThemeScope(
+            brightness: dark ? Brightness.dark : Brightness.light,
+            child: kit.OutlineWhereStrip(
+              where: where,
+              colors: const {'cursor': Color(0xffdd925b)},
+              onTap: () => taps++,
+            ),
           ),
           dark: dark,
         ),
@@ -132,7 +141,7 @@ void main() {
       await tester.tap(find.text('Contents ▾'));
       expect(taps, 1);
       await expectLater(
-        find.byType(OutlineWhereStrip),
+        find.byType(kit.OutlineWhereStrip),
         matchesGoldenFile('goldens/outline-polish/strip-$tag.png'),
       );
       await tester.pumpWidget(const SizedBox());

@@ -51,4 +51,10 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The dev pane's packages
 
-The Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) uses `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.6.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.7.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+
+## The chat outline
+
+Chapter cards and headings, section dividers, the where-am-I strip, Contents and their menus, the fold and jump state, the indexed list and its row layout come from the kit (`OutlineController`, `OutlineList`, `OutlineWhereStrip` and the rest of `agent_kit`'s outline area). Scratch's side is `addons/agent/agent_outline.dart` (the store's `ChatOutline` becomes the kit's `Outline`), `ChatReaderController` (composes the kit's `OutlineController`; keeps following the end of a live reply, pending references, the plain list and `keepMessagePosition`) and `AgentChat`, which passes the host actions as `OutlineAction`s. `ItemRow` carries an item id, so the chat looks the item up when a row is built. The chat itself, `AgentChat(store, panel)`, is unchanged.
+
+The kit reads its tokens through `BbThemeScope`. `NotesShell` wraps the app in one, above the navigator, because the kit's sheets and menus are routes and read the scope too.
