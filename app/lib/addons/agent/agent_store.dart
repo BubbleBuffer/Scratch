@@ -43,13 +43,15 @@ import '../../core/vault.dart';
 import '../../ui/app_name.dart';
 import '../../src/rust/api/agent.dart' hide AgentPermissionMode;
 import '../../src/rust/api/agent.dart' as bridge show AgentPermissionMode;
-import '../../src/rust/api/vault.dart' as bridge
+import '../../src/rust/api/vault.dart'
+    as bridge
     show VaultAgentDefaults, VaultAgentModel;
 import '../../state/app_state.dart';
 import 'dev_replay.dart';
 import '../../src/rust/api/types.dart' show TrustedHubCertificate;
 import 'host_relay_link.dart';
 import 'agent_chat_prefs.dart';
+import 'agent_event_feed.dart';
 import 'agent_search_source.dart';
 import 'agent_search_vault.dart';
 import 'outline_names.dart';
@@ -221,8 +223,7 @@ class AgentStore extends ChangeNotifier {
       final view = VaultAgentDefaultsView(
         host: AgentHost.ofRunner(d.runner),
         models: {
-          for (final m in d.models)
-            ?AgentHost.ofRunner(m.runner): m.model,
+          for (final m in d.models) ?AgentHost.ofRunner(m.runner): m.model,
         },
         toolSets: {
           for (final e in sets.entries)
@@ -420,6 +421,7 @@ class AgentStore extends ChangeNotifier {
   bool get requiresHubSignIn => hubAgentPlatform && hubLink == null;
 
   NotesAgent? _agent;
+  final _eventFeed = AgentEventFeed();
   Future<NotesAgent?>? _opening;
   StreamSubscription<AgentEvent>? _sub;
   StreamSubscription<AgentEvent>? _uiSub;
@@ -443,6 +445,10 @@ class AgentStore extends ChangeNotifier {
 
   /// Whether the agent is open.
   bool get isOpen => _agent != null && !_resetHubState;
+
+  /// Read-only consumers follow this connection across local subscription
+  /// replacement. A closed connection never switches to a newer agent.
+  Stream<AgentEvent> eventsFor(NotesAgent agent) => _eventFeed.eventsFor(agent);
 
   /// Every chat, newest first.
   List<AgentSession> sessions = const [];
@@ -526,7 +532,10 @@ class AgentStore extends ChangeNotifier {
   ({List<String>? ids, bool unavailable}) defaultHostModels() {
     final r = runnerModels(defaultHost);
     if (r.live) {
-      return (ids: {for (final m in r.models) m.id}.toList(), unavailable: false);
+      return (
+        ids: {for (final m in r.models) m.id}.toList(),
+        unavailable: false,
+      );
     }
     return (ids: null, unavailable: r.unreachable);
   }
@@ -640,10 +649,7 @@ class AgentStore extends ChangeNotifier {
     final agent = await _count(() => _connect(hub));
     try {
       final info = await _count(agent.hostInfo);
-      return (
-        _withExtras(await _count(agent.models), info),
-        info.defaultModel,
-      );
+      return (_withExtras(await _count(agent.models), info), info.defaultModel);
     } finally {
       await agent.closeEvents();
       agent.dispose();
@@ -971,8 +977,10 @@ class AgentStore extends ChangeNotifier {
       if (globalCancelled != null) await globalCancelled;
       if (cancelled != null) await cancelled;
       if (_disposed || !identical(agent, _agent)) return;
-      _sub = agent.subscribe().listen(
-        _onEvent,
+      _sub = _eventFeed.bind(
+        agent,
+        agent.subscribe(),
+        onEvent: _onEvent,
         onError: (Object e) => AppLog.info('agent events: $e'),
       );
       if (id != null) {
@@ -1087,7 +1095,9 @@ class AgentStore extends ChangeNotifier {
       hub?.url,
       hub?.token,
       // Trusting or revoking the hub's certificate reconnects with it.
-      hub == null ? '' : _appSettings().trustedCertificates.trustKeyFor(hub.url),
+      hub == null
+          ? ''
+          : _appSettings().trustedCertificates.trustKeyFor(hub.url),
       resolvedModel(AgentHost.local).model ?? '',
       settings.agentBunPath.trim(),
       settings.agentClaudeCodeDir.trim(),
@@ -1248,9 +1258,7 @@ class AgentStore extends ChangeNotifier {
       final taken = settings.agentMcpServers;
       final added = <String, Map<String, dynamic>>{
         for (final e in found.entries)
-          if (e.key is String &&
-              e.value is Map &&
-              !taken.containsKey(e.key))
+          if (e.key is String && e.value is Map && !taken.containsKey(e.key))
             e.key as String: Map<String, dynamic>.from(e.value as Map),
       };
       AppLog.info(
@@ -1394,6 +1402,7 @@ class AgentStore extends ChangeNotifier {
         return null;
       }
       _agent = agent;
+      _eventFeed.open(agent);
       _agentOnHub = hub != null;
       _search ??= _newSearchIndex();
       _syncOutlinePoll();
@@ -1406,8 +1415,10 @@ class AgentStore extends ChangeNotifier {
         _mcpSent = null;
         await _sendMcp(agent, _mcpJson);
       }
-      _sub = agent.subscribe().listen(
-        _onEvent,
+      _sub = _eventFeed.bind(
+        agent,
+        agent.subscribe(),
+        onEvent: _onEvent,
         onError: (Object e) => AppLog.info('agent events: $e'),
       );
       _subscribedSession = null;
@@ -2011,7 +2022,9 @@ class AgentStore extends ChangeNotifier {
           return;
         }
         if (synced == null || !app.sync.connected) {
-          throw StateError('$appName disconnected from the Hub before the turn.');
+          throw StateError(
+            '$appName disconnected from the Hub before the turn.',
+          );
         }
       }
       // send queues a follow-up while busy and preserves its structured
@@ -2133,6 +2146,7 @@ class AgentStore extends ChangeNotifier {
     if (opening != null) await opening;
     final a = _agent;
     _agent = null;
+    if (a != null) _eventFeed.close(a);
     final sub = _sub;
     _sub = null;
     // Cancelling waits until the stream yields again: closing it on the

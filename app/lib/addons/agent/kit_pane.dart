@@ -29,6 +29,7 @@ class _AgentKitScreenState extends State<AgentKitScreen> {
   late final AgentStore store = AgentStore.of(context.app);
   ScratchKitBackend? _backend;
   Object? _agent;
+  int _syncGeneration = 0;
 
   @override
   void initState() {
@@ -46,15 +47,29 @@ class _AgentKitScreenState extends State<AgentKitScreen> {
   /// Follows the store: a new agent (the host was switched) gets a new
   /// backend, and an unopened store opens its newest chat.
   Future<void> _sync() async {
+    final generation = ++_syncGeneration;
     final agent = await store.ensureOpen();
-    if (!mounted || agent == null) return;
+    if (!mounted || generation != _syncGeneration) return;
+    if (agent == null) {
+      if (_backend != null) {
+        setState(() {
+          _agent = null;
+          _backend = null;
+        });
+      }
+      return;
+    }
     if (store.openId == null && store.sessions.isNotEmpty) {
       await store.openSession(store.sessions.first.id);
     }
-    if (!mounted || identical(agent, _agent)) return;
+    if (!mounted || generation != _syncGeneration || identical(agent, _agent)) {
+      return;
+    }
     setState(() {
       _agent = agent;
-      _backend = ScratchKitBackend(NotesAgentSource(agent));
+      _backend = ScratchKitBackend(
+        NotesAgentSource(agent, events: store.eventsFor(agent)),
+      );
     });
   }
 

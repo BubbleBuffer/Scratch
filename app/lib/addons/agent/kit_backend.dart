@@ -28,8 +28,9 @@ abstract interface class KitAgentSource {
 
 /// [KitAgentSource] over a live `NotesAgent`.
 class NotesAgentSource implements KitAgentSource {
-  NotesAgentSource(this.agent);
+  NotesAgentSource(this.agent, {this.events});
   final NotesAgent agent;
+  final Stream<AgentEvent>? events;
 
   @override
   Future<List<AgentSession>> sessions() => agent.sessions();
@@ -43,7 +44,7 @@ class NotesAgentSource implements KitAgentSource {
       agent.eventsAfter(after: after, sessionId: sessionId);
 
   @override
-  Stream<AgentEvent> subscribe() => agent.subscribe();
+  Stream<AgentEvent> subscribe() => events ?? agent.subscribe();
 }
 
 /// How long burst events (tool starts and ends) wait before one `gap` makes
@@ -57,6 +58,8 @@ class ScratchKitBackend implements kit.AgentBackend {
   ScratchKitBackend(this.source, {this.reloadDelay = kitReloadDelay});
   final KitAgentSource source;
   final Duration reloadDelay;
+  final _snapshots = <String, AgentSessionState>{};
+  final _snapshotListeners = <String, Set<void Function(AgentSessionState)>>{};
 
   @override
   kit.KitCapabilities get capabilities => kit.KitCapabilities.none();
@@ -78,7 +81,12 @@ class ScratchKitBackend implements kit.AgentBackend {
   @override
   Future<kit.ChatSnapshot> loadChat(String chatId) async {
     try {
-      return kitSnapshot(await source.sessionState(chatId));
+      final state = await source.sessionState(chatId);
+      _snapshots[chatId] = state;
+      for (final listener in [...?_snapshotListeners[chatId]]) {
+        listener(state);
+      }
+      return kitSnapshot(state);
     } catch (e) {
       throw const kit.KitFailed('That chat could not be loaded.');
     }
@@ -91,14 +99,36 @@ class ScratchKitBackend implements kit.AgentBackend {
     Timer? reload;
     var reloadSeq = 0;
     var lastSeq = after;
+    var stopped = false;
+    final loaded = _snapshots[chatId];
     late final StreamController<kit.KitEvent> out;
 
+    void seed(AgentSessionState state) {
+      mapper.seed(state);
+      if (state.seq.toInt() > lastSeq) lastSeq = state.seq.toInt();
+    }
+
+    void gap(int seq, {int skipped = 0}) {
+      reload?.cancel();
+      reload = null;
+      out.add(kit.GapEvent(seq: seq, chat: chatId, skipped: skipped));
+    }
+
     void emit(AgentEvent e) {
+      if (stopped) return;
+      // Lag and reconnect gaps belong to the whole connection, have an empty
+      // session, and can carry an old cursor. They still invalidate this chat.
+      if (e.kind == 'gap' && (e.sessionId.isEmpty || e.sessionId == chatId)) {
+        gap(e.sequence.toInt(), skipped: e.skipped.toInt());
+        return;
+      }
       if (e.sessionId != chatId) return;
       final seq = e.sequence.toInt();
       if (e.durable) {
         if (seq <= lastSeq) return;
         lastSeq = seq;
+      } else if (seq < lastSeq) {
+        return;
       }
       final mapped = mapper.map(e);
       for (final event in mapped.events) {
@@ -108,7 +138,7 @@ class ScratchKitBackend implements kit.AgentBackend {
         reloadSeq = seq;
         reload ??= Timer(reloadDelay, () {
           reload = null;
-          if (!out.isClosed) {
+          if (!stopped && !out.isClosed) {
             out.add(kit.GapEvent(seq: reloadSeq, chat: chatId));
           }
         });
@@ -120,30 +150,68 @@ class ScratchKitBackend implements kit.AgentBackend {
       // lost; duplicates are dropped by sequence.
       final buffered = <AgentEvent>[];
       var replaying = true;
-      live = source.subscribe().listen(
-        (e) => replaying ? buffered.add(e) : emit(e),
-        onError: out.addError,
-        onDone: () => out.close(),
-      );
       try {
-        mapper.seed(await source.sessionState(chatId));
+        live = source.subscribe().listen(
+          (e) {
+            if (stopped) return;
+            replaying ? buffered.add(e) : emit(e);
+          },
+          onError: (Object error, StackTrace stack) {
+            if (!stopped) out.addError(error, stack);
+          },
+          onDone: () {
+            stopped = true;
+            reload?.cancel();
+            out.close();
+          },
+        );
+        final current = await source.sessionState(chatId);
+        if (stopped) return;
+        seed(current);
         final past = await source.eventsAfter(after, chatId);
+        if (stopped) return;
         if (past.resync) {
-          out.add(kit.GapEvent(seq: past.lastSeq.toInt(), chat: chatId));
+          gap(past.lastSeq.toInt());
           lastSeq = past.lastSeq.toInt();
         } else {
           past.events.forEach(emit);
         }
+        // The second snapshot may include text produced after loadChat, and
+        // live paragraphs buffered during either await may overlap it. A
+        // reload reconciles both through Scratch's authoritative snapshot;
+        // replaying those paragraphs would append already-seeded text twice.
+        final overlaps = buffered.any(
+          (e) => e.sessionId == chatId && e.kind == 'paragraph',
+        );
+        final moved =
+            loaded != null &&
+            (loaded.seq != current.seq ||
+                loaded.liveSeen != current.liveSeen ||
+                loaded.streamingText != current.streamingText);
+        if (overlaps || moved) gap(lastSeq);
+        replaying = false;
+        for (final event in buffered) {
+          if (overlaps && event.kind == 'paragraph') continue;
+          emit(event);
+        }
       } catch (e, st) {
-        out.addError(e, st);
+        if (!stopped) out.addError(e, st);
+        replaying = false;
+        if (!stopped) buffered.forEach(emit);
       }
-      replaying = false;
-      buffered.forEach(emit);
     }
 
     out = StreamController<kit.KitEvent>(
-      onListen: () => unawaited(start()),
+      onListen: () {
+        (_snapshotListeners[chatId] ??= {}).add(seed);
+        unawaited(start());
+      },
       onCancel: () async {
+        stopped = true;
+        _snapshotListeners[chatId]?.remove(seed);
+        if (_snapshotListeners[chatId]?.isEmpty ?? false) {
+          _snapshotListeners.remove(chatId);
+        }
         reload?.cancel();
         await live?.cancel();
       },
@@ -591,13 +659,34 @@ class KitMapped {
 class KitEventMapper {
   KitEventMapper(this.chatId);
   final String chatId;
-  final Map<String, int> _offset = {};
+  final Map<String, String> _text = {};
+  final Map<String, int> _textSeq = {};
 
   /// Starts a run's offset after the text the snapshot already holds.
   void seed(AgentSessionState s) {
     final run = s.runs.where((r) => _outcome(r.status, r.error) == null);
-    if (run.isNotEmpty && s.streamingText.isNotEmpty) {
-      _offset[run.last.id] = s.streamingText.length;
+    final active = run.lastOrNull;
+    final previous = active == null ? null : _text[active.id];
+    final previousSeq = active == null ? null : _textSeq[active.id];
+    _text.clear();
+    _textSeq.clear();
+    if (active != null) {
+      // A paragraph may arrive while loadChat's snapshot is in flight. Keep
+      // that known tail when the snapshot is an earlier prefix at the same
+      // durable position; a newer durable turn can reset the streamed text.
+      final keepTail =
+          previous != null &&
+          previous.startsWith(s.streamingText) &&
+          previousSeq != null &&
+          previousSeq >= s.seq.toInt();
+      final text = keepTail ? previous : s.streamingText;
+      // An empty prefix can predate a paragraph received during the load.
+      // Keep its known tail, but leave genuinely empty/new turns unseeded so
+      // their first paragraph has neither an offset nor a leading separator.
+      if (text.isNotEmpty) {
+        _text[active.id] = text;
+        _textSeq[active.id] = keepTail ? previousSeq : s.seq.toInt();
+      }
     }
   }
 
@@ -607,7 +696,8 @@ class KitEventMapper {
     switch (e.kind) {
       case 'run_started':
       case 'run_quota_resumed':
-        _offset.remove(e.runId);
+        _text.remove(e.runId);
+        _textSeq.remove(e.runId);
         return KitMapped([
           kit.RunStarted(
             seq: seq,
@@ -628,7 +718,8 @@ class KitEventMapper {
           ),
         ]);
       case 'run_finished':
-        _offset.remove(e.runId);
+        _text.remove(e.runId);
+        _textSeq.remove(e.runId);
         return KitMapped([
           kit.RunFinished(
             seq: seq,
@@ -643,9 +734,11 @@ class KitEventMapper {
       case 'paragraph':
         final text = e.text ?? '';
         if (text.isEmpty) return const KitMapped([]);
-        final start = _offset[e.runId];
+        final previous = _text[e.runId];
+        final start = previous?.length;
         final piece = start == null ? text : '\n\n$text';
-        _offset[e.runId] = (start ?? 0) + piece.length;
+        _text[e.runId] = '${previous ?? ''}$piece';
+        _textSeq[e.runId] = seq;
         return KitMapped([
           kit.MessageDelta(
             seq: seq,

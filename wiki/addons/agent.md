@@ -32,6 +32,8 @@ A second, read-only chat view built from the shared [agent kit](https://github.c
 
 The data path is unchanged (Dart, flutter_rust_bridge, `NotesAgent`). `kit_backend.dart` implements the kit's `AgentBackend` over `sessions`, `sessionState`, `eventsAfter` and `subscribe`: `listChats`, `loadChat` and `events` work, capabilities are empty, and every command (send, cancel, approve, rename, undo, models and the rest) fails with `KitUnsupported`. Scratch sends no message or tool-row events, so `events` forwards run start and finish, approvals and streamed paragraphs, and asks the kit to reload the chat (a debounced `gap`) after tool, queue and settle events.
 
+The pane follows a store-owned feed for its connection, so view-scope subscription replacement keeps it live and requests a reload across the replacement window. Connection-wide transport gaps also trigger a reload even when they have no session ID. Startup reconciles snapshot and buffered paragraph overlap through a reload, and cancellation stops pending startup work from publishing events.
+
 Mapping gaps (Scratch concept dropped or reduced):
 
 - The chat list has no run status (every row is idle), no cursor and a client-side title filter.
