@@ -29,13 +29,13 @@ The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same f
 
 ## The pin
 
-`app/pubspec.yaml` declares `bb_ui` as a git dependency on a tag:
+`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to the commit of kit tag `v0.4.0` (`f1663dd`), because pub cannot take a tag ref for these path-based git packages:
 
 ```yaml
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: v0.1.0
+      ref: f1663dd9c6e8c9383543652e6fffde9165500a16
       path: packages/bb_ui
 ```
 
@@ -49,6 +49,6 @@ The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same f
 
 To try an unreleased kit change, point `ref:` at a branch or commit for a draft pull request, or use `dependency_overrides` with local `path:` entries; never merge either.
 
-## The dev pane's pin (temporary)
+## The dev pane's packages
 
-The Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) needs `agent_kit` and `agent_kit_core`, which no kit tag includes yet. Until the kit tags a release with them, all four kit packages are pinned to commit `a3ded63` (`ref:` is the full commit hash) instead of a tag. `bb_ui` moves to the same commit, and `agent_kit` and `agent_kit_core` are declared directly. Replace the hash with the tag at the next bump.
+The Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) uses `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. All three kit packages (`bb_ui`, `agent_kit`, `agent_kit_core`) are pinned to the commit of kit tag `v0.4.0` (`f1663dd`) and move together at each bump: move them to the next tag's commit. `agent_kit` depends on `bb_ui` by path, so pub resolves it as git at that commit and a tag ref on the direct dependency fails version solving.
