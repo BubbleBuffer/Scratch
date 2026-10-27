@@ -17,9 +17,15 @@ import 'harness.dart';
 import 'search_hits_fixture.dart';
 import 'sync_helpers.dart' show real;
 
-/// A context with an Overlay above it, as a toast needs.
-BuildContext _overlayContext(WidgetTester tester) =>
-    tester.element(find.byType(Overlay).first);
+/// A context below an Overlay (Overlay.of looks at ancestors), as a toast needs.
+BuildContext _overlayContext(WidgetTester tester) => tester.element(
+  find
+      .descendant(
+        of: find.byType(Overlay).first,
+        matching: find.byWidgetPredicate((_) => true),
+      )
+      .first,
+);
 
 void main() {
   setUpAll(initCore);
