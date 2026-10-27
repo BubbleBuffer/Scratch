@@ -45,6 +45,7 @@ import 'blocks/chat_ref.dart';
 import 'commands.dart';
 import 'chat_type.dart';
 import 'chat_search.dart';
+import 'kit_pane.dart';
 export 'chat_search.dart'
     show AgentChatSearchSource, ChatSearchTarget, openChatHit;
 export 'chat_type.dart' show chatNoteType, chatChip, chatCard, chatEmbed;
@@ -86,7 +87,8 @@ class AgentAddon extends Addon {
           final app = AppScope.maybeOf(context);
           return app != null && AgentStore.of(app).enabled;
         },
-        build: (_) => const AgentScreen(),
+        build: (_) =>
+            agentKitPane ? const AgentKitScreen() : const AgentScreen(),
         wrap: (_, child) => AgentPanelShell(child: child),
         headerAction: (_) => const AgentPanelToggle(),
       ),
