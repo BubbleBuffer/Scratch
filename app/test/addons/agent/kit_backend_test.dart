@@ -5,6 +5,7 @@ import 'package:agent_kit/agent_kit.dart';
 import 'package:agent_kit_core/agent_kit_core.dart' as kit;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notes_app/addons/agent/agent_event_feed.dart';
 import 'package:notes_app/addons/agent/kit_backend.dart';
 import 'package:notes_app/src/rust/api/agent.dart';
 
@@ -66,6 +67,7 @@ AgentSessionState _state({
   List<AgentToolActivity> activity = const [],
   List<AgentEdit> edits = const [],
   int seq = 7,
+  int liveSeen = 0,
   String streaming = '',
 }) => AgentSessionState(
   session: _session(),
@@ -75,7 +77,7 @@ AgentSessionState _state({
   activity: activity,
   edits: edits,
   seq: seq,
-  liveSeen: seq,
+  liveSeen: liveSeen,
   streamingText: streaming,
 );
 
@@ -129,6 +131,7 @@ AgentEvent _event(
   AgentApproval? approval,
   String? approvalId,
   String? approvalState,
+  int skipped = 0,
 }) => AgentEvent(
   kind: kind,
   sequence: seq,
@@ -143,7 +146,7 @@ AgentEvent _event(
   approvalId: approvalId,
   approvalState: approvalState,
   isError: false,
-  skipped: 0,
+  skipped: skipped,
   json: '{}',
 );
 
@@ -168,6 +171,56 @@ class _Source implements KitAgentSource {
 
   @override
   Stream<AgentEvent> subscribe() => live.stream;
+}
+
+class _ControlledSource extends _Source {
+  Completer<AgentSessionState>? snapshot;
+  Completer<AgentEvents>? replay;
+
+  @override
+  Future<AgentSessionState> sessionState(String sessionId) =>
+      snapshot?.future ?? super.sessionState(sessionId);
+
+  @override
+  Future<AgentEvents> eventsAfter(int after, String sessionId) {
+    afterAsked = after;
+    return replay?.future ?? super.eventsAfter(after, sessionId);
+  }
+}
+
+/// Models the bridge's connection-wide close, rather than closing only the
+/// particular Dart listener that the kit happens to own.
+class _Connection implements NotesAgent {
+  final streams = <StreamController<AgentEvent>>[];
+  AgentSessionState state = _state();
+
+  @override
+  Stream<AgentEvent> subscribe({String? sessionId}) {
+    final stream = StreamController<AgentEvent>.broadcast();
+    streams.add(stream);
+    return stream.stream;
+  }
+
+  void emit(AgentEvent event) {
+    for (final stream in streams) {
+      if (!stream.isClosed) stream.add(event);
+    }
+  }
+
+  @override
+  Future<void> closeEvents() async {
+    await Future.wait([for (final stream in streams) stream.close()]);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      switch (invocation.memberName) {
+        #sessionState => Future.value(state),
+        #eventsAfter => Future.value(
+          AgentEvents(events: const [], lastSeq: state.seq, resync: false),
+        ),
+        _ => super.noSuchMethod(invocation),
+      };
 }
 
 Future<void> _settle() =>
@@ -457,6 +510,473 @@ void main() {
   });
 
   group('events', () {
+    test(
+      'store feed can be read before the first subscription binds',
+      () async {
+        final connection = _Connection();
+        final feed = AgentEventFeed()..open(connection);
+        final got = <AgentEvent>[];
+        var done = false;
+        final reader = feed
+            .eventsFor(connection)
+            .listen(got.add, onDone: () => done = true);
+        await _settle();
+        expect(done, isFalse);
+        final sub = feed.bind(
+          connection,
+          connection.subscribe(),
+          onEvent: (_) {},
+          onError: (_) {},
+        );
+        connection.emit(_event('run_started'));
+        await _settle();
+        expect(got.single.kind, 'run_started');
+        feed.close(connection);
+        await reader.cancel();
+        await sub.cancel();
+        await connection.closeEvents();
+      },
+    );
+
+    test(
+      'old live paragraphs do not change the current streaming offset',
+      () async {
+        final source = _Source(
+          state: _state(
+            runs: [_run('run-1', 'running')],
+            streaming: 'First',
+            liveSeen: 1,
+          ),
+        );
+        final got = <kit.KitEvent>[];
+        final sub = ScratchKitBackend(source)
+            .events(_chat, after: 7)
+            .listen(got.add);
+        await _settle();
+        source.live
+          ..add(_event('paragraph', seq: 6, durable: false, text: 'Old'))
+          ..add(_event('paragraph', seq: 7, durable: false, text: 'Next'));
+        await _settle();
+        final delta = got.whereType<kit.MessageDelta>().single;
+        expect(delta.offset, 5);
+        expect(delta.text, '\n\nNext');
+        await sub.cancel();
+        await source.live.close();
+      },
+    );
+
+    test(
+      'store feed survives closeEvents and reports its replacement gap',
+      () async {
+        final connection = _Connection();
+        final feed = AgentEventFeed();
+        var storeEvents = 0;
+        var storeSub = feed.bind(
+          connection,
+          connection.subscribe(),
+          onEvent: (_) => storeEvents++,
+          onError: (_) {},
+        );
+        final backend = ScratchKitBackend(
+          NotesAgentSource(connection, events: feed.eventsFor(connection)),
+        );
+        final got = <kit.KitEvent>[];
+        var done = false;
+        final sub = backend
+            .events(_chat, after: 7)
+            .listen(got.add, onDone: () => done = true);
+        await _settle();
+        connection.emit(
+          _event('paragraph', seq: 7, durable: false, text: 'One'),
+        );
+        await _settle();
+        expect(got.whereType<kit.MessageDelta>(), hasLength(1));
+
+        final cancelled = storeSub.cancel();
+        await connection.closeEvents();
+        await cancelled;
+        expect(done, isFalse);
+        storeSub = feed.bind(
+          connection,
+          connection.subscribe(),
+          onEvent: (_) => storeEvents++,
+          onError: (_) {},
+        );
+        await _settle();
+        expect(got.whereType<kit.GapEvent>(), hasLength(1));
+        connection.emit(
+          _event(
+            'approval_resolved',
+            seq: 8,
+            approvalId: 'ap',
+            approvalState: 'denied',
+          ),
+        );
+        await _settle();
+        expect(got.whereType<kit.ApprovalResolved>(), hasLength(1));
+        expect(storeEvents, 2);
+        expect(done, isFalse);
+        feed.close(connection);
+        await _settle();
+        expect(done, isTrue);
+        await sub.cancel();
+        await storeSub.cancel();
+        await connection.closeEvents();
+      },
+    );
+
+    test('a closed store feed never follows a newer connection', () async {
+      final old = _Connection(), next = _Connection();
+      final feed = AgentEventFeed();
+      final oldSub = feed.bind(
+        old,
+        old.subscribe(),
+        onEvent: (_) {},
+        onError: (_) {},
+      );
+      final events = <AgentEvent>[];
+      var done = false;
+      final reader = feed
+          .eventsFor(old)
+          .listen(events.add, onDone: () => done = true);
+      final newSub = feed.bind(
+        next,
+        next.subscribe(),
+        onEvent: (_) {},
+        onError: (_) {},
+      );
+      old.emit(_event('run_started'));
+      next.emit(_event('run_finished'));
+      await _settle();
+      expect(done, isTrue);
+      expect(events, isEmpty);
+      expect(await feed.eventsFor(old).toList(), isEmpty);
+      // A late close for the previous connection must not close the new one.
+      feed.close(old);
+      final newest = <AgentEvent>[];
+      final newReader = feed.eventsFor(next).listen(newest.add);
+      next.emit(_event('run_started', seq: 10));
+      await _settle();
+      expect(newest.single.sequence, 10);
+      feed.close(next);
+      await reader.cancel();
+      await newReader.cancel();
+      await oldSub.cancel();
+      await newSub.cancel();
+      await old.closeEvents();
+      await next.closeEvents();
+    });
+
+    test(
+      'buffered paragraphs overlapping startup reload without duplication',
+      () async {
+        final source = _ControlledSource();
+        final pending = source.snapshot = Completer<AgentSessionState>();
+        final backend = ScratchKitBackend(source);
+        final got = <kit.KitEvent>[];
+        final sub = backend.events(_chat, after: 7).listen(got.add);
+        source.live.add(
+          _event('paragraph', seq: 7, durable: false, text: 'First'),
+        );
+        await _settle();
+        source.state = _state(
+          runs: [_run('run-1', 'running')],
+          streaming: 'First',
+          liveSeen: 1,
+        );
+        pending.complete(source.state);
+        await _settle();
+        expect(got.whereType<kit.MessageDelta>(), isEmpty);
+        expect(got.whereType<kit.GapEvent>(), hasLength(1));
+        source.snapshot = null;
+        var snapshot = await backend.loadChat(_chat);
+        source.live.add(
+          _event('paragraph', seq: 7, durable: false, text: 'Second'),
+        );
+        await _settle();
+        snapshot = kit.reduce(
+          snapshot,
+          got.whereType<kit.MessageDelta>().single,
+        );
+        expect(
+          (snapshot.items.single as kit.AssistantMessage).markdown,
+          'First\n\nSecond',
+        );
+        await sub.cancel();
+        await source.live.close();
+      },
+    );
+
+    test(
+      'a second snapshot ahead of loadChat reconciles through a gap',
+      () async {
+        final source = _Source(
+          state: _state(
+            runs: [_run('run-1', 'running')],
+            streaming: 'First',
+            liveSeen: 1,
+          ),
+        );
+        final backend = ScratchKitBackend(source);
+        await backend.loadChat(_chat);
+        source.state = _state(
+          runs: [_run('run-1', 'running')],
+          streaming: 'First\n\nSecond',
+          liveSeen: 2,
+        );
+        final got = <kit.KitEvent>[];
+        final sub = backend.events(_chat, after: 7).listen(got.add);
+        await _settle();
+        expect(got.whereType<kit.GapEvent>(), hasLength(1));
+        var snapshot = await backend.loadChat(_chat);
+        source.live.add(
+          _event('paragraph', seq: 7, durable: false, text: 'Third'),
+        );
+        await _settle();
+        snapshot = kit.reduce(
+          snapshot,
+          got.whereType<kit.MessageDelta>().single,
+        );
+        expect(
+          (snapshot.items.single as kit.AssistantMessage).markdown,
+          'First\n\nSecond\n\nThird',
+        );
+        await sub.cancel();
+        await source.live.close();
+      },
+    );
+
+    test('a gap reload rebases the active streaming offset', () async {
+      final source = _Source(
+        state: _state(
+          runs: [_run('run-1', 'running')],
+          streaming: 'First',
+          liveSeen: 1,
+        ),
+      );
+      final backend = ScratchKitBackend(source);
+      await backend.loadChat(_chat);
+      final got = <kit.KitEvent>[];
+      final sub = backend.events(_chat, after: 7).listen(got.add);
+      await _settle();
+      source.state = _state(
+        runs: [_run('run-1', 'running')],
+        streaming: 'First\n\nLost',
+        liveSeen: 2,
+      );
+      source.live.add(_event('gap', seq: 7, durable: false, session: ''));
+      await _settle();
+      var snapshot = await backend.loadChat(_chat);
+      source.live.add(
+        _event('paragraph', seq: 7, durable: false, text: 'Next'),
+      );
+      await _settle();
+      final delta = got.whereType<kit.MessageDelta>().single;
+      expect(delta.offset, 'First\n\nLost'.length);
+      snapshot = kit.reduce(snapshot, delta);
+      expect(
+        (snapshot.items.single as kit.AssistantMessage).markdown,
+        'First\n\nLost\n\nNext',
+      );
+      await sub.cancel();
+      await source.live.close();
+    });
+
+    test(
+      'a paragraph arriving during reload keeps the following offset',
+      () async {
+        final source = _ControlledSource();
+        source.state = _state(
+          runs: [_run('run-1', 'running')],
+          streaming: 'First',
+          liveSeen: 1,
+        );
+        final backend = ScratchKitBackend(source);
+        await backend.loadChat(_chat);
+        final got = <kit.KitEvent>[];
+        final sub = backend.events(_chat, after: 7).listen(got.add);
+        await _settle();
+        source.live.add(
+          _event('paragraph', seq: 7, durable: false, text: 'Second'),
+        );
+        await _settle();
+        final pending = source.snapshot = Completer<AgentSessionState>();
+        final loading = backend.loadChat(_chat);
+        source.live.add(
+          _event('paragraph', seq: 7, durable: false, text: 'Third'),
+        );
+        await _settle();
+        pending.complete(
+          _state(
+            runs: [_run('run-1', 'running')],
+            streaming: 'First\n\nSecond',
+            liveSeen: 2,
+          ),
+        );
+        var snapshot = await loading;
+        snapshot = kit.reduce(snapshot, got.whereType<kit.MessageDelta>().last);
+        source.live.add(
+          _event('paragraph', seq: 7, durable: false, text: 'Fourth'),
+        );
+        await _settle();
+        final delta = got.whereType<kit.MessageDelta>().last;
+        expect(delta.offset, 'First\n\nSecond\n\nThird'.length);
+        snapshot = kit.reduce(snapshot, delta);
+        expect(
+          (snapshot.items.single as kit.AssistantMessage).markdown,
+          'First\n\nSecond\n\nThird\n\nFourth',
+        );
+        await sub.cancel();
+        await source.live.close();
+      },
+    );
+
+    test(
+      'an empty reload preserves a paragraph that arrived in flight',
+      () async {
+        final source = _ControlledSource();
+        source.state = _state(runs: [_run('run-1', 'running')]);
+        final backend = ScratchKitBackend(source);
+        await backend.loadChat(_chat);
+        final got = <kit.KitEvent>[];
+        final sub = backend.events(_chat, after: 7).listen(got.add);
+        await _settle();
+        final pending = source.snapshot = Completer<AgentSessionState>();
+        final loading = backend.loadChat(_chat);
+        source.live.add(
+          _event('paragraph', seq: 7, durable: false, text: 'First'),
+        );
+        await _settle();
+        pending.complete(_state(runs: [_run('run-1', 'running')]));
+        var snapshot = await loading;
+        snapshot = kit.reduce(
+          snapshot,
+          got.whereType<kit.MessageDelta>().single,
+        );
+        source.live.add(
+          _event('paragraph', seq: 7, durable: false, text: 'Second'),
+        );
+        await _settle();
+        final delta = got.whereType<kit.MessageDelta>().last;
+        expect(delta.offset, 'First'.length);
+        expect(delta.text, '\n\nSecond');
+        snapshot = kit.reduce(snapshot, delta);
+        expect(
+          (snapshot.items.single as kit.AssistantMessage).markdown,
+          'First\n\nSecond',
+        );
+        await sub.cancel();
+        await source.live.close();
+      },
+    );
+
+    for (final run in ['run-1', 'run-2']) {
+      test('a newer durable empty snapshot resets text for $run', () {
+        final mapper = KitEventMapper(_chat);
+        mapper.seed(_state(runs: [_run('run-1', 'running')]));
+        mapper.map(_event('paragraph', seq: 7, durable: false, text: 'Old'));
+        // A newer durable phase may clear streaming text even within the
+        // same run. A different active run must also begin at zero.
+        mapper.seed(_state(seq: 8, runs: [_run(run, 'running')]));
+        final delta =
+            mapper
+                    .map(
+                      _event(
+                        'paragraph',
+                        seq: 8,
+                        durable: false,
+                        run: run,
+                        text: 'New',
+                      ),
+                    )
+                    .events
+                    .single
+                as kit.MessageDelta;
+        expect(delta.offset, 0);
+        expect(delta.text, 'New');
+      });
+    }
+
+    for (final fail in [false, true]) {
+      test(
+        'cancelling pending startup snapshot ignores late ${fail ? 'failure' : 'completion'}',
+        () async {
+          final source = _ControlledSource();
+          final pending = source.snapshot = Completer<AgentSessionState>();
+          final got = <kit.KitEvent>[];
+          final errors = <Object>[];
+          final sub = ScratchKitBackend(source)
+              .events(_chat, after: 7)
+              .listen(got.add, onError: errors.add);
+          await sub.cancel();
+          if (fail) {
+            pending.completeError(StateError('late startup failure'));
+          } else {
+            pending.complete(_state());
+          }
+          await _settle();
+          expect(source.afterAsked, -1);
+          expect(got, isEmpty);
+          expect(errors, isEmpty);
+          expect(source.live.hasListener, isFalse);
+          await source.live.close();
+        },
+      );
+    }
+
+    test(
+      'cancelling pending replay drops replay, buffered events and timers',
+      () async {
+        final source = _ControlledSource();
+        final pending = source.replay = Completer<AgentEvents>();
+        final got = <kit.KitEvent>[];
+        final errors = <Object>[];
+        final sub = ScratchKitBackend(
+          source,
+          reloadDelay: Duration.zero,
+        ).events(_chat, after: 7).listen(got.add, onError: errors.add);
+        await _settle();
+        expect(source.afterAsked, 7);
+        source.live.add(_event('tool_finished', seq: 9));
+        await _settle();
+        await sub.cancel();
+        pending.complete(
+          AgentEvents(
+            events: [_event('run_started')],
+            lastSeq: 9,
+            resync: true,
+          ),
+        );
+        await _settle();
+        expect(got, isEmpty);
+        expect(errors, isEmpty);
+        expect(source.live.hasListener, isFalse);
+        await source.live.close();
+      },
+    );
+
+    test('a connection-wide live gap reloads the selected chat', () async {
+      final source = _Source();
+      final got = <kit.KitEvent>[];
+      final sub = ScratchKitBackend(source)
+          .events(_chat, after: 7)
+          .listen(got.add);
+      await _settle();
+      // Real lag/reconnect notifications have no session and are live, not
+      // durable. Their cursor may equal the snapshot's durable sequence.
+      source.live.add(
+        _event('gap', session: '', seq: 7, durable: false, skipped: 4),
+      );
+      await _settle();
+      final gaps = got.whereType<kit.GapEvent>().toList();
+      expect(gaps, hasLength(1));
+      expect(gaps.single.chat, _chat);
+      expect(gaps.single.seq, 7);
+      expect(gaps.single.skipped, 4);
+      await sub.cancel();
+      await source.live.close();
+    });
+
     test('replays durable events after the snapshot, then goes live', () async {
       final source = _Source(
         state: _state(runs: [_run('run-1', 'running')]),
