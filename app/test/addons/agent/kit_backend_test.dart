@@ -447,7 +447,7 @@ void main() {
   });
 
   group('backend', () {
-    test('declares no optional capability', () {
+    test('declares no capabilities, including writes', () {
       final backend = ScratchKitBackend(_Source());
       expect(backend.capabilities.values, isEmpty);
     });
@@ -491,6 +491,24 @@ void main() {
       ];
       for (final call in calls) {
         await expectLater(call(), throwsA(isA<kit.KitUnsupported>()));
+      }
+      for (final entry in <kit.KitCapability, Future<Object?> Function()>{
+        kit.KitCapability.createChat: () => backend.createChat(),
+        kit.KitCapability.send: () => backend.send(_chat, 'hi'),
+        kit.KitCapability.cancel: () => backend.cancel(_chat),
+        kit.KitCapability.approve: () =>
+            backend.decideApproval(_chat, 'ap', kit.ApprovalDecision.approve),
+      }.entries) {
+        await expectLater(
+          entry.value(),
+          throwsA(
+            isA<kit.KitUnsupported>().having(
+              (e) => e.capability,
+              'capability',
+              entry.key,
+            ),
+          ),
+        );
       }
     });
 
@@ -1180,6 +1198,11 @@ void pumpPaneTests() {
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.text('Add milk to groceries'), findsOneWidget);
       expect(find.textContaining('milk is on the list'), findsOneWidget);
+      expect(find.text('This chat is read-only.'), findsOneWidget);
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText).last).readOnly,
+        isTrue,
+      );
       await tester.pumpWidget(const SizedBox());
     });
   });

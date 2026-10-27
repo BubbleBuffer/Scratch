@@ -227,14 +227,14 @@ class ScratchKitBackend implements kit.AgentBackend {
 
   @override
   Future<kit.ChatSummary> createChat({String? title, String? workspace}) =>
-      Future.error(_readOnly(kit.KitCapability.steer));
+      Future.error(_readOnly(kit.KitCapability.createChat));
 
   @override
   Future<kit.SendResult> send(
     String chatId,
     String text, {
     List<kit.KitRef> refs = const [],
-  }) => Future.error(_readOnly(kit.KitCapability.steer));
+  }) => Future.error(_readOnly(kit.KitCapability.send));
 
   @override
   Future<String> steer(
@@ -248,7 +248,7 @@ class ScratchKitBackend implements kit.AgentBackend {
     String chatId,
     String text, {
     List<kit.KitRef> refs = const [],
-  }) => Future.error(_readOnly(kit.KitCapability.steer));
+  }) => Future.error(_readOnly(kit.KitCapability.send));
 
   @override
   Future<void> sendQueuedNow(String chatId, String inputId) =>
@@ -264,7 +264,7 @@ class ScratchKitBackend implements kit.AgentBackend {
 
   @override
   Future<void> cancel(String chatId) =>
-      Future.error(_readOnly(kit.KitCapability.steer));
+      Future.error(_readOnly(kit.KitCapability.cancel));
 
   @override
   Future<void> resume(String chatId) =>
@@ -275,7 +275,7 @@ class ScratchKitBackend implements kit.AgentBackend {
     String chatId,
     String approvalId,
     kit.ApprovalDecision decision,
-  ) => Future.error(_readOnly(kit.KitCapability.steer));
+  ) => Future.error(_readOnly(kit.KitCapability.approve));
 
   @override
   Future<void> answerQuestion(
