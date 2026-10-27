@@ -46,7 +46,8 @@ import 'chat_type.dart';
 import 'chat_search.dart';
 import 'kit_pane.dart';
 export 'chat_search.dart'
-    show AgentChatSearchSource, ChatSearchTarget, openChatHit;
+    show AgentChatSearchSource, ChatSearchTargetNavigation, openChatHit;
+export 'chat_search_target.dart' show ChatSearchTarget;
 export 'chat_type.dart' show chatNoteType, chatChip, chatCard, chatEmbed;
 import 'navigation.dart';
 
