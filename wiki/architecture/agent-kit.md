@@ -48,3 +48,7 @@ The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same f
 3. If the kit changed anything visible, the pull request shows before/after screenshots and updates the goldens on purpose.
 
 To try an unreleased kit change, point `ref:` at a branch or commit for a draft pull request, or use `dependency_overrides` with local `path:` entries; never merge either.
+
+## The dev pane's pin (temporary)
+
+The Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) needs `agent_kit` and `agent_kit_core`, which no kit tag includes yet. Until the kit tags a release with them, all four kit packages are pinned to commit `a3ded63` (`ref:` is the full commit hash) instead of a tag. `bb_ui` moves to the same commit, and `agent_kit` and `agent_kit_core` are declared directly. Replace the hash with the tag at the next bump.
