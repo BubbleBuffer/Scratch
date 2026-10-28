@@ -1,6 +1,7 @@
 // Temporary probe (removed before merge): where the rich page's blocks sit
 // on a phone before the golden test taps toggle-r06.
 
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -41,6 +42,25 @@ void main() {
           'PROBE scrollable axis=${pos.axis} pixels=${pos.pixels} '
           'max=${pos.maxScrollExtent} viewport=${pos.viewportDimension}',
         );
+      }
+      for (final e in find.byType(Viewport).evaluate()) {
+        final v = e.renderObject as RenderViewport;
+        if (v.axis != Axis.vertical || !v.hasSize) continue;
+        // ignore: avoid_print
+        print('PROBE viewport top=${v.localToGlobal(Offset.zero)} size=${v.size} '
+            'cacheExtent=${v.cacheExtent} style=${v.cacheExtentStyle} offset=${v.offset}');
+        v.visitChildren((c) {
+          final s = c as RenderSliver;
+          // ignore: avoid_print
+          print('PROBE  sliver ${s.runtimeType} c=${s.constraints} g=${s.geometry}');
+          if (s is RenderSliverMultiBoxAdaptor) {
+            var n = 0;
+            var child = s.firstChild;
+            while (child != null) { n++; child = s.childAfter(child); }
+            // ignore: avoid_print
+            print('PROBE   built=$n first=${s.firstChild == null ? null : s.indexOf(s.firstChild!)} last=${s.lastChild == null ? null : s.indexOf(s.lastChild!)}');
+          }
+        });
       }
       // ignore: avoid_print
       print(

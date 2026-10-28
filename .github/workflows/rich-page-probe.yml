@@ -17,14 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            flutter: 3.47.5
-            lib: notes_bridge.dll
           - os: ubuntu-latest
             flutter: 3.47.5
-            lib: libnotes_bridge.so
-          - os: ubuntu-latest
-            flutter: ''
             lib: libnotes_bridge.so
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
