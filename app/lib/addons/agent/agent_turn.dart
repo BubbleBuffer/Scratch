@@ -47,7 +47,7 @@ class AgentTurnView extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: AgentEditRow(
-              key: ValueKey('agent-edit-${edit.id}'),
+              key: ValueKey('agent-edit-row-${edit.id}'),
               edit: edit,
               sessionId: store.openId,
               onUndo: () => store.undoEdit(edit.id),
@@ -305,7 +305,9 @@ class _AgentEditRowState extends State<AgentEditRow> {
       edit.pageTitle,
       firstLine: pages.meta(edit.pageId)?.firstLine ?? '',
     );
-    return kit.FileEditRow(
+    return KeyedSubtree(
+      key: ValueKey('agent-edit-${edit.id}'),
+      child: kit.FileEditRow(
       kitFileEdit(
         edit,
         label: switch (edit.kind) {
@@ -325,6 +327,7 @@ class _AgentEditRowState extends State<AgentEditRow> {
         sessionId: widget.sessionId,
       ),
       onUndo: _undo,
+      ),
     );
   }
 }
