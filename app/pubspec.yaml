@@ -34,12 +34,12 @@ dependencies:
   agent_kit:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: 745755d2bb7e91f9e49f2bf6f27aa0191139c4c5
+      ref: 62ff82cad0d57183953ee7a7975980037ea3887e
       path: packages/agent_kit
   agent_kit_core:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: 745755d2bb7e91f9e49f2bf6f27aa0191139c4c5
+      ref: 62ff82cad0d57183953ee7a7975980037ea3887e
       path: packages/agent_kit_core
 
 dev_dependencies:
