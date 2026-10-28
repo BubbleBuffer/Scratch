@@ -342,6 +342,7 @@ fn restore_legacy(
             ops.push(BlockOp::SetTarget { id: root.into(), target: block.target.clone() });
             ops.push(BlockOp::SetColor { id: root.into(), color: block.color.clone() });
             ops.push(BlockOp::SetWidth { id: root.into(), width: block.width });
+            ops.push(BlockOp::SetNumberedStart { id: root.into(), numbered_start: block.numbered_start });
         }
     }
     doc.apply(&ops)?;
@@ -449,6 +450,45 @@ mod tests {
         assert_eq!(result.page_action, PageAction::Unchanged);
         assert_eq!(doc.blocks(), expected_blocks);
         assert_eq!(conflict.applied, vec![auto], "caller retains the automatic application");
+    }
+
+    #[test]
+    fn numbered_start_survives_historical_block_pick_and_undo() {
+        let mut doc = nested();
+        doc.apply(&[
+            BlockOp::SetKind { id: "target".into(), kind: BlockKind::Numbered },
+            BlockOp::SetNumberedStart { id: "target".into(), numbered_start: Some(3) },
+        ]).unwrap();
+        let scope = ConflictScope::Block { block: "target".into() };
+        let side = present(&mut doc, &scope, None);
+        let mut conflict = conflict(scope, side);
+        doc.apply(&[BlockOp::SetNumberedStart {
+            id: "target".into(), numbered_start: Some(7),
+        }]).unwrap();
+
+        pick(&mut doc, &mut conflict);
+        assert_eq!(target(&mut doc).numbered_start, Some(3));
+        undo(&mut doc, &conflict).unwrap();
+        assert_eq!(target(&mut doc).numbered_start, Some(7));
+    }
+
+    #[test]
+    fn legacy_block_restore_sets_and_clears_numbered_start() {
+        let mut doc = nested();
+        let mut block = target(&mut doc);
+        block.kind = BlockKind::Numbered;
+        block.numbered_start = Some(3);
+        doc.apply(&[BlockOp::Delete { id: "target".into() }]).unwrap();
+
+        restore_legacy(&mut doc, "target", &SideState::Present {
+            content: vec![block.clone()],
+        }, None).unwrap();
+        assert_eq!(target(&mut doc).numbered_start, Some(3));
+        block.numbered_start = None;
+        restore_legacy(&mut doc, "target", &SideState::Present {
+            content: vec![block],
+        }, None).unwrap();
+        assert_eq!(target(&mut doc).numbered_start, None);
     }
 
     #[test]

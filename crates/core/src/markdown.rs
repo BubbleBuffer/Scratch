@@ -540,7 +540,11 @@ pub(crate) fn render_blocks(
     let mut prev: Option<&BlockKind> = None;
     for b in blocks {
         number = if b.kind == BlockKind::Numbered {
-            number + 1
+            if prev == Some(&BlockKind::Numbered) {
+                number.saturating_add(1)
+            } else {
+                b.numbered_start.unwrap_or(1)
+            }
         } else {
             0
         };
@@ -626,12 +630,7 @@ pub(crate) fn render_blocks(
                 };
                 let fence = if query {
                     // A query can itself contain literal fences.
-                    let longest = b.text
-                        .split(|c| c != '`')
-                        .map(str::len)
-                        .max()
-                        .unwrap_or(0);
-                    "`".repeat(3.max(longest + 1))
+                    "`".repeat(3.max(longest_backtick_run(&b.text) + 1))
                 } else if b.text.contains("```") || info.contains('`') {
                     "~~~~".into()
                 } else {
@@ -777,6 +776,26 @@ fn escape(s: &str, out: &mut String) {
             out.push('\\');
         }
         out.push(c);
+    }
+}
+
+/// The length of the longest run of backticks in `s` (0 when there are none).
+fn longest_backtick_run(s: &str) -> usize {
+    s.split(|c| c != '`').map(str::len).max().unwrap_or(0)
+}
+
+/// The backticks that open and close a code span over `text`: one more than
+/// the longest backtick run in `text`, and a space each side when `text`
+/// starts or ends with a backtick, or its own edge spaces would be stripped.
+fn code_span_delims(text: &str) -> (String, String) {
+    let ticks = "`".repeat(longest_backtick_run(text) + 1);
+    let padded_spaces = text.starts_with(' ')
+        && text.ends_with(' ')
+        && text.chars().any(|c| c != ' ');
+    if text.starts_with('`') || text.ends_with('`') || padded_spaces {
+        (format!("{ticks} "), format!(" {ticks}"))
+    } else {
+        (ticks.clone(), ticks)
     }
 }
 
@@ -972,6 +991,10 @@ pub(crate) fn render_inline_with(
                 None => (open_tag(&m.kind, names), close_tag(&m.kind, names)),
             },
             MarkKind::Link(url) if page_on(&marks, m) && !md_link(url) && !is_web(url) => continue,
+            MarkKind::Code => {
+                let span: String = chars[m.start as usize..m.end as usize].iter().collect();
+                code_span_delims(&span)
+            }
             _ => (open_tag(&m.kind, names), close_tag(&m.kind, names)),
         };
         written.push(Written {

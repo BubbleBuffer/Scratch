@@ -584,6 +584,7 @@ fn query_card(text: &str) -> Block {
         target: None,
         color: None,
         width: None,
+        numbered_start: None,
     }
 }
 
@@ -694,4 +695,107 @@ fn query_card_and_chip_survive_file_export_import() {
         assert_eq!(actual.marks, expected.marks);
     }
     assert_eq!(again.blocks.len(), page.blocks.len());
+}
+
+/// One paragraph, `before <code> after`, whose code span is `span` and
+/// whose markdown is `rendered` (the span as written). The text is read back
+/// with the same text and marks.
+fn code_span_round_trips(span: &str, rendered: &str) {
+    let t = Temp::new("inline_code");
+    let v = t.vault();
+    let text = format!("before {span} after");
+    let start = "before ".chars().count() as u32;
+    let block = Block {
+        id: new_id(),
+        kind: BlockKind::Paragraph,
+        text: text.clone(),
+        marks: vec![Mark {
+            start,
+            end: start + span.chars().count() as u32,
+            kind: MarkKind::Code,
+        }],
+        checked: false,
+        children: Vec::new(),
+        target: None,
+        color: None,
+        width: None,
+        numbered_start: None,
+    };
+    let markdown = v.blocks_markdown(vec![block.clone()]);
+    assert_eq!(markdown, format!("before {rendered} after"));
+    let again = v.parse_markdown(markdown).remove(0);
+    assert_eq!(again.kind, BlockKind::Paragraph);
+    assert_eq!(again.text, text);
+    assert_eq!(again.marks, block.marks);
+}
+
+#[test]
+fn inline_code_with_a_backtick_inside_round_trips() {
+    code_span_round_trips("a`b", "``a`b``");
+}
+
+#[test]
+fn inline_code_of_only_backticks_round_trips() {
+    code_span_round_trips("```", "```` ``` ````");
+}
+
+#[test]
+fn inline_code_starting_and_ending_with_backticks_round_trips() {
+    code_span_round_trips("`x`", "`` `x` ``");
+}
+
+#[test]
+fn plain_inline_code_keeps_single_backticks() {
+    code_span_round_trips("code", "`code`");
+}
+
+#[test]
+fn inline_code_preserves_content_spaces_around_backticks() {
+    code_span_round_trips(" `x` ", "``  `x`  ``");
+}
+
+/// Independently of the writer, CommonMark drops one space
+/// from each side of a code span that has both, so `` `` `x` `` `` is `` `x` ``.
+#[test]
+fn inline_code_padding_is_stripped_when_parsed() {
+    let t = Temp::new("inline_code_padding");
+    let v = t.vault();
+    let block = v.parse_markdown("before `` `x` `` after".into()).remove(0);
+    assert_eq!(block.text, "before `x` after");
+    let code = block
+        .marks
+        .iter()
+        .find(|m| m.kind == MarkKind::Code)
+        .expect("a code mark");
+    let code_text: String = block
+        .text
+        .chars()
+        .skip(code.start as usize)
+        .take((code.end - code.start) as usize)
+        .collect();
+    assert_eq!(code_text, "`x`");
+}
+
+#[test]
+fn inline_code_padding_strips_exactly_one_space_and_preserves_exceptions() {
+    let t = Temp::new("inline_code_padding_edges");
+    let v = t.vault();
+    for (source, expected) in [
+        ("`  x  `", " x "),
+        ("` x`", " x"),
+        ("`x `", "x "),
+        ("` `", " "),
+        ("`   `", "   "),
+        ("` \t `", "\t"),
+    ] {
+        let blocks = v.parse_markdown(format!("before {source} after"));
+        assert_eq!(blocks.len(), 1, "{source:?}");
+        let block = &blocks[0];
+        assert_eq!(block.text, format!("before {expected} after"), "{source:?}");
+        assert_eq!(block.marks, vec![Mark {
+            start: 7,
+            end: 7 + expected.chars().count() as u32,
+            kind: MarkKind::Code,
+        }], "{source:?}");
+    }
 }

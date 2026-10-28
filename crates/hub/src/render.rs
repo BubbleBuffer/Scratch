@@ -527,6 +527,7 @@ mod tests {
             target: None,
             color: None,
             width: None,
+            numbered_start: None,
         };
         assert_eq!(description(&[b("Hello"), b("world")]), "Hello world");
         let long = "word ".repeat(80);

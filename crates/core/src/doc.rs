@@ -819,6 +819,11 @@ impl PageDoc {
                 }
                 _ => None,
             },
+            numbered_start: match m.get("numbered_start") {
+                Some(ValueOrContainer::Value(LoroValue::I64(n)))
+                    if (0..=u32::MAX as i64).contains(&n) && n != 1 => Some(n as u32),
+                _ => None,
+            },
         })
     }
 
@@ -906,7 +911,8 @@ impl PageDoc {
                 BlockOp::SetChecked { id, .. }
                 | BlockOp::SetTarget { id, .. }
                 | BlockOp::SetColor { id, .. }
-                | BlockOp::SetWidth { id, .. } => sim.require(id)?,
+                | BlockOp::SetWidth { id, .. }
+                | BlockOp::SetNumberedStart { id, .. } => sim.require(id)?,
             }
         }
         // Check the final tree so a replacement can turn a parent into a
@@ -1049,6 +1055,21 @@ impl PageDoc {
                     match w {
                         Some(w) => m.insert("width", w as i64)?,
                         None => m.delete("width")?,
+                    }
+                }
+                Ok(())
+            }
+            BlockOp::SetNumberedStart { id, numbered_start } => {
+                let m = self.tree.get_meta(self.node(id)?)?;
+                let start = numbered_start.filter(|start| *start != 1);
+                let cur = match m.get("numbered_start") {
+                    Some(ValueOrContainer::Value(LoroValue::I64(n))) => Some(n),
+                    _ => None,
+                };
+                if cur != start.map(i64::from) {
+                    match start {
+                        Some(start) => m.insert("numbered_start", i64::from(start))?,
+                        None => m.delete("numbered_start")?,
                     }
                 }
                 Ok(())
