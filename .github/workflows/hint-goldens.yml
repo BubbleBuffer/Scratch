@@ -1,0 +1,75 @@
+# Temporary: renders the goldens on Windows (where the baselines come from) for
+# main and this branch, checks main's renders against the committed baselines,
+# and uploads the images that change. Removed before merge.
+name: hint-goldens
+
+on:
+  push:
+    branches: [fix/move-to-hint]
+    paths: [.github/workflows/hint-goldens.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: windows-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: head
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: base
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-goldens
+          workspaces: head
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.5
+          cache: true
+      - name: Build host bridge
+        working-directory: head
+        run: cargo build --release --locked -p notes_bridge
+      - name: Render goldens on both sides
+        env:
+          NOTES_BRIDGE_LIB: ${{ github.workspace }}\head\target\release\notes_bridge.dll
+        run: |
+          tests="test/pages_golden_test.dart test/today_features_golden_test.dart test/shell_golden_test.dart test/golden_test.dart"
+          for side in base head; do
+            (cd $side/app && flutter pub get >/dev/null)
+            (cd $side/app && flutter test --update-goldens --concurrency=1 $tests > ../../$side.log 2>&1 || true)
+            tail -15 $side.log
+            echo "== $side: renders that differ from its committed baselines"
+            git -C $side status --short -- app | grep -i '\.png' || echo "(none)"
+          done
+          (cd base/app && find . -name '*.png' -print0 | sort -z | xargs -0 sha256sum) > base.sha
+          (cd head/app && find . -name '*.png' -print0 | sort -z | xargs -0 sha256sum) > head.sha
+          mkdir -p out/base out/head
+          awk '{print $2}' base.sha | while read f; do
+            if ! cmp -s "base/app/$f" "head/app/$f"; then
+              echo "DIFFERS $f"
+              mkdir -p "out/base/$(dirname "$f")" "out/head/$(dirname "$f")"
+              cp "base/app/$f" "out/base/$f"; cp "head/app/$f" "out/head/$f" 2>/dev/null || true
+            fi
+          done
+          echo "compared $(wc -l < base.sha) images; differing: $(find out/base -name '*.png' | wc -l)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hint-goldens
+          path: |
+            out
+            base.log
+            head.log
