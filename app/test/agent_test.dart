@@ -306,25 +306,45 @@ void main() {
     );
     store.debugAddApproval(approval('a1'));
     await settle(tester);
-    expect(textOf(tester, 'agent-approval-tool-a1'), 'delete_page');
+    // The bar names the tool and its key argument on one line; the full
+    // arguments are one click away.
+    expect(find.text('Needs approval'), findsOneWidget);
     expect(
-      textOf(tester, 'agent-approval-args-a1'),
-      contains('"page": "Garden plan"'),
+      find.descendant(of: key('agent-approval-a1'), matching: find.text('delete_page')),
+      findsOneWidget,
     );
-    expect(key('agent-approve-a1'), findsOneWidget);
-    expect(key('agent-approve-session-a1'), findsOneWidget);
-    await tapAndSettle(tester, key('agent-approve-a1'));
+    expect(
+      find.descendant(of: key('agent-approval-a1'), matching: find.text('Garden plan')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('"permanent"'), findsNothing);
+    await tapAndSettle(tester, find.text('Details'));
+    expect(find.textContaining('"page": "Garden plan"'), findsOneWidget);
+    expect(find.text('For session'), findsOneWidget);
+    await tapAndSettle(tester, find.text('Approve'));
     expect(key('agent-approval-a1'), findsNothing);
 
     // Deny opens an optional reason, then decides.
     store.debugAddApproval(approval('a2'));
     await settle(tester);
-    await tapAndSettle(tester, key('agent-deny-a2'));
-    expect(key('agent-deny-reason-a2'), findsOneWidget);
-    expect(key('agent-approve-a2'), findsNothing);
-    await enterField(tester, 'agent-deny-reason-a2', 'Keep it');
-    await tapAndSettle(tester, key('agent-deny-confirm-a2'));
+    await tapAndSettle(tester, find.text('Deny'));
+    expect(find.text('Approve'), findsNothing);
+    final reason = find.descendant(
+      of: key('agent-approval-a2'),
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(reason, 'Keep it');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await settle(tester);
     expect(key('agent-approval-a2'), findsNothing);
+
+    // 1, 2 and 3 answer while the composer is empty.
+    store.debugAddApproval(approval('a3'));
+    await settle(tester);
+    expect(key('agent-approval-a3'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+    await settle(tester);
+    expect(key('agent-approval-a3'), findsNothing);
   });
 
   appTest('Confirm tools run without approval in the shipped Bypass agent', (
@@ -674,10 +694,10 @@ void main() {
       ),
     );
     await settle(tester);
-    expect(
-      textOf(tester, 'agent-approval-args-project-open'),
-      'Open folder C:/Work/Garden as project Garden?',
-    );
+    expect(find.text('project_open'), findsOneWidget);
+    expect(find.text('C:/Work/Garden'), findsOneWidget);
+    await tapAndSettle(tester, find.text('Details'));
+    expect(find.textContaining('"name": "Garden"'), findsOneWidget);
   });
 
   appTest('task availability follows host capabilities', (tester) async {

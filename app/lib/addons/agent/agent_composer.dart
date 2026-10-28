@@ -24,16 +24,22 @@ class AgentComposer extends StatefulWidget {
     required this.store,
     this.panel = false,
     this.mentionSource = mentionPages,
+    this.controller,
   });
   final AgentStore store;
   final bool panel;
   final AgentMentionSource mentionSource;
+
+  /// The draft, when the host wants to read it; the composer makes its own
+  /// otherwise.
+  final TextEditingController? controller;
   @override
   State<AgentComposer> createState() => _AgentComposerState();
 }
 
 class _AgentComposerState extends State<AgentComposer> {
-  final _text = TextEditingController();
+  final _ownText = TextEditingController();
+  TextEditingController get _text => widget.controller ?? _ownText;
   late final _focus = FocusNode(onKeyEvent: _onKey);
   EditorFocus? _editor;
   String? _pageId, _removedPage, _removedSelection;
@@ -81,7 +87,8 @@ class _AgentComposerState extends State<AgentComposer> {
   @override
   void dispose() {
     _editor?.removeListener(_editorChanged);
-    _text.dispose();
+    _text.removeListener(_textChanged);
+    _ownText.dispose();
     _focus.dispose();
     super.dispose();
   }
