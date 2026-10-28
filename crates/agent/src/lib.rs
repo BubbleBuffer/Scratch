@@ -14,6 +14,7 @@ pub mod claude;
 mod context;
 mod gateway;
 pub mod mcp;
+mod outline_lcm;
 mod outline_titles;
 /// Explicitly renamed sessions retain their complete display name.
 pub fn session_user_named_ids_at(data_dir: &std::path::Path) -> anyhow::Result<Vec<String>> {
@@ -204,8 +205,8 @@ pub enum Forwarded {
 
 /// The outline of `session` in `store`, with its notes-owned file at `outline_path`.
 /// The notes-owned outline wins whenever one was saved for the session, even an
-/// empty one. Otherwise BubblePaw's context chapters are returned without sections,
-/// each ending at its last message. Empty when neither exists.
+/// empty one. Otherwise LCM subject chapters with episode sections take precedence
+/// over legacy context chapters without sections. Empty when none exist.
 pub fn read_session_outline(
     store: &Store,
     outline_path: &Path,
@@ -215,6 +216,9 @@ pub fn read_session_outline(
     if let Some(chapters) = vault_tools::outline::OutlineStore::read_session(outline_path, session)?
     {
         return Ok(vault_tools::outline::ChatOutline { chapters });
+    }
+    if let Some(outline) = outline_lcm::read(store, session)? {
+        return Ok(outline);
     }
     let chapters = store.context_chapters(session)?;
     if chapters.is_empty() {
@@ -1052,8 +1056,9 @@ impl Agent {
         self.store.list_sessions()
     }
 
-    /// The session's outline: the notes-owned one when saved, else BubblePaw's context
-    /// chapters. See [`read_session_outline`]. Errors for an unknown session.
+    /// The session's outline: notes-owned when saved, then LCM subject chapters,
+    /// then legacy context chapters. See [`read_session_outline`]. Errors for an
+    /// unknown session.
     pub fn session_outline(&self, session: &str) -> Result<vault_tools::outline::ChatOutline> {
         outline_titles::refresh(&self.store, &self.outline_path, session)?;
         read_session_outline(&self.store, &self.outline_path, session)

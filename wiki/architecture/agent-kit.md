@@ -55,6 +55,12 @@ The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dar
 
 ## The chat outline
 
+The local Rust reader in [`crates/agent`](../../crates/agent/src/lib.rs) chooses the notes-owned `agent/chat_outline.sqlite` outline first (including a saved empty outline), then BubblePaw's LCM `context_subject_chapters` and `context_episodes`, then legacy `context_chapters`. It reads LCM through the pinned SDK's public store APIs. A session with no LCM rows retains the legacy behavior.
+
+LCM subject chapters have consecutive episode membership. Their ordinal defines chapter order; each episode becomes a section with its title, summary and inclusive message anchors. Chapter anchors span their first and last episodes, timestamps come from those messages, and the SDK's open/closed status determines whether the chapter is ongoing. LCM split decisions are not displayed as user decisions.
+
+The shared [LCM title helper](../../crates/agent/src/outline_lcm.rs) uses a closed chapter's generated description, or an open chapter's first episode title. Without an episode it returns an empty title; it invents no placeholder. Automatic chat titles use the same rule and source order, and explicit user renames remain sticky. The SDK writer creates a chapter together with its first episode, so the no-episode title case is covered directly by the helper test. The outline DTO and Dart adapter are unchanged; this read path does not add Hub outline RPCs.
+
 Chapter cards and headings, section dividers, the where-am-I strip, Contents and their menus, the fold and jump state, the indexed list and its row layout come from the kit (`OutlineController`, `OutlineList`, `OutlineWhereStrip` and the rest of `agent_kit`'s outline area). Scratch's side is `addons/agent/agent_outline.dart` (the store's `ChatOutline` becomes the kit's `Outline`), `ChatReaderController` (composes the kit's `OutlineController`; keeps following the end of a live reply, pending references, the plain list and `keepMessagePosition`) and `AgentChat`, which passes the host actions as `OutlineAction`s. `ItemRow` carries an item id, so the chat looks the item up when a row is built. The chat itself, `AgentChat(store, panel)`, is unchanged.
 
 The kit reads its tokens through `BbThemeScope`. `NotesShell` wraps the app in one, above the navigator, because the kit's sheets and menus are routes and read the scope too.
