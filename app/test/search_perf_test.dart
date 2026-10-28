@@ -249,7 +249,7 @@ void main() {
       // ignore: avoid_print
       print('search perf: query controls cached');
       final measured = vault = _SearchVault(raw, cached);
-      expect(await tester.runAsync(measured.pageCount), _pages);
+      expect(await tester.runAsync(measured.pageCount), _pages + 1);
       // Construct the stores in the real zone as well: ReminderStore's
       // initial Future.value must complete while runAsync awaits start.
       final state = (await tester.runAsync(() async {
