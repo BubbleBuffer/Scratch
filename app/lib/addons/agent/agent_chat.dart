@@ -11,6 +11,8 @@ import 'package:agent_kit/agent_kit.dart'
         OutlineList,
         OutlineSection,
         OutlineWhereStrip,
+        TimelineEntry,
+        TranscriptList,
         outlineSegments,
         outlineStripColors;
 import 'package:agent_kit_core/agent_kit_core.dart' show ApprovalChoice;
@@ -377,12 +379,20 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
                 ),
               ],
             )
-          : ListView.builder(
-              key: _reader.plainViewport,
-              controller: _reader.scroll,
-              padding: padding,
-              itemCount: items.length,
-              itemBuilder: (context, i) => rows.plainRow(i, items[i]),
+          : TranscriptList(
+              entries: [
+                for (var i = 0; i < items.length; i++)
+                  TimelineEntry(
+                    id: items[i].id,
+                    builder: (_) => rows.plainRow(i, items[i]),
+                  ),
+              ],
+              scroll: _reader.scroll,
+              viewportKey: _reader.plainViewport,
+              contentWidth: Layout.contentWidth,
+              gutter: 0,
+              rowGap: 14,
+              padding: padding.copyWith(bottom: padding.bottom + 14),
             );
       return Container(
         decoration: BoxDecoration(

@@ -24,17 +24,12 @@ class ChatTranscriptView {
   final AgentStore store;
   final ChatReaderController reader;
 
-  /// A row of the plain list: one chat item, spaced as the plain list always
-  /// has been. Keyed by index, so the top row can be measured on screen.
-  Widget plainRow(int i, ChatItem item) => Center(
+  /// A row of the plain list: one chat item. The kit list centres it and puts
+  /// the row gap between rows; it is keyed by index so the top row can be
+  /// measured on screen.
+  Widget plainRow(int i, ChatItem item) => KeyedSubtree(
     key: reader.plainRows.putIfAbsent(i, () => GlobalKey()),
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: Layout.contentWidth),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: itemView(item),
-      ),
-    ),
+    child: itemView(item),
   );
 
   Widget itemView(ChatItem item) => switch (item) {
