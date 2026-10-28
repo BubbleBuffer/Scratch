@@ -322,6 +322,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CalendarCategory dco_decode_box_autoadd_calendar_category(dynamic raw);
 
   @protected
+  ChapterCard dco_decode_box_autoadd_chapter_card(dynamic raw);
+
+  @protected
   Condition dco_decode_box_autoadd_condition(dynamic raw);
 
   @protected
@@ -349,6 +352,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
   @protected
+  LegacyCard dco_decode_box_autoadd_legacy_card(dynamic raw);
+
+  @protected
   OutlineChapter dco_decode_box_autoadd_outline_chapter(dynamic raw);
 
   @protected
@@ -356,6 +362,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PagePrefsData dco_decode_box_autoadd_page_prefs_data(dynamic raw);
+
+  @protected
+  PointOfInterest dco_decode_box_autoadd_point_of_interest(dynamic raw);
 
   @protected
   PropDef dco_decode_box_autoadd_prop_def(dynamic raw);
@@ -418,7 +427,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ChangeKind dco_decode_change_kind(dynamic raw);
 
   @protected
+  ChapterCard dco_decode_chapter_card(dynamic raw);
+
+  @protected
+  ChapterStatus dco_decode_chapter_status(dynamic raw);
+
+  @protected
   ChatOutline dco_decode_chat_outline(dynamic raw);
+
+  @protected
+  CompactedHistory dco_decode_compacted_history(dynamic raw);
 
   @protected
   Condition dco_decode_condition(dynamic raw);
@@ -472,6 +490,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DownloadedUpdate dco_decode_downloaded_update(dynamic raw);
 
   @protected
+  EpisodeAction dco_decode_episode_action(dynamic raw);
+
+  @protected
+  EpisodeCard dco_decode_episode_card(dynamic raw);
+
+  @protected
   ExternalSearchRow dco_decode_external_search_row(dynamic raw);
 
   @protected
@@ -493,6 +517,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GroupRow dco_decode_group_row(dynamic raw);
 
   @protected
+  HistorySegment dco_decode_history_segment(dynamic raw);
+
+  @protected
+  HistorySegmentKind dco_decode_history_segment_kind(dynamic raw);
+
+  @protected
   Hit dco_decode_hit(dynamic raw);
 
   @protected
@@ -509,6 +539,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ImportReport dco_decode_import_report(dynamic raw);
+
+  @protected
+  LegacyCard dco_decode_legacy_card(dynamic raw);
+
+  @protected
+  LegacyKind dco_decode_legacy_kind(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
@@ -615,6 +651,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ConflictSide> dco_decode_list_conflict_side(dynamic raw);
 
   @protected
+  List<EpisodeAction> dco_decode_list_episode_action(dynamic raw);
+
+  @protected
+  List<EpisodeCard> dco_decode_list_episode_card(dynamic raw);
+
+  @protected
   List<Filter> dco_decode_list_filter(dynamic raw);
 
   @protected
@@ -622,6 +664,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<GroupRow> dco_decode_list_group_row(dynamic raw);
+
+  @protected
+  List<HistorySegment> dco_decode_list_history_segment(dynamic raw);
 
   @protected
   List<Hit> dco_decode_list_hit(dynamic raw);
@@ -722,6 +767,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MatchedFilterValue dco_decode_matched_filter_value(dynamic raw);
 
   @protected
+  MessageRange dco_decode_message_range(dynamic raw);
+
+  @protected
   MountInfo dco_decode_mount_info(dynamic raw);
 
   @protected
@@ -756,6 +804,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiTask? dco_decode_opt_box_autoadd_ai_task(dynamic raw);
 
   @protected
+  ChapterCard? dco_decode_opt_box_autoadd_chapter_card(dynamic raw);
+
+  @protected
   Condition? dco_decode_opt_box_autoadd_condition(dynamic raw);
 
   @protected
@@ -780,6 +831,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
+
+  @protected
+  LegacyCard? dco_decode_opt_box_autoadd_legacy_card(dynamic raw);
+
+  @protected
+  PointOfInterest? dco_decode_opt_box_autoadd_point_of_interest(dynamic raw);
 
   @protected
   Resolution? dco_decode_opt_box_autoadd_resolution(dynamic raw);
@@ -834,6 +891,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ParsedQuery dco_decode_parsed_query(dynamic raw);
+
+  @protected
+  PointOfInterest dco_decode_point_of_interest(dynamic raw);
 
   @protected
   Progress dco_decode_progress(dynamic raw);
@@ -912,6 +972,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SyncStatus dco_decode_sync_status(dynamic raw);
+
+  @protected
+  TargetKind dco_decode_target_kind(dynamic raw);
 
   @protected
   Token dco_decode_token(dynamic raw);
@@ -1286,6 +1349,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ChapterCard sse_decode_box_autoadd_chapter_card(SseDeserializer deserializer);
+
+  @protected
   Condition sse_decode_box_autoadd_condition(SseDeserializer deserializer);
 
   @protected
@@ -1321,6 +1387,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
+  LegacyCard sse_decode_box_autoadd_legacy_card(SseDeserializer deserializer);
+
+  @protected
   OutlineChapter sse_decode_box_autoadd_outline_chapter(
     SseDeserializer deserializer,
   );
@@ -1332,6 +1401,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PagePrefsData sse_decode_box_autoadd_page_prefs_data(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PointOfInterest sse_decode_box_autoadd_point_of_interest(
     SseDeserializer deserializer,
   );
 
@@ -1404,7 +1478,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ChangeKind sse_decode_change_kind(SseDeserializer deserializer);
 
   @protected
+  ChapterCard sse_decode_chapter_card(SseDeserializer deserializer);
+
+  @protected
+  ChapterStatus sse_decode_chapter_status(SseDeserializer deserializer);
+
+  @protected
   ChatOutline sse_decode_chat_outline(SseDeserializer deserializer);
+
+  @protected
+  CompactedHistory sse_decode_compacted_history(SseDeserializer deserializer);
 
   @protected
   Condition sse_decode_condition(SseDeserializer deserializer);
@@ -1470,6 +1553,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DownloadedUpdate sse_decode_downloaded_update(SseDeserializer deserializer);
 
   @protected
+  EpisodeAction sse_decode_episode_action(SseDeserializer deserializer);
+
+  @protected
+  EpisodeCard sse_decode_episode_card(SseDeserializer deserializer);
+
+  @protected
   ExternalSearchRow sse_decode_external_search_row(
     SseDeserializer deserializer,
   );
@@ -1493,6 +1582,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GroupRow sse_decode_group_row(SseDeserializer deserializer);
 
   @protected
+  HistorySegment sse_decode_history_segment(SseDeserializer deserializer);
+
+  @protected
+  HistorySegmentKind sse_decode_history_segment_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Hit sse_decode_hit(SseDeserializer deserializer);
 
   @protected
@@ -1509,6 +1606,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ImportReport sse_decode_import_report(SseDeserializer deserializer);
+
+  @protected
+  LegacyCard sse_decode_legacy_card(SseDeserializer deserializer);
+
+  @protected
+  LegacyKind sse_decode_legacy_kind(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
@@ -1659,6 +1762,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<EpisodeAction> sse_decode_list_episode_action(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<EpisodeCard> sse_decode_list_episode_card(SseDeserializer deserializer);
+
+  @protected
   List<Filter> sse_decode_list_filter(SseDeserializer deserializer);
 
   @protected
@@ -1666,6 +1777,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<GroupRow> sse_decode_list_group_row(SseDeserializer deserializer);
+
+  @protected
+  List<HistorySegment> sse_decode_list_history_segment(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<Hit> sse_decode_list_hit(SseDeserializer deserializer);
@@ -1786,6 +1902,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  MessageRange sse_decode_message_range(SseDeserializer deserializer);
+
+  @protected
   MountInfo sse_decode_mount_info(SseDeserializer deserializer);
 
   @protected
@@ -1828,6 +1947,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiTask? sse_decode_opt_box_autoadd_ai_task(SseDeserializer deserializer);
 
   @protected
+  ChapterCard? sse_decode_opt_box_autoadd_chapter_card(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Condition? sse_decode_opt_box_autoadd_condition(SseDeserializer deserializer);
 
   @protected
@@ -1858,6 +1982,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
+  LegacyCard? sse_decode_opt_box_autoadd_legacy_card(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PointOfInterest? sse_decode_opt_box_autoadd_point_of_interest(
+    SseDeserializer deserializer,
+  );
 
   @protected
   Resolution? sse_decode_opt_box_autoadd_resolution(
@@ -1924,6 +2058,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ParsedQuery sse_decode_parsed_query(SseDeserializer deserializer);
+
+  @protected
+  PointOfInterest sse_decode_point_of_interest(SseDeserializer deserializer);
 
   @protected
   Progress sse_decode_progress(SseDeserializer deserializer);
@@ -2004,6 +2141,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SyncStatus sse_decode_sync_status(SseDeserializer deserializer);
+
+  @protected
+  TargetKind sse_decode_target_kind(SseDeserializer deserializer);
 
   @protected
   Token sse_decode_token(SseDeserializer deserializer);
@@ -2450,6 +2590,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_chapter_card(
+    ChapterCard self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_condition(
     Condition self,
     SseSerializer serializer,
@@ -2498,6 +2644,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_legacy_card(
+    LegacyCard self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_outline_chapter(
     OutlineChapter self,
     SseSerializer serializer,
@@ -2512,6 +2664,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_page_prefs_data(
     PagePrefsData self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_point_of_interest(
+    PointOfInterest self,
     SseSerializer serializer,
   );
 
@@ -2615,7 +2773,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_change_kind(ChangeKind self, SseSerializer serializer);
 
   @protected
+  void sse_encode_chapter_card(ChapterCard self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_chapter_status(ChapterStatus self, SseSerializer serializer);
+
+  @protected
   void sse_encode_chat_outline(ChatOutline self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_compacted_history(
+    CompactedHistory self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_condition(Condition self, SseSerializer serializer);
@@ -2702,6 +2872,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_episode_action(EpisodeAction self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_episode_card(EpisodeCard self, SseSerializer serializer);
+
+  @protected
   void sse_encode_external_search_row(
     ExternalSearchRow self,
     SseSerializer serializer,
@@ -2726,6 +2902,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_group_row(GroupRow self, SseSerializer serializer);
 
   @protected
+  void sse_encode_history_segment(
+    HistorySegment self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_history_segment_kind(
+    HistorySegmentKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_hit(Hit self, SseSerializer serializer);
 
   @protected
@@ -2742,6 +2930,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_import_report(ImportReport self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_legacy_card(LegacyCard self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_legacy_kind(LegacyKind self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
@@ -2927,6 +3121,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_episode_action(
+    List<EpisodeAction> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_episode_card(
+    List<EpisodeCard> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_filter(List<Filter> self, SseSerializer serializer);
 
   @protected
@@ -2937,6 +3143,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_group_row(List<GroupRow> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_history_segment(
+    List<HistorySegment> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_hit(List<Hit> self, SseSerializer serializer);
@@ -3098,6 +3310,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_message_range(MessageRange self, SseSerializer serializer);
+
+  @protected
   void sse_encode_mount_info(MountInfo self, SseSerializer serializer);
 
   @protected
@@ -3149,6 +3364,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_chapter_card(
+    ChapterCard? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_condition(
     Condition? self,
     SseSerializer serializer,
@@ -3190,6 +3411,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_i_64(
     PlatformInt64? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_legacy_card(
+    LegacyCard? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_point_of_interest(
+    PointOfInterest? self,
     SseSerializer serializer,
   );
 
@@ -3273,6 +3506,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_parsed_query(ParsedQuery self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_point_of_interest(
+    PointOfInterest self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_progress(Progress self, SseSerializer serializer);
@@ -3366,6 +3605,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_sync_status(SyncStatus self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_target_kind(TargetKind self, SseSerializer serializer);
 
   @protected
   void sse_encode_token(Token self, SseSerializer serializer);
