@@ -204,7 +204,7 @@ class _PageMenuState extends State<PageMenu> {
       row('copy-link', ico(Ico.link), 'Copy link', () => onAction(PageMenuAction.copyLink), shortcut: 'Ctrl+L'),
       if (widget.canShare) row('share', icx(Ix.linkPage), shareMenuLabel(_shareCount), () => onAction(PageMenuAction.share)),
       row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: 'Ctrl+D'),
-      row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo), shortcut: 'Ctrl+Shift+P'),
+      row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo)),
       if (widget.canAskAi) row('ask-ai', AiMark(size: iconSize), 'Ask AI', () => onAction(PageMenuAction.askAi)),
       sep(),
       row('undo', ico(Ico.undo), 'Undo', canUndo ? () => onAction(PageMenuAction.undo) : null, shortcut: 'Ctrl+Z'),
