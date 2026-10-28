@@ -1,8 +1,12 @@
 import '../../services/addon_services.dart';
 
-import 'package:flutter/services.dart';
+import 'package:agent_kit/agent_kit.dart' as kit;
+import 'package:agent_kit_core/agent_kit_core.dart'
+    as kit
+    show KitChoice, KitRef;
 import 'package:flutter/widgets.dart';
 
+import '../../shell/page_stack.dart' show pageLabelOf;
 import '../../state/app_state.dart';
 import '../../state/pages_store.dart';
 import '../../state/editor_focus.dart';
@@ -11,12 +15,11 @@ import 'agent_store.dart';
 
 /// Looks up the pages an `@` query offers; [mentionPages] unless a test
 /// supplies its own.
-typedef AgentMentionSource =
-    Future<List<MentionItem>> Function(
-      BuildContext context,
-      String query,
-      String exclude,
-    );
+typedef AgentMentionSource = Future<List<MentionItem>> Function(
+  BuildContext context,
+  String query,
+  String exclude,
+);
 
 class AgentComposer extends StatefulWidget {
   const AgentComposer({
@@ -40,22 +43,15 @@ class AgentComposer extends StatefulWidget {
 class _AgentComposerState extends State<AgentComposer> {
   final _ownText = TextEditingController();
   TextEditingController get _text => widget.controller ?? _ownText;
-  late final _focus = FocusNode(onKeyEvent: _onKey);
+  final _focus = FocusNode();
   EditorFocus? _editor;
   String? _pageId, _removedPage, _removedSelection;
   AgentContextPage? _autoPage;
   AgentContextSelection? _selection;
   final _chats = <String, AgentContextChat>{};
   final _mentions = <String, AgentContextPage>{};
-  List<MentionItem>? _menu;
-  int _active = 0, _mentionStart = 0, _request = 0, _queryEpoch = 0;
-  bool _sending = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _text.addListener(_textChanged);
-  }
+  final _found = <String, MentionItem>{};
+  int _request = 0;
 
   @override
   void didChangeDependencies() {
@@ -87,7 +83,6 @@ class _AgentComposerState extends State<AgentComposer> {
   @override
   void dispose() {
     _editor?.removeListener(_editorChanged);
-    _text.removeListener(_textChanged);
     _ownText.dispose();
     _focus.dispose();
     super.dispose();
@@ -155,105 +150,67 @@ class _AgentComposerState extends State<AgentComposer> {
     if (requested) _focus.requestFocus();
   }
 
-  void _textChanged() {
-    if (!mounted) return;
-    setState(() {});
-    _findMentions();
-  }
-
-  Future<void> _findMentions() async {
-    final epoch = ++_queryEpoch;
-    final cursor = _text.selection.extentOffset;
-    if (cursor < 0 || !_text.selection.isCollapsed) {
-      setState(() => _menu = null);
-      return;
-    }
-    final before = _text.text.substring(0, cursor);
-    final match = RegExp(r'(?:^|\s)@([^\s@]*)$').firstMatch(before);
-    if (match == null) {
-      setState(() => _menu = null);
-      return;
-    }
-    final pages = await widget.mentionSource(context, match[1]!, '');
-    if (!mounted || epoch != _queryEpoch) return;
-    setState(() {
-      _mentionStart = before.lastIndexOf('@');
-      final query = match[1]!.toLowerCase();
-      _menu = [
-        ...pages,
-        ...widget.store.sessions
-            .where(
-              (chat) =>
-                  chat.id != widget.store.openId &&
-                  chat.title.toLowerCase().contains(query),
-            )
-            .take(4)
-            .map(
-              (chat) => MentionItem.chat(
-                chat.id,
-                widget.store.displaySessionTitle(chat.id, chat.title),
-              ),
+  /// What `@` offers: the vault's pages, then other chats whose title matches.
+  Future<List<kit.KitRef>> _suggest(String query) async {
+    final pages = await widget.mentionSource(context, query, '');
+    if (!mounted) return const [];
+    final q = query.toLowerCase();
+    final store = widget.store;
+    final items = [
+      ...pages,
+      ...store.sessions
+          .where(
+            (chat) =>
+                chat.id != store.openId && chat.title.toLowerCase().contains(q),
+          )
+          .take(4)
+          .map(
+            (chat) => MentionItem.chat(
+              chat.id,
+              store.displaySessionTitle(chat.id, chat.title),
             ),
-      ];
-      _active = 0;
-    });
+          ),
+    ];
+    _found.clear();
+    return [
+      for (final it in items)
+        if (!it.isDate)
+          () {
+            final ref = kit.KitRef(
+              kind: it.isChat ? 'chat' : 'page',
+              id: it.id,
+              label: it.label,
+            );
+            _found['${ref.kind}-${ref.id}'] = it;
+            return ref;
+          }(),
+    ];
   }
 
-  void _pick(MentionItem item) {
-    final end = _text.selection.extentOffset;
-    final inserted = '@${item.label} ';
-    setState(() {
-      if (item.isChat) {
-        _chats[item.id] = AgentContextChat(id: item.id, title: item.label);
-      } else {
-        _mentions[item.id] = AgentContextPage(id: item.id, title: item.label);
-      }
-      _menu = null;
-    });
-    _text.value = TextEditingValue(
-      text: _text.text.replaceRange(_mentionStart, end, inserted),
-      selection: TextSelection.collapsed(
-        offset: _mentionStart + inserted.length,
-      ),
+  kit.MentionRowLook _look(BuildContext context, kit.KitRef ref) {
+    final it = _found['${ref.kind}-${ref.id}'];
+    if (it == null || it.isChat) return const kit.MentionRowLook();
+    final m = context.mobile;
+    final page = pageLabelOf(context, it.id, it.label);
+    return kit.MentionRowLook(
+      leading: PageIcon(icon: it.icon, size: m ? 22 : 20),
+      label: page.text,
+      firstLine: page.firstLine,
     );
-    _focus.requestFocus();
   }
 
-  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (_menu != null && event is KeyDownEvent) {
-      if (event.logicalKey == LogicalKeyboardKey.escape) {
-        setState(() => _menu = null);
-        return KeyEventResult.handled;
+  void _mentioned(kit.KitRef ref) {
+    setState(() {
+      if (ref.kind == 'chat') {
+        _chats[ref.id] = AgentContextChat(id: ref.id, title: ref.label);
+      } else {
+        _mentions[ref.id] = AgentContextPage(id: ref.id, title: ref.label);
       }
-      if (_menu!.isNotEmpty &&
-          (event.logicalKey == LogicalKeyboardKey.arrowDown ||
-              event.logicalKey == LogicalKeyboardKey.arrowUp)) {
-        setState(
-          () => _active =
-              (_active +
-                  (event.logicalKey == LogicalKeyboardKey.arrowDown ? 1 : -1)) %
-              _menu!.length,
-        );
-        return KeyEventResult.handled;
-      }
-      if (_menu!.isNotEmpty && event.logicalKey == LogicalKeyboardKey.enter) {
-        _pick(_menu![_active]);
-        return KeyEventResult.handled;
-      }
-    }
-    final enter =
-        event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter;
-    if (!enter || HardwareKeyboard.instance.isShiftPressed) {
-      return KeyEventResult.ignored;
-    }
-    if (event is KeyDownEvent) _send();
-    return KeyEventResult.handled;
+    });
   }
 
-  Future<void> _send() async {
-    final text = _text.text.trim();
-    if (text.isEmpty || _sending) return;
+  Future<bool> _send(kit.ComposerSubmission submission) async {
+    final text = submission.text;
     final store = widget.store;
     final pages = Map<String, AgentContextPage>.of(_mentions);
     final autoPage = _autoPage;
@@ -267,69 +224,24 @@ class _AgentComposerState extends State<AgentComposer> {
             chats: _chats.values.toList(),
             selection: _selection,
           );
-    setState(() => _sending = true);
-    try {
-      if (store.openId == null) {
-        final first = text.split('\n').first.trim();
-        final session = await store.createSession(
-          title: first.length > 60 ? '${first.substring(0, 60)}…' : first,
-        );
-        if (session == null) return;
-      }
-      await store.send(text, context: context);
-      if (mounted && store.error == null) {
-        _text.clear();
-        setState(() {
-          _mentions.clear();
-          _chats.clear();
-          _selection = null;
-          _menu = null;
-          _removedPage = null;
-          _removedSelection = null;
-          _captureEditor();
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
+    if (store.openId == null) {
+      final first = text.split('\n').first.trim();
+      final session = await store.createSession(
+        title: first.length > 60 ? '${first.substring(0, 60)}…' : first,
+      );
+      if (session == null) return false;
     }
-  }
-
-  Widget _chip(
-    String label,
-    Key key,
-    VoidCallback remove, {
-    Ico icon = Ico.page,
-  }) {
-    final c = context.colors;
-    return Container(
-      key: key,
-      padding: const EdgeInsets.only(left: 6),
-      decoration: BoxDecoration(color: c.bgSecondary, borderRadius: Radii.pill),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon20(icon, size: 12, color: c.iconTertiary),
-          const SizedBox(width: 4),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: widget.panel ? 190 : 280),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: ts(context.type.uiSmall, c.textSecondary),
-            ),
-          ),
-          IconBtn(
-            Ico.close,
-            key: ValueKey('${(key as ValueKey).value}-remove'),
-            size: 24,
-            glyph: 12,
-            semanticLabel: 'Remove context',
-            onTap: remove,
-          ),
-        ],
-      ),
-    );
+    await store.send(text, context: context);
+    if (!mounted || store.error != null) return false;
+    setState(() {
+      _mentions.clear();
+      _chats.clear();
+      _selection = null;
+      _removedPage = null;
+      _removedSelection = null;
+      _captureEditor();
+    });
+    return true;
   }
 
   String get _selectionLabel {
@@ -340,185 +252,114 @@ class _AgentComposerState extends State<AgentComposer> {
     return 'Selection · “${words.length > 35 ? '${words.substring(0, 35)}…' : words}”';
   }
 
+  Key _chipKey(kit.KitRef ref) => switch (ref.kind) {
+    'page' => const ValueKey('agent-context-page'),
+    'selection' => const ValueKey('agent-context-selection'),
+    'chat' => ValueKey('agent-context-chat-${ref.id}'),
+    _ => ValueKey('agent-context-mention-${ref.id}'),
+  };
+
+  void _removeRef(kit.KitRef ref) => setState(() {
+    switch (ref.kind) {
+      case 'page':
+        _removedPage = _autoPage?.id;
+        _autoPage = null;
+      case 'selection':
+        _removedSelection = _selectionKey(_editor!);
+        _selection = null;
+      case 'chat':
+        _chats.remove(ref.id);
+      default:
+        _mentions.remove(ref.id);
+    }
+  });
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
-    final c = context.colors;
     final pages = context.watch<PagesStore>();
     final running = store.running;
     final model = store.modelOf(store.openId);
     final models = store.shownModels(current: model);
     final showModel = models.isNotEmpty && model != null;
-    final showHost = store.canPickHost;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (_menu != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 5),
-            child: MentionMenu(
-              key: const ValueKey('agent-mentions'),
-              items: _menu!,
-              active: _active,
-              maxHeight: 180,
-              onPick: _pick,
-              onHover: (i) => setState(() => _active = i),
-            ),
+    String titleOf(AgentContextPage p) =>
+        displayTitle(p.title, firstLine: pages.meta(p.id)?.firstLine ?? '');
+    return kit.AgentComposer(
+      onSubmit: _send,
+      running: running,
+      onStop: store.stop,
+      controller: _text,
+      focusNode: _focus,
+      placeholder: running ? 'Steer the agent…' : 'Ask the agent…',
+      maxLines: widget.panel ? 5 : 8,
+      chipMaxWidth: widget.panel ? 190 : 280,
+      models: showModel
+          ? [
+              for (final m in models)
+                kit.KitChoice(id: m, label: store.modelLabel(m)),
+            ]
+          : const [],
+      modelId: model,
+      showModelPick: showModel,
+      onModelChanged: (c) => store.pickModel(store.openId, c.id),
+      // Where the chat runs; fixed once it has messages, so it shows without
+      // a menu.
+      workspaces: store.canPickHost
+          ? [
+              for (final h in store.usableHosts)
+                kit.KitChoice(id: h.name, label: h.label),
+            ]
+          : const [],
+      workspaceId: store.host.name,
+      workspaceTitle: 'Runs on',
+      workspaceLocked: store.hostLocked || running,
+      onWorkspaceChanged: (c) =>
+          store.pickHost(AgentHost.values.firstWhere((h) => h.name == c.id)),
+      showModeToggle: false,
+      runningSendLabel: 'Steer',
+      refs: [
+        if (_autoPage != null)
+          kit.KitRef(
+            kind: 'page',
+            id: _autoPage!.id,
+            label: titleOf(_autoPage!),
           ),
-        GestureDetector(
-          onTap: _focus.requestFocus,
-          child: FieldFrame(
-            padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_autoPage != null ||
-                    _selection != null ||
-                    _mentions.isNotEmpty ||
-                    _chats.isNotEmpty) ...[
-                  Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: [
-                      if (_autoPage != null)
-                        _chip(
-                          displayTitle(
-                            _autoPage!.title,
-                            firstLine:
-                                pages.meta(_autoPage!.id)?.firstLine ?? '',
-                          ),
-                          const ValueKey('agent-context-page'),
-                          () => setState(() {
-                            _removedPage = _autoPage!.id;
-                            _autoPage = null;
-                          }),
-                        ),
-                      if (_selection != null)
-                        _chip(
-                          _selectionLabel,
-                          const ValueKey('agent-context-selection'),
-                          () => setState(() {
-                            _removedSelection = _selectionKey(_editor!);
-                            _selection = null;
-                          }),
-                          icon: Ico.text,
-                        ),
-                      for (final chat in _chats.values)
-                        _chip(
-                          chat.title,
-                          ValueKey('agent-context-chat-${chat.id}'),
-                          () => setState(() => _chats.remove(chat.id)),
-                          icon: Ico.comment,
-                        ),
-                      for (final page in _mentions.values)
-                        _chip(
-                          displayTitle(
-                            page.title,
-                            firstLine: pages.meta(page.id)?.firstLine ?? '',
-                          ),
-                          ValueKey('agent-context-mention-${page.id}'),
-                          () => setState(() => _mentions.remove(page.id)),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                ],
-                Stack(
-                  children: [
-                    if (_text.text.isEmpty)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: Text(
-                            running ? 'Steer the agent…' : 'Ask the agent…',
-                            style: ts(context.type.body, c.textTertiary),
-                          ),
-                        ),
-                      ),
-                    EditableText(
-                      key: const ValueKey('agent-composer'),
-                      controller: _text,
-                      focusNode: _focus,
-                      style: ts(context.type.body, c.textPrimary),
-                      cursorColor: c.textPrimary,
-                      backgroundCursorColor: c.textTertiary,
-                      selectionColor: c.textSelection,
-                      cursorWidth: 1.5,
-                      minLines: 1,
-                      maxLines: widget.panel ? 5 : 8,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      selectionControls: noteSelectionControls,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    if (showModel || showHost)
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Where the chat runs; fixed once it has
-                                // messages, so it shows without a menu.
-                                if (showHost)
-                                  SelectButton<AgentHost>(
-                                    key: const ValueKey('agent-runner'),
-                                    title: 'Runs on',
-                                    value: store.host,
-                                    options: store.usableHosts,
-                                    labelOf: (h) => h.label,
-                                    onChanged: store.hostLocked || running
-                                        ? null
-                                        : (h) => store.pickHost(h),
-                                  ),
-                                if (showModel)
-                                  SelectButton<String>(
-                                    key: const ValueKey('agent-model'),
-                                    title: 'Model',
-                                    value: model,
-                                    options: models,
-                                    labelOf: store.modelLabel,
-                                    onChanged: (m) =>
-                                        store.pickModel(store.openId, m),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      )
-                    else
-                      const Spacer(),
-                    if (running) ...[
-                      SecondaryButton(
-                        key: const ValueKey('agent-stop'),
-                        label: 'Stop',
-                        height: 32,
-                        onTap: store.stop,
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    PrimaryButton(
-                      key: const ValueKey('agent-send'),
-                      label: running ? 'Steer' : 'Send',
-                      height: 32,
-                      icon: Ico.arrowUp,
-                      onTap: _send,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+        if (_selection != null)
+          kit.KitRef(
+            kind: 'selection',
+            id: 'selection',
+            label: _selectionLabel,
           ),
-        ),
+        for (final chat in _chats.values)
+          kit.KitRef(kind: 'chat', id: chat.id, label: chat.title),
+        for (final page in _mentions.values)
+          kit.KitRef(kind: 'mention', id: page.id, label: titleOf(page)),
       ],
+      chipKeyOf: _chipKey,
+      onRemoveRef: _removeRef,
+      mentions: _Mentions(_suggest),
+      mentionLook: _look,
+      onMentionPicked: _mentioned,
+      maxMentions: 10,
+      keys: const kit.ComposerKeys(
+        field: ValueKey('agent-composer'),
+        send: ValueKey('agent-send'),
+        stop: ValueKey('agent-stop'),
+        mentions: ValueKey('agent-mentions'),
+        model: ValueKey('agent-model'),
+        workspace: ValueKey('agent-runner'),
+      ),
     );
   }
+}
+
+class _Mentions implements kit.MentionSource {
+  const _Mentions(this._suggest);
+  final Future<List<kit.KitRef>> Function(String) _suggest;
+
+  @override
+  String get trigger => '@';
+
+  @override
+  Future<List<kit.KitRef>> suggest(String query) => _suggest(query);
 }
