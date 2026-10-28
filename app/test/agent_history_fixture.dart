@@ -110,6 +110,8 @@ ChapterCard _chapter(
   List<EpisodeCard> episodes, {
   int? messageCount,
   int? episodeCount,
+  List<String> decisions = const [],
+  List<ChapterSection> sections = const [],
 }) => ChapterCard(
   id: id,
   status: status,
@@ -125,6 +127,8 @@ ChapterCard _chapter(
   messageCount: messageCount,
   episodeCount: episodeCount,
   episodes: episodes,
+  decisions: decisions,
+  sections: sections,
 );
 
 HistorySegment _card(ChapterCard c) => HistorySegment(
@@ -206,6 +210,11 @@ CompactedHistory historyOf({bool compactable = true}) {
     ],
     messageCount: 18,
     episodeCount: 2,
+    decisions: const ['Hold the last value on reconnect.'],
+    sections: const [
+      ChapterSection(name: 'Find the cause', firstEpisode: 1, lastEpisode: 1),
+      ChapterSection(name: 'Hold the figure', firstEpisode: 2, lastEpisode: 2),
+    ],
   );
   final reconnect1 = _chapter(
     'ch2',
@@ -226,6 +235,7 @@ CompactedHistory historyOf({bool compactable = true}) {
     [_episode('ep4', 32, 38, 'Retry cap', gist: 'Stop after five tries.')],
     messageCount: 12,
     episodeCount: 2,
+    decisions: const ['Stop after five tries.'],
   );
   final settings = _chapter(
     'ch3',

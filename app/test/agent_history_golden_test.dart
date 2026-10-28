@@ -1,10 +1,10 @@
 // Golden screenshots of the chat in compacted mode, at desktop and phone
 // width, light and dark: opened on the "Full messages from here" hairline, and
 // scrolled up to the first closed chapter opened into its episodes with the
-// first episode's action log. Baselines are rendered on the CI runner
-// (Linux, the golden render step of the compacted-history workflow), not on
-// Windows, so they are kept under goldens/compacted and compared by hand.
-// Regenerate with: flutter test --update-goldens test/agent_history_golden_test.dart
+// first episode's action log. Baselines are Linux renders (not the Windows
+// baselines of the other goldens), kept under goldens/compacted; the CI
+// `flutter` job compares them on its pinned Flutter version (ci.yml). Regenerate
+// on Linux with that Flutter: flutter test --update-goldens test/agent_history_golden_test.dart
 
 @Tags(['golden'])
 library;
@@ -55,6 +55,16 @@ void main() {
         await tapVisible(tester, key('history-chapter-ch1-toggle'));
         await tapVisible(tester, key('history-episode-ep1-header'));
         await _shot('cards-$tag');
+      });
+
+      appTest('a closed chapter with its decision and sections, $tag', (
+        tester,
+      ) async {
+        await open(tester);
+        await scrollUpTo(tester, key('history-chapter-ch1-toggle'));
+        await tester.ensureVisible(key('history-chapter-ch1-face'));
+        await settle(tester);
+        await _shot('chapter-$tag');
       });
     }
   }
