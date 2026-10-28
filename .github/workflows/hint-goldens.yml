@@ -54,8 +54,8 @@ jobs:
             echo "== $side: renders that differ from its committed baselines"
             git -C $side status --short -- app | grep -i '\.png' || echo "(none)"
           done
-          (cd base/app && find . -name '*.png' -print0 | sort -z | xargs -0 sha256sum) > base.sha
-          (cd head/app && find . -name '*.png' -print0 | sort -z | xargs -0 sha256sum) > head.sha
+          (cd base/app && find . -name '*.png' -print0 | sort -z | xargs -0 sha256sum | sed 's/ [*]/ /') > base.sha
+          (cd head/app && find . -name '*.png' -print0 | sort -z | xargs -0 sha256sum | sed 's/ [*]/ /') > head.sha
           mkdir -p out/base out/head
           awk '{print $2}' base.sha | while read f; do
             if ! cmp -s "base/app/$f" "head/app/$f"; then
