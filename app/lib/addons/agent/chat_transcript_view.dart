@@ -65,11 +65,5 @@ class ChatTranscriptView {
             : context.colors.textTertiary,
       ),
     ),
-    ApprovalItem() => ApprovalCard(
-      approval: item.approval,
-      key: ValueKey('agent-approval-${item.approval.id}'),
-      onDecide: (decision, reason) =>
-          store.decide(item.approval.id, decision, reason: reason),
-    ),
   };
 }

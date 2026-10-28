@@ -1,0 +1,94 @@
+# Temporary: renders the agent goldens on main and on this branch with the same
+# bridge and compares the images. Removed before merge.
+name: approval-compare
+
+on:
+  push:
+    branches: [port/approval-bar]
+    paths: [.github/workflows/approval-compare.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: head
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: base
+          persist-credentials: false
+      - name: BubblePaw-Core revision
+        id: core
+        working-directory: head
+        run: |
+          rev=$(grep -oE 'BubblePaw-Core\?tag=v[0-9.]+#[0-9a-f]{40}' Cargo.lock | head -1 | cut -d'#' -f2)
+          test -n "$rev"
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: BubbleBuffer/BubblePaw-Core
+          ref: ${{ steps.core.outputs.rev }}
+          path: BubblePaw-Core
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: flutter
+          workspaces: |
+            head
+            BubblePaw-Core
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build host bridge
+        working-directory: head
+        run: cargo build --release --locked -p notes_bridge
+      - name: Build BubblePaw fake extension
+        working-directory: BubblePaw-Core
+        run: cargo build -p bubblepaw-runner --features test-fixtures --bin bubblepaw-fake-extension
+      - name: Render goldens on both sides
+        env:
+          NOTES_BRIDGE_LIB: ${{ github.workspace }}/head/target/release/libnotes_bridge.so
+          NOTES_FAKE_EXTENSION: ${{ github.workspace }}/BubblePaw-Core/target/debug/bubblepaw-fake-extension
+        run: |
+          tests="test/agent_golden_test.dart test/agent_panel_golden_test.dart test/chat_reference_golden_test.dart test/mobile_agent_golden_test.dart test/ai_golden_test.dart test/agent_chat_partb_test.dart test/agent_transcript_order_test.dart"
+          for side in base head; do
+            (cd $side/app && sed -i '/^org\.gradle\.java\.home=/d' android/gradle.properties && flutter pub get >/dev/null)
+            (cd $side/app && flutter test --update-goldens --concurrency=1 $tests > ../../$side.log 2>&1 || true)
+            tail -15 $side.log
+          done
+          git -C head status --short | head -3
+          (cd base/app && find . -name '*.png' -print0 | sort -z | xargs -0 sha256sum) > base.sha
+          (cd head/app && find . -name '*.png' -print0 | sort -z | xargs -0 sha256sum) > head.sha
+          wc -l base.sha head.sha
+          diff base.sha head.sha && echo "GOLDENS IDENTICAL" || true
+          mkdir -p out/base out/head
+          awk '{print $2}' base.sha | while read f; do
+            if ! cmp -s "base/app/$f" "head/app/$f"; then
+              echo "DIFFERS $f"
+              mkdir -p "out/base/$(dirname "$f")" "out/head/$(dirname "$f")"
+              cp "base/app/$f" "out/base/$f"; cp "head/app/$f" "out/head/$f" 2>/dev/null || true
+            fi
+          done
+          echo "compared $(wc -l < base.sha) images; differing: $(find out/base -name '*.png' | wc -l)"
+          grep -E '^[0-9:]+ \+[0-9]+' base.log | tail -1
+          grep -E '^[0-9:]+ \+[0-9]+' head.log | tail -1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: approval-compare
+          path: |
+            out
+            base.log
+            head.log
+            base.sha
+            head.sha

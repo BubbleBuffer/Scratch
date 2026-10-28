@@ -51,7 +51,7 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The dev pane's packages
 
-The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.7.2`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.8.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
 
 ## The chat outline
 
@@ -102,7 +102,7 @@ These run on the code before any increment and stay green through all of them.
 |---|---|---|---|---|
 | 0 | Protective tests, the `mentionSource` seam, this plan | nothing | everything | the tests above |
 | 1 | Transcript adapter: `AgentSessionState` and the open chat's live state to the kit's `TranscriptItem`s, with no widget change | nothing visible | the mapping (`agent_transcript.dart` keeps ordering, ownership and outline segments) | order test; new mapping tests; goldens identical by construction |
-| 2 | Approval | `ApprovalBar` (keys 1, 2, 3, "Needs approval", waiting time) replaces `ApprovalCard` | `project_open` wording, the arguments text | approval tests in `agent_test.dart` and `agent_chat_partb_test.dart`; approval goldens |
+| 2 | Approval (done) | `ApprovalBar` (keys 1, 2, 3, "Needs approval", waiting time, Details) replaces `ApprovalCard` | the mapping from `AgentApproval` (`kitApproval`, `kitToolTarget`) | approval tests in `agent_test.dart` and `agent_chat_partb_test.dart`; approval goldens |
 | 3 | Tool and code cells | `ActivityGroupView`, exec output rows replace `AgentWorkRow` and `CodeCellRow` | code disclosure setting, the work summary counts | partb activity tests; agent goldens |
 | 4 | Edit rows | `FileEditRow`, `DiffView` replace `AgentEditRow` | page-edit rows (opening the page at the changed blocks), undo that finishes later, edits of untitled pages | partb edit and undo tests; goldens |
 | 5 | Turn view | `AssistantProse`, notice lines for stopped and failed runs, the working line | `AgentMarkdown` as the `MarkdownRenderer` (reference chips, page links), `Add to note` | partb live-turn test; reference goldens |
@@ -115,7 +115,12 @@ Each increment from 2 on first checks whether the kit can draw Scratch's current
 
 These are visible or behavioural, so the swap cannot be byte-identical until each is decided or the kit grows an option:
 
-- Approval: Scratch draws a card in the transcript with the raw arguments in a code box, and its buttons read Approve, Approve for session and Deny. The kit's bar sits above the composer, reads Approve, For session and Deny, and shows tool, target and diff, with the arguments only as a details view. Keys `agent-approve-<id>`, `agent-approve-session-<id>` and `agent-deny-<id>` that tests use would change.
+- Approval (settled, done): the kit's bar replaces the card. It sits above the composer and reads Approve, For session and Deny with the keys 1, 2 and 3. It names the tool and its key argument (a command, path, URL, title, query or page) on one line, cut with a tooltip; Details opens the full arguments as indented JSON. The old `agent-approve-*` keys are gone and the tests find the buttons by their text.
+- Edit rows (settled): the kit's `onUndo` returns a future and the row reads "Undoing…" until it completes, "Undo failed" if it throws (agent-kit 0.8.0).
 - Edit rows: the kit's undo is a void callback and its row cannot show that an undo is running or failed; Scratch's finishes later and reports.
-- Composer: the kit composer clears its text when it submits. Scratch clears it only after the send worked, so the draft, the mentions and the quote survive a failure; this needs the host to keep or restore them (the kit takes a `controller`) or a kit option, and `agent_composer_input_test.dart` is what proves it.
+- Composer (settled): the kit's `onSubmit` returns `FutureOr<bool>` (agent-kit 0.8.0) and the composer clears only on `true`, so a failed send keeps the text, the mentions, the chips and the quote. `agent_composer_input_test.dart` proves it.
 - Transcript: Scratch groups a turn's messages, activity, edits and cells into one `AgentTurn` item per outline segment; the kit's items are flatter. The mapping in increment 1 has to carry segment ids so the outline and "keep message position" still find their rows.
+
+## Approval bar
+
+A request the agent waits on is the kit's `ApprovalBar` (agent-kit 0.8.0), not a card in the transcript. `AgentChat` draws one bar per pending approval above the composer (`_approvalBars`), each from `kitApproval(AgentApproval)` (`kit_backend.dart`): tool name, a target taken from the call's `path`, `command`, `url`, `title`, `query`, `page`, `name` or `id` argument (first present), the request time for "waiting 12m" (read against the app clock), and the arguments for Details. Approve, For session and Deny (with an optional reason) call `AgentStore.decide` as `approve`, `approve_session` and `deny`. The first bar answers to 1, 2 and 3 while no text field has focus, focus is inside the bar, or the composer is empty (`AgentComposer` takes the draft's controller for that). The transcript no longer has approval items (`ApprovalItem` is gone from `agentTurns`). `test/agent_test.dart` covers approve, deny with a reason, the keys, and the `project_open` request.

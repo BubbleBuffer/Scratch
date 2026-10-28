@@ -429,6 +429,8 @@ void main() {
       expect(kitToolKind('exec'), kit.ToolKind.exec);
       expect(kitToolKind('mystery'), kit.ToolKind.other);
       expect(kitToolTarget('{"query":"milk"}'), 'milk');
+      expect(kitToolTarget('{"command":"cargo test","cwd":"/w"}'), 'cargo test');
+      expect(kitToolTarget('{"url":"https://a.test/x"}'), 'https://a.test/x');
       expect(kitToolTarget('not json'), isNull);
       expect(kitToolTarget('[1]'), isNull);
     });

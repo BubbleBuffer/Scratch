@@ -12,7 +12,7 @@ import '../../services/addon_services.dart';
 // - Phones: no chat list, so New chat is an icon in the top bar. Signed out
 //   on Android it is off and the chat shows Sign in (see AgentChat).
 
-export 'agent_cells.dart' show CodeCellRow, ApprovalCard;
+export 'agent_cells.dart' show CodeCellRow;
 export 'agent_chat.dart' show AgentChat, agentEmptyLine;
 
 import 'package:flutter/widgets.dart';

@@ -2,6 +2,7 @@ import '../../services/addon_services.dart';
 
 import 'package:agent_kit/agent_kit.dart'
     show
+        ApprovalBar,
         ItemRow,
         OutlineAction,
         OutlineControllerContents,
@@ -11,6 +12,7 @@ import 'package:agent_kit/agent_kit.dart'
         OutlineWhereStrip,
         outlineSegments,
         outlineStripColors;
+import 'package:agent_kit_core/agent_kit_core.dart' show ApprovalChoice;
 import 'package:flutter/widgets.dart';
 
 import '../../ui/ui.dart';
@@ -22,6 +24,7 @@ import 'agent_transcript.dart';
 import 'chat_reader_controller.dart';
 import 'chat_reference.dart';
 import 'chat_transcript_view.dart';
+import 'kit_backend.dart' show kitApproval;
 import 'dev_replay.dart';
 
 const agentEmptyLine =
@@ -48,6 +51,10 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
   /// Where the reader is, and how they move through the transcript. It holds
   /// the outline's folds and jumps.
   late final ChatReaderController _reader;
+
+  /// The composer's text, so the approval bar knows when 1, 2 and 3 are
+  /// not typing.
+  final _draft = TextEditingController();
 
   @override
   void initState() {
@@ -76,6 +83,7 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
   void dispose() {
     widget.store.showSession(false);
     _reader.dispose();
+    _draft.dispose();
     super.dispose();
   }
 
@@ -132,6 +140,46 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
         chatTitle: title,
         chapter: raw,
         section: rawSection,
+      ),
+    );
+  }
+
+  /// The requests the agent waits on, above the composer: the first one
+  /// answers to 1, 2 and 3.
+  Widget _approvalBars(AgentStore store, double pad) {
+    final pending = store.pendingApprovals;
+    if (pending.isEmpty) return const SizedBox.shrink();
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: Layout.contentWidth + 64),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(pad, 0, pad, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < pending.length; i++)
+                Padding(
+                  padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
+                  child: ApprovalBar(
+                    key: ValueKey('agent-approval-${pending[i].id}'),
+                    approval: kitApproval(pending[i]),
+                    now: clockNow(),
+                    captureKeys: i == 0,
+                    composerEmpty: () => _draft.text.trim().isEmpty,
+                    onDecide: (d) => store.decide(
+                      pending[i].id,
+                      switch (d.choice) {
+                        ApprovalChoice.approve => 'approve',
+                        ApprovalChoice.approveForSession => 'approve_session',
+                        ApprovalChoice.deny => 'deny',
+                      },
+                      reason: d.reason,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -199,7 +247,6 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
         store.state,
         streaming: store.streaming,
         error: store.error,
-        approvals: store.pendingApprovals,
         anchorOf: anchors,
         segmentOf: segments.isEmpty ? null : segments,
       );
@@ -403,6 +450,7 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
               if (store.replay case final playback?
                   when playback.sessionId == store.openId)
                 ReplayControls(playback: playback),
+              if (!signIn) _approvalBars(store, pad),
               if (!signIn)
                 Center(
                   child: ConstrainedBox(
@@ -416,7 +464,11 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
                         pad,
                         widget.panel ? 12 : 20,
                       ),
-                      child: AgentComposer(store: store, panel: widget.panel),
+                      child: AgentComposer(
+                        store: store,
+                        panel: widget.panel,
+                        controller: _draft,
+                      ),
                     ),
                   ),
                 ),

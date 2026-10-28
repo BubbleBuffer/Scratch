@@ -424,7 +424,16 @@ String? kitToolTarget(String argumentsJson) {
   try {
     final args = jsonDecode(argumentsJson);
     if (args is! Map) return null;
-    for (final key in const ['path', 'title', 'query', 'page', 'name', 'id']) {
+    for (final key in const [
+      'path',
+      'command',
+      'url',
+      'title',
+      'query',
+      'page',
+      'name',
+      'id',
+    ]) {
       final v = args[key];
       if (v is String && v.isNotEmpty) return v;
     }
