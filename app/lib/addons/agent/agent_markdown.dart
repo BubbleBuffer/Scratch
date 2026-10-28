@@ -118,6 +118,7 @@ List<FlatBlock> markdownBlocks(NotesVault vault, String text) {
       target: b.target,
       color: b.color,
       width: b.width,
+      numberedStart: b.numberedStart,
       marks: [for (final m in b.marks) restoreMark(m)],
     );
   }
@@ -148,8 +149,11 @@ class AgentMarkdown extends StatelessWidget {
         (depth, _) =>
             depth > b.depth || (depth == b.depth && b.kind != 'numbered'),
       );
+      final previousNumber = numbers[b.depth];
       final n = b.kind == 'numbered'
-          ? numbers[b.depth] = (numbers[b.depth] ?? 0) + 1
+          ? numbers[b.depth] = previousNumber == null
+                ? b.numberedStart ?? 1
+                : previousNumber + 1
           : 0;
       if (i > 0) children.add(SizedBox(height: _gap(previous!, b.kind)));
       children.add(_BlockView(b, number: n, key: ValueKey('md-$i')));

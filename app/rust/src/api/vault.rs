@@ -489,7 +489,7 @@ impl NotesVault {
 
     /// One transaction: all ops or none.
     pub fn apply(&self, page_id: String, ops: Vec<BOp>) -> Result<(), String> {
-        let ops = ops.into_iter().map(block_op).collect::<Result<Vec<_>, _>>()?;
+        let ops = block_ops(ops)?;
         self.inner.apply(page_id, ops).map_err(err)
     }
 

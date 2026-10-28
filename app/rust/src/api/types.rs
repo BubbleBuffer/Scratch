@@ -71,6 +71,8 @@ pub struct FlatBlock {
     pub color: Option<String>,
     /// Image width in percent of the text column, None for the full width.
     pub width: Option<u32>,
+    /// First number of a numbered-list run; None uses the default start of 1.
+    pub numbered_start: Option<u32>,
 }
 
 /// A page with its blocks and metadata.
@@ -294,6 +296,7 @@ pub enum OpKind {
     SetTarget,
     SetColor,
     SetWidth,
+    SetNumberedStart,
 }
 
 /// One edit of a page's block tree. Which fields matter depends on `op`
@@ -312,6 +315,9 @@ pub struct BOp {
     pub target: Option<String>,
     pub color: Option<String>,
     pub width: Option<u32>,
+    /// Initial start for Insert, or the value for SetNumberedStart.
+    /// None or 1 clears an explicit start for SetNumberedStart.
+    pub numbered_start: Option<u32>,
 }
 
 // ------------------------------------------------------------- properties

@@ -14,6 +14,7 @@ import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/src/rust/api/types.dart';
 
 import 'agent_test.dart' show openAgentScreen, openAgentStore;
+import 'agent_chat_partb_test.dart' show showWidget;
 import 'harness.dart';
 import 'sync_helpers.dart';
 
@@ -73,6 +74,37 @@ BMark markOver(FlatBlock b, String text) {
 
 void main() {
   setUpAll(initCore);
+
+  appTest('numbered replies preserve and display each run start', (tester) async {
+    final tv = await pumpApp(tester, mobile: false);
+    final page = tv.pages['Garden plan']!;
+    final markdown = '''3. [Recipes](page:$page)
+4. Plant
+    7. Nested first
+    8. Nested next
+
+New run
+
+0. Zero
+1. One
+
+Default run
+
+1. Default''';
+    final blocks = markdownBlocks(tv.vault.raw, markdown);
+    final first = blocks.first;
+    expect(first.numberedStart, 3);
+    expect(first.marks.single.kind, BMarkKind.pageLink);
+    expect(first.marks.single.url, page);
+    expect(blocks.firstWhere((b) => b.text == 'Nested first').numberedStart, 7);
+    expect(blocks.firstWhere((b) => b.text == 'Zero').numberedStart, 0);
+
+    await showWidget(tester, AgentMarkdown(markdown));
+    final markers = tester.widgetList<Text>(
+      find.byKey(const ValueKey('md-marker-numbered')),
+    ).map((w) => w.data).toList();
+    expect(markers, ['3.', '4.', '7.', '8.', '0.', '1.', '1.']);
+  });
 
   appTest(
     'explicit page URL uses its id even when its label names another page',

@@ -13724,6 +13724,7 @@ impl SseDecode for crate::api::types::BOp {
         let mut var_target = <Option<String>>::sse_decode(deserializer);
         let mut var_color = <Option<String>>::sse_decode(deserializer);
         let mut var_width = <Option<u32>>::sse_decode(deserializer);
+        let mut var_numberedStart = <Option<u32>>::sse_decode(deserializer);
         return crate::api::types::BOp {
             op: var_op,
             id: var_id,
@@ -13736,6 +13737,7 @@ impl SseDecode for crate::api::types::BOp {
             target: var_target,
             color: var_color,
             width: var_width,
+            numbered_start: var_numberedStart,
         };
     }
 }
@@ -14335,6 +14337,7 @@ impl SseDecode for crate::api::types::FlatBlock {
         let mut var_target = <Option<String>>::sse_decode(deserializer);
         let mut var_color = <Option<String>>::sse_decode(deserializer);
         let mut var_width = <Option<u32>>::sse_decode(deserializer);
+        let mut var_numberedStart = <Option<u32>>::sse_decode(deserializer);
         return crate::api::types::FlatBlock {
             id: var_id,
             kind: var_kind,
@@ -14345,6 +14348,7 @@ impl SseDecode for crate::api::types::FlatBlock {
             target: var_target,
             color: var_color,
             width: var_width,
+            numbered_start: var_numberedStart,
         };
     }
 }
@@ -15461,6 +15465,7 @@ impl SseDecode for crate::api::types::OpKind {
             6 => crate::api::types::OpKind::SetTarget,
             7 => crate::api::types::OpKind::SetColor,
             8 => crate::api::types::OpKind::SetWidth,
+            9 => crate::api::types::OpKind::SetNumberedStart,
             _ => unreachable!("Invalid variant for OpKind: {}", inner),
         };
     }
@@ -18824,6 +18829,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::types::BOp {
             self.target.into_into_dart().into_dart(),
             self.color.into_into_dart().into_dart(),
             self.width.into_into_dart().into_dart(),
+            self.numbered_start.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -19625,6 +19631,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::types::FlatBlock {
             self.target.into_into_dart().into_dart(),
             self.color.into_into_dart().into_dart(),
             self.width.into_into_dart().into_dart(),
+            self.numbered_start.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -19924,6 +19931,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::types::OpKind {
             Self::SetTarget => 6.into_dart(),
             Self::SetColor => 7.into_dart(),
             Self::SetWidth => 8.into_dart(),
+            Self::SetNumberedStart => 9.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -21813,6 +21821,7 @@ impl SseEncode for crate::api::types::BOp {
         <Option<String>>::sse_encode(self.target, serializer);
         <Option<String>>::sse_encode(self.color, serializer);
         <Option<u32>>::sse_encode(self.width, serializer);
+        <Option<u32>>::sse_encode(self.numbered_start, serializer);
     }
 }
 
@@ -22273,6 +22282,7 @@ impl SseEncode for crate::api::types::FlatBlock {
         <Option<String>>::sse_encode(self.target, serializer);
         <Option<String>>::sse_encode(self.color, serializer);
         <Option<u32>>::sse_encode(self.width, serializer);
+        <Option<u32>>::sse_encode(self.numbered_start, serializer);
     }
 }
 
@@ -23142,6 +23152,7 @@ impl SseEncode for crate::api::types::OpKind {
                 crate::api::types::OpKind::SetTarget => 6,
                 crate::api::types::OpKind::SetColor => 7,
                 crate::api::types::OpKind::SetWidth => 8,
+                crate::api::types::OpKind::SetNumberedStart => 9,
                 _ => {
                     unimplemented!("");
                 }
