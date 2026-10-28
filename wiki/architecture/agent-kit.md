@@ -65,6 +65,72 @@ Chapter cards and headings, section dividers, the where-am-I strip, Contents and
 
 The kit reads its tokens through `BbThemeScope`. `NotesShell` wraps the app in one, above the navigator, because the kit's sheets and menus are routes and read the scope too.
 
+## Compacted history data (trial)
+
+The Rust agent exposes `read_session_compacted_history(store, session)`,
+`session_compacted_history_at(data_dir, session)`, and
+`Agent::session_compacted_history(session)`. Flutter calls
+`NotesAgent.compactedHistory(sessionId: ...)` through the generated bridge.
+This is a data projection only; it does not implement the trial UI.
+
+The call reads the SDK's legacy checkpoint, legacy chapters, LCM subject chapters,
+episodes and canonical messages on demand. It never reads the notes-owned
+outline, writes summaries, caches results or creates tables. The outline keeps
+its existing source precedence independently.
+
+`CompactedHistory` contains `compactable`, `message_count`, `message_ids`, `boundary` and ordered
+`segments`. Rust segments are `LegacyCard`, `ChapterCard` or `Messages`. The
+bridge uses a plain tagged DTO: `kind`, `range`, and nullable `legacy` and
+`chapter` payloads; exactly the payload selected by the kind is present.
+Uncovered gaps appear as Messages at their original position. The final segment
+is always Messages, including an empty range when all messages are summarized.
+Its start is the boundary for “Full messages from here”. An empty chat has
+`Messages(0..0)` and boundary 0. Any overlapping summary coverage returns
+`compactable: false`, no segments and boundary 0; consumers display the chat in
+full. Remote agents likewise return `compactable: false`, since this local-only
+call cannot inspect the hub's store.
+For a one-based “message N” label, display `boundary + 1`.
+
+A gap between episodes inside a chapter splits it into contiguous ChapterCard
+parts, with Messages between them. The parts share the chapter ID, title, status
+and summary. Their one-based `part` and `parts` identify their position; each part
+has its own range, anchors, times and episodes. Only the last part carries
+`message_count` and `episode_count` (nullable footer totals for the whole
+chapter). Earlier parts have no footer counts. The message total sums the
+episode ranges, excluding the uncovered gaps. An unsplit chapter has
+`part = parts = 1` and both footer totals.
+
+All ranges are **zero-based, start-inclusive and end-exclusive**, in canonical
+`Store::messages` order. They are not global SQLite sequences or indexes into a
+filtered UI transcript. Counts include canonical runtime notices; Scratch's
+ordinary session-state projection filters those notices. Card and episode
+message IDs and a complete canonical `message_ids` index-to-ID map are supplied
+so a later UI adapter can locate every segment in the displayed messages without
+treating canonical indexes as filtered indexes. It can slice the ID map for a
+Messages range and select the matching displayed messages, omitting hidden notices.
+
+| Data | Source |
+| --- | --- |
+| Legacy checkpoint | Range starts at 0 and ends just after `through_message_id`; stored summary; no title. |
+| Legacy chapter | Stored ID, title and summary; first and last message IDs give its range. No episodes are fabricated. |
+| LCM chapter | Stored ID and open/closed status; the shared #57 title helper uses the closed description or first episode title. Closed summary is returned as stored; open summary is absent. No decisions or sections fields exist. |
+| Chapter times and counts | First and last covered timestamps for the part. Only the last part carries whole-chapter totals: summed episode range lengths and episode count. |
+| Episode | Stored ID, title and message anchors; timestamps and count from those canonical messages. Gist and action rows are parsed from the stored summary. |
+| Actions | The port of BubblePaw-base's v3 Actions parser, including its upstream tests. The pinned Core v0.2.1 does not export that parser. Summaries without Actions return an empty list. |
+| Action metadata | Stored verb and target; conservative target classification; change and outcome joined as the change marker when present; explicit point-of-interest kind and reason. No missing marker or reason is invented. |
+| Episode counters | Parsed row count, rows with an explicit point of interest (including errors), and rows explicitly marked error. |
+
+Explicit `page:` and HTTP(S) targets classify as pages; Ran and Asked classify
+as commands and questions. Read and file-edit verbs require path or filename
+syntax to classify as paths; ambiguous targets remain Other.
+
+The reader and real SDK-writer fixtures are in
+[`compacted_history.rs`](../../crates/agent/src/compacted_history.rs) and
+[`tests/compacted_history.rs`](../../crates/agent/tests/compacted_history.rs).
+The parser was ported from BubblePaw-base `8c27a80e`,
+`crates/bubblepaw-runner/src/episode_actions.rs`; upstream verb aliases, malformed
+row handling and v2 compatibility are retained.
+
 ## Search widgets
 
 The search presentation is bb_ui's (`package:bb_ui/search.dart`, imported as `bb`): `SearchPanel` (field, filter slot, arrow and Enter selection, notes), `SearchResultsList`, `SearchResultRow`, `SearchGroupHeader`, `HighlightedText` and `SearchTypeChips` over neutral `SearchResult`, `SearchResultSection` and `SearchTypeChip` models, with `termHighlights` for the marked ranges. Scratch keeps the mapping and the data. It is shared by the Ctrl+K overlay, the mobile search screen and home's inline results through `app/lib/shell/search_widgets.dart`, which re-exports three files: `search_result_widgets.dart` (`searchResultOf` maps a `Hit` to a `bb.SearchResult`: title tone, page icon and path or the source's icon, highlights; plus the Hit-typed `SearchResultRow` and `SearchResultsList` adapters that map a picked result back to its `Hit`), `search_type_chips.dart` (which `type:` chips a query shows, drawn by bb) and `search_panel_body.dart` (a thin wrapper around `bb.SearchPanel` that keeps the `type:` rewrite). The shared list builds all result models up front instead of one per visible row. Rows from registered sources are opaque to them: a hit's `target` is read only by the source that wrote it, and `openChatHit` (`addons/agent/chat_search.dart`) is the Agent source's open. `ChatSearchTarget` (`chat_search_target.dart`) reads and writes that JSON and imports nothing from navigation. `test/search_open_contract_test.dart` pins the open contract: a malformed target says why, an anchored hit asks for its range with the hit's labels, and a chat the agent does not have is reported.

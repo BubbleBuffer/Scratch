@@ -9,7 +9,7 @@ use vault_tools::outline::{ChatOutline, OutlineChapter, OutlineSection};
 
 /// Closed chapters use their generated description; open chapters use their
 /// first episode's title, or an empty title until an episode is available.
-fn chapter_title(
+pub(crate) fn chapter_title(
     chapter: &ContextSubjectChapter,
     first_episode: Option<&ContextEpisode>,
 ) -> String {
