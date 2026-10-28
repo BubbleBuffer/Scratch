@@ -6,7 +6,6 @@ import 'package:agent_kit_core/agent_kit_core.dart'
     show KitChoice, KitRef;
 import 'package:flutter/widgets.dart';
 
-import '../../shell/page_stack.dart' show pageLabelOf;
 import '../../state/app_state.dart';
 import '../../state/pages_store.dart';
 import '../../state/editor_focus.dart';
@@ -191,11 +190,14 @@ class _AgentComposerState extends State<AgentComposer> {
     final it = _found['${ref.kind}-${ref.id}'];
     if (it == null || it.isChat) return const kit.MentionRowLook();
     final m = context.mobile;
-    final page = pageLabelOf(context, it.id, it.label);
+    // An untitled page shows its first line, live while it is open.
+    final stored = context.watch<PagesStore>().meta(it.id)?.firstLine ?? '';
+    final live = PageStackScope.maybeOf(context)?.firstLines[it.id];
+    final line = live != null && live.trim().isNotEmpty ? live : stored;
     return kit.MentionRowLook(
       leading: PageIcon(icon: it.icon, size: m ? 22 : 20),
-      label: page.text,
-      firstLine: page.firstLine,
+      label: displayTitle(it.label, firstLine: line),
+      firstLine: it.label.trim().isEmpty && line.trim().isNotEmpty,
     );
   }
 
