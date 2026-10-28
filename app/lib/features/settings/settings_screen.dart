@@ -383,7 +383,6 @@ class PreferencesBody extends StatelessWidget {
       const SettingsHeading('Preferences', primary: true),
       SettingsRow(
         label: 'Appearance',
-        description: 'Customize how $appName looks on this device.',
         trailing: SelectButton<ThemePref>(
           key: const ValueKey('theme-select'),
           title: 'Appearance',
