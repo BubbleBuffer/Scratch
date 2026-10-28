@@ -309,8 +309,14 @@ void main() {
     // The bar names the tool and its key argument on one line; the full
     // arguments are one click away.
     expect(find.text('Needs approval'), findsOneWidget);
-    expect(find.text('delete_page'), findsOneWidget);
-    expect(find.text('Garden plan'), findsOneWidget);
+    expect(
+      find.descendant(of: key('agent-approval-a1'), matching: find.text('delete_page')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: key('agent-approval-a1'), matching: find.text('Garden plan')),
+      findsOneWidget,
+    );
     expect(find.textContaining('"permanent"'), findsNothing);
     await tapAndSettle(tester, find.text('Details'));
     expect(find.textContaining('"page": "Garden plan"'), findsOneWidget);
