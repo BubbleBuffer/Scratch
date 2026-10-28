@@ -9,7 +9,8 @@
 # Skipped on purpose:
 #   - notes-tauri (prototypes/tauri): a bake-off prototype that needs the GTK
 #     and WebKitGTK dev packages; the private gate excludes it too.
-#   - Flutter goldens: their baselines are rendered on Windows.
+#   - Flutter goldens: their baselines are rendered on Windows (the compacted-history
+#     goldens are Linux baselines and have their own step below).
 #   - rustfmt is report-only and clippy warnings do not fail the job (see
 #     the rust job).
 #   - Flutter perf (timing budgets) and drive (a long-lived session host)
@@ -94,6 +95,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Pinned: the compacted-history goldens below are Linux baselines, which
+          # a Flutter release can shift.
+          flutter-version: 3.47.8
           cache: true
       # The harness loads target/release/libnotes_bridge.so (app/test/harness.dart).
       - name: Build host bridge
@@ -142,3 +146,9 @@ jobs:
           jobs=$(( $(nproc) / 2 ))
           [ "$jobs" -lt 1 ] && jobs=1
           flutter test --concurrency="$jobs" -x 'golden || perf || drive' "${files[@]}"
+      - name: flutter test (compacted-history goldens, Linux baselines)
+        working-directory: scratch/app
+        env:
+          NOTES_BRIDGE_LIB: ${{ github.workspace }}/scratch/target/release/libnotes_bridge.so
+          NOTES_FAKE_EXTENSION: ${{ github.workspace }}/BubblePaw-Core/target/debug/bubblepaw-fake-extension
+        run: flutter test --concurrency=1 test/agent_history_golden_test.dart

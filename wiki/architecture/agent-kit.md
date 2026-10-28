@@ -51,7 +51,7 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The dev pane's packages
 
-The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.15.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.15.1`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
 
 ## The chat outline
 
@@ -145,7 +145,7 @@ row handling and v2 compatibility are retained.
 
 Each chat has a setting, **Chat history: Full | Compacted (trial)**, default Full. It is saved per chat on this device in `agent_chats.json` (`"history": "compacted"`, written only when on; `AgentChatPref.compacted`, `AgentStore.historyCompacted` and `setHistoryCompacted`). A gear above the transcript opens the popover (a sheet on a phone) with the mockup's copy (`agent_history_setting.dart`). The gear shows only for a chat whose history has summary cards; every other chat looks exactly as before, so the Full goldens are unchanged.
 
-In Compacted, older history is the kit's history cards (agent-kit 0.15.0, `history/`, documented in its `docs/agent-kit.md`): a legacy summary card, a closed chapter card that opens into episode cards, and for the open chapter a plain group header over its always-listed episodes. An episode opens into its action log and from there into its original messages. A hairline, "Full messages from here · message N" (N is `boundary + 1`), marks where full messages begin; below it is the live end, drawn by the same item views as the Full list. The chat opens scrolled to the hairline.
+In Compacted, older history is the kit's history cards (agent-kit 0.15.1, `history/`, documented in its `docs/agent-kit.md`): a legacy summary card, a closed chapter card that opens into episode cards, and for the open chapter a plain group header over its always-listed episodes. An episode opens into its action log and from there into its original messages. A hairline, "Full messages from here · message N" (N is `boundary + 1`), marks where full messages begin; below it is the live end, drawn by the same item views as the Full list. The chat opens scrolled to the hairline.
 
 Scratch's side:
 
@@ -154,9 +154,9 @@ Scratch's side:
 - The compacted list is a third body of `AgentChat`, beside the plain list and the outline list. It has its own scroll controller, viewport key and `HistoryController` (what is open), so switching never shares a position with the other lists. The outline strip is hidden in this mode and the outline's own sync is skipped.
 - Shown as Full whatever the setting says: a chat with `compactable: false` (no notice), a chat with no card, and a chat with a pending reference (it needs the full transcript to jump into).
 - Switching the setting keeps the draft (the composer stays mounted) and the place: the message at the top of the view is measured before the switch and the new list opens there (a card, when the message is inside one).
-- The Rust projection exposes chapter decisions and sections; the current chat adapter does not forward them to the kit yet. The kit view models already accept both as plain fields.
+- A chapter card shows the chapter's `decisions` (one `◆` line each) and `sections` (a coloured bar and a name each) under its summary, and `N sections` in the counts. `historyChapter` maps both from `ChapterCard`; they are set on the last part of a split chapter only, and an empty list leaves its row out, so a chapter without them looks as before. Section episode ordinals are kept on the view model but not drawn.
 
-Tests: `agent_history_map_test.dart` (mapping and entry order, no native core), `agent_history_test.dart` (opening on the hairline, the folding toggles, draft and place across a switch both ways, `compactable: false` as Full, Full as default) and `agent_history_golden_test.dart` (desktop and phone, light and dark: `goldens/compacted/`). The compacted baselines were rendered on the CI runner (Linux) and are compared by hand; the other goldens are Windows baselines.
+Tests: `agent_history_map_test.dart` (mapping and entry order, no native core), `agent_history_test.dart` (opening on the hairline, the folding toggles, draft and place across a switch both ways, `compactable: false` as Full, Full as default) and `agent_history_golden_test.dart` (desktop and phone, light and dark: `goldens/compacted/`). The compacted baselines are Linux renders (the other goldens are Windows baselines). CI compares them in the `flutter` job (step "compacted-history goldens, Linux baselines") on a pinned Flutter version; to change them, re-render with `flutter test --update-goldens test/agent_history_golden_test.dart` on that Flutter on Linux (a CI run that uploads the PNGs), review, and commit. A Flutter bump needs the same re-render.
 
 ## Search widgets
 

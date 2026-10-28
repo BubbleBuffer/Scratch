@@ -17,6 +17,7 @@ import 'package:agent_kit/agent_kit.dart'
         HistoryLegacyCard,
         HistoryPoint,
         HistoryPointKind,
+        HistorySection,
         TimelineEntry;
 import 'package:flutter/widgets.dart';
 
@@ -120,6 +121,15 @@ HistoryChapter historyChapter(ChapterCard c, int colorIndex) => HistoryChapter(
   messageCount: c.messageCount,
   episodeCount: c.episodeCount,
   episodes: [for (final e in c.episodes) historyEpisode(e)],
+  decisions: c.decisions,
+  sections: [
+    for (final s in c.sections)
+      HistorySection(
+        name: s.name,
+        firstEpisode: s.firstEpisode,
+        lastEpisode: s.lastEpisode,
+      ),
+  ],
   colorIndex: colorIndex,
 );
 

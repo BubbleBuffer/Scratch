@@ -68,6 +68,31 @@ void main() {
     expect(parts[3].endedAt, isNull);
   });
 
+  test(
+    'decisions and sections map through; a chapter without them has none',
+    () {
+      final chapters = [
+        for (final s in historyOf().segments)
+          if (s.chapter != null) s.chapter!,
+      ];
+      final parts = [
+        for (final (i, c) in chapters.indexed) historyChapter(c, i),
+      ];
+      expect(parts[0].decisions, ['Hold the last value on reconnect.']);
+      expect(parts[0].sections.map((s) => s.name), [
+        'Find the cause',
+        'Hold the figure',
+      ]);
+      expect(parts[0].sections.last.firstEpisode, 2);
+      // Split chapter: the last part carries them, the first none.
+      expect(parts[1].decisions, isEmpty);
+      expect(parts[1].sections, isEmpty);
+      expect(parts[2].decisions, ['Stop after five tries.']);
+      expect(parts[2].sections, isEmpty);
+      expect(parts[3].decisions, isEmpty);
+    },
+  );
+
   test('an episode keeps its actions, markers and flagged points', () {
     final chapters = [
       for (final s in historyOf().segments)
