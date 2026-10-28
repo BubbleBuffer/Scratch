@@ -34,11 +34,15 @@ void main() {
     );
     await showWidget(
       tester,
-      Column(
-        children: [
-          Expanded(child: AgentChat(store: store, panel: true)),
-          Expanded(child: AgentChat(store: store, panel: true)),
-        ],
+      OverflowBox(
+        alignment: Alignment.topCenter,
+        maxHeight: 1300,
+        child: Column(
+          children: [
+            SizedBox(height: 640, child: AgentChat(store: store, panel: true)),
+            SizedBox(height: 640, child: AgentChat(store: store, panel: true)),
+          ],
+        ),
       ),
     );
     store.debugAddApproval(approval('a1'));
