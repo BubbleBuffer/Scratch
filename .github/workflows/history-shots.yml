@@ -49,7 +49,6 @@ jobs:
       - name: Build BubblePaw fake extension
         working-directory: BubblePaw-Core
         run: cargo build -p bubblepaw-runner --features test-fixtures --bin bubblepaw-fake-extension
-      - name: Render goldens on both sides
       - name: Render the compacted goldens
         env:
           NOTES_BRIDGE_LIB: ${{ github.workspace }}/head/target/release/libnotes_bridge.so
