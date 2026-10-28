@@ -51,7 +51,7 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The dev pane's packages
 
-The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.14.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.15.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
 
 ## The chat outline
 
@@ -71,7 +71,7 @@ The Rust agent exposes `read_session_compacted_history(store, session)`,
 `session_compacted_history_at(data_dir, session)`, and
 `Agent::session_compacted_history(session)`. Flutter calls
 `NotesAgent.compactedHistory(sessionId: ...)` through the generated bridge.
-This is a data projection only; it does not implement the trial UI.
+The data call is a projection only. The trial UI that draws it is described under "Compacted history in the chat".
 
 The call reads the SDK's legacy checkpoint, legacy chapters, LCM subject chapters,
 episodes and canonical messages on demand. It never reads the notes-owned
@@ -131,6 +131,23 @@ The parser was ported from BubblePaw-base `8c27a80e`,
 `crates/bubblepaw-runner/src/episode_actions.rs`; upstream verb aliases, malformed
 row handling and v2 compatibility are retained.
 
+## Compacted history in the chat (trial)
+
+Each chat has a setting, **Chat history: Full | Compacted (trial)**, default Full. It is saved per chat on this device in `agent_chats.json` (`"history": "compacted"`, written only when on; `AgentChatPref.compacted`, `AgentStore.historyCompacted` and `setHistoryCompacted`). A gear above the transcript opens the popover (a sheet on a phone) with the mockup's copy (`agent_history_setting.dart`). The gear shows only for a chat whose history has summary cards; every other chat looks exactly as before, so the Full goldens are unchanged.
+
+In Compacted, older history is the kit's history cards (agent-kit 0.15.0, `history/`, documented in its `docs/agent-kit.md`): a legacy summary card, a closed chapter card that opens into episode cards, and for the open chapter a plain group header over its always-listed episodes. An episode opens into its action log and from there into its original messages. A hairline, "Full messages from here · message N" (N is `boundary + 1`), marks where full messages begin; below it is the live end, drawn by the same item views as the Full list. The chat opens scrolled to the hairline.
+
+Scratch's side:
+
+- `agent_history.dart` maps the store's `CompactedHistory` onto the kit's plain view models (`HistoryChapter`, `HistoryEpisode`, `HistoryLegacy`) and builds the `TranscriptList` entries. `historySegments` gives every covered message the key of its episode, legacy card or stretch shown in full, and `agentTurns` splits turns along those keys, so no turn straddles a card edge. A card's original messages are built only when an episode opens ("Show messages"). A Messages stretch inside a split chapter stays in place between its parts.
+- `AgentStore` loads `compactedHistory(sessionId:)` with the outline and keeps it as `compacted` for the open chat. It is read-only data: nothing is written back.
+- The compacted list is a third body of `AgentChat`, beside the plain list and the outline list. It has its own scroll controller, viewport key and `HistoryController` (what is open), so switching never shares a position with the other lists. The outline strip is hidden in this mode and the outline's own sync is skipped.
+- Shown as Full whatever the setting says: a chat with `compactable: false` (no notice), a chat with no card, and a chat with a pending reference (it needs the full transcript to jump into).
+- Switching the setting keeps the draft (the composer stays mounted) and the place: the message at the top of the view is measured before the switch and the new list opens there (a card, when the message is inside one).
+- The kit has no decisions or sections to show because the store has none; the view models take them as plain fields when it does.
+
+Tests: `agent_history_map_test.dart` (mapping and entry order, no native core), `agent_history_test.dart` (opening on the hairline, the folding toggles, draft and place across a switch both ways, `compactable: false` as Full, Full as default) and `agent_history_golden_test.dart` (desktop and phone, light and dark: `goldens/compacted/`). The compacted baselines were rendered on the CI runner (Linux) and are compared by hand; the other goldens are Windows baselines.
+
 ## Search widgets
 
 The search presentation is bb_ui's (`package:bb_ui/search.dart`, imported as `bb`): `SearchPanel` (field, filter slot, arrow and Enter selection, notes), `SearchResultsList`, `SearchResultRow`, `SearchGroupHeader`, `HighlightedText` and `SearchTypeChips` over neutral `SearchResult`, `SearchResultSection` and `SearchTypeChip` models, with `termHighlights` for the marked ranges. Scratch keeps the mapping and the data. It is shared by the Ctrl+K overlay, the mobile search screen and home's inline results through `app/lib/shell/search_widgets.dart`, which re-exports three files: `search_result_widgets.dart` (`searchResultOf` maps a `Hit` to a `bb.SearchResult`: title tone, page icon and path or the source's icon, highlights; plus the Hit-typed `SearchResultRow` and `SearchResultsList` adapters that map a picked result back to its `Hit`), `search_type_chips.dart` (which `type:` chips a query shows, drawn by bb) and `search_panel_body.dart` (a thin wrapper around `bb.SearchPanel` that keeps the `type:` rewrite). The shared list builds all result models up front instead of one per visible row. Rows from registered sources are opaque to them: a hit's `target` is read only by the source that wrote it, and `openChatHit` (`addons/agent/chat_search.dart`) is the Agent source's open. `ChatSearchTarget` (`chat_search_target.dart`) reads and writes that JSON and imports nothing from navigation. `test/search_open_contract_test.dart` pins the open contract: a malformed target says why, an anchored hit asks for its range with the hit's labels, and a chat the agent does not have is reported.
@@ -143,7 +160,7 @@ Scratch's side is `app/lib/shell/command_palette.dart`: `paletteCommands` maps `
 
 ## Chat preferences
 
-Each chat's host ("Runs on") and picked model stay in Scratch; no kit widget reads them, so agent-kit has no preferences API. `AgentChatPrefs` (`addons/agent/agent_chat_prefs.dart`) holds the choices and goes through a small `AgentChatPrefsStorage` interface (`read`, `write`). `AgentChatPrefsFile` (`agent_chat_prefs_file.dart`) is the only implementation: the device's `<data dir>/agent_chats.json`, never synced, in the same format as before (an object keyed by chat id, `{"host": ..., "model": ...}`, two-space indent). `AgentStore` builds it with that file, or with no storage (memory only) when it has neither a data dir nor a settings file. A missing or unreadable file, and entries that are not a valid choice, give no choices. A save writes `agent_chats.json.tmp` and renames it over the file; a failed save is dropped, so the choice stays in memory for the run, the old file is left as it was and the next save that works writes everything. `test/agent_runner_select_test.dart` covers the round trip, a junk file, a file saved by earlier versions (loaded and re-saved byte for byte), a failed save and a throwing storage.
+Each chat's host ("Runs on"), picked model and history setting stay in Scratch; no kit widget reads them, so agent-kit has no preferences API. `AgentChatPrefs` (`addons/agent/agent_chat_prefs.dart`) holds the choices and goes through a small `AgentChatPrefsStorage` interface (`read`, `write`). `AgentChatPrefsFile` (`agent_chat_prefs_file.dart`) is the only implementation: the device's `<data dir>/agent_chats.json`, never synced, in the same format as before (an object keyed by chat id, `{"host": ..., "model": ...}`, plus `"history": "compacted"` while that chat shows compacted history, two-space indent). `AgentStore` builds it with that file, or with no storage (memory only) when it has neither a data dir nor a settings file. A missing or unreadable file, and entries that are not a valid choice, give no choices. A save writes `agent_chats.json.tmp` and renames it over the file; a failed save is dropped, so the choice stays in memory for the run, the old file is left as it was and the next save that works writes everything. `test/agent_runner_select_test.dart` covers the round trip, a junk file, a file saved by earlier versions (loaded and re-saved byte for byte), a failed save and a throwing storage.
 
 ## MCP and runner settings
 
