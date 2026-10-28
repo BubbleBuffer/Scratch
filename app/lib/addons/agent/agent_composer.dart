@@ -9,10 +9,25 @@ import '../../state/editor_focus.dart';
 import '../../ui/ui.dart';
 import 'agent_store.dart';
 
+/// Looks up the pages an `@` query offers; [mentionPages] unless a test
+/// supplies its own.
+typedef AgentMentionSource =
+    Future<List<MentionItem>> Function(
+      BuildContext context,
+      String query,
+      String exclude,
+    );
+
 class AgentComposer extends StatefulWidget {
-  const AgentComposer({super.key, required this.store, this.panel = false});
+  const AgentComposer({
+    super.key,
+    required this.store,
+    this.panel = false,
+    this.mentionSource = mentionPages,
+  });
   final AgentStore store;
   final bool panel;
+  final AgentMentionSource mentionSource;
   @override
   State<AgentComposer> createState() => _AgentComposerState();
 }
@@ -152,7 +167,7 @@ class _AgentComposerState extends State<AgentComposer> {
       setState(() => _menu = null);
       return;
     }
-    final pages = await mentionPages(context, match[1]!, '');
+    final pages = await widget.mentionSource(context, match[1]!, '');
     if (!mounted || epoch != _queryEpoch) return;
     setState(() {
       _mentionStart = before.lastIndexOf('@');
