@@ -466,8 +466,21 @@ kit.Approval kitApproval(AgentApproval a) => kit.Approval(
   decidedAt: _time(a.decidedAt),
 );
 
-kit.FileDiff _diff(AgentEdit e) => kit.FileDiff(
-  path: e.pageTitle,
+/// A page edit as a kit edit item. [label] and [path] name the page the way the
+/// chat shows it (an untitled page reads from its first line).
+kit.FileEdit kitFileEdit(AgentEdit e, {String? label, String? path}) =>
+    kit.FileEdit(
+      id: 'edit:${e.id}',
+      at: _time(e.at),
+      diff: _diff(e, path: path),
+      callId: e.callId,
+      undoable: e.undoable,
+      undone: e.undone,
+      label: label,
+    );
+
+kit.FileDiff _diff(AgentEdit e, {String? path}) => kit.FileDiff(
+  path: path ?? e.pageTitle,
   change: switch (e.kind) {
     'created' => kit.FileChange.created,
     'trashed' => kit.FileChange.deleted,
@@ -573,16 +586,7 @@ kit.ChatSnapshot kitSnapshot(AgentSessionState s) {
       for (final c in m.toolCalls) {
         final edit = edits[activity[c.id]?.editId];
         if (edit == null || !shownEdits.add(edit.id)) continue;
-        items.add(
-          kit.FileEdit(
-            id: 'edit:${edit.id}',
-            at: _time(edit.at),
-            diff: _diff(edit),
-            callId: edit.callId,
-            undoable: edit.undoable,
-            undone: edit.undone,
-          ),
-        );
+        items.add(kitFileEdit(edit));
       }
     }
   }

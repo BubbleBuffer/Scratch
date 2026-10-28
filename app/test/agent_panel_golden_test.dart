@@ -48,7 +48,7 @@ void main() {
       );
       await settle(tester);
       final edit = store.state!.edits.firstWhere((e) => e.kind == 'edited');
-      await tapAndSettle(tester, key('agent-edit-${edit.id}-toggle'));
+      await tapAndSettle(tester, find.text('Edited Garden plan'));
       expect(find.text('Created Seed list'), findsOneWidget);
       expect(find.text('Edited Garden plan'), findsOneWidget);
       await shot('$tag-agent-panel');

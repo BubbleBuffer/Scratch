@@ -29,7 +29,7 @@ void main() {
       );
       await settle(tester);
       final edit = store.state!.edits.single;
-      await tapAndSettle(tester, key('agent-edit-${edit.id}-undo'));
+      await tapAndSettle(tester, find.descendant(of: key('agent-edit-${edit.id}'), matching: find.text('Undo')));
       await settleUntil(tester, () => store.state!.edits.single.undone);
       expect(find.text('Undone'), findsOneWidget);
       final restored = await real(tester, () => tv.vault.loadPage(page));
@@ -52,11 +52,11 @@ void main() {
         tester,
         () => tv.vault.renamePage(page, 'My newer garden title'),
       );
-      await tester.ensureVisible(key('agent-edit-${second.id}-undo'));
-      await tapAndSettle(tester, key('agent-edit-${second.id}-undo'));
+      await tester.ensureVisible(find.descendant(of: key('agent-edit-${second.id}'), matching: find.text('Undo')));
+      await tapAndSettle(tester, find.descendant(of: key('agent-edit-${second.id}'), matching: find.text('Undo')));
       expect(
-        textOf(tester, 'agent-edit-${second.id}-refusal'),
-        contains('page changed since the agent\'s edit; use page history'),
+        find.textContaining('page changed since the agent\'s edit; use page history'),
+        findsOneWidget,
       );
       expect(
         (await real(tester, () => tv.vault.loadPage(page))).title,

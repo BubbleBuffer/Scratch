@@ -2,7 +2,9 @@ import 'navigation.dart';
 
 import 'package:agent_kit_core/agent_kit_core.dart' as kit
     show ActivityGroup, ToolRow, WorkState;
-import 'package:agent_kit/agent_kit.dart' as kit show ActivityGroupView;
+import 'package:agent_kit/agent_kit.dart'
+    as kit
+    show ActivityGroupView, FileEditRow, UndoRefused;
 import 'package:flutter/widgets.dart';
 
 import '../../state/app_state.dart';
@@ -12,7 +14,7 @@ import 'agent_cells.dart';
 import 'agent_markdown.dart';
 import 'agent_store.dart';
 import 'agent_transcript.dart';
-import 'kit_backend.dart' show kitToolKind;
+import 'kit_backend.dart' show kitFileEdit, kitToolKind;
 
 class AgentTurnView extends StatelessWidget {
   const AgentTurnView({super.key, required this.turn, required this.store});
@@ -260,6 +262,9 @@ class _CodeDisclosureState extends State<_CodeDisclosure> {
   );
 }
 
+/// A page edit as the kit's edit row: Scratch's wording, "Open" at the
+/// changed blocks, and an undo that finishes later (the row shows
+/// "Undoing…"; a refusal's reason shows under the row).
 class AgentEditRow extends StatefulWidget {
   const AgentEditRow({
     super.key,
@@ -275,9 +280,8 @@ class AgentEditRow extends StatefulWidget {
 }
 
 class _AgentEditRowState extends State<AgentEditRow> {
-  bool _open = false, _all = false, _undoing = false;
   AgentEdit? _result;
-  String? _refusal;
+
   @override
   void didUpdateWidget(AgentEditRow oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -285,21 +289,11 @@ class _AgentEditRowState extends State<AgentEditRow> {
   }
 
   Future<void> _undo() async {
-    setState(() {
-      _undoing = true;
-      _refusal = null;
-    });
     try {
       final result = await widget.onUndo();
       if (mounted) setState(() => _result = result);
     } catch (e) {
-      if (mounted) {
-        setState(
-          () => _refusal = '$e'.replaceFirst(RegExp(r'^Exception: '), ''),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _undoing = false);
+      throw kit.UndoRefused('$e'.replaceFirst(RegExp(r'^Exception: '), ''));
     }
   }
 
@@ -311,182 +305,26 @@ class _AgentEditRowState extends State<AgentEditRow> {
       edit.pageTitle,
       firstLine: pages.meta(edit.pageId)?.firstLine ?? '',
     );
-    final c = context.colors;
-    final green = c.dark ? const Color(0xFF93BD9B) : const Color(0xFF397748);
-    final red = c.dark ? const Color(0xFFE0A3A3) : const Color(0xFFAD4B4B);
-    final label = switch (edit.kind) {
-      'created' => 'Created $pageName',
-      'trashed' => 'Moved $pageName to trash',
-      'row' => 'Updated a row in $pageName',
-      _ => 'Edited $pageName',
-    };
-    final lines = [for (final h in edit.hunks) ...h.lines];
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: c.borderSubtle),
-        borderRadius: Radii.field,
+    return kit.FileEditRow(
+      kitFileEdit(
+        edit,
+        label: switch (edit.kind) {
+          'created' => 'Created $pageName',
+          'trashed' => 'Moved $pageName to trash',
+          'row' => 'Updated a row in $pageName',
+          _ => 'Edited $pageName',
+        },
+        path: pageName,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            child: LayoutBuilder(
-              builder: (context, bounds) => Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 4,
-                children: [
-                  Hover(
-                    key: ValueKey('agent-edit-${edit.id}-toggle'),
-                    onTap: lines.isEmpty
-                        ? null
-                        : () => setState(() => _open = !_open),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 2,
-                      vertical: 4,
-                    ),
-                    radius: Radii.sm,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon20(
-                          _open ? Ico.chevronDown : Ico.chevronRight,
-                          size: 12,
-                          color: c.iconTertiary,
-                        ),
-                        const SizedBox(width: 4),
-                        Icon20(
-                          edit.kind == 'trashed'
-                              ? Ico.trash
-                              : edit.kind == 'created'
-                              ? Ico.plus
-                              : Ico.compose,
-                          size: 14,
-                          color: c.iconSecondary,
-                        ),
-                        const SizedBox(width: 5),
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: (bounds.maxWidth - 39)
-                                .clamp(0.0, 250.0)
-                                .toDouble(),
-                          ),
-                          child: Text(
-                            label,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: ts(
-                              context.type.uiSmall,
-                              edit.undone ? c.textTertiary : c.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (edit.kind != 'created' && edit.kind != 'trashed') ...[
-                    Text(
-                      '+${edit.added}',
-                      style: ts(context.type.uiSmall, green),
-                    ),
-                    Text(
-                      '−${edit.removed}',
-                      style: ts(context.type.uiSmall, red),
-                    ),
-                  ],
-                  IntrinsicWidth(
-                    child: TextBtn(
-                      'Open',
-                      key: ValueKey('agent-edit-${edit.id}-open'),
-                      height: 28,
-                      onTap: () => openAgentPage(
-                        context,
-                        edit.pageId,
-                        edit.pageTitle,
-                        blocks: edit.changedBlocks,
-                        sessionId: widget.sessionId,
-                      ),
-                    ),
-                  ),
-                  if (edit.undone || edit.undoable)
-                    IntrinsicWidth(
-                      child: TextBtn(
-                        edit.undone
-                            ? 'Undone'
-                            : _undoing
-                            ? 'Undoing…'
-                            : 'Undo',
-                        key: ValueKey('agent-edit-${edit.id}-undo'),
-                        height: 28,
-                        color: edit.undone ? c.textTertiary : null,
-                        onTap: edit.undone || _undoing ? null : _undo,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          if (_refusal != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: Text(
-                _refusal!,
-                key: ValueKey('agent-edit-${edit.id}-refusal'),
-                style: ts(context.type.uiSmall, c.textTertiary),
-              ),
-            ),
-          if (_open)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 2, 10, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final (i, line)
-                      in (_all ? lines : lines.take(12)).indexed)
-                    Container(
-                      color: line.tag == '+'
-                          ? c.okBg
-                          : line.tag == '-'
-                          ? c.dangerBg
-                          : null,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 1,
-                      ),
-                      child: Text(
-                        '${line.tag == '=' ? ' ' : line.tag} ${line.text}',
-                        key: ValueKey('agent-edit-${edit.id}-line-$i'),
-                        style:
-                            ts(
-                              context.type.code,
-                              line.tag == '+'
-                                  ? green
-                                  : line.tag == '-'
-                                  ? red
-                                  : c.textSecondary,
-                              mono: true,
-                            ).copyWith(
-                              decoration: line.tag == '-'
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                      ),
-                    ),
-                  if (!_all && lines.length > 12)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextBtn(
-                        'Show all',
-                        key: ValueKey('agent-edit-${edit.id}-all'),
-                        height: 28,
-                        onTap: () => setState(() => _all = true),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-        ],
+      openEveryEdit: true,
+      onOpen: () => openAgentPage(
+        context,
+        edit.pageId,
+        edit.pageTitle,
+        blocks: edit.changedBlocks,
+        sessionId: widget.sessionId,
       ),
+      onUndo: _undo,
     );
   }
 }
