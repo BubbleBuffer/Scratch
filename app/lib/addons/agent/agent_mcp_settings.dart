@@ -5,137 +5,18 @@
 // off. The list is this device's (AI settings `agentMcpServers`); changes
 // apply to both engines at once ([AgentStore]), and each server's state is
 // read from the chat engine every [McpServersSettings.statusInterval] while
-// the section is shown.
+// the section is shown. What the section does is [McpServersController]; the
+// editor's data and the JSON format are in agent_mcp_draft.dart. This file
+// is the layout.
 
-import 'dart:async';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/tool_sets.dart';
 import '../../services/addon_services.dart';
 import '../../ui/ui.dart';
+import 'agent_mcp_controller.dart';
+import 'agent_mcp_draft.dart';
 import 'agent_store.dart';
-
-/// One server as the editor shows it.
-class McpServerDraft {
-  McpServerDraft({
-    this.name = '',
-    this.isUrl = false,
-    this.command = '',
-    this.args = '',
-    this.env = '',
-    this.url = '',
-    this.headers = '',
-  });
-
-  /// [json] (BubblePaw's `McpServerSettings`) named [name], as text.
-  factory McpServerDraft.of(String name, Map<String, dynamic> json) {
-    String lines(Object? map) => map is Map
-        ? [for (final e in map.entries) '${e.key}=${e.value}'].join('\n')
-        : '';
-    final args = json['args'];
-    return McpServerDraft(
-      name: name,
-      isUrl: json['url'] is String,
-      command: json['command'] is String ? json['command'] as String : '',
-      args: args is List ? args.map((a) => '$a').join('\n') : '',
-      env: lines(json['env']),
-      url: json['url'] is String ? json['url'] as String : '',
-      headers: lines(json['headers_from']),
-    );
-  }
-
-  String name, command, args, env, url, headers;
-  bool isUrl;
-}
-
-/// Non-empty trimmed lines of [text].
-List<String> _lines(String text) => [
-  for (final l in text.split('\n'))
-    if (l.trim().isNotEmpty) l.trim(),
-];
-
-/// `KEY=value` lines as a map; null when a line has no `=` or no key.
-Map<String, String>? _pairs(String text) {
-  final out = <String, String>{};
-  for (final l in _lines(text)) {
-    final i = l.indexOf('=');
-    if (i <= 0) return null;
-    out[l.substring(0, i).trim()] = l.substring(i + 1).trim();
-  }
-  return out;
-}
-
-/// Why [d] can't be saved among [names] (the other servers' names), or null.
-String? validateMcpServer(McpServerDraft d, Iterable<String> names) {
-  final name = d.name.trim();
-  if (name.isEmpty) return 'Give the server a name.';
-  if (names.contains(name)) return 'A server named $name already exists.';
-  if (d.isUrl) {
-    if (d.url.trim().isEmpty) return 'Enter the server URL.';
-    final headers = _pairs(d.headers);
-    if (headers == null) {
-      return 'Write each header as Header=ENV_VAR, one per line.';
-    }
-    for (final e in headers.entries) {
-      final v = e.value;
-      if (v.isEmpty) return 'Header ${e.key} needs an environment variable.';
-      if (!v.endsWith('_API_KEY') &&
-          !v.endsWith('_KEY') &&
-          !v.endsWith('_TOKEN')) {
-        return '$v must end in _API_KEY, _KEY or _TOKEN.';
-      }
-    }
-  } else {
-    if (d.command.trim().isEmpty) return 'Enter the command that starts it.';
-    if (_pairs(d.env) == null) {
-      return 'Write each environment variable as KEY=value, one per line.';
-    }
-  }
-  return null;
-}
-
-/// [d] as BubblePaw JSON, on top of [base] (the server as saved), so keys
-/// the editor doesn't show stay as they are. Keys of the other kind go:
-/// a URL server can't have a command, arguments, environment or folder.
-Map<String, dynamic> mcpServerJson(
-  McpServerDraft d, [
-  Map<String, dynamic> base = const {},
-]) {
-  final out = Map<String, dynamic>.of(base);
-  out.putIfAbsent('enabled', () => true);
-  if (d.isUrl) {
-    for (final k in ['command', 'args', 'env', 'env_from', 'cwd']) {
-      out.remove(k);
-    }
-    out['url'] = d.url.trim();
-    final headers = _pairs(d.headers) ?? const {};
-    if (headers.isEmpty) {
-      out.remove('headers_from');
-    } else {
-      out['headers_from'] = headers;
-    }
-  } else {
-    for (final k in ['url', 'headers_from']) {
-      out.remove(k);
-    }
-    out['command'] = d.command.trim();
-    final args = _lines(d.args);
-    if (args.isEmpty) {
-      out.remove('args');
-    } else {
-      out['args'] = args;
-    }
-    final env = _pairs(d.env) ?? const {};
-    if (env.isEmpty) {
-      out.remove('env');
-    } else {
-      out['env'] = env;
-    }
-  }
-  return out;
-}
 
 /// Marks the MCP servers in Settings > AI, so Settings > Sync can scroll to
 /// them ([showMcpServers]).
@@ -153,154 +34,29 @@ class McpServersSettings extends StatefulWidget {
 }
 
 class _McpServersSettingsState extends State<McpServersSettings> {
-  Timer? _poll;
-  List<AgentMcpServer>? _status;
-
-  /// The editor: open for a new server ([_original] null) or for the server
-  /// named [_original].
-  bool _editing = false;
-  String? _original;
-  bool _isUrl = false;
-  String? _editorError;
-  final _name = TextEditingController();
-  final _command = TextEditingController();
-  final _args = TextEditingController();
-  final _env = TextEditingController();
-  final _url = TextEditingController();
-  final _headers = TextEditingController();
+  // Reads [widget]'s store each time, so a new store is picked up.
+  late final _mcp = McpServersController(
+    read: () => widget.store.settings.agentMcpServers,
+    write: (next) =>
+        widget.store.settings.update((s) => s.agentMcpServers = next),
+    status: () => widget.store.mcpStatus(),
+  );
 
   @override
   void initState() {
     super.initState();
-    unawaited(_read());
-    _poll = Timer.periodic(McpServersSettings.statusInterval, (_) => _read());
+    _mcp.addListener(_changed);
+    _mcp.start(McpServersSettings.statusInterval);
   }
 
   @override
   void dispose() {
-    _poll?.cancel();
-    for (final c in [_name, _command, _args, _env, _url, _headers]) {
-      c.dispose();
-    }
+    _mcp.removeListener(_changed);
+    _mcp.dispose();
     super.dispose();
   }
 
-  Future<void> _read() async {
-    final next = await widget.store.mcpStatus();
-    if (!mounted || listEquals(next, _status)) return;
-    setState(() => _status = next);
-  }
-
-  Map<String, Map<String, dynamic>> get _servers =>
-      widget.store.settings.agentMcpServers;
-
-  void _edit(String? name) {
-    final d = name == null
-        ? McpServerDraft()
-        : McpServerDraft.of(name, _servers[name] ?? const {});
-    setState(() {
-      _editing = true;
-      _original = name;
-      _isUrl = d.isUrl;
-      _editorError = null;
-      _name.text = d.name;
-      _command.text = d.command;
-      _args.text = d.args;
-      _env.text = d.env;
-      _url.text = d.url;
-      _headers.text = d.headers;
-    });
-  }
-
-  void _close() => setState(() {
-    _editing = false;
-    _original = null;
-    _editorError = null;
-  });
-
-  void _save() {
-    final d = McpServerDraft(
-      name: _name.text.trim(),
-      isUrl: _isUrl,
-      command: _command.text,
-      args: _args.text,
-      env: _env.text,
-      url: _url.text,
-      headers: _headers.text,
-    );
-    final original = _original;
-    final error = validateMcpServer(
-      d,
-      _servers.keys.where((n) => n != original),
-    );
-    if (error != null) {
-      setState(() => _editorError = error);
-      return;
-    }
-    final server = mcpServerJson(
-      d,
-      original == null ? const {} : _servers[original] ?? const {},
-    );
-    // Same place in the list; a rename keeps it there.
-    widget.store.settings.update((s) {
-      final next = <String, Map<String, dynamic>>{};
-      for (final e in s.agentMcpServers.entries) {
-        next[e.key == original ? d.name : e.key] = e.key == original
-            ? server
-            : e.value;
-      }
-      next.putIfAbsent(d.name, () => server);
-      s.agentMcpServers = next;
-    });
-    _close();
-  }
-
-  void _setEnabled(String name, bool on) {
-    widget.store.settings.update((s) {
-      s.agentMcpServers = {
-        for (final e in s.agentMcpServers.entries)
-          e.key: e.key == name
-              ? (Map<String, dynamic>.of(e.value)..['enabled'] = on)
-              : e.value,
-      };
-    });
-    setState(() {});
-  }
-
-  void _remove(String name) {
-    widget.store.settings.update(
-      (s) => s.agentMcpServers = {
-        for (final e in s.agentMcpServers.entries)
-          if (e.key != name) e.key: e.value,
-      },
-    );
-    if (_original == name) {
-      _close();
-    } else {
-      setState(() {});
-    }
-  }
-
-  /// The server's state in words, and whether it is a problem.
-  (String, bool)? _stateOf(String name, bool enabled) {
-    final list = _status;
-    if (list == null) return null;
-    final s = list.where((x) => x.name == name).firstOrNull;
-    if (s == null) return enabled ? ('Not started', false) : ('Off', false);
-    return switch (s.state) {
-      'running' => (
-        'Running, ${s.tools} ${s.tools == 1 ? 'tool' : 'tools'}',
-        false,
-      ),
-      'failed' => (
-        s.error == null || s.error!.trim().isEmpty
-            ? 'Failed to start'
-            : 'Failed: ${s.error!.trim()}',
-        true,
-      ),
-      _ => ('Off', false),
-    };
-  }
+  void _changed() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +73,7 @@ class _McpServersSettingsState extends State<McpServersSettings> {
     final note = !everything
         ? 'Servers run only while Tools on this computer is '
               '${toolSetLabel('everything')}.'
-        : _status == null
+        : _mcp.serverStates == null
         ? 'Their state shows while the agent runs on this computer.'
         : null;
     return SettingsRow(
@@ -330,7 +86,7 @@ class _McpServersSettingsState extends State<McpServersSettings> {
         key: const ValueKey('agent-mcp-servers'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final e in _servers.entries)
+          for (final e in _mcp.servers.entries)
             _row(context, e.key, e.value, showState: everything),
           if (note != null)
             Padding(
@@ -350,7 +106,7 @@ class _McpServersSettingsState extends State<McpServersSettings> {
                 style: tsRaw(12, 16, 400, c.inlineCodeText),
               ),
             ),
-          if (_editing)
+          if (_mcp.editing)
             _editor(context)
           else
             Align(
@@ -358,7 +114,7 @@ class _McpServersSettingsState extends State<McpServersSettings> {
               child: TextBtn(
                 'Add server',
                 key: const ValueKey('agent-mcp-add'),
-                onTap: () => _edit(null),
+                onTap: () => _mcp.edit(null),
               ),
             ),
         ],
@@ -374,11 +130,8 @@ class _McpServersSettingsState extends State<McpServersSettings> {
   }) {
     final c = context.colors;
     final enabled = json['enabled'] != false;
-    final d = McpServerDraft.of(name, json);
-    final what = d.isUrl
-        ? d.url
-        : [d.command, ..._lines(d.args)].where((p) => p.isNotEmpty).join(' ');
-    final state = showState ? _stateOf(name, enabled) : null;
+    final what = McpServerDraft.of(name, json).summary;
+    final state = showState ? _mcp.stateOf(name, enabled) : null;
     return Padding(
       key: ValueKey('agent-mcp-server-$name'),
       padding: const EdgeInsets.only(bottom: 8),
@@ -418,19 +171,19 @@ class _McpServersSettingsState extends State<McpServersSettings> {
           TextBtn(
             'Edit',
             key: ValueKey('agent-mcp-edit-$name'),
-            onTap: () => _edit(name),
+            onTap: () => _mcp.edit(name),
           ),
           TextBtn(
             'Remove',
             key: ValueKey('agent-mcp-remove-$name'),
             color: c.inlineCodeText,
-            onTap: () => _remove(name),
+            onTap: () => _mcp.remove(name),
           ),
           const SizedBox(width: 8),
           Toggle(
             key: ValueKey('agent-mcp-enabled-$name'),
             value: enabled,
-            onChanged: (on) => _setEnabled(name, on),
+            onChanged: (on) => _mcp.setEnabled(name, on),
           ),
         ],
       ),
@@ -452,7 +205,7 @@ class _McpServersSettingsState extends State<McpServersSettings> {
             Expanded(
               child: SettingsField(
                 fieldKey: const ValueKey('agent-mcp-name'),
-                controller: _name,
+                controller: _mcp.name,
                 placeholder: 'Name',
                 autofocus: true,
               ),
@@ -461,18 +214,18 @@ class _McpServersSettingsState extends State<McpServersSettings> {
             SelectButton<bool>(
               key: const ValueKey('agent-mcp-type'),
               title: 'Server type',
-              value: _isUrl,
+              value: _mcp.isUrl,
               options: const [false, true],
               labelOf: (url) => url ? 'URL' : 'Command',
-              onChanged: (url) => setState(() => _isUrl = url),
+              onChanged: (url) => _mcp.isUrl = url,
             ),
           ],
         ),
-        if (_isUrl) ...[
+        if (_mcp.isUrl) ...[
           label('URL'),
           SettingsField(
             fieldKey: const ValueKey('agent-mcp-url'),
-            controller: _url,
+            controller: _mcp.url,
             placeholder: 'https://example.com/mcp',
             mono: true,
           ),
@@ -483,35 +236,35 @@ class _McpServersSettingsState extends State<McpServersSettings> {
           ),
           _LinesField(
             key: const ValueKey('agent-mcp-headers'),
-            controller: _headers,
+            controller: _mcp.headers,
             placeholder: 'Authorization=EXAMPLE_TOKEN',
           ),
         ] else ...[
           label('Command'),
           SettingsField(
             fieldKey: const ValueKey('agent-mcp-command'),
-            controller: _command,
+            controller: _mcp.command,
             placeholder: 'npx',
             mono: true,
           ),
           label('Arguments, one per line'),
           _LinesField(
             key: const ValueKey('agent-mcp-args'),
-            controller: _args,
+            controller: _mcp.args,
             placeholder: '-y\n@example/mcp-server',
           ),
           label('Environment, one per line as KEY=value'),
           _LinesField(
             key: const ValueKey('agent-mcp-env'),
-            controller: _env,
+            controller: _mcp.env,
             placeholder: 'EXAMPLE_ROOT=/path',
           ),
         ],
-        if (_editorError != null)
+        if (_mcp.editorError != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              _editorError!,
+              _mcp.editorError!,
               key: const ValueKey('agent-mcp-editor-error'),
               style: tsRaw(12, 16, 400, c.inlineCodeText),
             ),
@@ -520,16 +273,16 @@ class _McpServersSettingsState extends State<McpServersSettings> {
         Row(
           children: [
             SecondaryButton(
-              label: _original == null ? 'Add' : 'Save',
+              label: _mcp.original == null ? 'Add' : 'Save',
               key: const ValueKey('agent-mcp-save'),
               height: 32,
-              onTap: _save,
+              onTap: _mcp.save,
             ),
             const SizedBox(width: 8),
             TextBtn(
               'Cancel',
               key: const ValueKey('agent-mcp-cancel'),
-              onTap: _close,
+              onTap: _mcp.close,
             ),
           ],
         ),

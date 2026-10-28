@@ -6,6 +6,8 @@ export 'agent_cells.dart';
 export 'agent_chat.dart';
 export 'agent_composer.dart';
 export 'agent_markdown.dart';
+export 'agent_mcp_controller.dart';
+export 'agent_mcp_draft.dart';
 export 'agent_mcp_settings.dart';
 export 'agent_outline.dart';
 export 'agent_panel.dart';

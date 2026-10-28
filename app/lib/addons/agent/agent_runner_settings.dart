@@ -1,7 +1,9 @@
 // Settings > AI > Agent, shared by desktop and Android: "Run AI on" (the
 // vault's synced runner: the hub or this computer), each runner's model
 // picker filled from that runner, and each runner's tool set. Everything
-// else in the section depends on the runner chosen here.
+// else in the section depends on the runner chosen here. The options and
+// help lines are in agent_runner_choices.dart; this file lays them out and
+// saves through [AgentStore].
 
 import 'package:flutter/widgets.dart';
 
@@ -9,18 +11,10 @@ import '../../core/tool_sets.dart';
 import '../../services/addon_services.dart';
 import '../../ui/toast.dart';
 import '../../ui/ui.dart';
+import 'agent_runner_choices.dart';
 import 'agent_store.dart';
 
-/// What each runner does, in one line.
-String runnerHelp(AgentHost h) => switch (h) {
-  AgentHost.hub => 'Your hub runs the AI; works from every device.',
-  AgentHost.local =>
-    'This computer runs the AI with its own models and tools.',
-};
-
-/// The runner chosen for the vault (synced), or the built-in default.
-AgentHost chosenRunner(AgentStore store) =>
-    store.vaultDefaults.host ?? builtInAgentHost;
+export 'agent_runner_choices.dart' show chosenRunner, runnerHelp;
 
 Future<void> _write(
   BuildContext context,
@@ -76,29 +70,20 @@ class HubModelSetting extends StatelessWidget {
     final r = store.runnerModels(AgentHost.hub);
     final stored = store.vaultDefaults.models[AgentHost.hub];
     final ids = {for (final m in r.models) m.id}.toList();
-    final hostDefault = r.hostDefault;
-    String label(String? id) => id == null
-        ? hostDefault == null
-              ? 'Hub default'
-              : 'Hub default (${store.modelLabel(hostDefault)})'
-        : store.modelLabel(id);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SettingsRow(
           label: 'Model',
-          description: 'For new chats on every device. Each chat can pick another.',
+          description:
+              'For new chats on every device. Each chat can pick another.',
           stack: context.mobile,
           trailing: SelectButton<String?>(
             key: const ValueKey('agent-hub-model'),
             title: 'Model',
             value: stored,
-            options: [
-              null,
-              ...ids,
-              if (stored != null && !ids.contains(stored)) stored,
-            ],
-            labelOf: label,
+            options: hubModelOptions(ids, stored),
+            labelOf: (id) => hubModelLabel(id, r.hostDefault, store.modelLabel),
             onChanged: (m) => _write(
               context,
               () => store.setVaultDefaultModel(AgentHost.hub, m),
@@ -156,7 +141,7 @@ class ComputerModelSetting extends StatelessWidget {
       trailing: SelectButton<String>(
         key: const ValueKey('agent-computer-model'),
         title: 'Model',
-        value: stored != null && ids.contains(stored) ? stored : ids.first,
+        value: computerModelValue(ids, stored),
         options: ids,
         labelOf: store.modelLabel,
         onChanged: (m) => _write(
@@ -185,18 +170,9 @@ class RunnerToolSetSetting extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final set = store.vaultDefaults.toolSetFor(runner);
-    final onHub = runner == AgentHost.hub;
-    final what = switch (set) {
-      'read' => 'Reads the vault and changes nothing.',
-      'write' => 'Reads and edits the vault.',
-      _ =>
-        onHub
-            ? 'Every tool the hub has.'
-            : 'The vault, plus files, commands and MCP servers here.',
-    };
     return SettingsRow(
       label: 'Tools',
-      description: onHub ? '$what Jobs use it at once; hub chats after the hub restarts (an update or reboot).' : what,
+      description: toolSetHelp(set, runner),
       trailing: SelectButton<String>(
         key: ValueKey('agent-tool-set-${runner.runner}'),
         title: 'Tools',

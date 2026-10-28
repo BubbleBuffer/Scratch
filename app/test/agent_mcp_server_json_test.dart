@@ -147,136 +147,145 @@ void main() {
   });
 
   group('mcpServerJson', () {
-    final cases = <(String, McpServerDraft, Map<String, dynamic>, Map<String, dynamic>)>[
-      (
-        'a new command server',
-        _cmd(args: '-y\n@example/files', env: 'ROOT=/data'),
-        const {},
-        {
-          'enabled': true,
-          'command': 'npx',
-          'args': ['-y', '@example/files'],
-          'env': {'ROOT': '/data'},
-        },
-      ),
-      (
-        'text is trimmed and blank lines dropped',
-        _cmd(command: ' npx ', args: '\n  -y \n\n x\n', env: ' A = b=c \n\n'),
-        const {},
-        {
-          'enabled': true,
-          'command': 'npx',
-          'args': ['-y', 'x'],
-          'env': {'A': 'b=c'},
-        },
-      ),
-      (
-        'a new URL server',
-        _url(headers: 'Authorization=GH_TOKEN'),
-        const {},
-        {
-          'enabled': true,
-          'url': 'https://example.com/mcp',
-          'headers_from': {'Authorization': 'GH_TOKEN'},
-        },
-      ),
-      (
-        'a turned-off server stays off',
-        _cmd(),
-        const {'enabled': false, 'command': 'old'},
-        {'enabled': false, 'command': 'npx'},
-      ),
-      (
-        'cleared arguments and environment are removed',
-        _cmd(),
-        const {
-          'enabled': true,
-          'command': 'npx',
-          'args': ['-y'],
-          'env': {'A': '1'},
-        },
-        {'enabled': true, 'command': 'npx'},
-      ),
-      (
-        'cleared headers are removed',
-        _url(),
-        const {
-          'enabled': true,
-          'url': 'https://example.com/mcp',
-          'headers_from': {'A': 'X_KEY'},
-        },
-        {'enabled': true, 'url': 'https://example.com/mcp'},
-      ),
-      (
-        'unknown keys stay on a command server',
-        _cmd(command: 'uvx'),
-        const {
-          'command': 'npx',
-          'enabled': true,
-          'cwd': '/work',
-          'env_from': {'TOKEN': 'GH_TOKEN'},
-          'call_timeout_secs': 60,
-          'future': {'nested': [1, 2]},
-        },
-        {
-          'command': 'uvx',
-          'enabled': true,
-          'cwd': '/work',
-          'env_from': {'TOKEN': 'GH_TOKEN'},
-          'call_timeout_secs': 60,
-          'future': {'nested': [1, 2]},
-        },
-      ),
-      (
-        'unknown keys stay on a URL server',
-        _url(),
-        const {
-          'url': 'https://old.example.com/mcp',
-          'enabled': true,
-          'startup_timeout_secs': 30,
-        },
-        {
-          'url': 'https://example.com/mcp',
-          'enabled': true,
-          'startup_timeout_secs': 30,
-        },
-      ),
-      (
-        'command to URL drops the command keys and keeps the rest',
-        _url(headers: 'Authorization=GH_TOKEN'),
-        const {
-          'command': 'npx',
-          'args': ['-y'],
-          'env': {'A': '1'},
-          'env_from': {'B': 'B_TOKEN'},
-          'cwd': '/work',
-          'enabled': false,
-          'call_timeout_secs': 60,
-        },
-        {
-          'enabled': false,
-          'call_timeout_secs': 60,
-          'url': 'https://example.com/mcp',
-          'headers_from': {'Authorization': 'GH_TOKEN'},
-        },
-      ),
-      (
-        'URL to command drops the URL keys and keeps the rest',
-        _cmd(args: 'serve'),
-        const {
-          'url': 'https://example.com/mcp',
-          'headers_from': {'A': 'X_KEY'},
-          'enabled': true,
-          'startup_timeout_secs': 30,
-        },
-        {
-          'enabled': true,
-          'startup_timeout_secs': 30,
-          'command': 'npx',
-          'args': ['serve'],
-        },
-      ),
-    ];
+    final cases =
+        <(String, McpServerDraft, Map<String, dynamic>, Map<String, dynamic>)>[
+          (
+            'a new command server',
+            _cmd(args: '-y\n@example/files', env: 'ROOT=/data'),
+            const {},
+            {
+              'enabled': true,
+              'command': 'npx',
+              'args': ['-y', '@example/files'],
+              'env': {'ROOT': '/data'},
+            },
+          ),
+          (
+            'text is trimmed and blank lines dropped',
+            _cmd(
+              command: ' npx ',
+              args: '\n  -y \n\n x\n',
+              env: ' A = b=c \n\n',
+            ),
+            const {},
+            {
+              'enabled': true,
+              'command': 'npx',
+              'args': ['-y', 'x'],
+              'env': {'A': 'b=c'},
+            },
+          ),
+          (
+            'a new URL server',
+            _url(headers: 'Authorization=GH_TOKEN'),
+            const {},
+            {
+              'enabled': true,
+              'url': 'https://example.com/mcp',
+              'headers_from': {'Authorization': 'GH_TOKEN'},
+            },
+          ),
+          (
+            'a turned-off server stays off',
+            _cmd(),
+            const {'enabled': false, 'command': 'old'},
+            {'enabled': false, 'command': 'npx'},
+          ),
+          (
+            'cleared arguments and environment are removed',
+            _cmd(),
+            const {
+              'enabled': true,
+              'command': 'npx',
+              'args': ['-y'],
+              'env': {'A': '1'},
+            },
+            {'enabled': true, 'command': 'npx'},
+          ),
+          (
+            'cleared headers are removed',
+            _url(),
+            const {
+              'enabled': true,
+              'url': 'https://example.com/mcp',
+              'headers_from': {'A': 'X_KEY'},
+            },
+            {'enabled': true, 'url': 'https://example.com/mcp'},
+          ),
+          (
+            'unknown keys stay on a command server',
+            _cmd(command: 'uvx'),
+            const {
+              'command': 'npx',
+              'enabled': true,
+              'cwd': '/work',
+              'env_from': {'TOKEN': 'GH_TOKEN'},
+              'call_timeout_secs': 60,
+              'future': {
+                'nested': [1, 2],
+              },
+            },
+            {
+              'command': 'uvx',
+              'enabled': true,
+              'cwd': '/work',
+              'env_from': {'TOKEN': 'GH_TOKEN'},
+              'call_timeout_secs': 60,
+              'future': {
+                'nested': [1, 2],
+              },
+            },
+          ),
+          (
+            'unknown keys stay on a URL server',
+            _url(),
+            const {
+              'url': 'https://old.example.com/mcp',
+              'enabled': true,
+              'startup_timeout_secs': 30,
+            },
+            {
+              'url': 'https://example.com/mcp',
+              'enabled': true,
+              'startup_timeout_secs': 30,
+            },
+          ),
+          (
+            'command to URL drops the command keys and keeps the rest',
+            _url(headers: 'Authorization=GH_TOKEN'),
+            const {
+              'command': 'npx',
+              'args': ['-y'],
+              'env': {'A': '1'},
+              'env_from': {'B': 'B_TOKEN'},
+              'cwd': '/work',
+              'enabled': false,
+              'call_timeout_secs': 60,
+            },
+            {
+              'enabled': false,
+              'call_timeout_secs': 60,
+              'url': 'https://example.com/mcp',
+              'headers_from': {'Authorization': 'GH_TOKEN'},
+            },
+          ),
+          (
+            'URL to command drops the URL keys and keeps the rest',
+            _cmd(args: 'serve'),
+            const {
+              'url': 'https://example.com/mcp',
+              'headers_from': {'A': 'X_KEY'},
+              'enabled': true,
+              'startup_timeout_secs': 30,
+            },
+            {
+              'enabled': true,
+              'startup_timeout_secs': 30,
+              'command': 'npx',
+              'args': ['serve'],
+            },
+          ),
+        ];
     for (final (what, draft, base, want) in cases) {
       test(what, () => expect(mcpServerJson(draft, base), want));
     }
@@ -366,10 +375,7 @@ void main() {
       test(name, () {
         final draft = McpServerDraft.of(name, json);
         expect(validateMcpServer(draft, const []), isNull);
-        expect(
-          jsonEncode(mcpServerJson(draft, json)),
-          jsonEncode(json),
-        );
+        expect(jsonEncode(mcpServerJson(draft, json)), jsonEncode(json));
       });
     }
 
@@ -379,10 +385,7 @@ void main() {
       final out = mcpServerJson(draft, json);
       expect(out.keys.toList(), [...json.keys, 'args']);
       expect(out['args'], ['run', 'server']);
-      expect(
-        jsonEncode({...out}..remove('args')),
-        jsonEncode(json),
-      );
+      expect(jsonEncode({...out}..remove('args')), jsonEncode(json));
     });
   });
 }
