@@ -31,7 +31,7 @@ Future<void> pumpHistoryChat(
   bool compacted = true,
   bool compactable = true,
   bool dark = false,
-  double width = 560,
+  double width = 900,
   double height = 700,
 }) async {
   await tester.pumpWidget(
