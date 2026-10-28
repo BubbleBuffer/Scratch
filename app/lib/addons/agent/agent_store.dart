@@ -737,6 +737,13 @@ class AgentStore extends ChangeNotifier {
   /// The chat whose outline [outline] holds, once that load has finished.
   String? outlineFor;
 
+  /// The open chat's compacted history (cards and the boundary), loaded with
+  /// its outline; null while loading, on a failed read, or for a remote chat.
+  CompactedHistory? compacted;
+
+  /// The chat whose history [compacted] holds.
+  String? compactedFor;
+
   /// The message list the outline was loaded for. The outline only changes
   /// with messages, so a snapshot that adds none does not load it again.
   String? _outlineKey;
@@ -868,6 +875,16 @@ class AgentStore extends ChangeNotifier {
     final ids = allModelIds;
     if (ids.isEmpty) return def.isEmpty ? null : def;
     return ids.contains(def) ? def : ids.first;
+  }
+
+  /// Whether chat [id] shows older history as summary cards (off by default).
+  bool historyCompacted(String? id) =>
+      id != null && (_prefs[id]?.compacted ?? false);
+
+  /// Turns compacted history on or off for chat [id].
+  void setHistoryCompacted(String id, bool value) {
+    _prefs.setCompacted(id, host, value);
+    _notify();
   }
 
   void pickModel(String? id, String model) {
@@ -1574,11 +1591,17 @@ class AgentStore extends ChangeNotifier {
   /// it. Tests only. The view subscription reloads the database's session when
   /// a chat mounts, so a fixture must come after the mount has settled.
   @visibleForTesting
-  void seedFixture(AgentSessionState snapshot, ChatOutline chapters) {
+  void seedFixture(
+    AgentSessionState snapshot,
+    ChatOutline chapters, {
+    CompactedHistory? history,
+  }) {
     final id = snapshot.session.id;
     state = snapshot;
     outline = chapters;
     outlineFor = id;
+    compacted = history;
+    compactedFor = history == null ? null : id;
     _notify();
   }
 
@@ -1644,6 +1667,8 @@ class AgentStore extends ChangeNotifier {
   void _clearOutline() {
     outline = ChatOutline(chapters: const []);
     outlineFor = null;
+    compacted = null;
+    compactedFor = null;
     _outlineKey = null;
     _outlineRevision = null;
     _outlineLoads++;
@@ -1862,6 +1887,15 @@ class AgentStore extends ChangeNotifier {
       next = ChatOutline(chapters: const []);
     }
     if (!current()) return;
+    CompactedHistory? history;
+    try {
+      history = await _count(() => a.compactedHistory(sessionId: id));
+    } catch (_) {
+      history = null;
+    }
+    if (!current()) return;
+    compacted = history;
+    compactedFor = id;
     outline = next;
     outlineFor = id;
     _outlineKey = key;

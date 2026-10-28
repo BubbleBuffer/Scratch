@@ -13,18 +13,27 @@ import 'agent_chat_prefs_file.dart';
 export 'agent_chat_prefs_file.dart' show AgentChatPrefsFile;
 
 class AgentChatPref {
-  const AgentChatPref({required this.host, this.model});
+  const AgentChatPref({required this.host, this.model, this.compacted = false});
 
   final AgentHost host;
 
   /// `provider/model` picked in the chat; null: the default.
   final String? model;
 
-  AgentChatPref withModel(String? m) => AgentChatPref(host: host, model: m);
+  /// The chat shows its older history as summary cards (Settings: Chat history,
+  /// Compacted). Off by default; saved only when on.
+  final bool compacted;
+
+  AgentChatPref withModel(String? m) =>
+      AgentChatPref(host: host, model: m, compacted: compacted);
+
+  AgentChatPref withCompacted(bool v) =>
+      AgentChatPref(host: host, model: model, compacted: v);
 
   Map<String, dynamic> toJson() => {
     'host': host.name,
     if (model != null) 'model': model,
+    if (compacted) 'history': 'compacted',
   };
 
   static AgentChatPref? fromJson(Object? j) {
@@ -32,7 +41,11 @@ class AgentChatPref {
     final host = AgentHost.values.where((h) => h.name == j['host']).firstOrNull;
     if (host == null) return null;
     final model = j['model'];
-    return AgentChatPref(host: host, model: model is String ? model : null);
+    return AgentChatPref(
+      host: host,
+      model: model is String ? model : null,
+      compacted: j['history'] == 'compacted',
+    );
   }
 }
 
@@ -76,6 +89,15 @@ class AgentChatPrefs {
   void pickModel(String id, AgentHost host, String model) {
     final p = _byChat[id] ?? AgentChatPref(host: host);
     _byChat[id] = p.withModel(model);
+    _save();
+  }
+
+  /// Saves whether chat [id] shows compacted history; a chat with no recorded
+  /// host is recorded on [host].
+  void setCompacted(String id, AgentHost host, bool value) {
+    final p = _byChat[id];
+    if ((p?.compacted ?? false) == value) return;
+    _byChat[id] = (p ?? AgentChatPref(host: host)).withCompacted(value);
     _save();
   }
 

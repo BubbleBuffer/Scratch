@@ -28,18 +28,18 @@ dependencies:
   url_launcher: 6.3.3
   notes_bridge:
     path: rust_builder
-  # The shared agent kit, pinned to the commit of kit tag v0.10.0:
+  # The shared agent kit, pinned to the commit of kit tag v0.15.0:
   # agent_kit_core remains a path dependency of agent_kit, so both direct
   # refs must be the same full commit SHA. The chat's outline and the dev pane use them.
   agent_kit:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: cc42490c2fb9aa7b49febd39f30520b166e993ea
+      ref: 59e7aa53d64f4cdd670cd84194d6d90fceaae474
       path: packages/agent_kit
   agent_kit_core:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: cc42490c2fb9aa7b49febd39f30520b166e993ea
+      ref: 59e7aa53d64f4cdd670cd84194d6d90fceaae474
       path: packages/agent_kit_core
 
 dev_dependencies:
