@@ -75,7 +75,11 @@ class _FeedbackHostState extends State<FeedbackHost> {
       onShake: _onShake,
       isSuppressed: () => _controller.isOpen,
     );
-    _shakes = accelerometerEventStream().listen(
+    // The default 200 ms sampling misses short shakes; the game interval
+    // (20 ms) gives the detector samples close enough to see its peaks.
+    _shakes = accelerometerEventStream(
+      samplingPeriod: SensorInterval.gameInterval,
+    ).listen(
       (e) => detector.onSample(e.x, e.y, e.z, DateTime.now()),
     );
   }

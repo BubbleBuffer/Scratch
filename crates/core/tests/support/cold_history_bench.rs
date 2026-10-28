@@ -286,6 +286,7 @@ struct Flat {
     target: Option<String>,
     color: Option<String>,
     width: Option<u32>,
+    numbered_start: Option<u32>,
 }
 
 fn flatten(blocks: &[Block], parent: Option<&str>, out: &mut Vec<Flat>) {
@@ -302,6 +303,7 @@ fn flatten(blocks: &[Block], parent: Option<&str>, out: &mut Vec<Flat>) {
             target: b.target.clone(),
             color: b.color.clone(),
             width: b.width,
+            numbered_start: b.numbered_start,
         });
         flatten(&b.children, Some(b.id.as_str()), out);
         prev = Some(b.id.clone());
@@ -363,6 +365,9 @@ fn plan(blocks: &[Block], props: &[(String, PropValue)], seed: u64, volume: usiz
             }
             if let Some(w) = f.width {
                 step.ops.push(BlockOp::SetWidth { id: f.id.clone(), width: Some(w) });
+            }
+            if let Some(start) = f.numbered_start {
+                step.ops.push(BlockOp::SetNumberedStart { id: f.id.clone(), numbered_start: Some(start) });
             }
         }
         steps.push(step);

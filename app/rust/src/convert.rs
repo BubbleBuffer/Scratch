@@ -960,7 +960,7 @@ mod tests {
     fn conflict_block(id: &str, text: &str, children: Vec<vc::Block>) -> vc::Block {
         vc::Block {
             id: id.into(), kind: vc::BlockKind::Paragraph, text: text.into(), marks: vec![],
-            checked: false, target: None, color: None, width: None, children,
+            checked: false, target: None, color: None, width: None, numbered_start: None, children,
         }
     }
 

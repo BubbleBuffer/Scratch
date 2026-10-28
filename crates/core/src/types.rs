@@ -291,6 +291,11 @@ pub struct Block {
     /// None for the full width. Set with [`BlockOp::SetWidth`].
     #[serde(default)]
     pub width: Option<u32>,
+    /// Starting number of a numbered-list run, on its first item only.
+    /// None means 1; following items continue the run. Set with
+    /// [`BlockOp::SetNumberedStart`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub numbered_start: Option<u32>,
 }
 
 // Keep variants, wire names and the exhaustive built-in test list together.
@@ -494,6 +499,11 @@ pub enum BlockOp {
     SetWidth {
         id: BlockId,
         width: Option<u32>,
+    },
+    /// Sets a numbered-list run's first number; None or 1 clears it.
+    SetNumberedStart {
+        id: BlockId,
+        numbered_start: Option<u32>,
     },
 }
 
@@ -1317,6 +1327,7 @@ mod chat_ref_tests {
             target: Some(target.into()),
             color: None,
             width: None,
+            numbered_start: None,
         };
         assert_eq!(BlockKind::ChatRef.as_str(), "chat_ref");
         assert_eq!(BlockKind::parse("chat_ref"), BlockKind::ChatRef);

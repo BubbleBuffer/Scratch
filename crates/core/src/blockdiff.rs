@@ -34,6 +34,12 @@ pub(crate) fn insert_ops(blocks: &[Block]) -> Vec<BlockOp> {
                     width: x.width,
                 });
             }
+            if x.numbered_start.is_some() {
+                ops.push(BlockOp::SetNumberedStart {
+                    id: x.id.clone(),
+                    numbered_start: x.numbered_start,
+                });
+            }
             walk(&x.children, Some(&x.id), ops);
             prev = Some(x.id.clone());
         }
@@ -59,6 +65,7 @@ fn same_content(a: &Block, b: &Block) -> bool {
         && a.marks == b.marks
         && a.checked == b.checked
         && a.target == b.target
+        && a.numbered_start == b.numbered_start
 }
 
 fn flatten<'a>(b: &'a [Block], out: &mut Vec<&'a Block>) {
@@ -289,6 +296,12 @@ pub(crate) fn diff_ops(current: &[Block], target: &[Block]) -> Vec<BlockOp> {
                                 width: b.width,
                             });
                         }
+                        if old.numbered_start != b.numbered_start {
+                            self.ops.push(BlockOp::SetNumberedStart {
+                                id: b.id.clone(),
+                                numbered_start: b.numbered_start,
+                            });
+                        }
                     }
                     None => {
                         self.ops.push(BlockOp::Insert {
@@ -312,6 +325,12 @@ pub(crate) fn diff_ops(current: &[Block], target: &[Block]) -> Vec<BlockOp> {
                             self.ops.push(BlockOp::SetWidth {
                                 id: b.id.clone(),
                                 width: b.width,
+                            });
+                        }
+                        if b.numbered_start.is_some() {
+                            self.ops.push(BlockOp::SetNumberedStart {
+                                id: b.id.clone(),
+                                numbered_start: b.numbered_start,
                             });
                         }
                         self.place(&b.id, p, prev.as_ref());
@@ -358,6 +377,7 @@ mod tests {
             target: None,
             color: None,
             width: None,
+            numbered_start: None,
         }
     }
 

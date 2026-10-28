@@ -139,6 +139,11 @@ extension StoreX on BuildContext {
   T watch<T extends ChangeNotifier>() =>
       dependOnInheritedWidgetOfExactType<_StoreScope<T>>()!.notifier!;
 
+  /// The store of type [T] if one is provided above, rebuilding this widget
+  /// when it notifies; null before the vault is open.
+  T? maybeWatch<T extends ChangeNotifier>() =>
+      dependOnInheritedWidgetOfExactType<_StoreScope<T>>()?.notifier;
+
   /// The store of type [T], without rebuilding on its changes.
   T read<T extends ChangeNotifier>() =>
       getInheritedWidgetOfExactType<_StoreScope<T>>()!.notifier!;

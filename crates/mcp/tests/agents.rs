@@ -346,6 +346,7 @@ fn merge_prompt_and_answer() {
         target: None,
         color: None,
         width: None,
+        numbered_start: None,
     };
     let c = Conflict {
         page: page.clone(),

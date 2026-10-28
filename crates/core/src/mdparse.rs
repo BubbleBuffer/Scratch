@@ -379,6 +379,7 @@ struct PBlock {
     target: Option<String>,
     color: Option<String>,
     width: Option<u32>,
+    numbered_start: Option<u32>,
     children: Vec<PBlock>,
 }
 
@@ -392,6 +393,7 @@ impl PBlock {
             target: None,
             color: None,
             width: None,
+            numbered_start: None,
             children: Vec::new(),
         }
     }
@@ -522,14 +524,13 @@ fn todo(rest: &str) -> Option<(bool, &str)> {
     None
 }
 
-fn numbered(s: &str) -> Option<&str> {
+fn numbered(s: &str) -> Option<(u32, &str)> {
     let n = s.bytes().take_while(|b| b.is_ascii_digit()).count();
     if (1..=9).contains(&n) && matches!(s.as_bytes().get(n), Some(b'.' | b')')) {
         let rest = &s[n + 1..];
-        if rest.is_empty() {
-            return Some("");
-        }
-        return rest.strip_prefix(' ');
+        let number = s[..n].parse().ok()?;
+        let text = if rest.is_empty() { "" } else { rest.strip_prefix(' ')? };
+        return Some((number, text));
     }
     None
 }
@@ -763,7 +764,12 @@ impl Parser<'_, '_> {
                 }
             }
             blank = false;
-            let b = self.block(content, ind);
+            let mut b = self.block(content, ind);
+            // Only the first marker determines a numbered run's start.
+            // Subsequent authored numbers are normalized by the renderer.
+            if out.last().is_some_and(|last| last.kind == BlockKind::Numbered) {
+                b.numbered_start = None;
+            }
             out.push(b);
         }
         out
@@ -938,8 +944,10 @@ impl Parser<'_, '_> {
             }
             return PBlock::new(BlockKind::Bulleted, rest);
         }
-        if let Some(rest) = numbered(s) {
-            return PBlock::new(BlockKind::Numbered, rest);
+        if let Some((number, rest)) = numbered(s) {
+            let mut b = PBlock::new(BlockKind::Numbered, rest);
+            b.numbered_start = (number != 1).then_some(number);
+            return b;
         }
         let t = s.trim_end();
         if t == "<br>" {
@@ -1080,6 +1088,7 @@ fn finish(b: PBlock, r: &mut dyn Resolver) -> Block {
         target: b.target,
         color: b.color,
         width: b.width,
+        numbered_start: b.numbered_start,
     }
 }
 
@@ -1308,7 +1317,16 @@ fn inline_into(chars: &[char], r: &mut dyn Resolver, text: &mut String, marks: &
                 match find_seq(chars, i + run, &delim) {
                     Some(end) if end > i + run => {
                         let start = len;
-                        for &x in &chars[i + run..end] {
+                        let mut content = &chars[i + run..end];
+                        // CommonMark removes one padding space at each end,
+                        // except when the entire code span consists of spaces.
+                        if content.first() == Some(&' ')
+                            && content.last() == Some(&' ')
+                            && content.iter().any(|&x| x != ' ')
+                        {
+                            content = &content[1..content.len() - 1];
+                        }
+                        for &x in content {
                             push(text, &mut len, x);
                         }
                         marks.push(Mark {

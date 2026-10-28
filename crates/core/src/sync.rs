@@ -2104,6 +2104,7 @@ mod conflict_format_tests {
             target: None,
             color: None,
             width: None,
+            numbered_start: None,
         }
     }
 

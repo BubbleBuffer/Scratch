@@ -1,17 +1,33 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/editor/page_screen.dart';
 import 'package:notes_app/core/models.dart';
+import 'package:notes_app/feedback/feedback_sheet.dart';
 import 'package:notes_app/shell/home.dart';
 import 'package:notes_app/shell/navigation.dart';
 import 'package:notes_app/shell/page_stack.dart' show PileGeometry;
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'harness.dart';
+
+/// Fixed package facts and the Linux device plugin, as the feedback tests set
+/// them up: the sheet's diagnostics read both.
+void _fakePlatformInfo() {
+  PackageInfo.setMockInitialValues(
+    appName: 'Notes',
+    packageName: 'notes.test',
+    version: '0.1.0',
+    buildNumber: '1',
+    buildSignature: '',
+  );
+  DeviceInfoPlusLinuxPlugin.registerWith();
+}
 
 Finder screen(String id) => find.byWidgetPredicate(
   (w) => w is PageScreen && w.pageId == id && w.snapshot == null,
@@ -155,6 +171,28 @@ void main() {
     await tapAndSettle(t, find.byKey(const ValueKey('stack-fan-barrier')));
     expect(fan, findsNothing);
     expect(sheets(t).pages.map(sheets(t).idOf), [a, b]);
+  });
+  appTest('with the fan open, a tap on the sidebar feedback button under it '
+      'closes the fan and opens the sheet', (t) async {
+    _fakePlatformInfo();
+    final s = await pumpApp(t, mobile: false);
+    final a = s.pages['Recipes']!, b = s.pages['Budget']!;
+    await open(t, a);
+    await open(t, b, stack: true);
+    final fan = find.byKey(const ValueKey('stack-fan'));
+    Focus.of(t.element(find.byKey(ValueKey('stack-spine-$a')))).requestFocus();
+    await t.pump();
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await settle(t);
+    expect(fan, findsOneWidget);
+    // The barrier covers the sidebar; the tap must still reach its button.
+    await tapAndSettle(t, find.byKey(const ValueKey('sidebar-feedback')));
+    expect(fan, findsNothing);
+    await settleUntil(
+      t,
+      () => find.text('What happened?').evaluate().isNotEmpty,
+    );
+    expect(find.byType(FeedbackSheet), findsOneWidget);
   });
   test('pile geometry at depth 1, 2, 3 and 5', () {
     // Depth 1: no spine, the 12 px desk margin.
