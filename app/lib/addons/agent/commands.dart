@@ -47,6 +47,7 @@ void registerAgentCommands(CommandRegistry r) {
         final app = AppScope.maybeOf(context);
         return app != null && !context.mobile && AgentStore.of(app).enabled;
       },
+      disabledReason: 'Agent panel unavailable',
       run: toggleAgentPanel,
     ),
   );
