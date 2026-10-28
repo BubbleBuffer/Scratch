@@ -1,5 +1,8 @@
 import 'navigation.dart';
 
+import 'package:agent_kit_core/agent_kit_core.dart' as kit
+    show ActivityGroup, ToolRow, WorkState;
+import 'package:agent_kit/agent_kit.dart' as kit show ActivityGroupView;
 import 'package:flutter/widgets.dart';
 
 import '../../state/app_state.dart';
@@ -9,6 +12,7 @@ import 'agent_cells.dart';
 import 'agent_markdown.dart';
 import 'agent_store.dart';
 import 'agent_transcript.dart';
+import 'kit_backend.dart' show kitToolKind;
 
 class AgentTurnView extends StatelessWidget {
   const AgentTurnView({super.key, required this.turn, required this.store});
@@ -173,101 +177,87 @@ String workSummary(AgentTurn turn) {
   ].join(' · ');
 }
 
-class AgentWorkRow extends StatefulWidget {
+/// A turn's tool work: the kit's activity group under Scratch's verb line,
+/// with "Show code" for the turn's code cells once the group is open.
+class AgentWorkRow extends StatelessWidget {
   const AgentWorkRow({super.key, required this.turn});
   final AgentTurn turn;
+
+  kit.ActivityGroup _group() => kit.ActivityGroup(
+    id: turn.id,
+    rows: turn.activity.isEmpty
+        ? [
+            for (final cell in turn.cells)
+              kit.ToolRow(
+                id: cell.id,
+                name: cell.tool,
+                kind: kitToolKind(cell.tool),
+                target: cell.firstLine,
+                state: switch (cell.status) {
+                  CellStatus.failed => kit.WorkState.failed,
+                  _ => kit.WorkState.done,
+                },
+              ),
+          ]
+        : [
+            for (final a in turn.activity)
+              kit.ToolRow(
+                id: '${a.callId}-${a.order}',
+                name: a.name,
+                kind: kitToolKind(a.name),
+                target: a.summary,
+                state: a.isError ? kit.WorkState.failed : kit.WorkState.done,
+              ),
+          ],
+  );
+
   @override
-  State<AgentWorkRow> createState() => _AgentWorkRowState();
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(left: 6),
+    child: kit.ActivityGroupView(
+      _group(),
+      initiallyOpen: false,
+      summaryOf: (_) => workSummary(turn),
+      footer: turn.cells.isNotEmpty && !turn.live
+          ? _CodeDisclosure(turn: turn)
+          : null,
+    ),
+  );
 }
 
-class _AgentWorkRowState extends State<AgentWorkRow> {
-  bool _open = false, _code = false;
+class _CodeDisclosure extends StatefulWidget {
+  const _CodeDisclosure({required this.turn});
+  final AgentTurn turn;
   @override
-  Widget build(BuildContext context) {
-    final turn = widget.turn;
-    final c = context.colors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Hover(
-          key: ValueKey('agent-work-${turn.id}-toggle'),
-          onTap: () => setState(() => _open = !_open),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-          radius: Radii.md,
-          child: Row(
-            children: [
-              Icon20(
-                _open ? Ico.chevronDown : Ico.chevronRight,
-                size: 13,
-                color: c.iconTertiary,
-              ),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text.rich(
-                  TextSpan(
-                    children: [
-                      for (final part in workSummary(turn).split(' · ').indexed)
-                        TextSpan(
-                          text: '${part.$1 == 0 ? '' : ' · '}${part.$2}',
-                          style: ts(
-                            context.type.uiSmall,
-                            part.$2.endsWith('failed')
-                                ? c.inlineCodeText
-                                : c.textTertiary,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+  State<_CodeDisclosure> createState() => _CodeDisclosureState();
+}
+
+class _CodeDisclosureState extends State<_CodeDisclosure> {
+  bool _code = false;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextBtn(
+          _code ? 'Hide code' : 'Show code',
+          key: ValueKey('agent-work-${widget.turn.id}-code'),
+          height: 28,
+          onTap: () => setState(() => _code = !_code),
         ),
-        if (_open)
+      ),
+      if (_code)
+        for (final cell in widget.turn.cells)
           Padding(
-            padding: const EdgeInsets.only(left: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final activity in turn.activity)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      activity.summary,
-                      key: ValueKey(
-                        'agent-activity-${activity.callId}-${activity.order}',
-                      ),
-                      style: ts(
-                        context.type.uiSmall,
-                        activity.isError ? c.inlineCodeText : c.textSecondary,
-                      ),
-                    ),
-                  ),
-                if (turn.cells.isNotEmpty && !turn.live)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextBtn(
-                      _code ? 'Hide code' : 'Show code',
-                      key: ValueKey('agent-work-${turn.id}-code'),
-                      height: 28,
-                      onTap: () => setState(() => _code = !_code),
-                    ),
-                  ),
-                if (_code && !turn.live)
-                  for (final cell in turn.cells)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: CodeCellRow(
-                        key: ValueKey('agent-${cell.id}'),
-                        cell: cell,
-                      ),
-                    ),
-              ],
+            padding: const EdgeInsets.only(bottom: 6),
+            child: CodeCellRow(
+              key: ValueKey('agent-${cell.id}'),
+              cell: cell,
             ),
           ),
-      ],
-    );
-  }
+    ],
+  );
 }
 
 class AgentEditRow extends StatefulWidget {

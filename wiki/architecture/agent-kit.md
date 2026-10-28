@@ -51,7 +51,7 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The dev pane's packages
 
-The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.8.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.10.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
 
 ## The chat outline
 
@@ -103,7 +103,7 @@ These run on the code before any increment and stay green through all of them.
 | 0 | Protective tests, the `mentionSource` seam, this plan | nothing | everything | the tests above |
 | 1 | Transcript adapter: `AgentSessionState` and the open chat's live state to the kit's `TranscriptItem`s, with no widget change | nothing visible | the mapping (`agent_transcript.dart` keeps ordering, ownership and outline segments) | order test; new mapping tests; goldens identical by construction |
 | 2 | Approval (done) | `ApprovalBar` (keys 1, 2, 3, "Needs approval", waiting time, Details) replaces `ApprovalCard` | the mapping from `AgentApproval` (`kitApproval`, `kitToolTarget`) | approval tests in `agent_test.dart` and `agent_chat_partb_test.dart`; approval goldens |
-| 3 | Tool and code cells | `ActivityGroupView`, exec output rows replace `AgentWorkRow` and `CodeCellRow` | code disclosure setting, the work summary counts | partb activity tests; agent goldens |
+| 3 | Tool and code cells (done) | `ActivityGroupView` replaces the work row's list (agent-kit 0.10.0: verb-count summary by default, `summaryOf` and `footer` hooks) | Scratch's verb line (`workSummary`, passed as `summaryOf`), the "Show code" disclosure and `CodeCellRow` (the `footer`), the mapping from tool activity to `ToolRow`s | partb activity tests (the toggle is now the summary text); agent goldens |
 | 4 | Edit rows | `FileEditRow`, `DiffView` replace `AgentEditRow` | page-edit rows (opening the page at the changed blocks), undo that finishes later, edits of untitled pages | partb edit and undo tests; goldens |
 | 5 | Turn view | `AssistantProse`, notice lines for stopped and failed runs, the working line | `AgentMarkdown` as the `MarkdownRenderer` (reference chips, page links), `Add to note` | partb live-turn test; reference goldens |
 | 6 | Transcript list | `TranscriptList` under the outline rows (follow the end, jump to latest, anchor restore) | `ChatReaderController` (pending references, keep message position) | outline widget, split and live tests; order test |

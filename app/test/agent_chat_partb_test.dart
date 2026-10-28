@@ -179,6 +179,11 @@ Future<void> showWidget(
   }
 }
 
+/// The summary line that opens a turn's work.
+Finder workToggle(String turnId) => find
+    .descendant(of: key('agent-work-$turnId'), matching: find.byType(Text))
+    .first;
+
 Future<void> revealAndTap(WidgetTester tester, Finder target) async {
   await Scrollable.ensureVisible(tester.element(target), alignment: 0.5);
   await settle(tester);
@@ -492,7 +497,7 @@ void main() {
     expect(removed.style!.decoration, TextDecoration.lineThrough);
     await revealAndTap(tester, key('agent-edit-edit-all'));
     expect(key('agent-edit-edit-line-13'), findsOneWidget);
-    await revealAndTap(tester, key('agent-work-run-toggle'));
+    await revealAndTap(tester, workToggle('run'));
     expect(find.text('Command failed'), findsOneWidget);
     expect(key('agent-cell-call'), findsNothing);
     await revealAndTap(tester, key('agent-work-run-code'));
@@ -574,7 +579,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       expect(textOf(tester, 'agent-working'), 'Working · Command failed');
       expect(key('agent-stop'), findsOneWidget);
-      await tester.tap(key('agent-work-run-toggle'));
+      await tester.tap(workToggle('run'));
       await tester.pump(const Duration(milliseconds: 50));
       expect(key('agent-work-run-code'), findsNothing);
       store.debugSetSnapshot(snapshot(session: session, status: 'cancelled'));

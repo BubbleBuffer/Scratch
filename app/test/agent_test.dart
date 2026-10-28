@@ -128,12 +128,17 @@ String buttonLabel(WidgetTester tester, String k) => tester
 // aborts this cell; successful tests do not wait for its natural completion.
 const busyScript = 'const t = Date.now(); while (Date.now() - t < 30000) {} 1';
 
+/// The summary line that opens a turn's work.
+Finder workToggle(String turnId) => find
+    .descendant(of: key('agent-work-$turnId'), matching: find.byType(Text))
+    .first;
+
 /// The opened result of the session's last `js` cell.
 Future<String> lastCellResult(WidgetTester tester, AgentStore store) async {
   final call = store.state!.messages.expand((m) => m.toolCalls).last;
   final run = store.state!.runs.last;
   if (key('agent-cell-${call.id}-toggle').evaluate().isEmpty) {
-    await tapAndSettle(tester, key('agent-work-${run.id}-toggle'));
+    await tapAndSettle(tester, workToggle(run.id));
     await tapAndSettle(tester, key('agent-work-${run.id}-code'));
   }
   await tapAndSettle(tester, key('agent-cell-${call.id}-toggle'));
@@ -262,7 +267,7 @@ void main() {
     final call = store.state!.messages.expand((m) => m.toolCalls).single;
     final cell = 'agent-cell-${call.id}';
     expect(key(cell), findsNothing);
-    await tapAndSettle(tester, key('agent-work-${run!.id}-toggle'));
+    await tapAndSettle(tester, workToggle(run!.id));
     expect(key(cell), findsNothing);
     await tapAndSettle(tester, key('agent-work-${run.id}-code'));
     expect(key(cell), findsOneWidget);
