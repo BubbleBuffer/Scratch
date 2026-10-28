@@ -5,7 +5,7 @@
 // which this composes.
 
 import 'package:agent_kit/agent_kit.dart'
-    show ItemRow, OutlineController, OutlineLayout;
+    show HistoryController, ItemRow, OutlineController, OutlineLayout;
 import 'package:flutter/widgets.dart';
 
 import '../../src/rust/api/agent.dart' show ChatOutline;
@@ -47,6 +47,21 @@ class ChatReaderController {
   /// measured when the chat switches to the indexed list.
   final plainRows = <int, GlobalKey>{};
   final plainViewport = GlobalKey();
+
+  /// The compacted list: its own scroll position, viewport and card folds, so
+  /// switching the setting never shares a position with the plain list.
+  final historyScroll = ScrollController();
+  final historyViewport = GlobalKey();
+  final history = HistoryController();
+
+  /// Whether the chat shows compacted history now (set by the chat each build).
+  bool compacted = false;
+
+  /// Whether the outline list is the one on screen.
+  bool get onOutline => indexed && !compacted;
+
+  /// The scroll position of the plain-style list on screen.
+  ScrollController get activeScroll => compacted ? historyScroll : scroll;
   final transcriptViewport = GlobalKey();
   ChatOutline? rawOutline;
 
@@ -70,6 +85,8 @@ class ChatReaderController {
   void dispose() {
     controller.dispose();
     scroll.dispose();
+    historyScroll.dispose();
+    history.dispose();
   }
 
   /// Forgets the place in the last chat: another chat is open.
@@ -91,7 +108,8 @@ class ChatReaderController {
       controller.list.scroll.position.extentAfter < 24;
 
   /// Whether the plain list shows its last row, or is not yet laid out.
-  bool get plainAtEnd => !scroll.hasClients || scroll.position.extentAfter < 24;
+  bool get plainAtEnd =>
+      !activeScroll.hasClients || activeScroll.position.extentAfter < 24;
 
   /// Follows the end when a reply or a message arrives. The outline's own
   /// changes do not count, and a reader away from the end keeps their place
@@ -107,14 +125,17 @@ class ChatReaderController {
         !(s.replay?.active == true && s.replay?.sessionId == s.openId);
     last = token;
     lastMessages = messages.length;
-    if (!sent && !(indexed ? atEnd : plainAtEnd)) return;
+    // The compacted list opens on its boundary and follows the end itself;
+    // before it is laid out there is nothing to follow.
+    if (compacted && !sent && !activeScroll.hasClients) return;
+    if (!sent && !(onOutline ? atEnd : plainAtEnd)) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // A pending reference jumps instead of following the end.
       if (!mounted() || store().pendingFor(presentation()) != null) return;
-      if (indexed) {
+      if (onOutline) {
         controller.list.jumpToEnd();
-      } else if (scroll.hasClients) {
-        scroll.jumpTo(scroll.position.maxScrollExtent);
+      } else if (activeScroll.hasClients) {
+        activeScroll.jumpTo(activeScroll.position.maxScrollExtent);
       }
     });
   }

@@ -5,20 +5,20 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/agent_kit"
-      ref: cc42490c2fb9aa7b49febd39f30520b166e993ea
-      resolved-ref: cc42490c2fb9aa7b49febd39f30520b166e993ea
+      ref: "59e7aa53d64f4cdd670cd84194d6d90fceaae474"
+      resolved-ref: "59e7aa53d64f4cdd670cd84194d6d90fceaae474"
       url: "https://github.com/BubbleBuffer/agent-kit.git"
     source: git
-    version: "0.14.0"
+    version: "0.15.0"
   agent_kit_core:
     dependency: "direct main"
     description:
       path: "packages/agent_kit_core"
-      ref: cc42490c2fb9aa7b49febd39f30520b166e993ea
-      resolved-ref: cc42490c2fb9aa7b49febd39f30520b166e993ea
+      ref: "59e7aa53d64f4cdd670cd84194d6d90fceaae474"
+      resolved-ref: "59e7aa53d64f4cdd670cd84194d6d90fceaae474"
       url: "https://github.com/BubbleBuffer/agent-kit.git"
     source: git
-    version: "0.14.0"
+    version: "0.15.0"
   android_file_picker:
     dependency: transitive
     description:

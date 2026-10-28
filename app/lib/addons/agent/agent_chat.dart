@@ -12,6 +12,7 @@ import 'package:agent_kit/agent_kit.dart'
         OutlineSection,
         OutlineWhereStrip,
         TimelineEntry,
+        TranscriptAnchor,
         TranscriptList,
         outlineSegments,
         outlineStripColors;
@@ -21,6 +22,8 @@ import 'package:flutter/widgets.dart';
 import '../../ui/ui.dart';
 import 'add_to_note.dart';
 import 'agent_composer.dart';
+import 'agent_history.dart';
+import 'agent_history_setting.dart';
 import 'agent_outline.dart';
 import 'agent_store.dart';
 import 'agent_transcript.dart';
@@ -58,6 +61,12 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
   /// The composer's text, so the approval bar knows when 1, 2 and 3 are
   /// not typing.
   final _draft = TextEditingController();
+
+  /// The chat history setting at the last build, and where the reader was
+  /// (message id and its top edge in the transcript viewport) when it last
+  /// changed. The list built for the new mode opens there.
+  bool? _wasSetting;
+  ({String id, double y})? _switchAnchor;
 
   @override
   void initState() {
@@ -187,6 +196,78 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
     );
   }
 
+  /// The message at the top of the transcript and its top edge relative to the
+  /// viewport, or null when none is measured.
+  ({String id, double y})? _anchorInViewport() {
+    final anchor = _reader.readingAnchor;
+    final box = _reader.transcriptViewport.currentContext?.findRenderObject();
+    if (anchor == null || box is! RenderBox || !box.hasSize) return null;
+    return (id: anchor.id, y: anchor.y - box.localToGlobal(Offset.zero).dy);
+  }
+
+  /// Where the plain list opens after the setting changed: at the message the
+  /// reader was on. Null otherwise, so the list follows the end as before.
+  TranscriptAnchor? _plainAnchor(
+    List<ChatItem> items,
+    Map<String, String> anchors,
+  ) {
+    final switched = _switchAnchor;
+    final item = switched == null ? null : anchors[switched.id];
+    final at = item == null ? -1 : items.indexWhere((i) => i.id == item);
+    // The row gap sits above the item inside its slot (none above the first).
+    return switched == null || item == null || at < 0
+        ? null
+        : TranscriptAnchor(item, -(switched.y - (at == 0 ? 0 : 14)));
+  }
+
+  /// The compacted transcript: summary cards, the hairline and the live end.
+  /// It opens on the hairline, or where the reader was before the setting
+  /// changed.
+  Widget _compactedList(
+    AgentStore store,
+    ChatTranscriptView rows,
+    List<ChatItem> items,
+    Map<String, String> anchors,
+    EdgeInsets padding,
+  ) {
+    final history = store.compacted!;
+    final built = compactedEntries(
+      history: history,
+      items: items,
+      anchors: anchors,
+      segmentOf: historySegments(history),
+      controller: _reader.history,
+      itemView: rows.itemView,
+    );
+    var initial = const TranscriptAnchor(historyBoundaryId);
+    final switched = _switchAnchor;
+    final entry = switched == null ? null : built.entryOf[switched.id];
+    bool card(String? id) => id != null && id.startsWith('history-');
+    double? gapBefore(String? previous, String id) =>
+        card(previous) || card(id) ? 24 : null;
+    if (switched != null && entry != null) {
+      // A card opens at its top; a message where it was, the gap above it
+      // being part of its slot.
+      final at = built.entries.indexWhere((e) => e.id == entry);
+      final gap = at <= 0
+          ? 0.0
+          : gapBefore(built.entries[at - 1].id, entry) ?? 14.0;
+      initial = TranscriptAnchor(entry, card(entry) ? 0 : -(switched.y - gap));
+    }
+    return TranscriptList(
+      key: const ValueKey('agent-history-list'),
+      entries: built.entries,
+      initialAnchor: initial,
+      scroll: _reader.historyScroll,
+      viewportKey: _reader.historyViewport,
+      contentWidth: Layout.contentWidth,
+      gutter: 0,
+      rowGap: 14,
+      gapBefore: gapBefore,
+      padding: padding.copyWith(bottom: padding.bottom + 14),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ApprovalKeyPane(
     child: ListenableBuilder(
@@ -197,9 +278,24 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
       if (_reader.stateFor != store.openId) {
         _reader.stateFor = store.openId;
         _reader.reset();
+        _wasSetting = null;
+        _switchAnchor = null;
       }
       final messages = store.state?.messages ?? const <AgentMessage>[];
       final outline = kitOutline(store.outline, messages: messages);
+      final pendingReference = store.pendingFor(_presentation) != null;
+      final compactedOn = showsCompacted(
+        store,
+        pendingReference: pendingReference,
+      );
+      // Only the reader changing the setting keeps their place; the cards
+      // arriving with the data (or leaving for a reference) do not.
+      final setting = store.historyCompacted(store.openId);
+      if (_wasSetting != null && _wasSetting != setting) {
+        _switchAnchor = _anchorInViewport();
+      }
+      _wasSetting = setting;
+      _reader.compacted = compactedOn;
       final changed = !identical(_reader.rawOutline, store.outline);
       final sent =
           messages.length > _reader.lastMessages &&
@@ -207,14 +303,15 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
           !(store.replay?.active == true &&
               store.replay?.sessionId == store.openId);
       final keep =
-          changed &&
+          !compactedOn &&
+              changed &&
               !sent &&
-              !(_reader.indexed ? _reader.atEnd : _reader.plainAtEnd) &&
+              !(_reader.onOutline ? _reader.atEnd : _reader.plainAtEnd) &&
               store.pendingFor(_presentation) == null
           ? _reader.readingAnchor
           : null;
       _reader.rawOutline = store.outline;
-      final plainTop = !_reader.indexed && !outline.isEmpty
+      final plainTop = !compactedOn && !_reader.indexed && !outline.isEmpty
           ? _reader.plainTop()
           : null;
       final fold = _reader.controller.fold;
@@ -252,18 +349,24 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
         streaming: store.streaming,
         error: store.error,
         anchorOf: anchors,
-        segmentOf: segments.isEmpty ? null : segments,
+        segmentOf: compactedOn
+            ? historySegments(store.compacted!)
+            : segments.isEmpty
+            ? null
+            : segments,
       );
       final itemOf = {for (final item in items) item.id: item};
       // The anchor is measured after layout; walking children during build is
       // unsafe while the lazy transcript is replacing its rows.
-      _reader.controller.sync(
-        outline: outline,
-        itemIds: [for (final item in items) item.id],
-        anchorIds: messageIds,
-        anchorOf: anchors,
-        topAnchorId: _reader.readingAnchor?.id,
-      );
+      if (!compactedOn) {
+        _reader.controller.sync(
+          outline: outline,
+          itemIds: [for (final item in items) item.id],
+          anchorIds: messageIds,
+          anchorOf: anchors,
+          topAnchorId: _reader.readingAnchor?.id,
+        );
+      }
       final wasIndexed = _reader.indexed;
       _reader.indexed =
           _reader.indexed ||
@@ -359,6 +462,8 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
                 ),
               ),
             )
+          : compactedOn
+          ? _compactedList(store, rows, items, anchors, padding)
           : _reader.indexed
           ? OutlineList(
               controller: _reader.controller,
@@ -387,6 +492,7 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
                     builder: (_) => rows.plainRow(i, items[i]),
                   ),
               ],
+              initialAnchor: _plainAnchor(items, anchors),
               scroll: _reader.scroll,
               viewportKey: _reader.plainViewport,
               contentWidth: Layout.contentWidth,
@@ -394,6 +500,22 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
               rowGap: 14,
               padding: padding.copyWith(bottom: padding.bottom + 14),
             );
+      final switched = _switchAnchor;
+      if (switched != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _switchAnchor = null;
+          // The outline list is indexed: put the message back where it was.
+          final box = _reader.transcriptViewport.currentContext
+              ?.findRenderObject();
+          if (_reader.onOutline && box is RenderBox && box.hasSize) {
+            _reader.keepMessagePosition((
+              id: switched.id,
+              y: box.localToGlobal(Offset.zero).dy + switched.y,
+            ), store.outline, afterInitialLayout: true);
+          }
+        });
+      }
       return Container(
         decoration: BoxDecoration(
           color: c.bgPrimary,
@@ -441,7 +563,18 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-              if (!outline.isEmpty)
+              if (!signIn &&
+                  notice == null &&
+                  store.compactedFor == store.openId &&
+                  hasHistoryCards(store.compacted))
+                Padding(
+                  padding: EdgeInsets.fromLTRB(pad, 4, pad, 0),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: ChatSettingsButton(store: store),
+                  ),
+                ),
+              if (!outline.isEmpty && !compactedOn)
                 OutlineWhereStrip(
                   where: _reader.controller.where,
                   onTap: () => _reader.controller.showContents(context),
