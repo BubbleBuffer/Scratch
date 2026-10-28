@@ -142,6 +142,75 @@ void main() {
           reason: 'a broken file is replaced on the next save');
     });
 
+    test('a file saved by earlier versions loads and saves unchanged', () {
+      final file = fileNamed('agent_chats.json');
+      const saved = '{\n'
+          '  "a": {\n'
+          '    "host": "hub",\n'
+          '    "model": "codex/m1"\n'
+          '  },\n'
+          '  "b": {\n'
+          '    "host": "local"\n'
+          '  }\n'
+          '}';
+      file.writeAsStringSync(saved);
+      final prefs = AgentChatPrefs.load(file);
+      expect(prefs['a']?.host, AgentHost.hub);
+      expect(prefs['a']?.model, 'codex/m1');
+      expect(prefs['b']?.host, AgentHost.local);
+      expect(prefs['b']?.model, isNull);
+      prefs.pickModel('a', AgentHost.local, 'codex/m1');
+      expect(file.readAsStringSync(), saved,
+          reason: 'same choices, same file: the format is unchanged');
+    });
+
+    // The persistence boundary: a save that fails is dropped. The choice
+    // stays in memory, the old file is left as it was (the new one is
+    // written beside it and renamed over it), and the next save that works
+    // writes everything.
+    test('a failed save keeps the choice and leaves the file intact', () {
+      final file = fileNamed('agent_chats.json');
+      final prefs = AgentChatPrefs.load(file);
+      prefs.created('a', AgentHost.hub, model: 'codex/m1');
+      final before = file.readAsStringSync();
+
+      // A folder where the temporary file goes makes the write fail.
+      final tmp = Directory('${file.path}.tmp')..createSync();
+      prefs.pickModel('a', AgentHost.local, 'codex/m2');
+      expect(prefs['a']?.host, AgentHost.hub);
+      expect(prefs['a']?.model, 'codex/m2', reason: 'kept in memory');
+      expect(file.readAsStringSync(), before, reason: 'old file untouched');
+      expect(AgentChatPrefs.load(file)['a']?.model, 'codex/m1');
+
+      tmp.deleteSync();
+      prefs.created('b', AgentHost.local);
+      final loaded = AgentChatPrefs.load(file);
+      expect(loaded['a']?.model, 'codex/m2', reason: 'saved by the next write');
+      expect(loaded['b']?.host, AgentHost.local);
+    });
+
+    test('the choices go through their storage, which may fail', () {
+      final storage = _FlakyStorage({
+        'a': const AgentChatPref(host: AgentHost.hub, model: 'm1'),
+      });
+      final prefs = AgentChatPrefs(storage: storage);
+      expect(prefs['a']?.model, 'm1', reason: 'read from the storage');
+
+      storage.fail = true;
+      prefs.pickModel('a', AgentHost.local, 'm2');
+      expect(prefs['a']?.model, 'm2', reason: 'a throwing write is dropped');
+      expect(storage.saved['a']?.model, 'm1');
+
+      storage.fail = false;
+      prefs.remove('a');
+      expect(prefs['a'], isNull);
+      expect(storage.saved, isEmpty);
+
+      final memory = AgentChatPrefs();
+      memory.created('x', AgentHost.local);
+      expect(memory['x']?.host, AgentHost.local, reason: 'no storage: memory only');
+    });
+
     appTest('the store saves the model pick with the chat host', (t) async {
       await pumpApp(t, mobile: false);
       final store = AgentStore.attach(
@@ -414,4 +483,21 @@ void main() {
     await tapAndSettle(t, key('confirm-cancel'));
     expect(await answer, isFalse);
   });
+}
+
+/// Storage in memory whose writes throw while [fail] is set.
+class _FlakyStorage implements AgentChatPrefsStorage {
+  _FlakyStorage(Map<String, AgentChatPref> initial) : saved = Map.of(initial);
+
+  Map<String, AgentChatPref> saved;
+  bool fail = false;
+
+  @override
+  Map<String, AgentChatPref> read() => Map.of(saved);
+
+  @override
+  void write(Map<String, AgentChatPref> choices) {
+    if (fail) throw const FileSystemException('write failed');
+    saved = Map.of(choices);
+  }
 }
