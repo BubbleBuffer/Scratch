@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:agent_kit/agent_kit.dart' show KitChoice;
+import 'package:agent_kit_core/agent_kit_core.dart' show KitChoice;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
