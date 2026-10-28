@@ -13,6 +13,7 @@ import '../../services/addon_services.dart';
 
 import 'dart:io';
 
+import 'package:agent_kit/agent_kit.dart' as kit show MarkdownRenderer;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 
@@ -358,4 +359,18 @@ class CodeBox extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Scratch's markdown (vault links, page chips) for the kit's prose, notices
+/// and child results.
+class ScratchMarkdownRenderer implements kit.MarkdownRenderer {
+  const ScratchMarkdownRenderer();
+
+  @override
+  Widget build(
+    BuildContext context,
+    String markdown, {
+    bool streaming = false,
+    ValueChanged<String>? onLinkTap,
+  }) => AgentMarkdown(markdown);
 }

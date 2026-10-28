@@ -1,10 +1,22 @@
 import 'navigation.dart';
 
-import 'package:agent_kit_core/agent_kit_core.dart' as kit
-    show ActivityGroup, ToolRow, WorkState;
+import 'package:agent_kit_core/agent_kit_core.dart'
+    as kit
+    show
+        ActivityGroup,
+        AssistantMessage,
+        NoticeLine,
+        NoticeTone,
+        ToolRow,
+        WorkState;
 import 'package:agent_kit/agent_kit.dart'
     as kit
-    show ActivityGroupView, FileEditRow, UndoRefused;
+    show
+        ActivityGroupView,
+        AssistantProse,
+        FileEditRow,
+        NoticeLineView,
+        UndoRefused;
 import 'package:flutter/widgets.dart';
 
 import '../../state/app_state.dart';
@@ -30,17 +42,27 @@ class AgentTurnView extends StatelessWidget {
         for (final text in turn.texts)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: AgentMarkdown(
-              text.text,
+            child: KeyedSubtree(
               key: ValueKey('agent-msg-${text.id}'),
+              child: kit.AssistantProse(
+                kit.AssistantMessage(id: text.id, markdown: text.text),
+                renderer: const ScratchMarkdownRenderer(),
+              ),
             ),
           ),
         if (turn.streaming.trim().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: AgentMarkdown(
-              turn.streaming,
+            child: KeyedSubtree(
               key: const ValueKey('agent-msg-live'),
+              child: kit.AssistantProse(
+                kit.AssistantMessage(
+                  id: '${turn.id}-live',
+                  markdown: turn.streaming,
+                  streaming: true,
+                ),
+                renderer: const ScratchMarkdownRenderer(),
+              ),
             ),
           ),
         for (final edit in turn.edits)
@@ -77,17 +99,19 @@ class AgentTurnView extends StatelessWidget {
         if (turn.run?.status == 'cancelled')
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              'Stopped.',
-              style: ts(context.type.uiSmall, c.textTertiary),
+            child: kit.NoticeLineView(
+              kit.NoticeLine(id: '${turn.id}-stopped', text: 'Stopped.'),
             ),
           ),
         if ((turn.run?.error ?? '').isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              turn.run!.error!,
-              style: ts(context.type.uiSmall, c.inlineCodeText),
+            child: kit.NoticeLineView(
+              kit.NoticeLine(
+                id: '${turn.id}-error',
+                text: turn.run!.error!,
+                tone: kit.NoticeTone.danger,
+              ),
             ),
           ),
       ],
@@ -253,10 +277,7 @@ class _CodeDisclosureState extends State<_CodeDisclosure> {
         for (final cell in widget.turn.cells)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: CodeCellRow(
-              key: ValueKey('agent-${cell.id}'),
-              cell: cell,
-            ),
+            child: CodeCellRow(key: ValueKey('agent-${cell.id}'), cell: cell),
           ),
     ],
   );
@@ -308,25 +329,25 @@ class _AgentEditRowState extends State<AgentEditRow> {
     return KeyedSubtree(
       key: ValueKey('agent-edit-${edit.id}'),
       child: kit.FileEditRow(
-      kitFileEdit(
-        edit,
-        label: switch (edit.kind) {
-          'created' => 'Created $pageName',
-          'trashed' => 'Moved $pageName to trash',
-          'row' => 'Updated a row in $pageName',
-          _ => 'Edited $pageName',
-        },
-        path: pageName,
-      ),
-      openEveryEdit: true,
-      onOpen: () => openAgentPage(
-        context,
-        edit.pageId,
-        edit.pageTitle,
-        blocks: edit.changedBlocks,
-        sessionId: widget.sessionId,
-      ),
-      onUndo: _undo,
+        kitFileEdit(
+          edit,
+          label: switch (edit.kind) {
+            'created' => 'Created $pageName',
+            'trashed' => 'Moved $pageName to trash',
+            'row' => 'Updated a row in $pageName',
+            _ => 'Edited $pageName',
+          },
+          path: pageName,
+        ),
+        openEveryEdit: true,
+        onOpen: () => openAgentPage(
+          context,
+          edit.pageId,
+          edit.pageTitle,
+          blocks: edit.changedBlocks,
+          sessionId: widget.sessionId,
+        ),
+        onUndo: _undo,
       ),
     );
   }
