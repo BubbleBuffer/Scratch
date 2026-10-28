@@ -56,6 +56,16 @@ void main() {
         await tapVisible(tester, key('history-episode-ep1-header'));
         await _shot('cards-$tag');
       });
+
+      appTest('a closed chapter with its decision and sections, $tag', (
+        tester,
+      ) async {
+        await open(tester);
+        await scrollUpTo(tester, key('history-chapter-ch1-toggle'));
+        await tester.ensureVisible(key('history-chapter-ch1-face'));
+        await settle(tester);
+        await _shot('chapter-$tag');
+      });
     }
   }
 }
