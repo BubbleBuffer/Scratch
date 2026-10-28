@@ -52,6 +52,10 @@ Future<void> pumpHistoryChat(
     ),
   );
   await settle(tester);
+  if (store.openId == null) {
+    await real(tester, () => store.createSession(title: 'Long chat'));
+    await settle(tester);
+  }
   final id = store.openId!;
   store.seedFixture(
     historyChat(id),

@@ -66,3 +66,4 @@ jobs:
           path: |
             shots.log
             head/app/test/goldens/compacted
+# rerun
