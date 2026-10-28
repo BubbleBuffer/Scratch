@@ -8,6 +8,7 @@ import '../registry/command_registry.dart';
 import '../state/app_state.dart';
 import '../state/tree_store.dart';
 import '../ui/ui.dart';
+import 'command_palette.dart';
 import 'navigation.dart';
 import 'search.dart';
 
@@ -42,6 +43,19 @@ void registerShellCommands(CommandRegistry r) {
           showSearchOverlay(context);
         }
       },
+    ),
+  );
+  r.register(
+    Command(
+      id: paletteCommandId,
+      label: 'Command palette',
+      icon: Ico.terminal,
+      // Ctrl+K and Ctrl+P open search, and Ctrl+Shift+P is the usual key for
+      // a command palette.
+      shortcuts: const [
+        SingleActivator(LogicalKeyboardKey.keyP, control: true, shift: true),
+      ],
+      run: (context) => openCommandPalette(context, registry: r),
     ),
   );
   r.register(

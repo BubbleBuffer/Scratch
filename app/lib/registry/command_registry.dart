@@ -1,7 +1,8 @@
 // The command registry: app-wide actions with an id, a label, an optional
 // icon and keyboard shortcuts. The shell binds the shortcuts of every
-// registered command (desktop); menus and a future command palette list
-// them from here. Built-in commands live in lib/shell/commands.dart.
+// registered command (desktop); menus and the command palette
+// (lib/shell/command_palette.dart) list them from here. Built-in commands
+// live in lib/shell/commands.dart.
 
 import 'package:flutter/widgets.dart';
 
@@ -15,6 +16,7 @@ class Command {
     this.icon,
     this.shortcuts = const [],
     this.isEnabled,
+    this.disabledReason,
   });
 
   /// Stable id ("page.new").
@@ -28,6 +30,9 @@ class Command {
   /// Runs the command; [context] is inside the app's navigator.
   final void Function(BuildContext context) run;
   final bool Function(BuildContext context)? isEnabled;
+
+  /// What the palette says next to the command while [isEnabled] is false.
+  final String? disabledReason;
 }
 
 class CommandRegistry {
