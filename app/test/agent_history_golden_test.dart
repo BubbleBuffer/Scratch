@@ -30,7 +30,9 @@ void main() {
       final tag = '${phone ? 'phone' : 'desktop'}-${dark ? 'dark' : 'light'}';
 
       Future<void> open(WidgetTester tester) async {
-        await pumpApp(tester, mobile: phone, empty: true, dark: dark);
+        // The phone is a 375 px box: the Android build talks to a hub, which a
+        // local fixture session cannot use.
+        await pumpApp(tester, mobile: false, empty: true, dark: dark);
         final store = await openAgentStore(tester);
         await real(tester, () => store.createSession(title: 'Long chat'));
         await pumpHistoryChat(
