@@ -5,7 +5,6 @@ import 'dart:convert';
 import '../core/clock.dart';
 import '../core/models.dart';
 import '../core/vault.dart';
-import '../ui/app_name.dart';
 import '../ui/database/values.dart';
 
 const gettingStartedTitle = 'Getting started';
@@ -15,7 +14,7 @@ BOp _block(String id, String? after, String kind, String text, {bool checked = f
 
 List<BOp> gettingStartedOps() {
   final spec = <(String, String, bool)>[
-    (Kinds.paragraph, 'Welcome to $appName. Everything here is saved on this device as you type.', false),
+    (Kinds.paragraph, 'Everything here is saved on this device as you type.', false),
     (Kinds.heading2, 'The basics', false),
     (Kinds.todo, 'Click anywhere and just start typing', false),
     (Kinds.todo, 'Type / for headings, lists, to-dos, quotes, code and dividers', false),

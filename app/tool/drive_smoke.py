@@ -118,7 +118,7 @@ def main() -> int:
         assert page_title in output, "opened page title missing"
         body_text = ("A little work, some time outdoors, and something to look forward to."
                      if args.vault == "demo" else
-                     "Welcome to Scratch. Everything here is saved on this device as you type.")
+                     "Everything here is saved on this device as you type.")
         fields = [e for e in entries if e["role"] == "textfield" and
                   (body_text in e["label"] or body_text in e["state"])]
         if not fields:
