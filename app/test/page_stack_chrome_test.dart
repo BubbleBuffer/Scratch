@@ -4,6 +4,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/shell/page_stack.dart';
+import 'package:notes_app/ui/ui.dart';
 
 void main() {
   testWidgets('desktop with no store scope shows the child and no pile', (
@@ -13,16 +14,22 @@ void main() {
     tester.view.physicalSize = const Size(1440, 900);
     addTearDown(tester.view.reset);
 
+    // The app's theme root (app_shell.dart) is always above the chrome; only
+    // the store scopes are missing before the vault opens.
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(size: Size(1440, 900)),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: PageStackChrome(
-            child: const SizedBox(
-              key: ValueKey('desk-child'),
-              width: 10,
-              height: 10,
+        child: AppTheme(
+          colors: AppColors.light,
+          formFactor: FormFactor.desktop,
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: PageStackChrome(
+              child: const SizedBox(
+                key: ValueKey('desk-child'),
+                width: 10,
+                height: 10,
+              ),
             ),
           ),
         ),

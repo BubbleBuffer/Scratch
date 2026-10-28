@@ -480,12 +480,16 @@ class _PageStackChromeState extends State<PageStackChrome> {
           ],
           if (_fan && showPile) ...[
             Positioned.fill(
-              child: GestureDetector(
+              // A Listener, not a GestureDetector: a tap recognizer here is the
+              // top entry in the gesture arena and would reject the tap that
+              // the button underneath (the sidebar's feedback button, say)
+              // needs. The barrier closes on pointer down and lets the hit
+              // through, so that button's own tap still fires.
+              child: Listener(
                 key: const ValueKey('stack-fan-barrier'),
-                // Translucent: a tap closes the fan and still reaches the
-                // button underneath (the sidebar's feedback button, say).
                 behavior: HitTestBehavior.translucent,
-                onTap: _closeFan,
+                onPointerDown: (_) => _closeFan(),
+                child: const SizedBox.expand(),
               ),
             ),
             Positioned(
