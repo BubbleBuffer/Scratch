@@ -191,7 +191,8 @@ void main() {
       expect(store.error, isNull);
       expect(_draft(tester), isEmpty);
       expect(key('agent-context-mention-$recipes'), findsNothing);
-      expect(key('agent-context-selection'), findsNothing);
+      // The panel takes the page's current passage again for the next message.
+      expect(key('agent-context-selection'), findsOneWidget);
       final message = store.state!.messages.firstWhere((m) => m.role == 'user');
       expect(message.text, '@Recipes');
       expect(
