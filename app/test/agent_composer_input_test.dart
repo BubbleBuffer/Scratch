@@ -220,4 +220,24 @@ void main() {
     expect(store.sessions, isEmpty);
     expect(_draft(tester), 'First line\nSecond line');
   });
+
+  appTest('a send while the agent is off fails visibly and keeps the draft', (
+    tester,
+  ) async {
+    await pumpApp(tester, mobile: false);
+    final store = await openAgentStore(tester);
+    await real(tester, () => store.createSession(title: 'Agent off'));
+    await showWidget(tester, AgentComposer(store: store));
+    await tester.tap(key('agent-composer'));
+    await tester.enterText(key('agent-composer'), 'Do not lose me');
+    await settle(tester);
+
+    store.settings.agentEnabled = false;
+    await tapAndSettle(tester, key('agent-send'));
+    await settle(tester);
+
+    expect(store.error, isNotNull);
+    expect(_draft(tester), 'Do not lose me');
+    expect(store.state?.messages.where((m) => m.role == 'user'), isEmpty);
+  });
 }

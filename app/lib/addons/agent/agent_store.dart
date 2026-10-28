@@ -2000,7 +2000,12 @@ class AgentStore extends ChangeNotifier {
     final t = text.trim();
     if (id == null || t.isEmpty) return;
     final a = await ensureOpen();
-    if (a == null) return;
+    if (a == null) {
+      // Nothing was sent: say so, so the composer keeps the draft.
+      error = openError ?? 'The agent is not available.';
+      _notify();
+      return;
+    }
     error = null;
     try {
       // On Android the tools read the Hub replica. Finish local saves and a
