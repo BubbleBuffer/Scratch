@@ -8,8 +8,6 @@
 // method-channel default cannot describe a Linux device (its data is typed as
 // the base class, which the collector casts to LinuxDeviceInfo).
 
-import 'dart:typed_data';
-
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
