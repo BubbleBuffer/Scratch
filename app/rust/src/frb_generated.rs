@@ -13876,6 +13876,8 @@ impl SseDecode for crate::api::agent::ChapterCard {
         let mut var_range = <crate::api::agent::MessageRange>::sse_decode(deserializer);
         let mut var_messageCount = <Option<u32>>::sse_decode(deserializer);
         let mut var_episodeCount = <Option<u32>>::sse_decode(deserializer);
+        let mut var_decisions = <Vec<String>>::sse_decode(deserializer);
+        let mut var_sections = <Vec<crate::api::agent::ChapterSection>>::sse_decode(deserializer);
         let mut var_episodes = <Vec<crate::api::agent::EpisodeCard>>::sse_decode(deserializer);
         return crate::api::agent::ChapterCard {
             id: var_id,
@@ -13891,7 +13893,23 @@ impl SseDecode for crate::api::agent::ChapterCard {
             range: var_range,
             message_count: var_messageCount,
             episode_count: var_episodeCount,
+            decisions: var_decisions,
+            sections: var_sections,
             episodes: var_episodes,
+        };
+    }
+}
+
+impl SseDecode for crate::api::agent::ChapterSection {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_firstEpisode = <u32>::sse_decode(deserializer);
+        let mut var_lastEpisode = <u32>::sse_decode(deserializer);
+        return crate::api::agent::ChapterSection {
+            name: var_name,
+            first_episode: var_firstEpisode,
+            last_episode: var_lastEpisode,
         };
     }
 }
@@ -14884,6 +14902,20 @@ impl SseDecode for Vec<crate::api::types::Change> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::types::Change>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::agent::ChapterSection> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::agent::ChapterSection>::sse_decode(
+                deserializer,
+            ));
         }
         return ans_;
     }
@@ -19010,6 +19042,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::agent::ChapterCard {
             self.range.into_into_dart().into_dart(),
             self.message_count.into_into_dart().into_dart(),
             self.episode_count.into_into_dart().into_dart(),
+            self.decisions.into_into_dart().into_dart(),
+            self.sections.into_into_dart().into_dart(),
             self.episodes.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -19023,6 +19057,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::agent::ChapterCard>
     for crate::api::agent::ChapterCard
 {
     fn into_into_dart(self) -> crate::api::agent::ChapterCard {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::agent::ChapterSection {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.first_episode.into_into_dart().into_dart(),
+            self.last_episode.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::agent::ChapterSection
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::agent::ChapterSection>
+    for crate::api::agent::ChapterSection
+{
+    fn into_into_dart(self) -> crate::api::agent::ChapterSection {
         self
     }
 }
@@ -21926,7 +21982,18 @@ impl SseEncode for crate::api::agent::ChapterCard {
         <crate::api::agent::MessageRange>::sse_encode(self.range, serializer);
         <Option<u32>>::sse_encode(self.message_count, serializer);
         <Option<u32>>::sse_encode(self.episode_count, serializer);
+        <Vec<String>>::sse_encode(self.decisions, serializer);
+        <Vec<crate::api::agent::ChapterSection>>::sse_encode(self.sections, serializer);
         <Vec<crate::api::agent::EpisodeCard>>::sse_encode(self.episodes, serializer);
+    }
+}
+
+impl SseEncode for crate::api::agent::ChapterSection {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <u32>::sse_encode(self.first_episode, serializer);
+        <u32>::sse_encode(self.last_episode, serializer);
     }
 }
 
@@ -22696,6 +22763,16 @@ impl SseEncode for Vec<crate::api::types::Change> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::types::Change>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::agent::ChapterSection> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::agent::ChapterSection>::sse_encode(item, serializer);
         }
     }
 }

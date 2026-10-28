@@ -96,7 +96,8 @@ parts, with Messages between them. The parts share the chapter ID, title, status
 and summary. Their one-based `part` and `parts` identify their position; each part
 has its own range, anchors, times and episodes. Only the last part carries
 `message_count` and `episode_count` (nullable footer totals for the whole
-chapter). Earlier parts have no footer counts. The message total sums the
+chapter), plus `decisions` and `sections`. Earlier parts have no footer counts
+and empty metadata lists. The message total sums the
 episode ranges, excluding the uncovered gaps. An unsplit chapter has
 `part = parts = 1` and both footer totals.
 
@@ -113,10 +114,11 @@ Messages range and select the matching displayed messages, omitting hidden notic
 | --- | --- |
 | Legacy checkpoint | Range starts at 0 and ends just after `through_message_id`; stored summary; no title. |
 | Legacy chapter | Stored ID, title and summary; first and last message IDs give its range. No episodes are fabricated. |
-| LCM chapter | Stored ID and open/closed status; the shared #57 title helper uses the closed description or first episode title. Closed summary is returned as stored; open summary is absent. No decisions or sections fields exist. |
+| LCM chapter | Stored ID and open/closed status; the shared #57 title helper uses the closed description or first episode title. Closed summary is returned as stored; open summary is absent. |
+| Chapter decisions and sections | Core v0.3.0's optional close-time `context_subject_chapters.data` keys. Decisions preserve stored strings. Sections preserve names and convert Core's session episode ordinals to inclusive, one-based chapter-local episode positions. Ranges must tile all chapter episodes in order. Missing or malformed keys give an empty list independently; open chapters always have empty lists. Nothing is inferred from prose or episode Actions. |
 | Chapter times and counts | First and last covered timestamps for the part. Only the last part carries whole-chapter totals: summed episode range lengths and episode count. |
 | Episode | Stored ID, title and message anchors; timestamps and count from those canonical messages. Gist and action rows are parsed from the stored summary. |
-| Actions | The port of BubblePaw-base's v3 Actions parser, including its upstream tests. The pinned Core v0.2.1 does not export that parser. Summaries without Actions return an empty list. |
+| Actions | The existing port of BubblePaw-base's v3 Actions parser, including its upstream tests. This pin update preserves the current action projection. Summaries without Actions return an empty list. |
 | Action metadata | Stored verb and target; conservative target classification; change and outcome joined as the change marker when present; explicit point-of-interest kind and reason. No missing marker or reason is invented. |
 | Episode counters | Parsed row count, rows with an explicit point of interest (including errors), and rows explicitly marked error. |
 
@@ -127,6 +129,14 @@ syntax to classify as paths; ambiguous targets remain Other.
 The reader and real SDK-writer fixtures are in
 [`compacted_history.rs`](../../crates/agent/src/compacted_history.rs) and
 [`tests/compacted_history.rs`](../../crates/agent/tests/compacted_history.rs).
+The optional metadata follows the [Core v0.3.0 contract](https://github.com/BubbleBuffer/BubblePaw-Core/blob/v0.3.0/docs/lcm-contract.md).
+The normal chapter read uses the SDK. If typed decoding fails, a read-only
+connection to the SDK-resolved chat file decodes the same chapter rows with only
+the optional decisions/sections keys removed, then reads those keys independently.
+Malformed optional metadata cannot discard otherwise readable history or alter
+stored data. The fallback does not load telemetry because the display projection
+does not expose chapter usage or reasoning. Invalid base chapter data still
+reports its normal read error.
 The parser was ported from BubblePaw-base `8c27a80e`,
 `crates/bubblepaw-runner/src/episode_actions.rs`; upstream verb aliases, malformed
 row handling and v2 compatibility are retained.
@@ -144,7 +154,7 @@ Scratch's side:
 - The compacted list is a third body of `AgentChat`, beside the plain list and the outline list. It has its own scroll controller, viewport key and `HistoryController` (what is open), so switching never shares a position with the other lists. The outline strip is hidden in this mode and the outline's own sync is skipped.
 - Shown as Full whatever the setting says: a chat with `compactable: false` (no notice), a chat with no card, and a chat with a pending reference (it needs the full transcript to jump into).
 - Switching the setting keeps the draft (the composer stays mounted) and the place: the message at the top of the view is measured before the switch and the new list opens there (a card, when the message is inside one).
-- The kit has no decisions or sections to show because the store has none; the view models take them as plain fields when it does.
+- The Rust projection exposes chapter decisions and sections; the current chat adapter does not forward them to the kit yet. The kit view models already accept both as plain fields.
 
 Tests: `agent_history_map_test.dart` (mapping and entry order, no native core), `agent_history_test.dart` (opening on the hairline, the folding toggles, draft and place across a switch both ways, `compactable: false` as Full, Full as default) and `agent_history_golden_test.dart` (desktop and phone, light and dark: `goldens/compacted/`). The compacted baselines were rendered on the CI runner (Linux) and are compared by hand; the other goldens are Windows baselines.
 

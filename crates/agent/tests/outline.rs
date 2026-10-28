@@ -593,6 +593,8 @@ fn lcm_open(
         status: SubjectChapterStatus::Open,
         description: None,
         summary: None,
+        decisions: None,
+        sections: None,
         related_ids: Vec::new(),
         related_evidence: Vec::new(),
         model: None,

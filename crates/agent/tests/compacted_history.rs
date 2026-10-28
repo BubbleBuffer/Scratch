@@ -1,11 +1,13 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use vault_agent::bubblepaw_sdk::core::{
-    ContextCheckpoint, ContextEpisode, ContextSubjectChapter, EpisodeBatch, SubjectChapterStatus,
+    ChapterSection as StoredChapterSection, ContextCheckpoint, ContextEpisode,
+    ContextSubjectChapter, EpisodeBatch, SubjectChapterStatus,
 };
 use vault_agent::bubblepaw_sdk::store::{ContextChapter, Message, MessageOrigin, Role, Store};
 use vault_agent::compacted_history::{
-    ChapterStatus, CompactedHistory, HistorySegment, LegacyKind, MessageRange, TargetKind,
+    ChapterSection, ChapterStatus, CompactedHistory, HistorySegment, LegacyKind, MessageRange,
+    TargetKind,
 };
 use vault_agent::{
     read_session_compacted_history, session_compacted_history_at, Agent, AgentConfig, TestHooks,
@@ -21,6 +23,7 @@ struct Fixture {
     store: Store,
     session: String,
     messages: Vec<Message>,
+    chapter_metadata: HashMap<usize, (Vec<String>, Vec<StoredChapterSection>)>,
 }
 
 impl Fixture {
@@ -76,7 +79,18 @@ impl Fixture {
             store,
             session,
             messages,
+            chapter_metadata: HashMap::new(),
         }
+    }
+
+    fn with_chapter_metadata(
+        mut self,
+        chapter: usize,
+        decisions: Vec<String>,
+        sections: Vec<StoredChapterSection>,
+    ) -> Self {
+        self.chapter_metadata.insert(chapter, (decisions, sections));
+        self
     }
 
     fn read(&self) -> CompactedHistory {
@@ -133,6 +147,8 @@ impl Fixture {
             status: SubjectChapterStatus::Open,
             description: None,
             summary: None,
+            decisions: None,
+            sections: None,
             related_ids: vec![],
             related_evidence: vec![],
             model: None,
@@ -145,6 +161,10 @@ impl Fixture {
             closed.description = Some(format!("Chapter {chapter} description"));
             closed.summary = Some(format!("Chapter {chapter} summary"));
             closed.model = Some("test".into());
+            if let Some((decisions, sections)) = self.chapter_metadata.get(&chapter) {
+                closed.decisions = Some(decisions.clone());
+                closed.sections = Some(sections.clone());
+            }
             closed
         });
         self.store
@@ -195,6 +215,40 @@ impl Fixture {
                 .unwrap();
         conn.execute("UPDATE context_episodes SET first_message_seq=(SELECT seq FROM messages WHERE message_id=?1),data=json_set(data,'$.first_message_id',?1) WHERE ordinal=?2", rusqlite::params![self.messages[start].id, i64::try_from(ordinal).unwrap()]).unwrap();
     }
+
+    // Corruption fixtures start with a chapter accepted by the real SDK writer.
+    fn chapter_data(&self, chapter: usize) -> String {
+        let conn =
+            rusqlite::Connection::open(self.store.chat_path(&self.session).unwrap().unwrap())
+                .unwrap();
+        conn.query_row(
+            "SELECT data FROM context_subject_chapters WHERE id=?1",
+            [format!("chapter-{chapter}")],
+            |row| row.get(0),
+        )
+        .unwrap()
+    }
+
+    fn edit_chapter_data(&self, chapter: usize, edit: impl FnOnce(&mut serde_json::Value)) {
+        let conn =
+            rusqlite::Connection::open(self.store.chat_path(&self.session).unwrap().unwrap())
+                .unwrap();
+        let id = format!("chapter-{chapter}");
+        let raw: String = conn
+            .query_row(
+                "SELECT data FROM context_subject_chapters WHERE id=?1",
+                [&id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let mut data = serde_json::from_str(&raw).unwrap();
+        edit(&mut data);
+        conn.execute(
+            "UPDATE context_subject_chapters SET data=?1 WHERE id=?2",
+            rusqlite::params![serde_json::to_string(&data).unwrap(), id],
+        )
+        .unwrap();
+    }
 }
 
 fn range(start: usize, end: usize) -> MessageRange {
@@ -241,6 +295,8 @@ fn real_writer_projects_two_closed_chapters_one_open_and_five_mixed_episodes() {
         assert_eq!((card.part, card.parts), (1, 1));
         assert_eq!(card.message_count, Some(end - start));
         assert_eq!(card.episode_count, Some(count));
+        assert!(card.decisions.is_empty());
+        assert!(card.sections.is_empty());
         assert_eq!(card.episodes.len(), count);
         assert_eq!(card.started_at, f.messages[start].created_at);
         assert_eq!(card.ended_at, f.messages[end - 1].created_at);
@@ -308,6 +364,179 @@ fn real_writer_projects_two_closed_chapters_one_open_and_five_mixed_episodes() {
     );
     assert!(!f.dir.path().join("data/agent/chat_outline.sqlite").exists());
     assert_eq!(f.store.session(&f.session).unwrap().title, original_title);
+}
+
+#[test]
+fn real_writer_v2_metadata_projects_stored_copy_and_chapter_local_sections() {
+    let f = Fixture::new(12).with_chapter_metadata(
+        2,
+        vec![
+            "Keep original history available.".into(),
+            "Use SQLite.".into(),
+        ],
+        vec![
+            StoredChapterSection {
+                name: "Investigation".into(),
+                first_episode: 3,
+                last_episode: 3,
+            },
+            StoredChapterSection {
+                name: "Reader repair".into(),
+                first_episode: 4,
+                last_episode: 4,
+            },
+        ],
+    );
+    f.five_episodes(0);
+    let stored = f.store.context_subject_chapters(&f.session).unwrap();
+    assert_eq!(stored[1].sections.as_ref().unwrap()[0].first_episode, 3);
+    assert_eq!(stored[0].decisions, None);
+    assert_eq!(stored[0].sections, None);
+    let history = f.read();
+    let HistorySegment::ChapterCard(card) = &history.segments[1] else {
+        panic!("chapter")
+    };
+    assert_eq!(
+        card.decisions,
+        ["Keep original history available.", "Use SQLite."]
+    );
+    assert_eq!(
+        card.sections,
+        [
+            ChapterSection {
+                name: "Investigation".into(),
+                first_episode: 1,
+                last_episode: 1
+            },
+            ChapterSection {
+                name: "Reader repair".into(),
+                first_episode: 2,
+                last_episode: 2
+            },
+        ]
+    );
+    assert_eq!(card.summary.as_deref(), Some("Chapter 2 summary"));
+    let json = serde_json::to_value(card).unwrap();
+    assert_eq!(
+        json["decisions"],
+        serde_json::json!(["Keep original history available.", "Use SQLite."])
+    );
+    assert_eq!(json["sections"][1]["last_episode"], 2);
+    assert_eq!(
+        f.store.context_subject_chapters(&f.session).unwrap()[1].sections,
+        stored[1].sections
+    );
+}
+
+#[test]
+fn malformed_optional_chapter_fields_do_not_discard_history_or_the_other_field() {
+    let valid_sections =
+        serde_json::json!([{"name": "Stored section", "first_episode": 1, "last_episode": 2}]);
+    let mut cases = vec![
+        ("decisions", serde_json::json!(null)),
+        ("decisions", serde_json::json!({"text": "not an array"})),
+        ("decisions", serde_json::json!(["Valid", 7])),
+        ("decisions", serde_json::json!([""])),
+        ("decisions", serde_json::json!(["two\nlines"])),
+        ("decisions", serde_json::json!(["x".repeat(101)])),
+        ("sections", serde_json::json!(null)),
+        ("sections", serde_json::json!({})),
+        (
+            "sections",
+            serde_json::json!([{"name": "Wrong shape", "first_episode": "1", "last_episode": 2}]),
+        ),
+        (
+            "sections",
+            serde_json::json!([{"name": "Missing endpoint", "first_episode": 1}]),
+        ),
+    ];
+    for (name, first, last) in [
+        ("", 1, 2),
+        ("one two three four five six", 1, 2),
+        (" leading space", 1, 2),
+        ("Bad|name", 1, 2),
+        ("Zero", 0, 2),
+        ("Reversed", 2, 1),
+        ("Incomplete", 1, 1),
+        ("Outside", 1, 3),
+    ] {
+        cases.push((
+            "sections",
+            serde_json::json!([{"name": name, "first_episode": first, "last_episode": last}]),
+        ));
+    }
+    cases.push((
+        "sections",
+        serde_json::json!([
+            {"name": "First", "first_episode": 1, "last_episode": 2},
+            {"name": "Overlap", "first_episode": 2, "last_episode": 2},
+        ]),
+    ));
+    for (key, value) in cases {
+        let f = Fixture::new(12);
+        f.five_episodes(0);
+        let before = f.read();
+        f.edit_chapter_data(1, |data| {
+            data["decisions"] = serde_json::json!(["Stored decision."]);
+            data["sections"] = valid_sections.clone();
+            data[key] = value.clone();
+        });
+        let stored_data = f.chapter_data(1);
+        let history = f.read();
+        assert_eq!(history.boundary, before.boundary, "{key}: {value}");
+        assert!(history.compactable);
+        assert_eq!(history.segments.len(), before.segments.len());
+        let HistorySegment::ChapterCard(card) = &history.segments[0] else {
+            panic!("chapter")
+        };
+        assert_eq!(card.summary.as_deref(), Some("Chapter 1 summary"));
+        assert_eq!(card.episodes.len(), 2);
+        assert_eq!(
+            card.decisions.is_empty(),
+            key == "decisions",
+            "{key}: {value}"
+        );
+        assert_eq!(
+            card.sections.is_empty(),
+            key == "sections",
+            "{key}: {value}"
+        );
+        assert_eq!(f.read(), history);
+        assert_eq!(f.chapter_data(1), stored_data);
+    }
+}
+
+#[test]
+fn open_chapter_never_exposes_injected_close_metadata() {
+    let f = Fixture::new(2);
+    f.episode(1, 0..2, 1, 1, false, V3);
+    f.edit_chapter_data(1, |data| {
+        data["decisions"] = serde_json::json!(["Not closed."]);
+        data["sections"] =
+            serde_json::json!([{"name": "Open", "first_episode": 1, "last_episode": 1}]);
+    });
+    let history = f.read();
+    let HistorySegment::ChapterCard(card) = &history.segments[0] else {
+        panic!("chapter")
+    };
+    assert_eq!(card.status, ChapterStatus::Open);
+    assert!(card.decisions.is_empty());
+    assert!(card.sections.is_empty());
+}
+
+#[test]
+fn both_malformed_keys_in_a_central_chat_keep_the_rest_of_the_history() {
+    let f = Fixture::new(12);
+    f.five_episodes(0);
+    let before = f.read();
+    f.edit_chapter_data(1, |data| {
+        data["decisions"] = serde_json::json!([17]);
+        data["sections"] = serde_json::json!("not sections");
+    });
+    let stored_data = f.chapter_data(1);
+    assert!(f.store.context_subject_chapters(&f.session).is_err());
+    assert_eq!(f.read(), before);
+    assert_eq!(f.chapter_data(1), stored_data);
 }
 
 #[test]
@@ -464,7 +693,15 @@ fn targets_use_explicit_page_prefix_and_deterministic_read_paths() {
 
 #[test]
 fn internal_episode_gap_splits_chapter_parts_and_keeps_totals_on_last_part() {
-    let f = Fixture::new(12);
+    let f = Fixture::new(12).with_chapter_metadata(
+        1,
+        vec!["Keep raw gaps visible.".into()],
+        vec![StoredChapterSection {
+            name: "Reader work".into(),
+            first_episode: 1,
+            last_episode: 2,
+        }],
+    );
     f.five_episodes(0);
     f.change_episode_start(2, 3);
     let h = f.read();
@@ -493,6 +730,17 @@ fn internal_episode_gap_splits_chapter_parts_and_keeps_totals_on_last_part() {
     assert_eq!(last.range, range(3, 4));
     assert_eq!((first.message_count, first.episode_count), (None, None));
     assert_eq!((last.message_count, last.episode_count), (Some(3), Some(2)));
+    assert!(first.decisions.is_empty());
+    assert!(first.sections.is_empty());
+    assert_eq!(last.decisions, ["Keep raw gaps visible."]);
+    assert_eq!(
+        last.sections,
+        [ChapterSection {
+            name: "Reader work".into(),
+            first_episode: 1,
+            last_episode: 2,
+        }]
+    );
     for (part, start, end, episode_id) in [(first, 0, 2, "episode-1"), (last, 3, 4, "episode-2")] {
         assert_eq!(part.started_at, f.messages[start].created_at);
         assert_eq!(part.ended_at, f.messages[end - 1].created_at);
