@@ -432,6 +432,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ChapterCard dco_decode_chapter_card(dynamic raw);
 
   @protected
+  ChapterSection dco_decode_chapter_section(dynamic raw);
+
+  @protected
   ChapterStatus dco_decode_chapter_status(dynamic raw);
 
   @protected
@@ -636,6 +639,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<Change> dco_decode_list_change(dynamic raw);
+
+  @protected
+  List<ChapterSection> dco_decode_list_chapter_section(dynamic raw);
 
   @protected
   List<Conflict> dco_decode_list_conflict(dynamic raw);
@@ -1483,6 +1489,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ChapterCard sse_decode_chapter_card(SseDeserializer deserializer);
 
   @protected
+  ChapterSection sse_decode_chapter_section(SseDeserializer deserializer);
+
+  @protected
   ChapterStatus sse_decode_chapter_status(SseDeserializer deserializer);
 
   @protected
@@ -1739,6 +1748,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<Change> sse_decode_list_change(SseDeserializer deserializer);
+
+  @protected
+  List<ChapterSection> sse_decode_list_chapter_section(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<Conflict> sse_decode_list_conflict(SseDeserializer deserializer);
@@ -2778,6 +2792,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_chapter_card(ChapterCard self, SseSerializer serializer);
 
   @protected
+  void sse_encode_chapter_section(
+    ChapterSection self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_chapter_status(ChapterStatus self, SseSerializer serializer);
 
   @protected
@@ -3094,6 +3114,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_change(List<Change> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_chapter_section(
+    List<ChapterSection> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_conflict(List<Conflict> self, SseSerializer serializer);

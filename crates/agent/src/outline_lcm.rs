@@ -115,6 +115,8 @@ mod tests {
             description: (status == SubjectChapterStatus::Closed)
                 .then(|| "Generated chapter description".into()),
             summary: (status == SubjectChapterStatus::Closed).then(|| "Generated summary".into()),
+            decisions: None,
+            sections: None,
             related_ids: Vec::new(),
             related_evidence: Vec::new(),
             model: (status == SubjectChapterStatus::Closed).then(|| "test".into()),

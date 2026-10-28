@@ -11,7 +11,7 @@ import 'types.dart';
 import 'vault.dart';
 
 // These functions are ignored because they are not marked as `pub`: `compacted_at`, `local_close_chapter`, `local_compacted`, `local_outline_revision`, `local_outline`, `local_replay_control`, `local_replay_load`, `local_replay_status`, `local_upsert_chapter`, `local_upsert_section`, `outline_at`, `outline_data_dir`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 /// Runs the claimed AI task `task_id` with the agent (runner `agent`) in a
 /// session of its own, and writes the result or the error back to the task.
@@ -1546,6 +1546,10 @@ class ChapterCard {
   /// Whole-chapter footer totals, present only on the last part.
   final int? messageCount;
   final int? episodeCount;
+
+  /// Closed-chapter metadata, populated only on the last part.
+  final List<String> decisions;
+  final List<ChapterSection> sections;
   final List<EpisodeCard> episodes;
 
   const ChapterCard({
@@ -1562,6 +1566,8 @@ class ChapterCard {
     required this.range,
     this.messageCount,
     this.episodeCount,
+    this.decisions = const [],
+    this.sections = const [],
     required this.episodes,
   });
 
@@ -1580,6 +1586,8 @@ class ChapterCard {
       range.hashCode ^
       messageCount.hashCode ^
       episodeCount.hashCode ^
+      decisions.hashCode ^
+      sections.hashCode ^
       episodes.hashCode;
 
   @override
@@ -1600,7 +1608,36 @@ class ChapterCard {
           range == other.range &&
           messageCount == other.messageCount &&
           episodeCount == other.episodeCount &&
+          decisions == other.decisions &&
+          sections == other.sections &&
           episodes == other.episodes;
+}
+
+class ChapterSection {
+  final String name;
+
+  /// One-based episode ordinals within the whole chapter, inclusive.
+  final int firstEpisode;
+  final int lastEpisode;
+
+  const ChapterSection({
+    required this.name,
+    required this.firstEpisode,
+    required this.lastEpisode,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^ firstEpisode.hashCode ^ lastEpisode.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChapterSection &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          firstEpisode == other.firstEpisode &&
+          lastEpisode == other.lastEpisode;
 }
 
 enum ChapterStatus { open, closed }

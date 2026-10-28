@@ -492,7 +492,7 @@ dependencies = [
 [[package]]
 name = "bubblepaw-core"
 version = "0.2.1"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.1#7562f37e31a0e761f4ecddafb570c342e5b1b4b7"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -513,7 +513,7 @@ dependencies = [
 [[package]]
 name = "bubblepaw-mcp"
 version = "0.2.1"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.1#7562f37e31a0e761f4ecddafb570c342e5b1b4b7"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -530,7 +530,7 @@ dependencies = [
 [[package]]
 name = "bubblepaw-process"
 version = "0.2.1"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.1#7562f37e31a0e761f4ecddafb570c342e5b1b4b7"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
 dependencies = [
  "libc",
  "tokio",
@@ -540,7 +540,7 @@ dependencies = [
 [[package]]
 name = "bubblepaw-runner"
 version = "0.2.1"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.1#7562f37e31a0e761f4ecddafb570c342e5b1b4b7"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -576,7 +576,7 @@ dependencies = [
 [[package]]
 name = "bubblepaw-sdk"
 version = "0.2.1"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.2.1#7562f37e31a0e761f4ecddafb570c342e5b1b4b7"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
 dependencies = [
  "anyhow",
  "bubblepaw-core",
@@ -3669,7 +3669,7 @@ version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51e219e79014df21a225b1860a479e2dcd7cbd9130f4defd4bd0e191ea31d67d"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.21.7",
  "chrono",
  "getrandom 0.2.17",
  "http",

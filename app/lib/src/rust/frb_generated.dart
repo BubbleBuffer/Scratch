@@ -11859,8 +11859,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ChapterCard dco_decode_chapter_card(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 14)
-      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
+    if (arr.length != 16)
+      throw Exception('unexpected arr length: expect 16 but see ${arr.length}');
     return ChapterCard(
       id: dco_decode_String(arr[0]),
       status: dco_decode_chapter_status(arr[1]),
@@ -11875,7 +11875,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       range: dco_decode_message_range(arr[10]),
       messageCount: dco_decode_opt_box_autoadd_u_32(arr[11]),
       episodeCount: dco_decode_opt_box_autoadd_u_32(arr[12]),
-      episodes: dco_decode_list_episode_card(arr[13]),
+      decisions: dco_decode_list_String(arr[13]),
+      sections: dco_decode_list_chapter_section(arr[14]),
+      episodes: dco_decode_list_episode_card(arr[15]),
+    );
+  }
+
+  @protected
+  ChapterSection dco_decode_chapter_section(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return ChapterSection(
+      name: dco_decode_String(arr[0]),
+      firstEpisode: dco_decode_u_32(arr[1]),
+      lastEpisode: dco_decode_u_32(arr[2]),
     );
   }
 
@@ -12521,6 +12536,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<Change> dco_decode_list_change(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_change).toList();
+  }
+
+  @protected
+  List<ChapterSection> dco_decode_list_chapter_section(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_chapter_section).toList();
   }
 
   @protected
@@ -15136,6 +15157,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_range = sse_decode_message_range(deserializer);
     var var_messageCount = sse_decode_opt_box_autoadd_u_32(deserializer);
     var var_episodeCount = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_decisions = sse_decode_list_String(deserializer);
+    var var_sections = sse_decode_list_chapter_section(deserializer);
     var var_episodes = sse_decode_list_episode_card(deserializer);
     return ChapterCard(
       id: var_id,
@@ -15151,7 +15174,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       range: var_range,
       messageCount: var_messageCount,
       episodeCount: var_episodeCount,
+      decisions: var_decisions,
+      sections: var_sections,
       episodes: var_episodes,
+    );
+  }
+
+  @protected
+  ChapterSection sse_decode_chapter_section(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_firstEpisode = sse_decode_u_32(deserializer);
+    var var_lastEpisode = sse_decode_u_32(deserializer);
+    return ChapterSection(
+      name: var_name,
+      firstEpisode: var_firstEpisode,
+      lastEpisode: var_lastEpisode,
     );
   }
 
@@ -16045,6 +16083,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <Change>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_change(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ChapterSection> sse_decode_list_chapter_section(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ChapterSection>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_chapter_section(deserializer));
     }
     return ans_;
   }
@@ -18938,7 +18990,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_message_range(self.range, serializer);
     sse_encode_opt_box_autoadd_u_32(self.messageCount, serializer);
     sse_encode_opt_box_autoadd_u_32(self.episodeCount, serializer);
+    sse_encode_list_String(self.decisions, serializer);
+    sse_encode_list_chapter_section(self.sections, serializer);
     sse_encode_list_episode_card(self.episodes, serializer);
+  }
+
+  @protected
+  void sse_encode_chapter_section(
+    ChapterSection self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_u_32(self.firstEpisode, serializer);
+    sse_encode_u_32(self.lastEpisode, serializer);
   }
 
   @protected
@@ -19652,6 +19717,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_change(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_chapter_section(
+    List<ChapterSection> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_chapter_section(item, serializer);
     }
   }
 

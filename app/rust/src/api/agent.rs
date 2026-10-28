@@ -437,6 +437,7 @@ pub struct LegacyCard {
     pub message_count: u32,
 }
 
+#[frb(non_opaque)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChapterCard {
     pub id: String,
@@ -454,7 +455,20 @@ pub struct ChapterCard {
     /// Whole-chapter footer totals, present only on the last part.
     pub message_count: Option<u32>,
     pub episode_count: Option<u32>,
+    /// Closed-chapter metadata, populated only on the last part.
+    #[frb(default = "const []")]
+    pub decisions: Vec<String>,
+    #[frb(default = "const []")]
+    pub sections: Vec<ChapterSection>,
     pub episodes: Vec<EpisodeCard>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChapterSection {
+    pub name: String,
+    /// One-based episode ordinals within the whole chapter, inclusive.
+    pub first_episode: u32,
+    pub last_episode: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -597,7 +611,21 @@ mod compacted_from_core {
                 episode_count: value.episode_count.map(|count| {
                     u32::try_from(count).expect("session exceeds bridge message index capacity")
                 }),
+                decisions: value.decisions,
+                sections: value.sections.into_iter().map(Into::into).collect(),
                 episodes: value.episodes.into_iter().map(Into::into).collect(),
+            }
+        }
+    }
+
+    impl From<core::ChapterSection> for ChapterSection {
+        fn from(value: core::ChapterSection) -> Self {
+            Self {
+                name: value.name,
+                first_episode: u32::try_from(value.first_episode)
+                    .expect("chapter exceeds bridge episode index capacity"),
+                last_episode: u32::try_from(value.last_episode)
+                    .expect("chapter exceeds bridge episode index capacity"),
             }
         }
     }
@@ -1560,12 +1588,20 @@ mod outline_tests {
             range: core::MessageRange { start: 0, end: 2 },
             message_count: None,
             episode_count: None,
+            decisions: Vec::new(),
+            sections: Vec::new(),
             episodes: Vec::new(),
         };
         let last = core::ChapterCard {
             part: 2,
             message_count: Some(3),
             episode_count: Some(2),
+            decisions: vec!["Keep canonical history".into()],
+            sections: vec![core::ChapterSection {
+                name: "Implementation".into(),
+                first_episode: 1,
+                last_episode: 2,
+            }],
             ..first.clone()
         };
         let first: ChapterCard = first.into();
@@ -1575,6 +1611,17 @@ mod outline_tests {
         assert_eq!((last.part, last.parts), (2, 2));
         assert_eq!((first.message_count, first.episode_count), (None, None));
         assert_eq!((last.message_count, last.episode_count), (Some(3), Some(2)));
+        assert!(first.decisions.is_empty());
+        assert!(first.sections.is_empty());
+        assert_eq!(last.decisions, ["Keep canonical history"]);
+        assert_eq!(
+            last.sections,
+            [ChapterSection {
+                name: "Implementation".into(),
+                first_episode: 1,
+                last_episode: 2,
+            }]
+        );
     }
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]

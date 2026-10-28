@@ -7,8 +7,9 @@
 use std::collections::HashMap;
 
 use anyhow::{ensure, Context, Result};
-use bubblepaw_sdk::core::{ContextEpisode, SubjectChapterStatus};
+use bubblepaw_sdk::core::{ContextEpisode, ContextSubjectChapter, SubjectChapterStatus};
 use bubblepaw_sdk::store::{Message, Store};
+use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 
 use crate::episode_actions::{parse_actions, parse_gist, ActionKind, ActionVerb};
@@ -99,7 +100,21 @@ pub struct ChapterCard {
     /// not contribute to the message total.
     pub message_count: Option<usize>,
     pub episode_count: Option<usize>,
+    /// Close-time chapter metadata, present only on the final part. Missing or
+    /// malformed stored fields and open chapters project as empty lists.
+    #[serde(default)]
+    pub decisions: Vec<String>,
+    #[serde(default)]
+    pub sections: Vec<ChapterSection>,
     pub episodes: Vec<EpisodeCard>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChapterSection {
+    pub name: String,
+    /// Inclusive, one-based positions within the whole chapter's episodes.
+    pub first_episode: usize,
+    pub last_episode: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -303,6 +318,90 @@ fn target_kind(verb: &ActionVerb, target: &str) -> TargetKind {
     }
 }
 
+fn chapters(store: &Store, session: &str) -> Result<Vec<ContextSubjectChapter>> {
+    match store.context_subject_chapters(session) {
+        Ok(chapters) => Ok(chapters),
+        Err(error) if error.downcast_ref::<serde_json::Error>().is_some() => {
+            // Core's typed read rejects malformed optional metadata before the
+            // display projection can ignore it. Retry from the same durable
+            // rows, removing only these two optional keys before base decoding.
+            let path = store
+                .chat_path(session)?
+                .with_context(|| format!("cannot recover chapter metadata: {error}"))?;
+            let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+            conn.busy_timeout(std::time::Duration::from_secs(5))?;
+            let mut statement = conn.prepare(
+                "SELECT data FROM context_subject_chapters WHERE session_id=?1 ORDER BY ordinal",
+            )?;
+            let rows = statement.query_map([session], |row| row.get::<_, String>(0))?;
+            rows.map(|row| {
+                let mut data: serde_json::Value = serde_json::from_str(&row?)?;
+                let decisions = data
+                    .as_object_mut()
+                    .and_then(|data| data.remove("decisions"));
+                let sections = data
+                    .as_object_mut()
+                    .and_then(|data| data.remove("sections"));
+                let mut chapter: ContextSubjectChapter = serde_json::from_value(data)
+                    .with_context(|| format!("SDK chapter read failed: {error}"))?;
+                chapter.decisions = decisions.and_then(|value| serde_json::from_value(value).ok());
+                chapter.sections = sections.and_then(|value| serde_json::from_value(value).ok());
+                Ok(chapter)
+            })
+            .collect()
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn retrieval_metadata(
+    chapter: &ContextSubjectChapter,
+    members: &[&ContextEpisode],
+) -> (Vec<String>, Vec<ChapterSection>) {
+    if chapter.status == SubjectChapterStatus::Open {
+        return (Vec::new(), Vec::new());
+    }
+    let decisions = chapter
+        .decisions
+        .as_ref()
+        .filter(|decisions| {
+            decisions.iter().all(|decision| {
+                !decision.trim().is_empty()
+                    && decision.chars().count() <= 100
+                    && !decision.contains(['\r', '\n'])
+            })
+        })
+        .cloned()
+        .unwrap_or_default();
+    let mut sections = Vec::new();
+    let mut covered = 0;
+    for section in chapter.sections.as_deref().unwrap_or_default() {
+        if !(1..=5).contains(&section.name.split_whitespace().count())
+            || section.name != section.name.trim()
+            || section.name.contains(['|', '\r', '\n'])
+            || members.get(covered).map(|episode| episode.ordinal) != Some(section.first_episode)
+        {
+            return (decisions, Vec::new());
+        }
+        let Some(last) = members[covered..]
+            .iter()
+            .position(|episode| episode.ordinal == section.last_episode)
+        else {
+            return (decisions, Vec::new());
+        };
+        sections.push(ChapterSection {
+            name: section.name.clone(),
+            first_episode: covered + 1,
+            last_episode: covered + last + 1,
+        });
+        covered += last + 1;
+    }
+    if covered != members.len() {
+        sections.clear();
+    }
+    (decisions, sections)
+}
+
 /// Build summary cards and raw gaps without changing titles, summaries or serving
 /// state. Overlapping summary coverage yields `compactable: false` and no segments.
 pub fn read(store: &Store, session: &str) -> Result<CompactedHistory> {
@@ -311,7 +410,7 @@ pub fn read(store: &Store, session: &str) -> Result<CompactedHistory> {
     // episodes. Concurrent episode growth belongs to the next projection.
     let checkpoint = store.context_checkpoint(session)?;
     let legacy = store.context_chapters(session)?;
-    let chapters = store.context_subject_chapters(session)?;
+    let chapters = chapters(store, session)?;
     let last_episode_ordinal = chapters
         .iter()
         .map(|c| c.last_episode_ordinal)
@@ -387,6 +486,7 @@ pub fn read(store: &Store, session: &str) -> Result<CompactedHistory> {
             ChapterStatus::Closed
         };
         let title = crate::outline_lcm::chapter_title(&chapter, Some(first));
+        let (decisions, sections) = retrieval_metadata(&chapter, &members);
         let summary = if status == ChapterStatus::Open {
             None
         } else {
@@ -425,6 +525,16 @@ pub fn read(store: &Store, session: &str) -> Result<CompactedHistory> {
                 range: MessageRange { start, end },
                 message_count: (part == parts).then_some(message_count),
                 episode_count: (part == parts).then_some(episode_count),
+                decisions: if part == parts {
+                    decisions.clone()
+                } else {
+                    Vec::new()
+                },
+                sections: if part == parts {
+                    sections.clone()
+                } else {
+                    Vec::new()
+                },
                 episodes,
             }));
         }
