@@ -7,6 +7,7 @@
 
 import 'dart:io';
 
+import 'package:agent_kit_core/agent_kit_core.dart' show KitChoice;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/agent_chat_prefs.dart';
@@ -375,16 +376,16 @@ void main() {
     expect(store.canPickHost, isTrue);
     expect(store.host, AgentHost.local);
     expect(key('agent-runner'), findsOneWidget);
-    final picker = t.widget<SelectButton<AgentHost>>(key('agent-runner'));
-    expect(picker.options, AgentHost.values);
-    expect(picker.value, AgentHost.local);
+    final picker = t.widget<SelectButton<KitChoice>>(key('agent-runner'));
+    expect(picker.options.map((c) => c.id), [for (final h in AgentHost.values) h.name]);
+    expect(picker.value.id, AgentHost.local.name);
     expect(picker.onChanged, isNotNull, reason: 'a draft can switch');
 
     final s = await real(t, () => store.createSession(title: 'Runner'));
     await settle(t);
     expect(store.hostOf(s!.id), AgentHost.local, reason: 'saved with the chat');
     expect(
-      t.widget<SelectButton<AgentHost>>(key('agent-runner')).onChanged,
+      t.widget<SelectButton<KitChoice>>(key('agent-runner')).onChanged,
       isNotNull,
       reason: 'an empty chat can still switch',
     );
@@ -393,9 +394,9 @@ void main() {
     expect(run?.status, 'completed');
     await settle(t);
     expect(store.state!.messages, isNotEmpty);
-    final locked = t.widget<SelectButton<AgentHost>>(key('agent-runner'));
+    final locked = t.widget<SelectButton<KitChoice>>(key('agent-runner'));
     expect(locked.onChanged, isNull, reason: 'a chat with messages is fixed');
-    expect(locked.value, AgentHost.local, reason: 'it shows its runner');
+    expect(locked.value.id, AgentHost.local.name, reason: 'it shows its runner');
   });
 
   appTest('the runner picker is disabled while a reply runs', (t) async {
@@ -413,7 +414,7 @@ void main() {
     final s = await real(t, () => store.createSession(title: 'Busy'));
     await settle(t);
     expect(
-      t.widget<SelectButton<AgentHost>>(key('agent-runner')).onChanged,
+      t.widget<SelectButton<KitChoice>>(key('agent-runner')).onChanged,
       isNotNull,
       reason: 'an empty chat can switch',
     );
@@ -424,7 +425,7 @@ void main() {
     expect(store.running, isTrue);
     expect(store.hostLocked, isFalse);
     expect(
-      t.widget<SelectButton<AgentHost>>(key('agent-runner')).onChanged,
+      t.widget<SelectButton<KitChoice>>(key('agent-runner')).onChanged,
       isNull,
       reason: 'a running reply fixes the runner',
     );

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:agent_kit_core/agent_kit_core.dart' show KitChoice;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
@@ -56,9 +57,9 @@ void main() {
       });
       store.pickModel(null, 'codex/current');
       await openAgentScreen(t);
-      final picker = t.widget<SelectButton<String>>(key('agent-model'));
-      expect(picker.options, ['codex/shown', 'codex/hidden', 'codex/current']);
-      expect(picker.value, 'codex/current');
+      final picker = t.widget<SelectButton<KitChoice>>(key('agent-model'));
+      expect(picker.options.map((c) => c.id), ['codex/shown', 'codex/hidden', 'codex/current']);
+      expect(picker.value.id, 'codex/current');
       expect(store.modelLabel('claude-code/opus'), 'Opus (latest)');
       expect(store.modelLabel('claude-code/claude-fable-5-1'), 'Fable 5.1');
       expect(store.modelLabel('codex/shown'), 'Shown');
