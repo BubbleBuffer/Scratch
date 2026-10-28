@@ -20,6 +20,8 @@ String _draft(WidgetTester tester) =>
     tester.widget<EditableText>(key('agent-composer')).controller.text;
 
 void main() {
+  setUpAll(initCore);
+
   appTest(
     'an older @ answer that arrives late does not replace the newer menu',
     (tester) async {
