@@ -3,6 +3,7 @@ import '../../services/addon_services.dart';
 import 'package:agent_kit/agent_kit.dart'
     show
         ApprovalBar,
+        ApprovalKeyPane,
         ItemRow,
         OutlineAction,
         OutlineControllerContents,
@@ -185,7 +186,8 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
   }
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
+  Widget build(BuildContext context) => ApprovalKeyPane(
+    child: ListenableBuilder(
     listenable: widget.store,
     builder: (context, _) {
       final store = widget.store;
@@ -477,5 +479,6 @@ class _AgentChatState extends State<AgentChat> with TickerProviderStateMixin {
         ),
       );
     },
+    ),
   );
 }
