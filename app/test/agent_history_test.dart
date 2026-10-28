@@ -95,7 +95,7 @@ void main() {
     expect(key(_list), findsOneWidget);
     expect(find.text('Full messages from here'), findsOneWidget);
     expect(find.text('message 45'), findsOneWidget);
-    expect(find.textContaining('Question 29'), findsOneWidget);
+    expect(find.textContaining('Question 22'), findsOneWidget);
     // Older history is summaries, not messages.
     expect(find.textContaining('Question 3'), findsNothing);
     expect(find.textContaining('Question 10'), findsNothing);
