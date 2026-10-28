@@ -377,8 +377,10 @@ class _PageStackChromeState extends State<PageStackChrome> {
   @override
   Widget build(BuildContext context) {
     if (context.mobile) return widget.child;
+    // No store scope before the vault opens: there is no pile to show yet.
+    final tree = context.maybeWatch<TreeStore>();
+    if (tree == null) return widget.child;
     final stack = PageStackScope.of(context);
-    final tree = context.watch<TreeStore>();
     final pages = context.watch<PagesStore>();
     final rail = tree.sidebarCollapsed ? 0.0 : tree.sidebarWidth;
     final c = context.colors;
@@ -480,7 +482,9 @@ class _PageStackChromeState extends State<PageStackChrome> {
             Positioned.fill(
               child: GestureDetector(
                 key: const ValueKey('stack-fan-barrier'),
-                behavior: HitTestBehavior.opaque,
+                // Translucent: a tap closes the fan and still reaches the
+                // button underneath (the sidebar's feedback button, say).
+                behavior: HitTestBehavior.translucent,
                 onTap: _closeFan,
               ),
             ),

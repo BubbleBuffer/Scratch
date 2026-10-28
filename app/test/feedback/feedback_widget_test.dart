@@ -8,6 +8,8 @@
 // method-channel default cannot describe a Linux device (its data is typed as
 // the base class, which the collector casts to LinuxDeviceInfo).
 
+import 'dart:typed_data';
+
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -268,5 +270,25 @@ void main() {
     await tester.tap(_key('pages-feedback'));
     await _waitForSheet(tester);
     expect(find.byType(FeedbackSheet), findsOneWidget);
+  });
+
+  appTest('The screenshot is taken at 3x for a 4x screen, not 2x', (
+    tester,
+  ) async {
+    _fakePlatformInfo();
+    await pumpApp(tester, mobile: false);
+    // 1440 x 900 logical pixels at a pixel ratio of 4.
+    tester.view.devicePixelRatio = 4;
+    tester.view.physicalSize = const Size(1440 * 4, 900 * 4);
+    await settle(tester);
+    await _pressShortcut(tester);
+    await _waitForSheet(tester);
+    final shot = tester
+        .widget<FeedbackSheet>(find.byType(FeedbackSheet))
+        .screenshot!;
+    // PNG header: the IHDR width and height, big-endian, at bytes 16 to 23.
+    final header = ByteData.sublistView(shot);
+    expect(header.getUint32(16), 1440 * 3);
+    expect(header.getUint32(20), 900 * 3);
   });
 }
