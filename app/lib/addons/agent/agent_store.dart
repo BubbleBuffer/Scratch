@@ -378,10 +378,12 @@ class AgentStore extends ChangeNotifier {
   }
 
   AgentChatPrefs? _chatPrefs;
-  AgentChatPrefs get _prefs => _chatPrefs ??= AgentChatPrefs.load(
-    _dataDir == null && settings.file == null
+  AgentChatPrefs get _prefs => _chatPrefs ??= AgentChatPrefs(
+    storage: _dataDir == null && settings.file == null
         ? null
-        : File('${_folder()}${Platform.pathSeparator}agent_chats.json'),
+        : AgentChatPrefsFile(
+            File('${_folder()}${Platform.pathSeparator}agent_chats.json'),
+          ),
   );
 
   /// The host chat [id] was created on, if this device recorded it.
