@@ -82,3 +82,40 @@ The MCP servers and the runner pickers in Settings > AI > Agent stay in Scratch.
 - `agent_runner_choices.dart`: the chosen runner, the help lines and the model pickers' options; `agent_runner_settings.dart` lays them out and saves through `AgentStore` (vault defaults, synced).
 
 `test/agent_mcp_server_json_test.dart` has the table tests (every validation message, duplicate names, both transports and a change between them, unknown keys through load, edit and save, byte for byte). `test/agent_mcp_controller_test.dart` covers the controller and the runner choices; `test/agent_mcp_settings_test.dart` and `test/agent_runner_select_test.dart` cover the screens.
+
+## Transcript and composer port (plan)
+
+Port plan step 7: the chat's transcript and composer move onto the kit's surfaces (`agent_kit`: transcript, activity, approval, composer) fed by Scratch adapters, in increments that each land as one pull request. Scratch's current look is the target. A pull request either leaves the agent goldens byte-identical or lists every changed image with the reason; a change the kit cannot make without altering what the user sees or does is a design question and waits for an answer.
+
+What stays in Scratch, through the kit's hooks: reference chips and the vault's page mentions (`MarkdownRenderer`, `MentionSource`), page-edit rows with their undo that finishes later (`onUndo`), a draft that is kept when a send fails, the page, selection and chat context a message carries, and the chat store itself. The kit never reads `AgentStore`.
+
+### Protective tests (done first)
+
+These run on the code before any increment and stay green through all of them.
+
+- `test/agent_composer_input_test.dart`: an `@` answer for an older query that arrives after a newer one is dropped (arriving after, and arriving while the newer one is pending); an answer after the `@` is gone shows no menu; a send that fails (a model no provider serves) keeps the draft, the picked mention, the page chip and the quoted selection, and the same draft then goes out whole; a chat that cannot be created keeps the draft. `AgentComposer` takes an optional `mentionSource` (default `mentionPages`) so the test controls when each answer arrives; this is the seam the kit's `MentionSource` replaces.
+- Already in place: `test/agent_transcript_order_test.dart` (item order and tool ownership), `test/agent_chat_partb_test.dart` (live turn, edits, undo, context chips, composer layout), `test/agent_test.dart` (approvals, steer and stop), `test/agent_golden_test.dart`, `test/agent_panel_golden_test.dart`, `test/chat_reference_golden_test.dart`, `test/mobile_agent_golden_test.dart`.
+
+### Increments
+
+| # | Increment | Moves to the kit | Stays in Scratch | Protected by |
+|---|---|---|---|---|
+| 0 | Protective tests, the `mentionSource` seam, this plan | nothing | everything | the tests above |
+| 1 | Transcript adapter: `AgentSessionState` and the open chat's live state to the kit's `TranscriptItem`s, with no widget change | nothing visible | the mapping (`agent_transcript.dart` keeps ordering, ownership and outline segments) | order test; new mapping tests; goldens identical by construction |
+| 2 | Approval | `ApprovalBar` (keys 1, 2, 3, "Needs approval", waiting time) replaces `ApprovalCard` | `project_open` wording, the arguments text | approval tests in `agent_test.dart` and `agent_chat_partb_test.dart`; approval goldens |
+| 3 | Tool and code cells | `ActivityGroupView`, exec output rows replace `AgentWorkRow` and `CodeCellRow` | code disclosure setting, the work summary counts | partb activity tests; agent goldens |
+| 4 | Edit rows | `FileEditRow`, `DiffView` replace `AgentEditRow` | page-edit rows (opening the page at the changed blocks), undo that finishes later, edits of untitled pages | partb edit and undo tests; goldens |
+| 5 | Turn view | `AssistantProse`, notice lines for stopped and failed runs, the working line | `AgentMarkdown` as the `MarkdownRenderer` (reference chips, page links), `Add to note` | partb live-turn test; reference goldens |
+| 6 | Transcript list | `TranscriptList` under the outline rows (follow the end, jump to latest, anchor restore) | `ChatReaderController` (pending references, keep message position) | outline widget, split and live tests; order test |
+| 7 | Composer | `AgentComposer` with a `MentionSource`; chips from `KitRef`s | the mention source over pages and chats, the page, selection and chat context, host and model pickers, the draft kept on a failed send | `agent_composer_input_test.dart`; partb composer tests; composer goldens |
+
+Each increment from 2 on first checks whether the kit can draw Scratch's current look. Where it cannot, the kit change is released first (agent-kit v0.7.x, bb-ui v0.6.x, pinned by commit SHA as under "Bumping it") and the Scratch pull request follows. The pull request runs a temporary workflow that renders the agent goldens on main and on the branch with the same bridge and compares the images; it is removed before the merge.
+
+### Known differences to settle before increments 2 to 7
+
+These are visible or behavioural, so the swap cannot be byte-identical until each is decided or the kit grows an option:
+
+- Approval: Scratch draws a card in the transcript with the raw arguments in a code box, and its buttons read Approve, Approve for session and Deny. The kit's bar sits above the composer, reads Approve, For session and Deny, and shows tool, target and diff, with the arguments only as a details view. Keys `agent-approve-<id>`, `agent-approve-session-<id>` and `agent-deny-<id>` that tests use would change.
+- Edit rows: the kit's undo is a void callback and its row cannot show that an undo is running or failed; Scratch's finishes later and reports.
+- Composer: the kit composer clears its text when it submits. Scratch clears it only after the send worked, so the draft, the mentions and the quote survive a failure; this needs the host to keep or restore them (the kit takes a `controller`) or a kit option, and `agent_composer_input_test.dart` is what proves it.
+- Transcript: Scratch groups a turn's messages, activity, edits and cells into one `AgentTurn` item per outline segment; the kit's items are flatter. The mapping in increment 1 has to carry segment ids so the outline and "keep message position" still find their rows.
