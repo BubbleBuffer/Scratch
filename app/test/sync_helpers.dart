@@ -81,6 +81,12 @@ Future<String> makeConflict(WidgetTester tester, OtherDevice other, String title
     await real(tester, () => other.client!.syncOnce());
   }
   await core(tester, (v) => v.apply(page, [setText(here)]));
+  // Loro stamps each change in whole seconds. When both edits share a second,
+  // the shown text falls to the device-id tie-break, and the device id is
+  // random per vault, so the text would differ between runs. Flushing the
+  // first edit and waiting past a second boundary makes the later edit win.
+  await real(tester, () => current.vault.flush());
+  await real(tester, () => Future<void>.delayed(const Duration(milliseconds: 1100)));
   await real(tester, () => other.vault.apply(page, [setText(there)]));
   await real(tester, () => current.vault.flush());
   await real(tester, () => other.vault.flush());

@@ -71,7 +71,7 @@ Current Linux machine checks (2026-10-14): the locked workspace gate passes with
 - 2026-10-13: The conflict screen labels the sides Local and Cloud.
 - 2026-10-14: Undo of an ordinary resolution returns the conflict to pending review on every device.
 - 2026-10-14: `UseSide` and undo restore missing ancestors in their original order; with no usable version, the content is appended at the page root and logged.
-- 2026-10-14: Text edited on both sides shows the side with the later edit time, ties going to the greater device id, and still waits for a tap.
+- 2026-10-14: Text edited on both sides shows the side with the later edit time, ties going to the greater device id, and still waits for a tap. Edit times come from Loro change timestamps, which have whole-second resolution, so two edits in the same second tie. A device id is generated once per vault folder, so a tie can flip between runs.
 - 2026-10-14: Purge records carry the purging device id behind the `X-Purge-Device` capability.
 - 2026-10-14: Settings > Conflicts shows a 30-day "Recent" log below the pending list.
 
