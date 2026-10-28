@@ -11508,8 +11508,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BOp dco_decode_b_op(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 11)
-      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
     return BOp(
       op: dco_decode_op_kind(arr[0]),
       id: dco_decode_String(arr[1]),
@@ -11522,6 +11522,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       target: dco_decode_opt_String(arr[8]),
       color: dco_decode_opt_String(arr[9]),
       width: dco_decode_opt_box_autoadd_u_32(arr[10]),
+      numberedStart: dco_decode_opt_box_autoadd_u_32(arr[11]),
     );
   }
 
@@ -12199,8 +12200,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   FlatBlock dco_decode_flat_block(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return FlatBlock(
       id: dco_decode_String(arr[0]),
       kind: dco_decode_String(arr[1]),
@@ -12211,6 +12212,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       target: dco_decode_opt_String(arr[6]),
       color: dco_decode_opt_String(arr[7]),
       width: dco_decode_opt_box_autoadd_u_32(arr[8]),
+      numberedStart: dco_decode_opt_box_autoadd_u_32(arr[9]),
     );
   }
 
@@ -14736,6 +14738,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_target = sse_decode_opt_String(deserializer);
     var var_color = sse_decode_opt_String(deserializer);
     var var_width = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_numberedStart = sse_decode_opt_box_autoadd_u_32(deserializer);
     return BOp(
       op: var_op,
       id: var_id,
@@ -14748,6 +14751,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       target: var_target,
       color: var_color,
       width: var_width,
+      numberedStart: var_numberedStart,
     );
   }
 
@@ -15503,6 +15507,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_target = sse_decode_opt_String(deserializer);
     var var_color = sse_decode_opt_String(deserializer);
     var var_width = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_numberedStart = sse_decode_opt_box_autoadd_u_32(deserializer);
     return FlatBlock(
       id: var_id,
       kind: var_kind,
@@ -15513,6 +15518,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       target: var_target,
       color: var_color,
       width: var_width,
+      numberedStart: var_numberedStart,
     );
   }
 
@@ -18515,6 +18521,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.target, serializer);
     sse_encode_opt_String(self.color, serializer);
     sse_encode_opt_box_autoadd_u_32(self.width, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.numberedStart, serializer);
   }
 
   @protected
@@ -19212,6 +19219,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.target, serializer);
     sse_encode_opt_String(self.color, serializer);
     sse_encode_opt_box_autoadd_u_32(self.width, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.numberedStart, serializer);
   }
 
   @protected

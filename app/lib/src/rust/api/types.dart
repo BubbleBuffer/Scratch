@@ -281,6 +281,10 @@ class BOp {
   final String? color;
   final int? width;
 
+  /// Initial start for Insert, or the value for SetNumberedStart.
+  /// None or 1 clears an explicit start for SetNumberedStart.
+  final int? numberedStart;
+
   const BOp({
     required this.op,
     required this.id,
@@ -293,6 +297,7 @@ class BOp {
     this.target,
     this.color,
     this.width,
+    this.numberedStart,
   });
 
   @override
@@ -307,7 +312,8 @@ class BOp {
       checked.hashCode ^
       target.hashCode ^
       color.hashCode ^
-      width.hashCode;
+      width.hashCode ^
+      numberedStart.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -324,7 +330,8 @@ class BOp {
           checked == other.checked &&
           target == other.target &&
           color == other.color &&
-          width == other.width;
+          width == other.width &&
+          numberedStart == other.numberedStart;
 }
 
 /// A named calendar for task notes. Both switches are independent.
@@ -983,6 +990,9 @@ class FlatBlock {
   /// Image width in percent of the text column, None for the full width.
   final int? width;
 
+  /// First number of a numbered-list run; None uses the default start of 1.
+  final int? numberedStart;
+
   const FlatBlock({
     required this.id,
     required this.kind,
@@ -993,6 +1003,7 @@ class FlatBlock {
     this.target,
     this.color,
     this.width,
+    this.numberedStart,
   });
 
   @override
@@ -1005,7 +1016,8 @@ class FlatBlock {
       depth.hashCode ^
       target.hashCode ^
       color.hashCode ^
-      width.hashCode;
+      width.hashCode ^
+      numberedStart.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1020,7 +1032,8 @@ class FlatBlock {
           depth == other.depth &&
           target == other.target &&
           color == other.color &&
-          width == other.width;
+          width == other.width &&
+          numberedStart == other.numberedStart;
 }
 
 /// One board column.
@@ -1192,6 +1205,7 @@ enum OpKind {
   setTarget,
   setColor,
   setWidth,
+  setNumberedStart,
 }
 
 /// A page with its blocks and metadata.
