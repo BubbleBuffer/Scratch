@@ -130,20 +130,21 @@ void main() {
   appTest('a chapter card lists its decisions and sections; with none, no '
       'row', (tester) async {
     await pumpHistoryChat(tester, await _openedStore(tester));
+    // The list is scrolled up from the boundary: the last part of the split
+    // chapter, then its first part, then the first chapter.
+    await scrollUpTo(tester, key('history-chapter-ch2#2-toggle'));
+    expect(key('history-chapter-ch2#2-decision-0'), findsOneWidget);
+    expect(key('history-chapter-ch2#2-section-0'), findsNothing);
+    expect(find.text('12 messages · 2 episodes'), findsOneWidget);
+    await scrollUpTo(tester, key('history-chapter-ch2#1-toggle'));
+    expect(key('history-chapter-ch2#1-decision-0'), findsNothing);
+    expect(key('history-chapter-ch2#1-section-0'), findsNothing);
     await scrollUpTo(tester, key('history-chapter-ch1-toggle'));
     expect(key('history-chapter-ch1-decision-0'), findsOneWidget);
     expect(find.text('Hold the last value on reconnect.'), findsOneWidget);
     expect(key('history-chapter-ch1-section-0'), findsOneWidget);
     expect(find.text('Hold the figure'), findsOneWidget);
     expect(find.text('18 messages · 2 episodes · 2 sections'), findsOneWidget);
-    // The split chapter: nothing on the first part, a decision (and no
-    // sections row) on the last.
-    await scrollUpTo(tester, key('history-chapter-ch2#2-toggle'));
-    expect(key('history-chapter-ch2#1-decision-0'), findsNothing);
-    expect(key('history-chapter-ch2#1-section-0'), findsNothing);
-    expect(key('history-chapter-ch2#2-decision-0'), findsOneWidget);
-    expect(key('history-chapter-ch2#2-section-0'), findsNothing);
-    expect(find.text('12 messages · 2 episodes'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
