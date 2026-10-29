@@ -82,7 +82,7 @@ jobs:
           name: notes-windows-${{ steps.sha.outputs.short }}
           path: app/build/windows/x64/runner/Release
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
       # Inno Setup 6 ships on windows-latest; choco installs it if the image ever drops it.
       - name: Build installer
         id: installer
@@ -107,7 +107,7 @@ jobs:
           name: scratch-setup-${{ steps.sha.outputs.short }}
           path: app/${{ steps.installer.outputs.file }}
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   cli:
     name: notes cli and scratch-cli (windows)
@@ -136,11 +136,11 @@ jobs:
           name: notes-cli-windows-${{ steps.sha.outputs.short }}
           path: target/release/notes.exe
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
       - name: Upload scratch-cli.exe
         uses: actions/upload-artifact@v4
         with:
           name: scratch-cli-windows
           path: target/release/scratch-cli.exe
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
