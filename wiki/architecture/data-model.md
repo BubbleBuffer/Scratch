@@ -35,6 +35,12 @@ During a Markdown folder import, every JSON string value anywhere in type data t
 - **A view** is a saved query (filter, sort, group) plus a renderer: list, table, board, calendar, timeline, gallery. A calendar is a view over pages with a date property, so tasks, events and Google Calendar entries all appear there.
 - Views can also query across collections, for example "everything with a date this week".
 
+### View blocks
+
+A `view` block displays a page's children using the settings of a `ViewDef` in its JSON text. The block id is the view id; a stored `id` is ignored. `source` is `"contents"` (also the default when missing), and the optional block target is the source page id; no target means the page containing the block. Markdown uses a `view` fence containing that JSON object, with an optional `page` field for the target.
+
+The planned first-open migration is not yet implemented: concurrent insertion of the same logical block id creates distinct CRDT tree nodes, so it needs a safe way to preserve independent edits after sync.
+
 ## Links
 
 - Links point at page ids, not paths, so renaming or moving a page never breaks them. Backlinks are computed by the index.

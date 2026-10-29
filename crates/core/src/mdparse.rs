@@ -752,8 +752,8 @@ impl Parser<'_, '_> {
                 }
                 if ind > li {
                     let kids = self.level(ind);
-                    if out.last().is_some_and(|last| last.kind == BlockKind::Query) {
-                        // A query card is a leaf; following indented blocks
+                    if out.last().is_some_and(|last| matches!(last.kind, BlockKind::Query | BlockKind::View)) {
+                        // Query and view cards are leaves; following indented blocks
                         // remain separate blocks rather than becoming children.
                         out.extend(kids);
                     } else {
@@ -884,6 +884,7 @@ impl Parser<'_, '_> {
             let run = s.bytes().take_while(|&c| c == f.as_bytes()[0]).count();
             let info = s[run..].trim();
             let query = info == "query";
+            let view = info == "view";
             let mut text = Vec::new();
             while self.i < self.lines.len() {
                 let l = self.lines[self.i];
@@ -894,16 +895,34 @@ impl Parser<'_, '_> {
                     .count();
                 if closing.starts_with(f)
                     && indent_of(l) <= ind + 3
-                    && (!query || (close_run >= run && closing[close_run..].trim().is_empty()))
+                    && (!(query || view) || (close_run >= run && closing[close_run..].trim().is_empty()))
                 {
                     break;
                 }
                 text.push(strip_indent(l, ind).trim_end_matches('\r'));
             }
-            let kind = if query { BlockKind::Query } else { BlockKind::Code };
+            let kind = if query {
+                BlockKind::Query
+            } else if view {
+                BlockKind::View
+            } else {
+                BlockKind::Code
+            };
             let mut b = PBlock::new(kind, &text.join("\n"));
             b.literal = true;
-            b.target = (!query && !info.is_empty()).then(|| info.to_string());
+            b.target = (!(query || view) && !info.is_empty()).then(|| info.to_string());
+            if view {
+                // `page` belongs to the fence transport, while the stored text
+                // contains the view settings and source. Leave invalid JSON
+                // intact so it can be corrected in the editor.
+                if let Ok(serde_json::Value::Object(mut object)) = serde_json::from_str(&b.raw) {
+                    if let Some(page) = object.get("page").and_then(|v| v.as_str()).map(str::to_owned) {
+                        object.remove("page");
+                        b.target = Some(page);
+                        b.raw = serde_json::to_string(&object).expect("view JSON object");
+                    }
+                }
+            }
             return b;
         }
         if let Some(q) = s.strip_prefix('>') {
@@ -1905,6 +1924,61 @@ mod tests {
         assert_eq!(blocks[1].target, None);
         assert_eq!(blocks[1].text, "plain");
         assert_eq!(blocks[2].target.as_deref(), Some("py"));
+    }
+
+    #[test]
+    fn view_fences_round_trip_settings_source_and_optional_page() {
+        let definition = serde_json::json!({
+            "id": "view-1", "name": "Rows", "kind": "Table",
+            "filter": null, "sorts": [], "group_by": null,
+            "date_prop": null, "visible_props": ["status"],
+            "card_cover": null, "config": "{}",
+            "source": "is:todo\n```literal```\n[[Home]] *raw*"
+        });
+        for page in [None, Some("page-1")] {
+            let mut input = definition.clone();
+            if let Some(page) = page {
+                input["page"] = page.into();
+            }
+            let source = format!("````view\n{}\n````\n", input);
+            let blocks = parse_blocks(&source, &mut Recorder::default());
+            assert_eq!(blocks.len(), 1);
+            assert_eq!(blocks[0].kind, BlockKind::View);
+            assert_eq!(blocks[0].target.as_deref(), page);
+            assert_eq!(serde_json::from_str::<serde_json::Value>(&blocks[0].text).unwrap(), definition);
+            assert!(blocks[0].marks.is_empty());
+
+            let mut rendered = String::new();
+            crate::markdown::render_blocks(
+                &blocks, "", &std::collections::HashMap::new(), &|_| None, &mut rendered,
+            );
+            assert!(rendered.contains("````view\n"));
+            let restored = parse_blocks(&rendered, &mut Recorder::default());
+            assert_eq!(restored, blocks);
+        }
+    }
+
+    #[test]
+    fn view_fences_keep_unbound_text_and_do_not_absorb_children() {
+        let source = "````view\n{\n  \"source\": \"```literal```\"\n}\n\n````\n  after\n";
+        let blocks = parse_blocks(source, &mut Recorder::default());
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].text, "{\n  \"source\": \"```literal```\"\n}\n");
+        assert!(blocks[0].children.is_empty());
+        assert_eq!(blocks[1].text, "after");
+        let mut rendered = String::new();
+        crate::markdown::render_blocks(
+            &blocks, "", &std::collections::HashMap::new(), &|_| None, &mut rendered,
+        );
+        assert_eq!(parse_blocks(&rendered, &mut Recorder::default()), blocks);
+    }
+
+    #[test]
+    fn view_fences_keep_invalid_json_for_editing() {
+        let blocks = parse_blocks("~~~view\n{ unfinished *raw*\n~~~\n", &mut Recorder::default());
+        assert_eq!(blocks[0].kind, BlockKind::View);
+        assert_eq!(blocks[0].text, "{ unfinished *raw*");
+        assert!(blocks[0].marks.is_empty());
     }
 
     #[test]

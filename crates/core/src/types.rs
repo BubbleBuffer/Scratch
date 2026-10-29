@@ -380,6 +380,10 @@ block_kinds! {
     /// the block has no children and contributes no body text to search.
     #[serde(rename = "query")]
     Query => "query",
+    /// A saved contents view. `target` is the source page id (None means
+    /// this page); `text` holds ViewDef JSON with `source: "contents"`.
+    #[serde(rename = "view")]
+    View => "view",
 }
 
 /// An inline mark. `start` and `end` count Unicode scalar values (Rust
