@@ -25,11 +25,11 @@ List<BOp> gettingStartedOps() {
     (Kinds.todo, 'Type @ or [[ and a page name to link it.', false),
     (Kinds.todo, 'Pages that link here are listed at the bottom.', false),
     (Kinds.todo, 'Pages open on top of each other. Click the edge on the left, or press Esc, to go back.', false),
-    (Kinds.heading2, 'Databases', false),
-    (Kinds.paragraph, 'Tasks and Calendar are databases: every row is a page with properties.', false),
-    (Kinds.todo, 'Switch views (Table, Board, Calendar) with the tabs above.', false),
-    (Kinds.todo, 'Add a property with the + at the end of the header.', false),
-    (Kinds.todo, 'Type /database to make your own.', false),
+    (Kinds.heading2, 'Pages inside pages', false),
+    (Kinds.paragraph, 'Any page can hold other pages. Tasks and Calendar are pages too: each task and event is a page inside them.', false),
+    (Kinds.todo, 'Type /view to list the pages inside a page. Choose List, Table, Board or Calendar in the view’s menu.', false),
+    (Kinds.todo, 'Switch between a page’s views with the tabs above them.', false),
+    (Kinds.todo, 'Add a property such as Status or Due to one page, then add it to the pages next to it.', false),
     (Kinds.heading2, 'Plan your day with Today', false),
     (
       Kinds.paragraph,
@@ -38,7 +38,7 @@ List<BOp> gettingStartedOps() {
     ),
     (
       Kinds.paragraph,
-      'Give any to-do a date by typing @today or @tomorrow, or choose Set date in its block menu. It will appear in Today alongside the Tasks and Calendar databases.',
+      'Give any to-do a date by typing @today or @tomorrow, or choose Set date in its block menu. It will appear in Today alongside Tasks and Calendar.',
       false,
     ),
     (
