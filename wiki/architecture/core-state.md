@@ -7,6 +7,12 @@ status: current
 covers: ["crates/core/**"]
 ---
 
+
+Current build source (2026-10-29): Scratch resolves BubblePaw through the public
+`BubbleBuffer/BubblePaw-Core` Cargo git source at tag `v0.3.1`, pinned in
+`Cargo.lock`. Current builds need no `BubblePaw-base-agent` sibling. Commands
+below containing `--with ...BubblePaw-base-agent` record historical runs only;
+retain the matching dependency checkout when reproducing those old revisions.
 # Core (state)
 
 **As of 2026-09-30.** `crates/core` (package and library `vault_core`) implements the first core API (internal wiki) and Part A (data features) of the MVP core (internal wiki). Part B (sync) is not built. The core API page (internal wiki) was updated to match the deviations listed at the end. Track B (data features, 2026-10-01) added formula, rollup and files properties, templates for the children of any page, and folder mounts.
