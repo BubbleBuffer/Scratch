@@ -32,7 +32,7 @@ Tasks and events stay ordinary pages and blocks ([data model](../architecture/da
 
 Today stays a top-level shell destination. Its date strip scrolls continuously in both directions, shows weekday and date, marks days with Today-visible agenda items and Journal notes, and shares the selected date with Calendar. Today returns to the current day; the month label opens the jump picker. Left/right select adjacent days while the strip has focus; T returns to today and G opens the picker.
 
-The selected day uses the tasks add-on's compact short cards for timed items, tasks and dated to-dos. Plain `@date` mentions remain excluded by the shared agenda query. Overdue appears only on today. The mockup's initial five-card limit has Show more; overdue and larger done groups have disclosures, while one or two done items are shown directly. Completion and source-page opening use the existing agenda actions.
+The selected day uses the tasks add-on's compact short cards for timed items, tasks and dated to-dos. Plain `@date` mentions remain excluded by the shared agenda query. Overdue appears only on today and is expanded by default (re-expanded on each day change). It has its own budget of five rows with a "Show N more" button, so it never takes rows from today's list; today's rows have a separate five-card limit with Show more. Larger done groups have disclosures, while one or two done items are shown directly. Completion and source-page opening use the existing agenda actions.
 
 The day note embeds the ordinary page editor, editable on past and future dates and created only on first edit. Open as page opens the same document; returning restores inline editing. Embedded mobile editing keeps the existing keyboard toolbar and block menus above the keyboard, including on long notes. Quick capture remains available and writes Task/Note blocks into today's Journal note above Log, leaving Log last. The searchable All pages disclosure and shell navigation remain available; the old greeting, timeline, In motion and recent-card body is removed.
 
@@ -41,6 +41,7 @@ The day note embeds the ordinary page editor, editable on past and future dates 
 - **Journal:** the first daily note creates a top-level database "Journal" with a Date property and agenda role Off. New day notes start with an empty Tasks section and a collapsible Log last, both using the editor's existing toggle blocks; existing notes and Journal templates stay unchanged.
 - **Task links:** the core and bridge expose `link_task_to_day` to add a task page link under Tasks once per day, creating the note or missing Tasks section when needed. The tasks add-on links dated task saves and Calendar rescheduling; undated tasks do not link. Link failures are logged and do not fail a successful task save. Agent tools and database-row date edits are not wired in this round. Linking on a new day keeps the old day's link. `append_log` appends timestamped lines under Log.
 - **One page per day:** each note is titled in the app's long date format and dated with that day.
+- **To-dos in a day note:** an undated to-do in a day note counts as dated to that note's day, so an undone one stays in Overdue on later days until it is done. To-dos outside day notes stay undated and out of the agenda.
 - **Finding the note:** the Journal is found by a page role `journal`, not by its title. If the user renames it, it still works.
 
 ## Spaces and colours
@@ -73,6 +74,7 @@ The day note embeds the ordinary page editor, editable on past and future dates 
   - a Tasks database (status To do / Doing / Done, a Due date);
   - a Calendar database (a Date with time, which makes it Events);
   - the Journal on first use.
+- **With sync configured** nothing is created at boot. The starter pages are created after the first successful sync pull, and only if the vault still has no pages, so a new device does not add its own copy to a synced vault. If the pull fails, nothing is created this launch and the next launch decides again.
 - **A demo vault** (`--dart-define=SEED_DEMO=true`) holds the [direction brief's](../../design/directions/BRIEF.md#same-content-in-every-direction) content with dates relative to today, so every feature has something real on it.
 
 

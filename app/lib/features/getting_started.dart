@@ -158,3 +158,29 @@ Future<String> createGettingStarted(Vault vault, {bool createTasks = true}) asyn
   await createCalendarDatabase(vault);
   return id;
 }
+
+/// Boot-time starter pages for a fresh vault. Without a hub they are created
+/// now; with one configured they wait for [seedStarterPagesAfterPull].
+Future<bool> seedStarterPagesAtBoot(Vault vault, {required bool syncing, bool createTasks = true}) async {
+  if (syncing) return false;
+  await createGettingStarted(vault, createTasks: createTasks);
+  await vault.flush();
+  return true;
+}
+
+/// Whether the sidebar shows any page. Hidden system pages (nodes, calendars,
+/// feedback) are not top-level, and device node records are children of the
+/// nodes page, so none of them count.
+Future<bool> _hasVisiblePages(Vault vault) async => (await vault.listChildren(null, limit: 1)).isNotEmpty;
+
+/// Creates the starter pages once [firstPull] succeeds, and only if the vault
+/// still shows no pages, so synced pages are never joined by a second set. A
+/// pull that fails seeds nothing this launch.
+Future<bool> seedStarterPagesAfterPull(Vault vault, Future<bool> firstPull, {bool createTasks = true}) async {
+  if (!await firstPull) return false;
+  await vault.flush();
+  if (await _hasVisiblePages(vault)) return false;
+  await createGettingStarted(vault, createTasks: createTasks);
+  await vault.flush();
+  return true;
+}
