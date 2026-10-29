@@ -100,6 +100,7 @@ fn block(text: &str) -> Block {
         target: None,
         color: None,
         width: None,
+        numbered_start: None,
     }
 }
 

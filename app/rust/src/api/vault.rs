@@ -497,7 +497,7 @@ impl NotesVault {
     pub fn view_block_def(&self, id: String, text: String) -> ViewDef {
         let block = vault_core::Block {
             id, kind: vault_core::BlockKind::View, text, marks: vec![], checked: false,
-            children: vec![], target: None, color: None, width: None,
+            children: vec![], target: None, color: None, width: None, numbered_start: None,
         };
         view_from(vault_core::ViewBlock::def(&block))
     }
