@@ -59,7 +59,7 @@ void main() {
     expect(sheets(tester).topId, id);
     // Starters under the title, the cat below: nothing else offers a start.
     expect(key('page-starters'), findsOneWidget);
-    for (final k in ['start-blank', 'start-database', 'template-add']) {
+    for (final k in ['start-blank', 'template-add']) {
       expect(key(k), findsOneWidget, reason: k);
     }
     expect(key('template-offer'), findsNothing);

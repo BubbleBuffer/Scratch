@@ -67,7 +67,7 @@ void main() {
   });
 
   group('/ menu', () {
-    test('leads with the everyday blocks, Database and Callout early', () {
+    test('leads with the everyday blocks, View and Callout early', () {
       registerBuiltins();
       final labels = [for (final t in blockRegistry.filter('')) t.menuLabel];
       expect(labels.take(17).toList(), [
@@ -79,7 +79,7 @@ void main() {
         'Heading 3',
         'Bulleted list',
         'Numbered list',
-        'Database',
+        'View',
         'Callout',
         'Quote',
         'Divider',

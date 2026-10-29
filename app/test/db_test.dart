@@ -20,8 +20,7 @@ Future<List<PropDef>> schemaOf(WidgetTester tester) async {
 }
 
 Future<ViewDef> viewNamed(WidgetTester tester, String name) async {
-  await settle(tester);
-  final vs = await core(tester, (v) => v.run((x) => x.listViews(collection: db.projects)));
+  final vs = await viewBlocksOf(tester, db.projects);
   return vs.firstWhere((v) => v.name == name);
 }
 
@@ -314,30 +313,38 @@ void main() {
     dbTest('add, rename, duplicate and delete a view', (tester) async {
       await pumpDb(tester, mobile: false);
       await openView(tester, 'Table');
+      // "+ Add view" adds a List view block after the group and selects it.
       await tapKey(tester, 'add-view');
-      await tapKey(tester, 'layout-board');
-      await escape(tester);
-      var vs = await core(tester, (v) => v.run((x) => x.listViews(collection: db.projects)));
+      var vs = await viewBlocksOf(tester, db.projects);
       expect(vs.length, 7);
       final added = vs.last;
-      expect(added.kind, ViewKind.board);
-      expect(added.groupBy, db.schema['Status']!.key);
+      expect(added.kind, ViewKind.list);
+      expect(dbState(tester).store.view?.id, added.id);
+      // Its tab menu: a layout, then a name.
+      await tapKey(tester, 'tabs-more');
+      await settle(tester);
+      if (byKey('more-view-${added.name}').evaluate().isNotEmpty) await tapKey(tester, 'more-view-${added.name}');
       await tapKey(tester, 'tab-${added.name}');
+      await tapKey(tester, 'view-layout-board');
+      vs = await viewBlocksOf(tester, db.projects);
+      expect(vs.last.kind, ViewKind.board);
+      expect(vs.last.groupBy, db.schema['Status']!.key);
+      await tapKey(tester, 'tab-${vs.last.name}');
       await tester.enterText(byKey('view-name'), 'Kanban');
       await press(tester, LogicalKeyboardKey.enter);
       await escape(tester);
-      vs = await core(tester, (v) => v.run((x) => x.listViews(collection: db.projects)));
+      vs = await viewBlocksOf(tester, db.projects);
       expect(vs.map((v) => v.name), contains('Kanban'));
       await tapKey(tester, 'tab-Kanban');
       await tapKey(tester, 'view-duplicate');
-      vs = await core(tester, (v) => v.run((x) => x.listViews(collection: db.projects)));
+      vs = await viewBlocksOf(tester, db.projects);
       expect(vs.length, 8);
       await tapKey(tester, 'tabs-more');
       await settle(tester);
       if (byKey('more-view-Kanban').evaluate().isNotEmpty) await tapKey(tester, 'more-view-Kanban');
       await tapKey(tester, 'tab-Kanban');
       await tapKey(tester, 'view-delete');
-      vs = await core(tester, (v) => v.run((x) => x.listViews(collection: db.projects)));
+      vs = await viewBlocksOf(tester, db.projects);
       expect(vs.length, 7);
     });
 
@@ -470,19 +477,16 @@ void main() {
       expect(byKey('board-col-Done'), findsOneWidget);
     });
 
-    dbTest('turns a new page into a full-page database', (tester) async {
+    dbTest('a new page offers no Database starter', (tester) async {
       await pumpDb(tester, mobile: false);
       final id = await core(tester, (v) => v.createPage(title: ''));
       await settle(tester);
       nav.openPage(tester.element(find.byType(HomeScreen)), id, '', isNew: true);
       await settle(tester);
-      await tapKey(tester, 'start-database');
-      await settleUntil(tester, () => byKey('table-new').evaluate().isNotEmpty);
-      final schema = await core(tester, (v) => v.run((x) => x.getSchema(collection: id)));
-      expect(schema.map((d) => d.name), contains('Tags'));
+      expect(byKey('page-starters'), findsOneWidget);
+      expect(byKey('start-blank'), findsOneWidget);
       expect(byKey('start-database'), findsNothing);
-      await tapKey(tester, 'table-new');
-      expect(await rowsOf(tester, id), hasLength(1));
+      expect(find.descendant(of: byKey('page-starters'), matching: find.text('Database')), findsNothing);
     });
   });
 }

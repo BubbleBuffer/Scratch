@@ -412,6 +412,18 @@ Future<void> openView(WidgetTester tester, String view, {bool mobile = false}) a
   }
 }
 
+/// The settings of [page]'s view blocks as the core has them, in order.
+Future<List<ViewDef>> viewBlocksOf(WidgetTester tester, String page) async {
+  await settle(tester);
+  return core(tester, (v) async {
+    final p = await v.run((x) => x.loadPage(id: page));
+    return [
+      for (final b in p.blocks)
+        if (b.kind == 'view') await v.run((x) => x.viewBlockDef(id: b.id, text: b.text)),
+    ];
+  });
+}
+
 DatabaseViewState dbState(WidgetTester tester) => tester.state<DatabaseViewState>(find.byType(DatabaseView).first);
 
 /// Moves a mouse over [f] (desktop hover effects).
