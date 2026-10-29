@@ -277,9 +277,10 @@ pub struct Block {
     pub children: Vec<Block>,
     /// What the block points at: the page of a `LinkToPage`, the attachment
     /// of an `Image` or `File`, the URL of a `Bookmark`, or the fence info
-    /// string (language and optional flags) of a `Code` block. Set with
-    /// [`BlockOp::SetTarget`]. For these kinds `text` is the caption (for a
-    /// `File`, its display name).
+    /// string (language and optional flags) of a `Code` block, or the source
+    /// page of a `View` (None means the containing page). Set with
+    /// [`BlockOp::SetTarget`]. Link and media blocks use `text` as their
+    /// caption (for a `File`, its display name); a view stores settings JSON.
     #[serde(default)]
     pub target: Option<String>,
     /// Text or background colour of the whole block, by name:

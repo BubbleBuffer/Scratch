@@ -752,8 +752,8 @@ impl Parser<'_, '_> {
                 }
                 if ind > li {
                     let kids = self.level(ind);
-                    if out.last().is_some_and(|last| matches!(last.kind, BlockKind::Query | BlockKind::View)) {
-                        // Query and view cards are leaves; following indented blocks
+                    if out.last().is_some_and(|last| last.kind == BlockKind::Query) {
+                        // Query cards are leaves; following indented blocks
                         // remain separate blocks rather than becoming children.
                         out.extend(kids);
                     } else {
@@ -1959,13 +1959,13 @@ mod tests {
     }
 
     #[test]
-    fn view_fences_keep_unbound_text_and_do_not_absorb_children() {
+    fn view_fences_keep_unbound_text_and_children() {
         let source = "````view\n{\n  \"source\": \"```literal```\"\n}\n\n````\n  after\n";
         let blocks = parse_blocks(source, &mut Recorder::default());
-        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].text, "{\n  \"source\": \"```literal```\"\n}\n");
-        assert!(blocks[0].children.is_empty());
-        assert_eq!(blocks[1].text, "after");
+        assert_eq!(blocks[0].children.len(), 1);
+        assert_eq!(blocks[0].children[0].text, "after");
         let mut rendered = String::new();
         crate::markdown::render_blocks(
             &blocks, "", &std::collections::HashMap::new(), &|_| None, &mut rendered,

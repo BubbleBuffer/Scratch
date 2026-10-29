@@ -3248,6 +3248,15 @@ impl Vault {
     /// The page with its blocks, properties and details. Pages in the trash
     /// load too (`in_trash` is set).
     pub fn load_page(&self, id: PageId) -> Result<Page> {
+        if self.inner.read(&id, |doc| doc.needs_view_block_upgrade())? {
+            let changed = self.inner.edit(&id, |doc| doc.upgrade_view_blocks())?;
+            if changed {
+                let db = lock(&self.inner.db);
+                self.inner.sync_meta(&db, &id)?;
+                drop(db);
+                self.inner.emit([Change::TreeChanged]);
+            }
+        }
         let in_trash = lock(&self.inner.db).in_trash(&id)?.unwrap_or(false);
         let slot = self.inner.slot(&id)?;
         let mut st = lock(&slot.state);
