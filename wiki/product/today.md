@@ -70,9 +70,9 @@ The day note embeds the ordinary page editor, editable on past and future dates 
 ## First run and demo
 
 - **A fresh vault** starts with:
-  - Getting started, which explains Today, capture and dates, linking pages (@ or [[, backlinks, the page stack) and databases (views, properties, /database);
-  - a Tasks database (status To do / Doing / Done, a Due date);
-  - a Calendar database (a Date with time, which makes it Events);
+  - Getting started, which explains Today, capture and dates, linking pages (@ or [[, backlinks, the page stack) and nesting pages with views (/View, properties);
+  - a Tasks page (status To do / Doing / Done, a Due date; Table and Board views);
+  - a Calendar page (a Date with time, which makes it Events; Calendar and Table views);
   - the Journal on first use.
 - **With sync configured** nothing is created at boot. The starter pages are created after the first successful sync pull, and only if the vault still has no pages, so a new device does not add its own copy to a synced vault. If the pull fails, nothing is created this launch and the next launch decides again.
 - **A demo vault** (`--dart-define=SEED_DEMO=true`) holds the [direction brief's](../../design/directions/BRIEF.md#same-content-in-every-direction) content with dates relative to today, so every feature has something real on it.
