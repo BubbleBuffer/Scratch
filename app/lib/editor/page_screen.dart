@@ -2495,7 +2495,7 @@ class PageEditorState extends State<PageScreen>
       if (target != null && m.start <= offset && offset < m.end) {
         if (focusedId == n.id &&
             !readOnly &&
-            HardwareKeyboard.instance.isControlPressed) {
+            isCommandKeyPressed) {
           return false;
         }
         openPage(target);

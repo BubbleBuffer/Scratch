@@ -403,7 +403,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
                       if (event is PointerScrollEvent &&
                           event.scrollDelta.dy.abs() >
                               event.scrollDelta.dx.abs() &&
-                          !HardwareKeyboard.instance.isControlPressed) {
+                          !isCommandKeyPressed) {
                         GestureBinding.instance.pointerSignalResolver.register(
                           event,
                           (_) {

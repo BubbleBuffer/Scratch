@@ -33,22 +33,28 @@ import 'ai_test.dart' show aiStore, closeAi;
 import 'harness.dart';
 import 'sync_helpers.dart';
 
-/// BubblePaw's fake extension: NOTES_FAKE_EXTENSION, or its debug build
-/// next to this repo.
-String fakeExtension() {
+/// The fake extension built from the public BubblePaw-Core revision pinned
+/// in Cargo.lock. CI builds it and sets NOTES_FAKE_EXTENSION explicitly;
+/// local tests use the same override without assuming a sibling checkout.
+String? get fakeExtensionSkipReason {
   final forced = Platform.environment['NOTES_FAKE_EXTENSION'];
-  if (forced != null && forced.isNotEmpty) return forced;
-  final repo = File(bridgeLibrary()).parent.parent.parent;
-  final sep = Platform.pathSeparator;
-  final p =
-      '${repo.parent.path}${sep}BubblePaw-base-agent${sep}target${sep}debug$sep'
-      'bubblepaw-fake-extension${Platform.isWindows ? '.exe' : ''}';
-  if (!File(p).existsSync()) {
-    fail(
-      'build BubblePaw\'s fake extension (cargo build -p bubblepaw-fake-extension) or set NOTES_FAKE_EXTENSION ($p)',
-    );
+  if (forced == null || forced.isEmpty) {
+    return 'Agent tests require NOTES_FAKE_EXTENSION. Build the public '
+        'BubbleBuffer/BubblePaw-Core revision pinned in Cargo.lock with '
+        '`cargo build -p bubblepaw-runner --features test-fixtures '
+        '--bin bubblepaw-fake-extension`, then set NOTES_FAKE_EXTENSION '
+        'to that executable (see .github/workflows/ci.yml).';
   }
-  return p;
+  if (!File(forced).existsSync()) {
+    return 'NOTES_FAKE_EXTENSION does not name an existing executable: $forced';
+  }
+  return null;
+}
+
+String fakeExtension() {
+  final reason = fakeExtensionSkipReason;
+  if (reason != null) fail(reason);
+  return Platform.environment['NOTES_FAKE_EXTENSION']!;
 }
 
 /// Agent settings with the fake extension as Claude Code.
@@ -146,6 +152,10 @@ Future<String> lastCellResult(WidgetTester tester, AgentStore store) async {
 }
 
 void main() {
+  group('Agent integration', _agentTests, skip: fakeExtensionSkipReason);
+}
+
+void _agentTests() {
   setUpAll(initCore);
 
   appTest('chats: create, rename and delete', (tester) async {

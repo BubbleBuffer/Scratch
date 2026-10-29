@@ -1,7 +1,7 @@
 ---
 type: topic
 layer: state
-summary: "Local amd64 image build and the lead's deployment procedure for notes-hub behind the existing VPS Caddy and Authentik."
+summary: "Remote amd64 image build and the lead's deployment procedure for notes-hub behind the existing VPS Caddy and Authentik."
 parent: "[[architecture/index]]"
 status: current
 ---
@@ -10,7 +10,7 @@ status: current
 
 **Build step 4c, locally verified 2026-10-08.** The linux/amd64 image, archive and deploy kit are built and tested locally. These are instructions for the lead. No VPS connection or deployment was performed. See [Hub server](hub.md) for config and routes, and [the agent plan](../integrations/agent.md) for 4b and the later desktop relay.
 
-The target is **linux/amd64** at **https://notes.example.com**. Build on this Windows PC: the x86_64 VPS has about 9 GB free. The hub joins the external `notes-ingress` Docker network; Caddy terminates TLS and forwards HTTP to `notes-hub:8080`. The hub publishes no host port.
+The target is **linux/amd64** at **https://notes.example.com**. Build on a remote Docker host; the Windows PC sends the Scratch context and saves the image archive. The VPS is a deployment target, not the build host. The hub joins the external `notes-ingress` Docker network; Caddy terminates TLS and forwards HTTP to `notes-hub:8080`. The hub publishes no host port.
 
 ## Authentik
 
@@ -35,13 +35,13 @@ Assign it to the provider's scopes and enable **Include claims in id_token**. Th
 
 ## Build and send the kit
 
-Run from the Scratch repository root in **PowerShell 7.4 or newer**, with `gzip.exe` on PATH and Docker Desktop's Linux engine running. PowerShell 7.4 preserves the binary pipe from `docker save` into gzip:
+Run from the Scratch repository root in **PowerShell 7.4 or newer**, with `gzip.exe` on PATH and a Docker context available for the remote host. Select it with `-DockerContext <context>`; it does not require Docker Desktop or run Cargo on the PC. PowerShell 7.4 preserves the binary pipe from `docker save` into gzip:
 
 ```powershell
 pwsh -File .\deploy\hub\build.ps1
 ```
 
-After the build, run the repeatable local checks:
+The existing smoke harness requires PowerShell and curl on the Docker host with a local daemon, because it connects to its published localhost port. Run it there after the build, not from this PC against the remote daemon:
 
 ```powershell
 pwsh -File .\deploy\hub\smoke.ps1
@@ -52,10 +52,10 @@ The smoke script uses a fake issuer, an ephemeral localhost port and its own thr
 The build script builds `notes-hub:latest` for `linux/amd64` and saves `target/notes-hub.tar.gz`. Its equivalent build command is:
 
 ```powershell
-docker buildx build --platform linux/amd64 --build-context bubblepaw=../BubblePaw-base-agent --file deploy/hub/Dockerfile --tag notes-hub:latest --load .
+docker --context <context> buildx build --platform linux/amd64 --file deploy/hub/Dockerfile --tag notes-hub:latest --load .
 ```
 
-The repo is the build context. Scratch takes `bubblepaw-sdk` and `bubblepaw-mcp` from BubblePaw-Core at tag `v0.2.1` (pinned in `Cargo.lock`), so Cargo fetches them from git and the Rust build needs no sibling checkout. `deploy/hub/Dockerfile` and the `--build-context bubblepaw` line above still copy the pre-v0.2.0 path crates; they do not match this yet and need their own change. Cargo builds `notes_hub` in release mode with `--locked` and BuildKit caches.
+Scratch alone is the build context. Cargo fetches `bubblepaw-sdk` and `bubblepaw-mcp` from the public BubblePaw-Core repository at tag `v0.3.1`, pinned to `f3603685a040196617f1fb894978493fbe992349` in `Cargo.lock`. The Dockerfile reads the unique Core revision from that lockfile and fetches the same commit for the Claude Code extension, including its frozen Bun lockfile. No named build context or sibling checkout is needed. Cargo builds `notes_hub` in release mode with `--locked` and BuildKit caches. These source changes do not establish a new successful image build; historical verification below predates them.
 
 Pins: Rust **1.97.1** (`rust:1.97.1-bookworm`), Node **22.18.0** (`node:22.18.0-bookworm-slim`), Bun **1.4.2**, Claude Code **2.1.293**. The Codex CLI was removed from the image on 2026-10-25, with the hub's move to the four [hub models](hub.md#agent-models-and-credentials). Runtime base: `debian:bookworm-slim`. Docker reports **2,387,570,531 bytes** (2.39 GB / 2.22 GiB); `target/notes-hub.tar.gz` is **672,359,162 bytes** (672 MB / 641 MiB). Node, Bun and both CLI version commands passed as `hub`.
 
@@ -276,11 +276,11 @@ The [restore verifier](../../deploy/hub/backup/restore-test.sh) runs on the Dock
 
 The hub image is built and deployed from the private scratch-ops repo. The former private repo's `hub-image.yml` is retired; see the history bullet.
 
-- **Repos:** `BubbleBuffer/Scratch` (public) is the source. `BubbleBuffer/scratch-ops` (private) holds the `hub-deploy` workflow, the VPS deploy key and the private patterns. The hub image takes the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.2.1`.
+- **Repos:** `BubbleBuffer/Scratch` (public) is the source. `BubbleBuffer/scratch-ops` (private) holds the `hub-deploy` workflow, the VPS deploy key and the private patterns. The hub image takes the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.3.1`.
 - **Trigger:** by hand, from scratch-ops:
   `gh workflow run hub-deploy.yml -R BubbleBuffer/scratch-ops -f ref=<tag> -f dry_run=false`
   `dry_run=true` runs the build without the deploy.
-- **Build:** the workflow builds the image from Scratch at `ref`, with the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.2.1`, and pushes `ghcr.io/bubblebuffer/scratch-hub:<sha>`. The package is private. The workflow runs on the home build server, not on GitHub-hosted runners.
+- **Build:** the workflow builds the image from Scratch at `ref`, with the BubblePaw-Core commit that `Cargo.lock` pins for tag `v0.3.1`, and pushes `ghcr.io/bubblebuffer/scratch-hub:<sha>`. The package is private. The workflow runs on the home build server, not on GitHub-hosted runners.
 - **Deploy:** the workflow connects to the VPS with a key whose `authorized_keys` entry is `restrict,command="/opt/notes-hub/deploy.sh"`, so it can run nothing else. The 40-character commit sha goes as the command and a GHCR token on stdin. [deploy.sh](../../deploy/hub/deploy.sh):
   - logs in to GHCR in a temporary `DOCKER_CONFIG`, so no lasting token sits on the VPS
   - pulls `ghcr.io/bubblebuffer/scratch-hub:<sha>`, keeps the current `notes-hub:latest` as `notes-hub:previous` and retags the new image as `notes-hub:latest`

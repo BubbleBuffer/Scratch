@@ -79,7 +79,7 @@ class _NotesShellState extends State<NotesShell> {
                   child: CallbackShortcuts(
                     bindings: {
                       for (final c in commandRegistry.all)
-                        for (final s in c.shortcuts)
+                        for (final s in c.boundShortcuts)
                           s: () {
                             final ctx = navKey.currentContext;
                             if (ctx != null) commandRegistry.run(c.id, ctx);
