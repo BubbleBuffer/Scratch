@@ -827,15 +827,7 @@ class CollectionStore extends ChangeNotifier {
     _changed();
     final promotes = loaded && pageType == documentType;
     final r = await _write((v) => v.setSchema(collection: collection, schema: next));
-    if (promotes) {
-      // The core gives a document its first saved view when it gets
-      // properties; the page shows its children through view blocks, so
-      // the saved view goes again before it is migrated into a block.
-      pageType = databaseType;
-      for (final v in await vault.run((x) => x.listViews(collection: collection))) {
-        await _write((x) => x.deleteView(collection: collection, viewId: v.id));
-      }
-    }
+    if (promotes) pageType = databaseType;
     if (_inactive) return r;
     schema = r;
     _changed();

@@ -103,6 +103,12 @@ fn migration_pending(doc: &PageDoc) -> bool {
 }
 
 impl PageDoc {
+    /// Records that the page has no saved views left to migrate.
+    pub(crate) fn mark_view_blocks_current(&mut self) -> Result<()> {
+        self.doc.get_map("page").insert("views_migrated", 1_i64)?;
+        Ok(())
+    }
+
     /// A cheap preflight lets ordinary opens avoid a write transaction and
     /// leaves their decoded block cache cold. Repairs still run after sync,
     /// including on databases already converted to documents.

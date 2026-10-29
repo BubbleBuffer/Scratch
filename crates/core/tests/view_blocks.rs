@@ -697,3 +697,18 @@ fn conflicting_view_copies_keep_all_state_and_children_through_concurrent_repair
     a.load_page(page.clone()).unwrap();
     assert_eq!(snapshot(&a, &page).oplog_vv(), before);
 }
+
+#[test]
+fn page_given_properties_now_gets_no_view_block_from_its_saved_view() {
+    let temp = TempVault::new();
+    let vault = temp.open();
+    let page = vault.create_page(None, "Projects".into()).unwrap();
+    vault.set_schema(page.clone(), non_title_schema()).unwrap();
+    let opened = vault.load_page(page.clone()).unwrap();
+    assert_eq!(opened.page_type, PAGE_TYPE_DATABASE);
+    assert!(opened.blocks.is_empty());
+
+    let other = vault.create_page(None, "Reading".into()).unwrap();
+    vault.make_collection(other.clone()).unwrap();
+    assert!(vault.load_page(other).unwrap().blocks.is_empty());
+}
