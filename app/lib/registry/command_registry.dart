@@ -24,8 +24,12 @@ class Command {
   final String label;
   final Ico? icon;
 
-  /// Desktop keyboard shortcuts.
+  /// Desktop keyboard shortcuts, declared with Ctrl.
   final List<SingleActivator> shortcuts;
+
+  /// [shortcuts] as the platform binds them: Cmd instead of Ctrl on macOS.
+  List<SingleActivator> get boundShortcuts =>
+      [for (final s in shortcuts) platformActivator(s)];
 
   /// Runs the command; [context] is inside the app's navigator.
   final void Function(BuildContext context) run;
@@ -55,7 +59,7 @@ class CommandRegistry {
   /// Shortcut bindings for [context] (for CallbackShortcuts).
   Map<ShortcutActivator, VoidCallback> bindings(BuildContext context) => {
         for (final c in _commands.values)
-          for (final s in c.shortcuts) s: () => run(c.id, context),
+          for (final s in c.boundShortcuts) s: () => run(c.id, context),
       };
 }
 
@@ -63,6 +67,6 @@ class CommandRegistry {
 final commandRegistry = _showShortcutsInTooltips(CommandRegistry());
 
 CommandRegistry _showShortcutsInTooltips(CommandRegistry registry) {
-  AppTooltip.commandShortcuts = (id) => registry.of(id)?.shortcuts;
+  AppTooltip.commandShortcuts = (id) => registry.of(id)?.boundShortcuts;
   return registry;
 }

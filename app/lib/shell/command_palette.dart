@@ -39,7 +39,7 @@ PaletteCommand _paletteCommand(Command c, {required bool enabled}) {
     id: c.id,
     title: c.label,
     icon: c.icon,
-    shortcutLabel: c.shortcuts.isEmpty ? null : shortcutLabel(c.shortcuts.first),
+    shortcutLabel: c.shortcuts.isEmpty ? null : shortcutText(c.shortcuts.first),
     enabled: enabled,
     disabledReason: enabled
         ? null

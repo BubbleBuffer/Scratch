@@ -172,7 +172,9 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
         }
         return CallbackShortcuts(
           bindings: {
-            const SingleActivator(LogicalKeyboardKey.keyJ, control: true): () =>
+            platformActivator(
+              const SingleActivator(LogicalKeyboardKey.keyJ, control: true),
+            ): () =>
                 unawaited(toggleAgentPanel(context)),
           },
           child: Navigator(
@@ -221,7 +223,7 @@ class AgentPanelToggle extends StatelessWidget {
       builder: (context, _) => IconBtn(
         Ico.comment,
         key: const ValueKey('agent-panel-toggle'),
-        semanticLabel: 'Toggle agent panel (Ctrl+J)',
+        semanticLabel: 'Toggle agent panel (${shortcutHint('Ctrl+J')})',
         tooltip: 'Toggle agent panel',
         command: 'agent.open',
         selected: app.ui.agentPanelOpen,

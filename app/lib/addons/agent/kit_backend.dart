@@ -333,6 +333,14 @@ class ScratchKitBackend implements kit.AgentBackend {
       Future.error(_readOnly(kit.KitCapability.models));
 
   @override
+  Future<kit.ProviderSetup> listProviders() =>
+      Future.error(_readOnly(kit.KitCapability.providers));
+
+  @override
+  Future<kit.ProviderSetup> setDefaultModel(String modelId) =>
+      Future.error(_readOnly(kit.KitCapability.defaultModel));
+
+  @override
   Future<void> setProfile(String chatId, String profileId) =>
       Future.error(_readOnly(kit.KitCapability.profiles));
 

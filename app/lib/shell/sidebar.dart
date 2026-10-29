@@ -63,7 +63,8 @@ bool _standsInForSidebar(BuildContext context) {
 
 /// Semantic label for the feedback buttons. Their visible tooltip is AppTooltip
 /// with "Send feedback" and the shortcut from the registry (command feedback.send).
-const feedbackButtonLabel = 'Send feedback (Ctrl+Shift+F)';
+String get feedbackButtonLabel =>
+    'Send feedback (${shortcutHint('Ctrl+Shift+F')})';
 
 /// Runs the `feedback.send` command (the feedback sheet).
 void sendFeedback(BuildContext context) =>
@@ -926,7 +927,7 @@ class _NavRowState extends State<_NavRow> {
                 Opacity(
                   opacity: 0.7,
                   child: Text(
-                    'Ctrl K',
+                    shortcutHint('Ctrl K'),
                     style: ts(
                       const TypeSpec(11, 15, 400),
                       c.railMuted,
