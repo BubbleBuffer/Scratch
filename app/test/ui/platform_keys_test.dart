@@ -35,8 +35,8 @@ void main() {
     expect(bound.meta, isTrue);
     expect(bound.shift, isTrue);
     expect(bound.trigger, LogicalKeyboardKey.keyF);
-    expect(shortcutText(_ctrlShiftF), '⌘⇧F');
-    expect(shortcutText(platformActivator(_ctrlShiftF)), '⌘⇧F');
+    expect(shortcutText(_ctrlShiftF), '⇧⌘F');
+    expect(shortcutText(platformActivator(_ctrlShiftF)), '⇧⌘F');
     expect(shortcutHint('Ctrl+Shift+F'), '⇧⌘F');
     expect(shortcutHint('Ctrl+J'), '⌘J');
     expect(shortcutHint('Ctrl K'), '⌘K');
