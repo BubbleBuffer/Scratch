@@ -5,8 +5,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/agent_kit"
-      ref: "9514e1507681afd31f5167cc1dae141ebedbc7ab"
-      resolved-ref: "9514e1507681afd31f5167cc1dae141ebedbc7ab"
+      ref: "56805cb47a84eb5619826a21d4f7269e1cc69963"
+      resolved-ref: "56805cb47a84eb5619826a21d4f7269e1cc69963"
       url: "https://github.com/BubbleBuffer/agent-kit.git"
     source: git
     version: "0.15.1"
@@ -14,8 +14,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/agent_kit_core"
-      ref: "9514e1507681afd31f5167cc1dae141ebedbc7ab"
-      resolved-ref: "9514e1507681afd31f5167cc1dae141ebedbc7ab"
+      ref: "56805cb47a84eb5619826a21d4f7269e1cc69963"
+      resolved-ref: "56805cb47a84eb5619826a21d4f7269e1cc69963"
       url: "https://github.com/BubbleBuffer/agent-kit.git"
     source: git
     version: "0.15.1"

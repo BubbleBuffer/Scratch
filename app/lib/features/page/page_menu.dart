@@ -201,13 +201,13 @@ class _PageMenuState extends State<PageMenu> {
             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
               SpaceDot(meta.color), const SizedBox(width: 6), ico(Ico.chevronRight),
             ])),
-      row('copy-link', ico(Ico.link), 'Copy link', () => onAction(PageMenuAction.copyLink), shortcut: 'Ctrl+L'),
+      row('copy-link', ico(Ico.link), 'Copy link', () => onAction(PageMenuAction.copyLink), shortcut: shortcutHint('Ctrl+L')),
       if (widget.canShare) row('share', icx(Ix.linkPage), shareMenuLabel(_shareCount), () => onAction(PageMenuAction.share)),
-      row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: 'Ctrl+D'),
+      row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: shortcutHint('Ctrl+D')),
       row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo)),
       if (widget.canAskAi) row('ask-ai', AiMark(size: iconSize), 'Ask AI', () => onAction(PageMenuAction.askAi)),
       sep(),
-      row('undo', ico(Ico.undo), 'Undo', canUndo ? () => onAction(PageMenuAction.undo) : null, shortcut: 'Ctrl+Z'),
+      row('undo', ico(Ico.undo), 'Undo', canUndo ? () => onAction(PageMenuAction.undo) : null, shortcut: shortcutHint('Ctrl+Z')),
       row('history', icx(Ix.history), 'Page history', () => onAction(PageMenuAction.history)),
       row('trash', icx(Ix.restore), 'Show deleted pages', () => onAction(PageMenuAction.trash)),
       row('delete', ico(Ico.trash, danger: true), 'Delete', () => onAction(PageMenuAction.delete), danger: true),
@@ -215,7 +215,7 @@ class _PageMenuState extends State<PageMenu> {
       row('import', icx(Ix.import), 'Import', () => onAction(PageMenuAction.import)),
       row('export', icx(Ix.export), 'Export', () => onAction(PageMenuAction.export)),
       sep(),
-      row('feedback', icx(Ix.feedback), 'Send feedback', () => onAction(PageMenuAction.feedback), shortcut: 'Ctrl+Shift+F'),
+      row('feedback', icx(Ix.feedback), 'Send feedback', () => onAction(PageMenuAction.feedback), shortcut: shortcutHint('Ctrl+Shift+F')),
     ]);
   }
 }
