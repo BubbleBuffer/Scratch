@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [string] $ContextPath = (Join-Path $PSScriptRoot '../..'),
-    [string] $DockerContext = 'docker01'
+    [string] $DockerContext = 'default'
 )
 
 $ErrorActionPreference = 'Stop'

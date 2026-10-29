@@ -10,7 +10,7 @@ status: current
 
 **Build step 4c, locally verified 2026-10-08.** The linux/amd64 image, archive and deploy kit are built and tested locally. These are instructions for the lead. No VPS connection or deployment was performed. See [Hub server](hub.md) for config and routes, and [the agent plan](../integrations/agent.md) for 4b and the later desktop relay.
 
-The target is **linux/amd64** at **https://notes.example.com**. Build on the remote Docker host (`docker01`); the Windows PC sends the Scratch context and saves the image archive. The VPS is a deployment target, not the build host. The hub joins the external `notes-ingress` Docker network; Caddy terminates TLS and forwards HTTP to `notes-hub:8080`. The hub publishes no host port.
+The target is **linux/amd64** at **https://notes.example.com**. Build on a remote Docker host; the Windows PC sends the Scratch context and saves the image archive. The VPS is a deployment target, not the build host. The hub joins the external `notes-ingress` Docker network; Caddy terminates TLS and forwards HTTP to `notes-hub:8080`. The hub publishes no host port.
 
 ## Authentik
 
@@ -35,7 +35,7 @@ Assign it to the provider's scopes and enable **Include claims in id_token**. Th
 
 ## Build and send the kit
 
-Run from the Scratch repository root in **PowerShell 7.4 or newer**, with `gzip.exe` on PATH and the `docker01` Docker context available. The build script defaults to `-DockerContext docker01`; it does not require Docker Desktop or run Cargo on the PC. PowerShell 7.4 preserves the binary pipe from `docker save` into gzip:
+Run from the Scratch repository root in **PowerShell 7.4 or newer**, with `gzip.exe` on PATH and a Docker context available for the remote host. Select it with `-DockerContext <context>`; it does not require Docker Desktop or run Cargo on the PC. PowerShell 7.4 preserves the binary pipe from `docker save` into gzip:
 
 ```powershell
 pwsh -File .\deploy\hub\build.ps1
@@ -52,7 +52,7 @@ The smoke script uses a fake issuer, an ephemeral localhost port and its own thr
 The build script builds `notes-hub:latest` for `linux/amd64` and saves `target/notes-hub.tar.gz`. Its equivalent build command is:
 
 ```powershell
-docker --context docker01 buildx build --platform linux/amd64 --file deploy/hub/Dockerfile --tag notes-hub:latest --load .
+docker --context <context> buildx build --platform linux/amd64 --file deploy/hub/Dockerfile --tag notes-hub:latest --load .
 ```
 
 Scratch alone is the build context. Cargo fetches `bubblepaw-sdk` and `bubblepaw-mcp` from the public BubblePaw-Core repository at tag `v0.3.1`, pinned to `f3603685a040196617f1fb894978493fbe992349` in `Cargo.lock`. The Dockerfile reads the unique Core revision from that lockfile and fetches the same commit for the Claude Code extension, including its frozen Bun lockfile. No named build context or sibling checkout is needed. Cargo builds `notes_hub` in release mode with `--locked` and BuildKit caches. These source changes do not establish a new successful image build; historical verification below predates them.
