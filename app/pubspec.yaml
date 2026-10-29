@@ -28,7 +28,7 @@ dependencies:
   url_launcher: 6.3.3
   notes_bridge:
     path: rust_builder
-  # The shared agent kit, pinned to the commit of kit tag v0.16.0:
+  # The shared agent kit, pinned to the commit of kit tag v0.16.0 plus agent-kit PR 49 (repin to the next tag once it is released):
   # agent_kit_core remains a path dependency of agent_kit, so both direct
   # refs must be the same full commit SHA. The chat's outline and the dev pane use them.
   agent_kit:
