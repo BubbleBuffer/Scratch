@@ -151,4 +151,10 @@ jobs:
         env:
           NOTES_BRIDGE_LIB: ${{ github.workspace }}/scratch/target/release/libnotes_bridge.so
           NOTES_FAKE_EXTENSION: ${{ github.workspace }}/BubblePaw-Core/target/debug/bubblepaw-fake-extension
-        run: flutter test --concurrency=1 test/agent_history_golden_test.dart
+        run: flutter test --concurrency=1 --update-goldens test/agent_history_golden_test.dart
+      - name: TEMP upload re-rendered goldens
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compacted-goldens
+          path: scratch/app/test/goldens/compacted
