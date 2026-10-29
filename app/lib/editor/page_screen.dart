@@ -1584,11 +1584,24 @@ class PageEditorState extends State<PageScreen>
     focusBlock(n, ctl(n).selection.baseOffset);
   }
 
+  /// The start number and `N. ` prefix typed before [caret] when [text]
+  /// begins with one, or null. `1. ` is not one of these: the registry's
+  /// numbered prefix already handles it.
+  (int, String)? _typedNumberedAt(String text, int caret) {
+    final m = RegExp(r'^(\d+)\. ').firstMatch(text);
+    if (m == null || m.end != caret) return null;
+    final start = int.tryParse(m.group(1)!);
+    if (start == null || start > maxNumberedStart) return null;
+    return (start, m.group(0)!);
+  }
+
   bool _markdownShortcut(Node n, TextEditingValue v) {
     if (n.kind != Kinds.paragraph || !v.selection.isCollapsed) return false;
     final hit = blockRegistry.markdownAt(n.text, v.selection.baseOffset);
-    if (hit == null) return false;
-    final (type, prefix) = hit;
+    final typed = hit == null ? _typedNumberedAt(n.text, v.selection.baseOffset) : null;
+    if (hit == null && typed == null) return false;
+    final type = hit?.$1 ?? blockRegistry.of(Kinds.numbered);
+    final prefix = hit?.$2 ?? typed!.$2;
     final d = doc!;
     final c = ctl(n);
     rec('Turn into', () {
@@ -1603,7 +1616,14 @@ class PageEditorState extends State<PageScreen>
       if (!type.editable) {
         _push([n.setTextOp(), ..._turnInto(n, type.kind)]);
       } else {
-        _push([n.setTextOp(), ...d.setKind(n, type.kind)]);
+        final ops = [n.setTextOp(), ...d.setKind(n, type.kind)];
+        // A typed start joins the run above when there is one, and otherwise
+        // starts a new run at that number.
+        final start = typed?.$1;
+        if (start != null && start != 1 && d.prevSibling(n)?.kind != Kinds.numbered) {
+          ops.addAll(d.setNumberedStart(n, start));
+        }
+        _push(ops);
       }
     });
     _typingEntry = null;

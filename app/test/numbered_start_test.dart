@@ -84,6 +84,26 @@ void main() {
     });
   });
 
+  group('numbered run paste', () {
+    setUpAll(initCore);
+
+    test('a pasted run keeps the start number of its first item only', () {
+      final nodes = markdownToNodes('3. a\n4. b');
+      expect([for (final n in nodes) n.numberedStart], [3, null]);
+      final doc = Doc('page', '')..applyOps([
+        _insert('a', start: nodes[0].numberedStart),
+        _insert('b', after: 'a', start: nodes[1].numberedStart),
+      ]);
+      expect([for (final n in doc.roots) numberLabel(n.number, 0)], ['3.', '4.']);
+    });
+
+    test('a run starting at one, a nested run and a run after a bullet', () {
+      final nodes = markdownToNodes('1. a\n2. b\n- x\n  5. c\n  6. d\n3. e');
+      expect([for (final n in nodes) n.numberedStart], [null, null, null, 3]);
+      expect([for (final n in nodes[2].children) n.numberedStart], [5, null]);
+    });
+  });
+
   group('numbered run editor', () {
     setUpAll(initCore);
 

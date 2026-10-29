@@ -11,11 +11,10 @@ import '../../services/addon_services.dart';
 //   page by id or title) open the page.
 // - User messages are not parsed: they stay plain text.
 
-import 'dart:io';
-
 import 'package:agent_kit/agent_kit.dart' as kit show MarkdownRenderer;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/page_link.dart';
 import '../../core/paths.dart' show AppLog;
@@ -28,20 +27,11 @@ import '../../ui/ui.dart';
 /// Opens a web or mail link outside the app. Tests replace it.
 Future<void> Function(String url) openWebLink = _openWithSystem;
 
-/// The desktop's default handler for [url] (the agent runs on Windows and
-/// Linux). No shell is involved, so the URL is passed as one argument.
+/// Opens [url] in the system's default app for it (browser or mail client)
+/// through url_launcher, on every platform the app runs on.
 Future<void> _openWithSystem(String url) async {
   try {
-    if (Platform.isWindows) {
-      await Process.start('rundll32', [
-        'url.dll,FileProtocolHandler',
-        url,
-      ], mode: ProcessStartMode.detached);
-    } else if (Platform.isLinux) {
-      await Process.start('xdg-open', [url], mode: ProcessStartMode.detached);
-    } else if (Platform.isMacOS) {
-      await Process.start('open', [url], mode: ProcessStartMode.detached);
-    }
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   } catch (e) {
     AppLog.info('open link: $e');
   }
