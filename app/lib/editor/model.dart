@@ -95,6 +95,9 @@ class Node {
 /// A new block id in the core's format.
 String newBlockId() => newId();
 
+/// The largest number a numbered run can start at: the core stores it as a u32.
+const maxNumberedStart = 0xFFFFFFFF;
+
 BOp _op(OpKind op, String id,
         {String? parent,
         String? after,
@@ -351,6 +354,14 @@ class Doc {
     n.kind = kind;
     reflatten(); // numbering may change
     return [_op(OpKind.setKind, n.id, kind: kind)];
+  }
+
+  /// Stores [start] as the first number of the numbered run [n] starts, or
+  /// clears it (null starts the run at one).
+  List<BOp> setNumberedStart(Node n, int? start) {
+    n.numberedStart = start;
+    reflatten(); // numbering may change
+    return [_op(OpKind.setNumberedStart, n.id, numberedStart: start)];
   }
 
   List<BOp> setChecked(Node n, bool v) {

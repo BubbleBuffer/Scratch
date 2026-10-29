@@ -31,10 +31,12 @@ class _TodayViewState extends State<TodayView> {
   CalendarSettings? _calendars;
   final Map<String, TaskData> _tasks = {};
   int _generation = 0;
+  // Today's open and done rows share _limit; overdue rows have their own.
   int _limit = 5;
-  bool _overdueOpen = false;
+  int _overdueLimit = 5;
+  bool _overdueOpen = true;
   bool _doneOpen = false;
-  bool _loadingMore = false;
+  bool _loadingOverdue = false;
   bool _creating = false;
 
   @override
@@ -124,21 +126,21 @@ class _TodayViewState extends State<TodayView> {
     }
   }
 
-  Future<void> _more(AgendaStore store, {required bool fetchOverdue}) async {
-    if (_loadingMore) return;
-    final day = store.selectedDay;
-    if (!fetchOverdue) {
-      setState(() => _limit += 5);
+  Future<void> _moreOverdue(AgendaStore store, {required bool fetch}) async {
+    if (_loadingOverdue) return;
+    if (!fetch) {
+      setState(() => _overdueLimit += 5);
       return;
     }
-    setState(() => _loadingMore = true);
+    final day = store.selectedDay;
+    setState(() => _loadingOverdue = true);
     try {
       await store.showMoreOverdue();
       if (mounted && sameDay(day, store.selectedDay) && store.error == null) {
-        setState(() => _limit += 5);
+        setState(() => _overdueLimit += 5);
       }
     } finally {
-      if (mounted) setState(() => _loadingMore = false);
+      if (mounted) setState(() => _loadingOverdue = false);
     }
   }
 
@@ -235,7 +237,10 @@ class _TodayViewState extends State<TodayView> {
     if (_day == null || !sameDay(_day!, store.selectedDay)) {
       _day = store.selectedDay;
       _limit = 5;
-      _overdueOpen = _doneOpen = false;
+      _overdueLimit = 5;
+      // Overdue opens again each day; a collapse applies to that day only.
+      _overdueOpen = true;
+      _doneOpen = false;
     }
     // Calendar can clip an event across days. Today's compact agenda follows
     // its start date, and its core query already applies Show in Today.
@@ -275,19 +280,22 @@ class _TodayViewState extends State<TodayView> {
       return visible;
     }
 
-    final shownOverdue = _overdueOpen ? take(overdue) : <AgendaItem>[];
-    final shownOpen = take(open);
-    final shownDone = doneVisible ? take(done) : <AgendaItem>[];
-    final shown = shownOverdue.length + shownOpen.length + shownDone.length;
-    final total =
-        open.length +
-        (doneVisible ? done.length : 0) +
-        (_overdueOpen && store.isToday ? store.overdueCount : 0);
-    final hidden = math.max(0, total - shown);
+    // Overdue rows take their own budget, so they never push out Today's rows.
+    final shownOverdue = _overdueOpen
+        ? overdue.take(math.max(0, _overdueLimit)).toList()
+        : <AgendaItem>[];
+    final overdueHidden = _overdueOpen && store.isToday
+        ? math.max(0, store.overdueCount - shownOverdue.length)
+        : 0;
     final fetchOverdue =
         _overdueOpen &&
         store.overdueCount > overdue.length &&
-        _limit + 5 > overdue.length;
+        _overdueLimit + 5 > overdue.length;
+    final shownOpen = take(open);
+    final shownDone = doneVisible ? take(done) : <AgendaItem>[];
+    final shown = shownOpen.length + shownDone.length;
+    final total = open.length + (doneVisible ? done.length : 0);
+    final hidden = math.max(0, total - shown);
     final shortDay =
         '${weekdays[store.selectedDay.weekday - 1].substring(0, 3)} '
         '${store.selectedDay.day} ${months[store.selectedDay.month - 1].substring(0, 3)}';
@@ -357,6 +365,28 @@ class _TodayViewState extends State<TodayView> {
             () => setState(() => _overdueOpen = !_overdueOpen),
           ),
           for (final item in shownOverdue) _card(item, store, overdue: true),
+          if (overdueHidden > 0)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextBtn(
+                _loadingOverdue ? 'Loading…' : 'Show $overdueHidden more',
+                key: const ValueKey('today-overdue-more'),
+                onTap: _loadingOverdue
+                    ? null
+                    : () => _moreOverdue(store, fetch: fetchOverdue),
+                color: c.accentText,
+              ),
+            )
+          else if (_overdueLimit > 5 && shownOverdue.length > 5)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextBtn(
+                'Show less',
+                key: const ValueKey('today-overdue-less'),
+                onTap: () => setState(() => _overdueLimit = 5),
+                color: c.accentText,
+              ),
+            ),
           const SizedBox(height: 6),
         ],
         for (final item in shownOpen) _card(item, store),
@@ -393,11 +423,9 @@ class _TodayViewState extends State<TodayView> {
           Align(
             alignment: Alignment.centerLeft,
             child: TextBtn(
-              _loadingMore ? 'Loading…' : 'Show $hidden more',
+              'Show $hidden more',
               key: const ValueKey('today-more'),
-              onTap: _loadingMore
-                  ? null
-                  : () => _more(store, fetchOverdue: fetchOverdue),
+              onTap: () => setState(() => _limit += 5),
               color: c.accentText,
             ),
           )

@@ -201,6 +201,24 @@ class SyncStore extends ChangeNotifier {
   /// One complete sync, outside the background loop.
   Future<SyncReport?> syncOnce() async => _client?.syncOnce();
 
+  /// Completes true once a sync round succeeds: the first pull, since a round
+  /// pulls before it pushes. Completes false if the vault closes first. A hub
+  /// that never answers leaves it pending.
+  Future<bool> firstSyncOk() {
+    if (status.lastOkMs != null) return Future.value(true);
+    final done = Completer<bool>();
+    void check() {
+      if (done.isCompleted) return;
+      if (status.lastOkMs != null) {
+        done.complete(true);
+      } else if (_inactive) {
+        done.complete(false);
+      }
+    }
+    addListener(check);
+    return done.future.whenComplete(() => removeListener(check));
+  }
+
   void _refreshStatus() {
     final c = _client;
     if (c == null || _inactive) return;

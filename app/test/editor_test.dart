@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/models.dart';
+import 'package:notes_app/editor/model.dart';
 import 'package:notes_app/features/getting_started.dart';
 
 import 'harness.dart';
@@ -126,6 +127,51 @@ void main() {
       await typeText(tester, '---');
       final blocks = (await blocksOf(tester, s.showcaseId));
       expect(blocks[blocks.indexWhere((b) => b.id == 'sc03') + 1].kind, Kinds.divider);
+    });
+
+    appTest('typing "3. " starts a numbered run at 3', (tester) async {
+      final s = await pumpApp(tester, mobile: false);
+      await openShowcase(tester);
+      await newBlockAfterPlain(tester);
+      await typeText(tester, '3. x');
+      final blocks = await blocksOf(tester, s.showcaseId);
+      final nb = blocks[blocks.indexWhere((b) => b.id == 'sc03') + 1];
+      expect(nb.kind, Kinds.numbered);
+      expect(nb.text, 'x');
+      expect(nb.numberedStart, 3);
+      final doc = Doc.fromPage(await pageOf(tester, s.showcaseId));
+      expect(doc.byId[nb.id]!.number, 3);
+    });
+
+    appTest('typing "1. " stores no start number', (tester) async {
+      final s = await pumpApp(tester, mobile: false);
+      await openShowcase(tester);
+      await newBlockAfterPlain(tester);
+      await typeText(tester, '1. x');
+      final blocks = await blocksOf(tester, s.showcaseId);
+      final nb = blocks[blocks.indexWhere((b) => b.id == 'sc03') + 1];
+      expect(nb.kind, Kinds.numbered);
+      expect(nb.text, 'x');
+      expect(nb.numberedStart, isNull);
+    });
+
+    appTest('typing "5. " under a numbered item joins its run and stores nothing', (tester) async {
+      final s = await pumpApp(tester, mobile: false);
+      await openShowcase(tester);
+      await newBlockAfterPlain(tester);
+      await typeText(tester, '1. x');
+      await key(tester, LogicalKeyboardKey.enter); // an empty numbered item below
+      await key(tester, LogicalKeyboardKey.enter); // exits the list into a paragraph
+      await typeText(tester, '5. z');
+      final blocks = await blocksOf(tester, s.showcaseId);
+      final i = blocks.indexWhere((b) => b.id == 'sc03');
+      expect(blocks[i + 1].text, 'x');
+      final nb = blocks[i + 2];
+      expect(nb.kind, Kinds.numbered);
+      expect(nb.text, 'z');
+      expect(nb.numberedStart, isNull);
+      final doc = Doc.fromPage(await pageOf(tester, s.showcaseId));
+      expect(doc.byId[nb.id]!.number, 2);
     });
 
     appTest('to-do checkboxes toggle with a tap', (tester) async {
