@@ -11,7 +11,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../shell/navigation.dart';
 import '../../ui/ui.dart';
-import '../settings/controls.dart' show SettingsHeading;
+import '../settings/settings_kit.dart';
 import 'share_client.dart';
 import 'share_popup.dart' show ShareLinkRow, shareClientOf;
 
@@ -111,17 +111,22 @@ class _SharedLinksBodyState extends State<SharedLinksBody> {
     final c = context.colors;
     final client = _client;
     if (client == null) {
-      return Text(
-        'Sign in to a hub in Sync to share pages.',
-        key: const ValueKey('shared-links-signed-out'),
-        style: tsRaw(13, 18, 400, c.textSecondary),
+      return SPage(
+        title: 'Shared links',
+        children: [
+          Text(
+            'Sign in to a hub in Sync and devices to share pages.',
+            key: const ValueKey('shared-links-signed-out'),
+            style: sHint(context),
+          ),
+        ],
       );
     }
     final links = _links;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SPage(
+      title: 'Shared links',
+      intro: 'Pages you have shared from this vault. Revoking a link stops it working for everyone.',
       children: [
-        const SettingsHeading('Shared links', primary: true),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),

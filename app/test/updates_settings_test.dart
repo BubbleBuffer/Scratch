@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:notes_app/features/settings/controls.dart';
+import 'package:notes_app/features/settings/settings_kit.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
 import 'package:notes_app/features/updates/update_controller.dart';
 import 'package:notes_app/src/rust/api/update.dart';
@@ -50,7 +50,7 @@ class FakeBackend implements UpdateBackend {
 }
 
 String statusText(WidgetTester tester) =>
-    tester.widgetList<SettingsRow>(find.byType(SettingsRow)).firstWhere((r) => r.label == 'Status').description!;
+    tester.widgetList<SRow>(find.byType(SRow)).firstWhere((r) => r.label == 'Status').desc!;
 
 void main() {
   setUpAll(initCore);
@@ -72,7 +72,7 @@ void main() {
     UpdateController.current = u;
     final tv = await pumpApp(tester, mobile: false);
     await tapAndSettle(tester, key('sidebar-settings'));
-    await tapAndSettle(tester, key('settings-nav-updates'));
+    await tapAndSettle(tester, key('settings-nav-about'));
     return (fake, u, tv);
   }
 
@@ -144,7 +144,7 @@ void main() {
   appTest('updates section: development build never checks', (tester) async {
     final (fake, _, _) = await openUpdates(tester, tag: '');
     expect(statusText(tester), 'Development build: updates are off.');
-    expect(tester.widget<Toggle>(key('updates-nightly')).onChanged, isNull);
+    expect(tester.widget<SSwitch>(key('updates-nightly')).onChanged, isNull);
     await tapAndSettle(tester, key('updates-check-now'));
     expect(fake.calls, isEmpty);
   });
@@ -153,7 +153,7 @@ void main() {
     UpdateController.current = UpdateController(currentTag: 'v0.1.0', updatesDir: 'u', settings: AppSettings(), backend: FakeBackend());
     await pumpApp(tester, mobile: true);
     await openMobileSettings(tester);
-    expect(key('settings-nav-updates'), findsNothing);
+    expect(find.byKey(const ValueKey('updates-check-now')), findsNothing);
     expect(find.text('Updates'), findsNothing);
   });
 }

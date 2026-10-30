@@ -88,7 +88,7 @@ void main() {
       ];
       expect(store.shownModels(), ['codex/shown', 'codex/hidden']);
       await tapAndSettle(t, key('sidebar-settings'));
-      await tapAndSettle(t, key('settings-nav-ai'));
+      await tapAndSettle(t, key('settings-nav-agent'));
       expect(key('agent-model-visible-claude-code/claude-opus-5-5'), findsNothing);
       expect(key('agent-model-add-field'), findsNothing);
       expect(key('agent-model-add'), findsNothing);

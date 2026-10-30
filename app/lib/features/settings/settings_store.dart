@@ -41,9 +41,6 @@ class AppSettings extends ChangeNotifier {
 
   ThemePref theme = ThemePref.system;
 
-  /// Optional compiled-in add-ons disabled on this device, applied at boot.
-  Set<String> disabledAddons = {};
-
   /// The vault folder chosen in settings (null: the default in the data
   /// folder). Takes effect at the next start.
   String? vaultPath;
@@ -133,8 +130,9 @@ class AppSettings extends ChangeNotifier {
     return s;
   }
 
+  /// Every add-on is always on, so a legacy `disabledAddons` key is not read,
+  /// and [toJson] leaves it out: the next save drops it from the file.
   void _fromJson(Map<String, dynamic> j) {
-    disabledAddons = (j['disabledAddons'] as List?)?.whereType<String>().toSet() ?? {};
     theme = ThemePref.values.firstWhere(
       (t) => t.name == j['theme'],
       orElse: () => ThemePref.system,
@@ -189,7 +187,6 @@ class AppSettings extends ChangeNotifier {
   }
 
   Map<String, dynamic> toJson() => {
-    if (disabledAddons.isNotEmpty) 'disabledAddons': disabledAddons.toList()..sort(),
     'theme': theme.name,
     'vaultPath': ?vaultPath,
     'hubEnabled': ?_hubEnabled,

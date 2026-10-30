@@ -10,7 +10,7 @@ status: current
 
 Kanban is a note type for collecting cards by hand. Each card points to a note of any type; opening the card opens that note. A database's Board view remains a live query. Both use the kit's `BoardRenderer`, while Kanban depends on no other add-on.
 
-`KanbanAddon` is compiled in, optional and enabled by default. Settings → About → Add-ons → Manage can disable it for the next start. Registration does not open a vault or start background work.
+`KanbanAddon` is compiled in and always on (the Add-ons page and its per-device switches were removed 2026-10-30). Registration does not open a vault or start background work.
 
 ## Data
 
@@ -74,7 +74,7 @@ The bridge has no `cancelling` status, so a stopping run shows as running until 
 
 The real backend's assignments are kept by the AI store, and the card's chip reads them through `current`, so a `record` made by the picker only shows where the store has no row yet.
 
-**Rename:** Settings > AI > "Runner names" lists the PCs by their vault names. Each row has an edit button; saving a trimmed, non-empty name calls `ai_rename_device`. The hub has no name to change. The picker and chips show the new name after the next runner listing.
+**Rename:** Settings > Agent > "Computer names" (formerly "Runner names") lists the PCs by their vault names. Each row has an edit button; saving a trimmed, non-empty name calls `ai_rename_device`. The hub has no name to change. The picker and chips show the new name after the next runner listing.
 
 Source: [`runner_picker.dart`](../../app/lib/addons/kanban/runner_picker.dart), [`runner_chip.dart`](../../app/lib/addons/kanban/runner_chip.dart), [`runner_backend.dart`](../../app/lib/addons/kanban/runner_backend.dart), [`runner_real.dart`](../../app/lib/addons/kanban/runner_real.dart), [`runner_fake.dart`](../../app/lib/addons/kanban/runner_fake.dart), [`ai_runners.dart`](../../app/lib/features/ai/ai_runners.dart), [`ai_settings_body.dart`](../../app/lib/features/ai/ai_settings_body.dart). Tests: [`kanban_runner_picker_test.dart`](../../app/test/addons/kanban/kanban_runner_picker_test.dart), [`kanban_runner_backend_test.dart`](../../app/test/addons/kanban/kanban_runner_backend_test.dart), [`kanban_runner_real_test.dart`](../../app/test/addons/kanban/kanban_runner_real_test.dart), [`ai_runner_names_test.dart`](../../app/test/ai_runner_names_test.dart).
 

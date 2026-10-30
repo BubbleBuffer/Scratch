@@ -1,10 +1,11 @@
-// Settings. Desktop: a centred panel over a dimmed
-// page, sections on the left, the section on the right). Mobile: a
-// full-screen list of sections, each opening its own screen.
+// Settings. Desktop: a centred panel over a dimmed page, the pages listed
+// on the left in groups, the page on the right. Mobile: a full-screen list
+// of the pages in the same groups, each opening its own screen under a
+// "‹ Settings" crumb.
 //
-// Sections: Preferences (theme), Sync (hub, connection, attachments),
-// Devices (desktop: devices paired with the hub), Conflicts, AI, Vault
-// (location; desktop: mounted folders), Updates (Windows) and About.
+// Pages: General, Reminders; Your vault: Sync and devices, Conflicts,
+// Storage, Shared links (only while signed in to a hub); AI: Agent,
+// Connectors; About (with Updates on Windows).
 
 import 'dart:async';
 import 'dart:io';
@@ -18,91 +19,110 @@ import '../../feedback/feedback_host.dart';
 import '../../state/app_state.dart';
 import '../../state/reminder_store.dart';
 import '../../state/sync_store.dart';
-import '../../shell/addons.dart';
+import '../../shell/addons.dart' show appAddonContext;
 import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
+import '../ai/ai_settings.dart' show AgentHost, hubAgentPlatform;
 import '../ai/ai_settings_body.dart';
-import '../ai/ask_ai.dart';
+import '../ai/ai_store.dart';
 import '../mounts/mounts.dart';
 import '../sync/conflicts.dart';
-import '../sync/sync_icons.dart';
 import '../share/share_popup.dart' show shareClientOf;
 import '../share/shared_links_settings.dart';
 import '../sync/sync_settings.dart';
 import '../updates/updates_settings.dart';
-import 'controls.dart';
+import 'connectors_body.dart';
+import 'settings_kit.dart';
 import 'settings_store.dart';
 
 const appVersion = '0.1.0';
 
 enum SettingsSection {
-  preferences('Preferences'),
-  reminders('Reminders'),
-  sync('Sync'),
-  sharedLinks('Shared links'),
-  devices('Devices'),
-  conflicts('Conflicts'),
-  ai('AI'),
-  vault('Vault'),
-  updates('Updates'),
-  about('About');
+  general('General', Sx.general),
+  reminders('Reminders', Sx.reminders),
+  sync('Sync and devices', Sx.sync, group: 'Your vault'),
+  conflicts('Conflicts', Sx.conflicts, group: 'Your vault'),
+  storage('Storage', Sx.storage, group: 'Your vault'),
+  sharedLinks('Shared links', Sx.link, group: 'Your vault'),
+  agent('Agent', Sx.agent, group: 'AI'),
+  connectors('Connectors', Sx.connectors, group: 'AI'),
+  about('About', Sx.info);
 
-  const SettingsSection(this.label);
+  const SettingsSection(this.label, this.icon, {this.group});
   final String label;
+  final Sx icon;
 
-  /// Devices are the hub's, so only desktop lists them. Shared links show
-  /// only while this device is signed in to a hub. Updates are Windows-only.
+  /// The nav heading this page sits under, or null.
+  final String? group;
+
+  /// Shared links show only while this device is signed in to a hub.
   static List<SettingsSection> visibleFor(BuildContext context) => [
     for (final s in values)
-      if ((s != devices || SyncStore.canHost) &&
-          (s != sharedLinks || shareClientOf(context) != null) &&
-          (s != updates || updatesAvailableHere()))
-        s,
+      if (s != sharedLinks || shareClientOf(context) != null) s,
   ];
 }
 
-Widget sectionIcon(SettingsSection s, Color color, double size) => switch (s) {
-      SettingsSection.preferences => SyncIcon(SyncIco.sun, size: size, color: color),
-      SettingsSection.reminders => Icon20(Ico.clock, size: size, color: color),
-      SettingsSection.sync => SyncIcon(SyncIco.cloud, size: size, color: color),
-      SettingsSection.sharedLinks => Icon20(Ico.link, size: size, color: color),
-      SettingsSection.devices => SyncIcon(SyncIco.devices, size: size, color: color),
-      SettingsSection.conflicts => SyncIcon(SyncIco.conflict, size: size, color: color),
-      SettingsSection.ai =>
-        SizedBox.square(dimension: size, child: Center(child: AiMark(size: size * 0.9, color: color))),
-      SettingsSection.vault => SyncIcon(SyncIco.folder, size: size, color: color),
-      SettingsSection.updates => Icon20(Ico.arrowDown, size: size, color: color),
-      SettingsSection.about => SyncIcon(SyncIco.info, size: size, color: color),
-    };
+Widget sectionIcon(SettingsSection s, Color color, double size) =>
+    SIcon(s.icon, size: size, color: color);
 
 Widget sectionBody(SettingsSection s) => switch (s) {
-      SettingsSection.preferences => const PreferencesBody(),
-      SettingsSection.reminders => const RemindersBody(),
-      SettingsSection.sync => const SyncBody(),
-      SettingsSection.sharedLinks => const SharedLinksBody(),
-      SettingsSection.devices => const DevicesBody(),
-      SettingsSection.conflicts => const ConflictsBody(),
-      SettingsSection.ai => const AiSettingsBody(),
-      SettingsSection.vault => const VaultBody(),
-      SettingsSection.updates => const UpdatesBody(),
-      SettingsSection.about => const AboutBody(),
-    };
+  SettingsSection.general => const GeneralBody(),
+  SettingsSection.reminders => const RemindersBody(),
+  SettingsSection.sync => const _SyncAndDevicesBody(),
+  SettingsSection.conflicts => const ConflictsBody(),
+  SettingsSection.storage => const VaultBody(),
+  SettingsSection.sharedLinks => const SharedLinksBody(),
+  SettingsSection.agent => const AiSettingsBody(),
+  SettingsSection.connectors => const ConnectorsBody(),
+  SettingsSection.about => const AboutBody(),
+};
 
-/// Opens settings at [section].
-Future<void> showSettings(BuildContext context, {SettingsSection section = SettingsSection.preferences}) {
-  if (context.mobile) {
-    final nav = Navigator.of(context);
-    if (section == SettingsSection.preferences) {
-      return nav.push(pageRoute((_) => const SettingsPage(), motion: Motion.of(context), mobile: true, settings: const RouteSettings(name: '/settings')));
-    }
-    return pushSettingsPage(context, section.label, sectionBody(section));
+/// Sync and devices: the hub this device syncs with, attachments and, on a
+/// computer, the hub it runs itself with the devices paired to it. Add-on
+/// sections placed with them ("Run schedules on this device") come last in
+/// the hub group.
+class _SyncAndDevicesBody extends StatelessWidget {
+  const _SyncAndDevicesBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final extra = appAddonContext.settingsSections.all.where(
+      (s) => s.location == 'addons' && (s.isVisible?.call(context) ?? true),
+    );
+    return SyncAndDevicesPage(extra: [for (final s in extra) s.build(context)]);
   }
-  return showPanel(context, (_) => SettingsModal(initial: section), width: 1150, height: 715);
+}
+
+/// Opens settings at [section]. With none, a phone opens the list of
+/// pages and a computer opens General.
+Future<void> showSettings(BuildContext context, {SettingsSection? section}) {
+  if (context.mobile) {
+    if (section == null) {
+      return Navigator.of(context).push(
+        pageRoute(
+          (_) => const SettingsPage(),
+          motion: Motion.of(context),
+          mobile: true,
+          settings: const RouteSettings(name: '/settings'),
+        ),
+      );
+    }
+    return pushSectionPage(context, section);
+  }
+  return showPanel(
+    context,
+    (_) => SettingsModal(initial: section ?? SettingsSection.general),
+    width: 1150,
+    height: 715,
+  );
 }
 
 /// Opens [section]: in the settings already open on a desktop, else as
 /// [showSettings] does.
-Future<void> openSettingsSection(BuildContext context, SettingsSection section) {
+Future<void> openSettingsSection(
+  BuildContext context,
+  SettingsSection section,
+) {
   final jump = context.dependOnInheritedWidgetOfExactType<_SettingsJump>();
   if (jump == null) return showSettings(context, section: section);
   jump.go(section);
@@ -175,11 +195,39 @@ class _PanelRoute<T> extends PopupRoute<T> {
 Future<void> pushSettingsPage(BuildContext context, String title, Widget body, {Key? key}) =>
     Navigator.of(context).push(pageRoute((_) => MobileSettingsScaffold(key: key, title: title, body: body), motion: Motion.of(context), mobile: true));
 
+/// Mobile: one settings page under a "‹ Settings" crumb; the page shows
+/// its own title.
+Future<void> pushSectionPage(BuildContext context, SettingsSection s) =>
+    Navigator.of(context).push(
+      pageRoute(
+        (_) => MobileSettingsScaffold(
+          key: ValueKey('settings-page-${s.name}'),
+          title: 'Settings',
+          crumb: true,
+          body: _SettingsJump(
+            go: (next) => pushSectionPage(context, next),
+            child: sectionBody(s),
+          ),
+        ),
+        motion: Motion.of(context),
+        mobile: true,
+      ),
+    );
+
 class MobileSettingsScaffold extends StatelessWidget {
-  const MobileSettingsScaffold({super.key, required this.title, required this.body, this.padded = true});
+  const MobileSettingsScaffold({
+    super.key,
+    required this.title,
+    required this.body,
+    this.padded = true,
+    this.crumb = false,
+  });
   final String title;
   final Widget body;
   final bool padded;
+
+  /// Shows [title] as a back crumb ("‹ Settings") instead of a heading.
+  final bool crumb;
 
   @override
   Widget build(BuildContext context) {
@@ -194,21 +242,42 @@ class MobileSettingsScaffold extends StatelessWidget {
             height: Layout.topbarHeight,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(children: [
-                IconBtn(Ico.chevronLeft,
-                    key: const ValueKey('back'),
-                    onTap: () => Navigator.of(context).maybePop(),
-                    size: 44,
-                    glyph: 24,
-                    color: c.iconPrimary,
-                    semanticLabel: 'Back'),
-                Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary))),
-              ]),
+              child: crumb
+                  ? Row(children: [
+                      Hover(
+                        key: const ValueKey('back'),
+                        onTap: () => Navigator.of(context).maybePop(),
+                        lift: 0,
+                        padding: const EdgeInsets.fromLTRB(6, 0, 12, 0),
+                        child: Semantics(
+                          button: true,
+                          label: 'Back to $title',
+                          child: SizedBox(
+                            height: 44,
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              SIcon(Sx.chevronLeft, size: 20, color: c.textSecondary),
+                              const SizedBox(width: 2),
+                              Text(title, style: tsRaw(15, 20, 600, c.textSecondary)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ])
+                  : Row(children: [
+                      IconBtn(Ico.chevronLeft,
+                          key: const ValueKey('back'),
+                          onTap: () => Navigator.of(context).maybePop(),
+                          size: 44,
+                          glyph: 24,
+                          color: c.iconPrimary,
+                          semanticLabel: 'Back'),
+                      Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary))),
+                    ]),
             ),
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(padded ? Layout.gutter : 0, 8, padded ? Layout.gutter : 0, mq.padding.bottom + 24),
+              padding: EdgeInsets.fromLTRB(padded ? Layout.gutter : 0, 8, padded ? Layout.gutter : 0, mq.padding.bottom + 48),
               child: body,
             ),
           ),
@@ -222,7 +291,7 @@ class MobileSettingsScaffold extends StatelessWidget {
 // Desktop modal
 
 class SettingsModal extends StatefulWidget {
-  const SettingsModal({super.key, this.initial = SettingsSection.preferences});
+  const SettingsModal({super.key, this.initial = SettingsSection.general});
   final SettingsSection initial;
 
   @override
@@ -236,41 +305,82 @@ class _SettingsModalState extends State<SettingsModal> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final conflicts = context.watch<SyncStore>().conflicts.length;
+    String? group;
+    final nav = <Widget>[];
+    for (final s in SettingsSection.visibleFor(context)) {
+      if (s.group != group) {
+        group = s.group;
+        if (group != null) nav.add(_NavGroup(group));
+      }
+      nav.add(_NavItem(
+        key: ValueKey('settings-nav-${s.name}'),
+        section: s,
+        selected: s == _section,
+        badge: s == SettingsSection.conflicts && conflicts > 0 ? '$conflicts' : null,
+        onTap: () => setState(() => _section = s),
+      ));
+      // About sits apart from the AI group.
+      if (s == SettingsSection.connectors) {
+        group = null;
+        nav.add(const SizedBox(height: 12));
+      }
+    }
     return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
-        width: 240,
-        color: c.bgSecondary,
-        padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
-            child: Text('Settings', style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
-          ),
-          for (final s in SettingsSection.visibleFor(context))
-            _NavItem(
-              key: ValueKey('settings-nav-${s.name}'),
-              section: s,
-              selected: s == _section,
-              badge: s == SettingsSection.conflicts && conflicts > 0 ? '$conflicts' : null,
-              onTap: () => setState(() => _section = s),
+        width: 236,
+        decoration: BoxDecoration(
+          color: c.bgSecondary,
+          border: Border(right: BorderSide(color: c.border)),
+        ),
+        padding: const EdgeInsets.fromLTRB(10, 18, 10, 18),
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Semantics(
+                header: true,
+                child: Text('Settings', style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
+              ),
             ),
-        ]),
+            ...nav,
+          ]),
+        ),
       ),
       Expanded(
         child: ColoredBox(
           color: c.bgPrimary,
           child: SingleChildScrollView(
             key: ValueKey('settings-body-${_section.name}'),
-            padding: const EdgeInsets.fromLTRB(60, 36, 60, 48),
-            child: _SettingsJump(
-              go: (s) => setState(() => _section = s),
-              child: sectionBody(_section),
+            padding: const EdgeInsets.fromLTRB(48, 36, 48, 64),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: _SettingsJump(
+                  go: (s) => setState(() => _section = s),
+                  child: KeyedSubtree(
+                    key: ValueKey('settings-page-${_section.name}'),
+                    child: sectionBody(_section),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
       ),
     ]);
   }
+}
+
+class _NavGroup extends StatelessWidget {
+  const _NavGroup(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(10, 16, 10, 4),
+    child: Text(label, style: tsRaw(11, 16, 720, context.colors.textTertiary)),
+  );
 }
 
 class _NavItem extends StatelessWidget {
@@ -285,23 +395,33 @@ class _NavItem extends StatelessWidget {
     final c = context.colors;
     return Padding(
       padding: const EdgeInsets.only(bottom: 1),
-      child: Hover(
-        onTap: onTap,
+      child: Semantics(
         selected: selected,
-        selectedColor: c.bgPressed,
-        radius: Radii.md,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: SizedBox(
-          height: 30,
-          child: Row(children: [
-            sectionIcon(section, selected ? c.iconPrimary : c.iconSecondary, 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(section.label,
-                  style: ts(TypeScale.desktop.ui, selected ? c.textPrimary : c.textSecondary)),
+        child: Hover(
+          onTap: onTap,
+          selected: selected,
+          selectedColor: c.bgPrimary,
+          lift: 0,
+          radius: Radii.md,
+          border: selected ? Border.all(color: c.border) : null,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 32),
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(color: selected ? c.accent : const Color(0x00000000), width: 3),
+              ),
             ),
-            if (badge != null) _Badge(badge!),
-          ]),
+            padding: const EdgeInsets.fromLTRB(7, 6, 10, 6),
+            child: Row(children: [
+              sectionIcon(section, selected ? c.iconPrimary : c.iconSecondary, 16),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(section.label,
+                    style: tsRaw(13.5, 18, selected ? 620 : 500, selected ? c.textPrimary : c.textSecondary)),
+              ),
+              if (badge != null) _Badge(badge!),
+            ]),
+          ),
         ),
       ),
     );
@@ -316,8 +436,8 @@ class _Badge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6),
         height: 18,
         alignment: Alignment.center,
-        decoration: BoxDecoration(color: context.colors.dangerBg, borderRadius: Radii.pill),
-        child: Text(text, style: tsRaw(11, 14, 600, context.colors.textPrimary)),
+        decoration: BoxDecoration(color: context.colors.attnBg, borderRadius: Radii.pill),
+        child: Text(text, style: tsRaw(11, 14, 650, context.colors.textPrimary)),
       );
 }
 
@@ -331,41 +451,71 @@ class SettingsPage extends StatelessWidget {
     final sync = context.watch<SyncStore>();
     final settings = AppSettings.of(context);
     return switch (s) {
-      SettingsSection.preferences => settings.theme == ThemePref.system ? 'System' : settings.theme.label,
+      SettingsSection.general => settings.theme == ThemePref.system ? 'System theme' : settings.theme.label,
       SettingsSection.reminders => settings.reminders.enabled ? 'On' : 'Off',
-      SettingsSection.sync => sync.connected ? 'On' : (sync.hosting ? 'Hub on' : 'Off'),
+      SettingsSection.sync => sync.connected ? 'Synced' : (sync.hosting ? 'Hub on' : 'Off'),
       SettingsSection.conflicts => sync.conflicts.isEmpty ? null : '${sync.conflicts.length}',
+      SettingsSection.agent => _agentValue(context),
       _ => null,
     };
+  }
+
+  String _agentValue(BuildContext context) {
+    final ai = AiStore.of(context.app);
+    if (hubAgentPlatform) return 'Hub';
+    if (!ai.settings.agentEnabled) return 'Off';
+    return ai.runsOn == AgentHost.hub ? 'Hub' : 'This computer';
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    String? group;
+    final rows = <Widget>[];
+    for (final s in SettingsSection.visibleFor(context)) {
+      if (s.group != group) {
+        group = s.group;
+        if (group != null) {
+          rows.add(Padding(
+            padding: const EdgeInsets.fromLTRB(Layout.gutter, 20, Layout.gutter, 6),
+            child: Text(group, style: tsRaw(12, 16, 720, c.textTertiary)),
+          ));
+        }
+      }
+      if (s == SettingsSection.about) rows.add(const SizedBox(height: 20));
+      rows.add(Hover(
+        key: ValueKey('settings-nav-${s.name}'),
+        onTap: () => pushSectionPage(context, s),
+        radius: 0,
+        lift: 0,
+        padding: const EdgeInsets.symmetric(horizontal: Layout.gutter),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Row(children: [
+            sectionIcon(s, c.iconSecondary, 20),
+            const SizedBox(width: 14),
+            Expanded(child: Text(s.label, style: tsRaw(15, 20, 500, c.textPrimary))),
+            if (_value(context, s) case final v?) ...[
+              Text(v, style: tsRaw(14, 20, 400, c.textTertiary)),
+              const SizedBox(width: 6),
+            ],
+            SIcon(Sx.chevronRight, size: 16, color: c.iconTertiary),
+          ]),
+        ),
+      ));
+    }
     return MobileSettingsScaffold(
-      title: 'Settings',
+      title: '',
       padded: false,
       body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (final s in SettingsSection.visibleFor(context))
-          Hover(
-            key: ValueKey('settings-nav-${s.name}'),
-            onTap: () => pushSettingsPage(context, s.label, sectionBody(s)),
-            radius: 0,
-            padding: const EdgeInsets.symmetric(horizontal: Layout.gutter),
-            child: SizedBox(
-              height: 48,
-              child: Row(children: [
-                sectionIcon(s, c.iconPrimary, 22),
-                const SizedBox(width: 14),
-                Expanded(child: Text(s.label, style: ts(context.type.body, c.textPrimary))),
-                if (_value(context, s) case final v?) ...[
-                  Text(v, style: ts(context.type.body, c.textTertiary)),
-                  const SizedBox(width: 4),
-                ],
-                Icon20(Ico.chevronRight, size: 18, color: c.iconTertiary),
-              ]),
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Layout.gutter, 0, Layout.gutter, 4),
+          child: Semantics(
+            header: true,
+            child: Text('Settings', style: tsDisplay(const TypeSpec(24, 28, 680), c.textPrimary)),
           ),
+        ),
+        ...rows,
       ]),
     );
   }
@@ -374,63 +524,98 @@ class SettingsPage extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Sections without sync
 
-class PreferencesBody extends StatelessWidget {
-  const PreferencesBody({super.key});
+class GeneralBody extends StatelessWidget {
+  const GeneralBody({super.key});
+
+  static String _themeLabel(ThemePref t) => switch (t) {
+    ThemePref.system => 'System',
+    ThemePref.light => 'Light',
+    ThemePref.dark => 'Dark',
+  };
 
   @override
   Widget build(BuildContext context) {
     final s = AppSettings.of(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Preferences', primary: true),
-      SettingsRow(
-        label: 'Appearance',
-        trailing: SelectButton<ThemePref>(
-          key: const ValueKey('theme-select'),
+    final m = context.mobile;
+    final phone = defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    return SPage(
+      title: 'General',
+      children: [
+        SSection(
           title: 'Appearance',
-          value: s.theme,
-          options: ThemePref.values,
-          labelOf: (t) => t.label,
-          onChanged: (t) => s.update((s) => s.theme = t),
+          first: true,
+          children: [
+            SRow(
+              label: 'Theme',
+              desc: 'Light or dark colours, on this device only.',
+              help:
+                  'Leave it on System to follow Windows or Android, including their night schedule.',
+              stack: m,
+              control: SSegmented<ThemePref>(
+                value: s.theme,
+                options: ThemePref.values,
+                labelOf: _themeLabel,
+                keyOf: (t) => ValueKey('theme-${t.name}'),
+                onChanged: (t) => s.update((s) => s.theme = t),
+              ),
+            ),
+          ],
         ),
-      ),
-      const SettingsHeading('Feedback', top: 24),
-      SettingsRow(
-        label: 'Send feedback',
-        description: 'Write what happened. A screenshot and the app’s diagnostics go with it.',
-        trailing: TextBtn(
-          'Open',
-          key: const ValueKey('send-feedback'),
-          onTap: () => FeedbackHost.of(context).open(context),
+        SSection(
+          title: 'Feedback',
+          children: [
+            SRow(
+              label: 'Send feedback',
+              desc:
+                  'Write what happened. A screenshot and the app’s diagnostics go with it.',
+              help: 'Whenever something breaks, looks wrong or confuses you.',
+              stack: m,
+              control: SButton(
+                'Write feedback',
+                key: const ValueKey('send-feedback'),
+                icon: Sx.feedback,
+                onTap: () => FeedbackHost.of(context).open(context),
+              ),
+            ),
+            if (phone)
+              SRow(
+                label: 'Shake to send feedback',
+                desc: 'Shake the phone to open the feedback sheet.',
+                scope: 'Phone',
+                help: 'Turn off if it opens by accident, for example while walking.',
+                control: SSwitch(
+                  key: const ValueKey('shake-to-send'),
+                  label: 'Shake to send feedback',
+                  value: s.shakeToSend,
+                  onChanged: (on) => s.update((s) => s.shakeToSend = on),
+                ),
+              ),
+          ],
         ),
-      ),
-      if (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS)
-        SettingsRow(
-          label: 'Shake to send feedback',
-          description: 'Shake the phone to open the feedback sheet.',
-          trailing: Toggle(
-            key: const ValueKey('shake-to-send'),
-            value: s.shakeToSend,
-            onChanged: (on) => s.update((s) => s.shakeToSend = on),
+        if (defaultTargetPlatform == TargetPlatform.android)
+          SSection(
+            title: 'Agent runs',
+            children: [
+              SRow(
+                label: 'Notify when a run finishes or fails',
+                desc:
+                    'A notice when a task you delegated finishes or fails. It appears when the app syncs the change.',
+                scope: 'Phone',
+                control: SSwitch(
+                  key: const ValueKey('run-notices'),
+                  label: 'Notify when a run finishes or fails',
+                  value: s.runNotices,
+                  onChanged: (on) {
+                    s.update((s) => s.runNotices = on);
+                    if (on) unawaited(context.app.runNotices.enable());
+                  },
+                ),
+              ),
+            ],
           ),
-        ),
-      if (defaultTargetPlatform == TargetPlatform.android) ...[
-        const SettingsHeading('Agent runs', top: 24),
-        SettingsRow(
-          label: 'Notify when a run finishes or fails',
-          description:
-              'A notice when a task you delegated finishes or fails. It appears when the app syncs the change.',
-          trailing: Toggle(
-            key: const ValueKey('run-notices'),
-            value: s.runNotices,
-            onChanged: (on) {
-              s.update((s) => s.runNotices = on);
-              if (on) unawaited(context.app.runNotices.enable());
-            },
-          ),
-        ),
       ],
-    ]);
+    );
   }
 }
 
@@ -445,61 +630,77 @@ class RemindersBody extends StatelessWidget {
     final s = AppSettings.of(context);
     final r = s.reminders;
     final store = context.watch<ReminderStore>();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final blocked = defaultTargetPlatform == TargetPlatform.android &&
+        store.permissionGranted == false;
+    final off = r.enabled ? null : 'Turn on Reminders to change this.';
+    return SPage(
+      title: 'Reminders',
+      intro:
+          'Notifications on this device for upcoming events, and one summary of your day each morning.',
       children: [
-        const SettingsHeading('Reminders', primary: true),
-        SettingsRow(
-          label: 'Reminders',
-          trailing: Toggle(
-            key: const ValueKey('reminders-enabled'),
-            value: r.enabled,
-            onChanged: (enabled) =>
-                s.update((s) => s.reminders = r.copyWith(enabled: enabled)),
+        if (blocked)
+          SNotice(
+            '**Notifications are off for $appName in Android settings.** Your reminder settings are kept; turn notifications on for $appName in Android’s settings to get them.',
+            kind: SNoticeKind.warn,
+            textKey: const ValueKey('reminders-permission-note'),
           ),
-        ),
-        SettingsRow(
-          label: 'Remind me before events',
-          trailing: SelectButton<int>(
-            key: const ValueKey('reminders-lead'),
-            title: 'Remind me before events',
-            value: r.leadMinutes,
-            options: const [0, 5, 10, 30],
-            labelOf: (minutes) => minutes == 0 ? 'At start' : '$minutes min',
-            onChanged: r.enabled
-                ? (lead) => s.update(
-                    (s) => s.reminders = r.copyWith(leadMinutes: lead),
-                  )
-                : null,
-          ),
-        ),
-        SettingsRow(
-          label: 'Morning summary at',
-          trailing: SelectButton<int>(
-            key: const ValueKey('reminders-morning'),
-            title: 'Morning summary at',
-            value: r.morning,
-            options: [
-              for (var minutes = 300; minutes <= 720; minutes += 30) minutes,
-            ],
-            labelOf: _time,
-            onChanged: r.enabled
-                ? (morning) => s.update(
-                    (s) => s.reminders = r.copyWith(morning: morning),
-                  )
-                : null,
-          ),
-        ),
-        if (defaultTargetPlatform == TargetPlatform.android &&
-            store.permissionGranted == false)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              'Notifications are off for $appName in Android settings.',
-              key: const ValueKey('reminders-permission-note'),
-              style: tsRaw(13, 18, 400, context.colors.textSecondary),
+        SSection(
+          first: !blocked,
+          children: [
+            SRow(
+              label: 'Reminders',
+              desc: 'Notify me about events and send a morning summary.',
+              help:
+                  'Turn off on a device where you don’t want to be notified, such as a shared computer.',
+              control: SSwitch(
+                key: const ValueKey('reminders-enabled'),
+                label: 'Reminders',
+                value: r.enabled,
+                onChanged: (enabled) =>
+                    s.update((s) => s.reminders = r.copyWith(enabled: enabled)),
+              ),
             ),
-          ),
+            SRow(
+              label: 'Remind me before events',
+              desc: 'How early the notification comes.',
+              disabled: !r.enabled,
+              reason: off,
+              control: SSelect<int>(
+                key: const ValueKey('reminders-lead'),
+                title: 'Remind me before events',
+                value: r.leadMinutes,
+                options: const [0, 5, 10, 30],
+                labelOf: (minutes) =>
+                    minutes == 0 ? 'At start' : '$minutes min before',
+                onChanged: r.enabled
+                    ? (lead) => s.update(
+                        (s) => s.reminders = r.copyWith(leadMinutes: lead),
+                      )
+                    : null,
+              ),
+            ),
+            SRow(
+              label: 'Morning summary',
+              desc: 'When the day’s summary arrives.',
+              disabled: !r.enabled,
+              reason: off,
+              control: SSelect<int>(
+                key: const ValueKey('reminders-morning'),
+                title: 'Morning summary time',
+                value: r.morning,
+                options: [
+                  for (var minutes = 300; minutes <= 720; minutes += 30) minutes,
+                ],
+                labelOf: _time,
+                onChanged: r.enabled
+                    ? (morning) => s.update(
+                        (s) => s.reminders = r.copyWith(morning: morning),
+                      )
+                    : null,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -545,60 +746,86 @@ class _VaultBodyState extends State<VaultBody> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     final s = AppSettings.of(context);
     final root = context.app.vault.root;
     final pending = s.vaultPath != null && s.vaultPath != root ? s.vaultPath : null;
     final desktop = !context.mobile;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Vault', primary: true),
-      SettingsRow(
-        label: 'Location',
-        description: 'The folder that holds your pages, as Markdown files and their history.',
-        stack: true,
-        trailing: CopyableText(root, textKey: const ValueKey('vault-path')),
-      ),
-      if (pending != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 4, bottom: 8),
-          child: Text('$appName opens $pending the next time it starts.',
-              key: const ValueKey('vault-pending'), style: tsRaw(13, 18, 400, c.textSecondary)),
-        ),
-      if (desktop) ...[
-        const SizedBox(height: 8),
-        SettingsRow(
-          label: 'Open another folder',
-          description: 'An empty folder starts a new vault; a vault folder opens it. Takes effect after a restart.',
-          stack: true,
-          trailing: Row(children: [
-            Expanded(
-              child: SettingsField(
-                fieldKey: const ValueKey('vault-path-field'),
-                controller: _path,
-                placeholder: Platform.isWindows ? r'D:\Notes' : '/home/me/Notes',
-                onSubmitted: (_) => _use(s),
+    return SPage(
+      title: 'Storage',
+      intro:
+          'Where this vault’s pages live on this device. Pages are Markdown files you can open with other apps.',
+      children: [
+        SSection(
+          title: 'Vault folder',
+          first: true,
+          children: [
+            SRow(
+              label: 'Location',
+              desc: 'The folder that holds your pages and their history.',
+              stack: true,
+              control: SCopyLine(root, textKey: const ValueKey('vault-path')),
+              below: pending == null
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '$appName opens $pending the next time it starts.',
+                        key: const ValueKey('vault-pending'),
+                        style: sHint(context),
+                      ),
+                    ),
+            ),
+            if (desktop)
+              SAdvanced(
+                headerKey: const ValueKey('vault-open-another'),
+                title: 'Open another folder',
+                summary: 'starts or opens a different vault',
+                children: [
+                  SRow(
+                    label: 'Use a different folder',
+                    desc:
+                        'An empty folder starts a new vault; a vault folder opens it. Takes effect after a restart.',
+                    help:
+                        'To keep separate vaults (for example work and personal), or to move the vault to another drive.',
+                    stack: true,
+                    control: Row(children: [
+                      Expanded(
+                        child: STextField(
+                          fieldKey: const ValueKey('vault-path-field'),
+                          controller: _path,
+                          mono: true,
+                          placeholder: Platform.isWindows ? r'D:\Notes' : '/home/me/Notes',
+                          onSubmitted: (_) => _use(s),
+                        ),
+                      ),
+                      if (FileDialogs.instance.folders) ...[
+                        const SizedBox(width: 8),
+                        SButton('Choose…', key: const ValueKey('vault-choose'), onTap: () => _choose(s)),
+                      ],
+                      const SizedBox(width: 8),
+                      SButton('Use folder', key: const ValueKey('vault-use'), onTap: () => _use(s)),
+                    ]),
+                    below: _error == null
+                        ? null
+                        : SNotice(_error!, kind: SNoticeKind.bad, textKey: const ValueKey('vault-error')),
+                  ),
+                  if (s.vaultPath != null)
+                    SRow(
+                      label: 'Default location',
+                      desc: 'Go back to the folder $appName picked when it was installed.',
+                      control: SButton(
+                        'Use the default location',
+                        key: const ValueKey('vault-use-default'),
+                        onTap: () => s.update((s) => s.vaultPath = null),
+                      ),
+                    ),
+                ],
               ),
-            ),
-            if (FileDialogs.instance.folders) ...[
-              const SizedBox(width: 8),
-              OutlineButton(key: const ValueKey('vault-choose'), label: 'Choose…', onTap: () => _choose(s)),
-            ],
-            const SizedBox(width: 8),
-            OutlineButton(key: const ValueKey('vault-use'), label: 'Use folder', onTap: () => _use(s)),
-          ]),
+          ],
         ),
-        if (_error != null) Text(_error!, style: tsRaw(13, 18, 400, c.inlineCodeText)),
-        if (s.vaultPath != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: TextBtn('Use the default location', onTap: () => s.update((s) => s.vaultPath = null), color: c.textSecondary),
-            ),
-          ),
-        const MountsSection(),
+        if (desktop) const MountsSection(),
       ],
-    ]);
+    );
   }
 }
 
@@ -608,52 +835,25 @@ class AboutBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vault = context.app.vault;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('About', primary: true),
-      const SettingsRow(label: 'Version', description: '$appName $appVersion'),
-      SettingsRow(
-        label: 'Device ID',
-        description: 'Identifies this device to the hub and in conflicts.',
-        stack: true,
-        trailing: CopyableText(vault.deviceId, textKey: const ValueKey('device-id')),
-      ),
-      SettingsRow(
-        label: 'Add-ons',
-        description: 'Manage the features installed on this device.',
-        trailing: TextBtn('Manage', key: const ValueKey('manage-addons'),
-          onTap: () => context.mobile
-            ? pushSettingsPage(context, 'Add-ons', const AddonsBody())
-            : showPanel(context, (_) => const Padding(
-                padding: EdgeInsets.all(24), child: AddonsBody()), shrink: true)),
-      ),
-    ]);
-  }
-}
-
-class AddonsBody extends StatelessWidget {
-  const AddonsBody({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final settings = AppSettings.of(context);
-    return Column(mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Add-ons', primary: true),
-      const Text('Changes take effect when you restart $appName.'),
-      for (final entry in addonList)
-        SettingsRow(label: entry.label,
-          description: entry.optional ? 'Optional' : 'Required',
-          trailing: entry.optional
-            ? Toggle(key: ValueKey('addon-${entry.addon.id}'),
-                value: !settings.disabledAddons.contains(entry.addon.id),
-                onChanged: (enabled) => settings.update((s) {
-                  if (enabled) { s.disabledAddons.remove(entry.addon.id); }
-                  else { s.disabledAddons.add(entry.addon.id); }
-                }))
-            : const Text('Enabled')),
-      for (final section in appAddonContext.settingsSections.all.where((s) => s.location == 'addons')) ...[
-        SettingsHeading(section.label),
-        section.build(context),
+    return SPage(
+      title: 'About',
+      children: [
+        SSection(
+          first: true,
+          children: [
+            const SRow(label: 'Version', desc: '$appName $appVersion'),
+            SRow(
+              label: 'Device ID',
+              desc:
+                  'Identifies this device to the hub and in conflicts. Support may ask for it.',
+              stack: true,
+              control: SCopyLine(vault.deviceId, textKey: const ValueKey('device-id')),
+            ),
+          ],
+        ),
+        // Windows only: the installed build and its updates, under the version.
+        if (updatesAvailableHere()) const UpdatesBody(embedded: true),
       ],
-    ]);
+    );
   }
 }
