@@ -404,16 +404,20 @@ pub fn recover(v: &Vault, node: &str) -> Result<u32> {
     Ok(n)
 }
 
-/// Moves `node`'s jobs that ended more than `keep_ms` before `now` to the
-/// trash. Returns how many.
-pub fn sweep(v: &Vault, node: &str, keep_ms: i64, now: i64) -> Result<u32> {
-    let mut n = 0;
-    for job in all(v)?.into_iter().filter(|j| j.node == node && j.ended()) {
-        let ended = job.finished_ms.unwrap_or(job.created_ms);
-        if now.saturating_sub(ended) >= keep_ms {
-            v.delete_page(job.id.clone())?;
-            n += 1;
-        }
-    }
-    Ok(n)
+/// `node`'s jobs that ended more than `keep_ms` before `now` and still name a
+/// session. The job row (outcome, attempts) is kept for good; only the raw
+/// session (the transcript and logs) expires. The caller deletes each session
+/// and then calls [`session_expired`].
+pub fn expired_sessions(v: &Vault, node: &str, keep_ms: i64, now: i64) -> Result<Vec<Job>> {
+    Ok(all(v)?
+        .into_iter()
+        .filter(|j| j.node == node && j.ended() && !j.session.is_empty())
+        .filter(|j| now.saturating_sub(j.finished_ms.unwrap_or(j.created_ms)) >= keep_ms)
+        .collect())
+}
+
+/// Clears the job's `session` once its session is deleted.
+pub fn session_expired(v: &Vault, id: &str) -> Result<()> {
+    v.remove_property(id.to_string(), "session".into())?;
+    Ok(())
 }
