@@ -1,4 +1,5 @@
 // Shared board layout and interactions. Storage belongs to BoardSource.
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
@@ -74,9 +75,12 @@ class _BoardRendererState extends State<BoardRenderer> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStops());
   }
 
+  /// Called from a card's focus-change callback, while the focus manager is
+  /// still going through its changed nodes: the stop is moved afterwards,
+  /// because changing a node's traversal flag there would modify that set.
   void _noteFocus(String id) {
     _activeCard = id;
-    _refreshStops();
+    scheduleMicrotask(_refreshStops);
   }
 
   /// The card the board's Tab stop sits on.

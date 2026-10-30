@@ -3,6 +3,8 @@
 // link to the full note. On desktop it sits beside the board; on a phone it
 // is a bottom sheet. Esc closes it.
 
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -62,8 +64,11 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
   void initState() {
     super.initState();
     // Tab skips the title, but Tab pressed while it has focus moves on.
+    // Set after the focus manager finishes its pass, not inside it.
     _titleFocus.addListener(
-      () => _titleFocus.skipTraversal = !_titleFocus.hasPrimaryFocus,
+      () => scheduleMicrotask(() {
+        if (mounted) _titleFocus.skipTraversal = !_titleFocus.hasPrimaryFocus;
+      }),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _titleFocus.requestFocus();
