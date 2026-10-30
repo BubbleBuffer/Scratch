@@ -229,9 +229,7 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
                   key: ValueKey('proposal-merge-${p.id}'),
                   label: 'Merge',
                   height: h,
-                  onTap: busy
-                      ? null
-                      : () => _act(p, 'Merge', widget.store.merge),
+                  onTap: busy ? () {} : () => _act(p, 'Merge', widget.store.merge),
                 ),
               ],
             ],

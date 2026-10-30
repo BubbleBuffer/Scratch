@@ -83,13 +83,13 @@ class VaultTriageBridge implements TriageBridge {
 }
 
 class TriageStore extends ChangeNotifier {
-  TriageStore(this.bridge, {ChangeFeed? feed}) : _feed = feed {
-    _feed?.addListener(onBatch);
+  TriageStore(this.bridge, {this.feed}) {
+    feed?.addListener(onBatch);
     load();
   }
 
   final TriageBridge bridge;
-  final ChangeFeed? _feed;
+  final ChangeFeed? feed;
 
   static final _stores = Expando<TriageStore>();
 
@@ -155,7 +155,7 @@ class TriageStore extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    _feed?.removeListener(onBatch);
+    feed?.removeListener(onBatch);
     super.dispose();
   }
 }
