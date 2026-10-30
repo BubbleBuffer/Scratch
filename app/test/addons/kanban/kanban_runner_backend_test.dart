@@ -127,7 +127,7 @@ void main() {
         AssignState.queued: 'queued',
         AssignState.waiting: 'waiting',
         AssignState.running: 'running',
-        AssignState.cancelling: 'cancelling',
+        AssignState.cancelling: 'cancellation requested',
         AssignState.done: 'done',
         AssignState.failed: 'failed',
         AssignState.cancelled: 'cancelled',

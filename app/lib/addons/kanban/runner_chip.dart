@@ -78,7 +78,7 @@ class RunnerChip extends StatelessWidget {
     );
     final reason = a.reason;
     final progress = runnerProgressText(a);
-    if (reason == null && progress == null) return chip;
+    if (reason == null && progress == null && !a.outdated) return chip;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,6 +88,14 @@ class RunnerChip extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             reason,
+            style: ts(const TypeSpec(12.5, 17, 400), c.textSecondary),
+          ),
+        ],
+        if (a.outdated) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Running on an earlier version of the note',
+            key: ValueKey('runner-outdated-${a.taskId}'),
             style: ts(const TypeSpec(12.5, 17, 400), c.textSecondary),
           ),
         ],

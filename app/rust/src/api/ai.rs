@@ -128,6 +128,10 @@ pub struct AiTask {
     /// Saved by the runner before the code task starts.
     pub worktree_branch: String,
     pub worktree_path: String,
+    /// A cancel was requested and the runner has not acknowledged it yet.
+    pub cancel_requested: bool,
+    /// The note changed after the running worker got its brief.
+    pub stale: bool,
 }
 
 fn task(t: tasks::Task) -> AiTask {
@@ -148,7 +152,15 @@ fn task(t: tasks::Task) -> AiTask {
         project: t.project,
         worktree_branch: t.worktree_branch,
         worktree_path: t.worktree_path,
+        cancel_requested: t.cancel_requested_ms.is_some(),
+        stale: false,
     }
+}
+
+/// [task] with `stale` set from the task's attempt and the note.
+fn task_in(v: &vault_core::Vault, t: tasks::Task) -> AiTask {
+    let stale = tasks::is_stale(v, &t);
+    AiTask { stale, ..task(t) }
 }
 
 /// The hub or a PC that uses this vault.
@@ -303,17 +315,31 @@ pub fn ai_cancel_task(vault: &NotesVault, id: String) -> Result<bool, String> {
     tasks::cancel(&vault.inner, &id).map_err(err)
 }
 
+/// Asks the runner to send the running worker the note's current version.
+/// Returns whether the task was running and took the request.
+pub fn ai_send_update(vault: &NotesVault, id: String) -> Result<bool, String> {
+    tasks::request_update(&vault.inner, &id).map_err(err)
+}
+
+/// Adds a to-do under the running task; the runner puts it on the worker's
+/// list and sends it as a steering message.
+pub fn ai_add_step(vault: &NotesVault, id: String, text: String) -> Result<(), String> {
+    tasks::add_step(&vault.inner, &id, &text).map_err(err)
+}
+
 /// The newest tasks first.
 pub fn ai_list_tasks(vault: &NotesVault, limit: u32) -> Result<Vec<AiTask>, String> {
     Ok(tasks::list(&vault.inner, limit)
         .map_err(err)?
         .into_iter()
-        .map(task)
+        .map(|t| task_in(&vault.inner, t))
         .collect())
 }
 
 pub fn ai_get_task(vault: &NotesVault, id: String) -> Result<AiTask, String> {
-    tasks::get(&vault.inner, &id).map(task).map_err(err)
+    tasks::get(&vault.inner, &id)
+        .map(|t| task_in(&vault.inner, t))
+        .map_err(err)
 }
 
 /// The "AI tasks" collection page, if it exists.

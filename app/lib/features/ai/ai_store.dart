@@ -69,6 +69,13 @@ abstract interface class AiTaskSource implements Listenable {
   /// Called when the user delegates a task to a runner from this device (the
   /// run notices ask for the notification permission then).
   void Function()? onDelegated;
+
+  /// Asks the runner of task [id] to stop it; it stays running until the
+  /// runner acknowledges.
+  Future<void> cancel(String id);
+
+  /// Asks the runner to send task [id]'s worker the note's current version.
+  Future<void> sendUpdate(String id);
 }
 
 /// Starts and stops the agent's runs for add-ons (a task assigned to the
@@ -320,6 +327,12 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
     } else {
       await vault.run((v) => aiCancelTask(vault: v, id: id), writes: true);
     }
+    await refresh();
+  }
+
+  @override
+  Future<void> sendUpdate(String id) async {
+    await vault.run((v) => aiSendUpdate(vault: v, id: id), writes: true);
     await refresh();
   }
 

@@ -11,6 +11,7 @@ import '../../ui/board/board_renderer.dart';
 import '../../ui/board/board_source.dart';
 import '../../services/addon_services.dart' show AddonServices;
 import '../../ui/database/widgets.dart' show showPanel;
+import '../../ui/toast.dart' show showToast;
 import '../../ui/ui.dart';
 import 'card_panel.dart';
 import 'keyboard_menu.dart';
@@ -342,6 +343,25 @@ class _KanbanBoardState extends State<KanbanBoard> {
                   _assignCard(context, anchor, card, runners);
                 },
               ),
+            if (runners != null &&
+                runners.of(card.id)?.state == AssignState.running)
+              MenuItem(
+                key: const ValueKey('kanban-cancel-run'),
+                label: 'Cancel run',
+                onTap: () {
+                  Navigator.of(panel).pop();
+                  _runCommand(context, runners.cancel(card.id));
+                },
+              ),
+            if (runners != null && (runners.of(card.id)?.outdated ?? false))
+              MenuItem(
+                key: const ValueKey('kanban-send-update'),
+                label: 'Send note update to agent',
+                onTap: () {
+                  Navigator.of(panel).pop();
+                  _runCommand(context, runners.sendUpdate(card.id));
+                },
+              ),
             if (phone && others.isNotEmpty)
               MenuItem(
                 key: const ValueKey('kanban-move-card'),
@@ -365,6 +385,15 @@ class _KanbanBoardState extends State<KanbanBoard> {
       ),
       width: 220,
     );
+  }
+
+  /// Runs a command on the card's run and shows why it failed.
+  Future<void> _runCommand(BuildContext context, Future<void> command) async {
+    try {
+      await command;
+    } on RunnerUnavailable catch (e) {
+      if (context.mounted) showToast(context, e.reason);
+    }
   }
 
   /// The runner picker for [card]: a popover under its ellipsis on a wide
