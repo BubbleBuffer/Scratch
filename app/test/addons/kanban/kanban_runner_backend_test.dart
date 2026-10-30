@@ -129,6 +129,7 @@ void main() {
         AssignState.running: 'running',
         AssignState.cancelling: 'cancellation requested',
         AssignState.review: 'ready for review',
+        AssignState.needsInput: 'needs your reply',
         AssignState.stalled: 'stalled',
         AssignState.done: 'done',
         AssignState.failed: 'failed',
