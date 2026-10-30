@@ -34,7 +34,7 @@ void main() {
                 width: 300,
                 child: Semantics(
                   container: true,
-                  identifier: field.id,
+                  identifier: 'title-field',
                   child: TextField(
                     controller: controller,
                     decoration: const InputDecoration(labelText: 'Title'),
@@ -53,7 +53,8 @@ void main() {
     final nodes = driver.snapshot();
     final byId = {for (final n in nodes) n.id: n};
     expect(byId.keys, contains('save-button'));
-    final field = nodes.singleWhere((n) => n.role == 'textfield');
+    final field = byId['title-field']!;
+    expect(field.role, 'textfield');
     final save = byId['save-button']!;
     expect(save.role, 'button');
     expect(save.label, 'Save');
