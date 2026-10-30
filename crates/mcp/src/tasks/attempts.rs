@@ -28,6 +28,9 @@ pub const HISTORY: &str = "attempts";
 /// cleared by the next attempt. While the status is still `running`, the
 /// runner has not acknowledged it.
 pub const CANCEL_REQUESTED: &str = "cancel_requested";
+/// The row property set (ms since the epoch) when the user asks the runner to
+/// send the worker the note's current version; cleared once sent.
+pub const UPDATE_REQUESTED: &str = "update_requested";
 
 /// Attempts kept in a row; the oldest go first.
 const MAX_ATTEMPTS: usize = 20;
@@ -47,6 +50,7 @@ pub mod kind {
     pub const CHECKPOINT: &str = "checkpoint";
     pub const STEERING_SENT: &str = "steering_sent";
     pub const STEERING_ACKNOWLEDGED: &str = "steering_acknowledged";
+    pub const UPDATE_REQUESTED: &str = "update_requested";
     pub const UPDATE_SENT: &str = "update_sent";
     pub const CANCEL_REQUESTED: &str = "cancel_requested";
     pub const CANCEL_ACKNOWLEDGED: &str = "cancel_acknowledged";
@@ -96,6 +100,9 @@ pub struct Attempt {
     pub result: Option<String>,
     /// To-do blocks whose text was sent to the worker as steering.
     pub steered: Vec<String>,
+    /// To-do blocks that were under the task when the run began: the user's,
+    /// never sent as steering.
+    pub baseline: Vec<String>,
     pub events: Vec<Event>,
 }
 
