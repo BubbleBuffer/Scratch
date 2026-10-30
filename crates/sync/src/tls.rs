@@ -694,11 +694,10 @@ mod tests {
         let ca_key = KeyPair::generate().unwrap();
         let mut ca = params("Test CA");
         ca.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
-        let ca_cert = ca.self_signed(&ca_key).unwrap();
+        ca.self_signed(&ca_key).unwrap();
+        let issuer = rcgen::Issuer::new(ca, ca_key);
         let key = KeyPair::generate().unwrap();
-        let leaf = params("hub.test")
-            .signed_by(&key, &ca_cert, &ca_key)
-            .unwrap();
+        let leaf = params("hub.test").signed_by(&key, &issuer).unwrap();
         let info = CertificateInfo::from_der(leaf.der()).unwrap();
         assert_eq!(info.subject, "CN=hub.test");
         assert_eq!(info.issuer, "CN=Test CA");
@@ -743,7 +742,7 @@ mod tests {
     /// A CA (self-signed root, or an intermediate under one).
     struct Ca {
         cert: rcgen::Certificate,
-        key: KeyPair,
+        issuer: rcgen::Issuer<'static, KeyPair>,
     }
 
     fn ca_params(cn: &str) -> CertificateParams {
@@ -759,16 +758,22 @@ mod tests {
 
     fn root_ca(cn: &str) -> Ca {
         let key = KeyPair::generate().unwrap();
-        let cert = ca_params(cn).self_signed(&key).unwrap();
-        Ca { cert, key }
+        let params = ca_params(cn);
+        let cert = params.self_signed(&key).unwrap();
+        Ca {
+            cert,
+            issuer: rcgen::Issuer::new(params, key),
+        }
     }
 
     fn intermediate_ca(cn: &str, parent: &Ca) -> Ca {
         let key = KeyPair::generate().unwrap();
-        let cert = ca_params(cn)
-            .signed_by(&key, &parent.cert, &parent.key)
-            .unwrap();
-        Ca { cert, key }
+        let params = ca_params(cn);
+        let cert = params.signed_by(&key, &parent.issuer).unwrap();
+        Ca {
+            cert,
+            issuer: rcgen::Issuer::new(params, key),
+        }
     }
 
     /// A served chain (leaf first) and the leaf's key.
@@ -797,7 +802,7 @@ mod tests {
 
     fn leaf_with(params: CertificateParams, ca: &Ca) -> Served {
         let key = KeyPair::generate().unwrap();
-        let cert = params.signed_by(&key, &ca.cert, &ca.key).unwrap();
+        let cert = params.signed_by(&key, &ca.issuer).unwrap();
         Served {
             chain: vec![cert.der().to_vec(), ca.cert.der().to_vec()],
             key: key.serialize_der(),
