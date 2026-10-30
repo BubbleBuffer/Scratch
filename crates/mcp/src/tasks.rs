@@ -852,7 +852,11 @@ pub fn report_progress(v: &Vault, id: &str, message: &str) -> Result<()> {
     if let Some(c) = collection(v)? {
         migrate_schema(v, &c)?;
     }
-    v.set_property(t.id.clone(), "progress".into(), PropValue::Text(message))?;
+    v.set_property(
+        t.id.clone(),
+        "progress".into(),
+        PropValue::Text(message.clone()),
+    )?;
     v.set_property(
         t.id.clone(),
         "progress_at".into(),

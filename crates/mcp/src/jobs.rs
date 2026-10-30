@@ -103,6 +103,7 @@ fn job_of(v: &Vault, row: &PageSummary, with_result: bool) -> Job {
         .then(|| v.load_page(row.id.clone()).ok())
         .flatten()
         .map(|page| v.blocks_markdown(page.blocks).trim().to_string());
+    let cancel_requested = status == RUNNING && !text(p, attempts::CANCEL_REQUESTED).is_empty();
     Job {
         id: row.id.clone(),
         prompt: text(p, "prompt"),
@@ -112,7 +113,7 @@ fn job_of(v: &Vault, row: &PageSummary, with_result: bool) -> Job {
         tools: text(p, "tools"),
         session: text(p, "session"),
         error: text(p, "error"),
-        cancel_requested: status == RUNNING && !text(p, attempts::CANCEL_REQUESTED).is_empty(),
+        cancel_requested,
         page: p
             .iter()
             .find(|x| x.key == "page")
