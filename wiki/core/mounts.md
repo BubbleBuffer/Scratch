@@ -10,7 +10,7 @@ status: current
 
 ## Built (2026-10-01)
 
-The simplest safe version of the design, desktop only. Core: [mounts.rs](../../crates/core/src/mounts.rs); app: Settings → Vault → Mounted folders.
+The simplest safe version of the design, desktop only. Core: [mounts.rs](../../crates/core/src/mounts.rs); app: Settings > Storage > Mounted folders.
 
 - **What a mount is.** A new page (named after the folder, at the top level) whose children are the folder's top-level `*.md` files, one page each, titled by file name. Subfolders and other files are ignored; pages nested deeper under a mounted page live in the vault only.
 - **The mount table** is `.vault/mounts.json` (page id and absolute folder), per device and not synced. Filters, read-only mode, owner and hub replica are not built. The mount page and its pages sync like any other pages; other devices see them as ordinary vault pages.

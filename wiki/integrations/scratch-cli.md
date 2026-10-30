@@ -32,7 +32,7 @@ Claude Code needs Bun and the extension folder, found as the desktop app finds t
 1. Extension folder: `NOTES_CLAUDE_CODE_DIR` when set; else the app's saved Claude Code folder (`agentClaudeCodeDir` in `ai_settings.json`, read beside the vault, then in the app's data folder: `NOTES_DATA_DIR`, else `%LOCALAPPDATA%\Notes` on Windows, else `~/.local/share/notes_app`); else the `claude-code` folder beside `scratch-cli.exe`; else `%LOCALAPPDATA%\Programs\Scratch\claude-code`, the installed app's copy (Windows only); else the extension location compiled into the binary from the BubblePaw dependency, which exists only on the machine that built it.
 2. Bun: the app's saved Bun path (`agentBunPath`, same files); else `bun` on `PATH`; then `~/.bun/bin`; then `bun\bun.exe` beside `scratch-cli.exe`, else in `%LOCALAPPDATA%\Programs\Scratch\bun` (Windows only).
 
-The Windows installer ships both, so an installed Scratch needs no setting: the CLI finds the same extension and Bun the app runs. Only a machine without the app (or with a BubblePaw checkout you would rather use) needs `NOTES_CLAUDE_CODE_DIR` or the folder in the app's Settings > AI > Agent.
+The Windows installer ships both, so an installed Scratch needs no setting: the CLI finds the same extension and Bun the app runs. Only a machine without the app (or with a BubblePaw checkout you would rather use) needs `NOTES_CLAUDE_CODE_DIR` or the folder in the app's Settings > Agent > Advanced.
 
 A model whose provider is missing fails the task before any request, with an error that names the provider and what is missing, for example `claude-code is unavailable: the Claude Code extension folder was not found; set NOTES_CLAUDE_CODE_DIR`. It is never sent to another provider.
 

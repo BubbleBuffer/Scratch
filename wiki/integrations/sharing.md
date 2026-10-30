@@ -111,7 +111,7 @@ Both lists come from the hub, so they show every link to the page, wherever it w
 **Revoking from anywhere:**
 
 - **Web:** the viewer header links to **Shared links** (`/shares`). It lists all active links with the page title (or "Deleted page"), visibility, kind and date, plus Copy, Open and Revoke (with the same inline confirm). Links of deleted or trashed pages stay listed and revocable.
-- **App:** **Settings › Shared links**, next to Sync, appears only when the device is signed in to a hub. It shows the same list from `GET /shares?all=1`, using the popup's row widget ([shared_links_settings.dart](../../app/lib/features/share/shared_links_settings.dart)). Open note opens the page and is disabled for a deleted page. The empty state reads "No shared links yet. Share a note from its menu."
+- **App:** **Settings > Shared links**, in the Your vault group after Storage, appears only when the device is signed in to a hub. It shows the same list from `GET /shares?all=1`, using the popup's row widget ([shared_links_settings.dart](../../app/lib/features/share/shared_links_settings.dart)). Open note opens the page and is disabled for a deleted page. The empty state reads "No shared links yet. Share a note from its menu."
 
 ## Tests
 
