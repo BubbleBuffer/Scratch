@@ -10,7 +10,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'vault.dart';
 
 // These functions are ignored because they are not marked as `pub`: `dto`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
 
 /// Queues a triage run on `runner` (a PC's device id, or "hub") and returns
 /// its AI task id. It reviews the pages under the top-level page
@@ -62,6 +62,62 @@ Future<TriageProposalDto> triageUndo({
 /// change feed means the proposal list changed.
 Future<String> triagePageId({required NotesVault vault}) =>
     RustLib.instance.api.crateApiTriageTriagePageId(vault: vault);
+
+/// The triage runs that applied links or tags and still have them, newest
+/// first.
+Future<List<TriageRunDto>> triageApplied({required NotesVault vault}) =>
+    RustLib.instance.api.crateApiTriageTriageApplied(vault: vault);
+
+/// Takes back every link and tag one run applied, newest first, and returns
+/// how many were undone.
+Future<int> triageUndoApplied({
+  required NotesVault vault,
+  required String task,
+}) => RustLib.instance.api.crateApiTriageTriageUndoApplied(
+  vault: vault,
+  task: task,
+);
+
+/// One link or tag a triage run applied, with the page titles for display.
+class TriageActionDto {
+  /// "link" or "tag".
+  final String kind;
+  final String pageId;
+  final String pageTitle;
+
+  /// A link's target page id; a tag's tag.
+  final String target;
+
+  /// A link's target title; "" for a tag.
+  final String targetTitle;
+
+  const TriageActionDto({
+    required this.kind,
+    required this.pageId,
+    required this.pageTitle,
+    required this.target,
+    required this.targetTitle,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^
+      pageId.hashCode ^
+      pageTitle.hashCode ^
+      target.hashCode ^
+      targetTitle.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TriageActionDto &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          pageId == other.pageId &&
+          pageTitle == other.pageTitle &&
+          target == other.target &&
+          targetTitle == other.targetTitle;
+}
 
 /// A proposal to merge two pages, with their titles for display.
 class TriageProposalDto {
@@ -132,4 +188,24 @@ class TriageProposalDto {
           createdMs == other.createdMs &&
           task == other.task &&
           mergedVersion == other.mergedVersion;
+}
+
+/// The links and tags one triage run applied and has not undone.
+class TriageRunDto {
+  /// The AI task row of the run.
+  final String task;
+  final List<TriageActionDto> actions;
+
+  const TriageRunDto({required this.task, required this.actions});
+
+  @override
+  int get hashCode => task.hashCode ^ actions.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TriageRunDto &&
+          runtimeType == other.runtimeType &&
+          task == other.task &&
+          actions == other.actions;
 }

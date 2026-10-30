@@ -76,7 +76,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -145572083;
+  int get rustContentHash => 1111554338;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -1369,6 +1369,10 @@ abstract class RustLibApi extends BaseApi {
     required NotesVault vault,
   });
 
+  Future<List<TriageRunDto>> crateApiTriageTriageApplied({
+    required NotesVault vault,
+  });
+
   Future<TriageProposalDto> crateApiTriageTriageDismiss({
     required NotesVault vault,
     required String id,
@@ -1390,6 +1394,11 @@ abstract class RustLibApi extends BaseApi {
   Future<TriageProposalDto> crateApiTriageTriageUndo({
     required NotesVault vault,
     required String id,
+  });
+
+  Future<int> crateApiTriageTriageUndoApplied({
+    required NotesVault vault,
+    required String task,
   });
 
   Future<UpdateCheck> crateApiUpdateUpdateCheck({
@@ -10798,6 +10807,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<List<TriageRunDto>> crateApiTriageTriageApplied({
+    required NotesVault vault,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesVault(
+            vault,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 247,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_triage_run_dto,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiTriageTriageAppliedConstMeta,
+        argValues: [vault],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTriageTriageAppliedConstMeta =>
+      const TaskConstMeta(debugName: "triage_applied", argNames: ["vault"]);
+
+  @override
   Future<TriageProposalDto> crateApiTriageTriageDismiss({
     required NotesVault vault,
     required String id,
@@ -10814,7 +10856,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 247,
+            funcId: 248,
             port: port_,
           );
         },
@@ -10848,7 +10890,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 248,
+            funcId: 249,
             port: port_,
           );
         },
@@ -10881,7 +10923,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 249,
+            funcId: 250,
             port: port_,
           );
         },
@@ -10920,7 +10962,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 250,
+            funcId: 251,
             port: port_,
           );
         },
@@ -10957,7 +10999,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 251,
+            funcId: 252,
             port: port_,
           );
         },
@@ -10976,6 +11018,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "triage_undo", argNames: ["vault", "id"]);
 
   @override
+  Future<int> crateApiTriageTriageUndoApplied({
+    required NotesVault vault,
+    required String task,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesVault(
+            vault,
+            serializer,
+          );
+          sse_encode_String(task, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 253,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_u_32,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiTriageTriageUndoAppliedConstMeta,
+        argValues: [vault, task],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTriageTriageUndoAppliedConstMeta =>
+      const TaskConstMeta(
+        debugName: "triage_undo_applied",
+        argNames: ["vault", "task"],
+      );
+
+  @override
   Future<UpdateCheck> crateApiUpdateUpdateCheck({
     required String currentTag,
     required bool includeNightly,
@@ -10991,7 +11071,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 252,
+            funcId: 254,
             port: port_,
           );
         },
@@ -11027,7 +11107,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 253,
+            funcId: 255,
             port: port_,
           );
         },
@@ -11057,7 +11137,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 254,
+            funcId: 256,
           )!;
         },
         codec: SseCodec(
@@ -11088,7 +11168,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 255,
+            funcId: 257,
             port: port_,
           );
         },
@@ -11123,7 +11203,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 256,
+            funcId: 258,
             port: port_,
           );
         },
@@ -13239,9 +13319,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<TriageActionDto> dco_decode_list_triage_action_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_triage_action_dto).toList();
+  }
+
+  @protected
   List<TriageProposalDto> dco_decode_list_triage_proposal_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_triage_proposal_dto).toList();
+  }
+
+  @protected
+  List<TriageRunDto> dco_decode_list_triage_run_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_triage_run_dto).toList();
   }
 
   @protected
@@ -14045,6 +14137,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  TriageActionDto dco_decode_triage_action_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return TriageActionDto(
+      kind: dco_decode_String(arr[0]),
+      pageId: dco_decode_String(arr[1]),
+      pageTitle: dco_decode_String(arr[2]),
+      target: dco_decode_String(arr[3]),
+      targetTitle: dco_decode_String(arr[4]),
+    );
+  }
+
+  @protected
   TriageProposalDto dco_decode_triage_proposal_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -14062,6 +14169,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       createdMs: dco_decode_i_64(arr[8]),
       task: dco_decode_String(arr[9]),
       mergedVersion: dco_decode_opt_String(arr[10]),
+    );
+  }
+
+  @protected
+  TriageRunDto dco_decode_triage_run_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return TriageRunDto(
+      task: dco_decode_String(arr[0]),
+      actions: dco_decode_list_triage_action_dto(arr[1]),
     );
   }
 
@@ -17028,6 +17147,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<TriageActionDto> sse_decode_list_triage_action_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <TriageActionDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_triage_action_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<TriageProposalDto> sse_decode_list_triage_proposal_dto(
     SseDeserializer deserializer,
   ) {
@@ -17037,6 +17170,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <TriageProposalDto>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_triage_proposal_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<TriageRunDto> sse_decode_list_triage_run_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <TriageRunDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_triage_run_dto(deserializer));
     }
     return ans_;
   }
@@ -18062,6 +18209,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  TriageActionDto sse_decode_triage_action_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_String(deserializer);
+    var var_pageId = sse_decode_String(deserializer);
+    var var_pageTitle = sse_decode_String(deserializer);
+    var var_target = sse_decode_String(deserializer);
+    var var_targetTitle = sse_decode_String(deserializer);
+    return TriageActionDto(
+      kind: var_kind,
+      pageId: var_pageId,
+      pageTitle: var_pageTitle,
+      target: var_target,
+      targetTitle: var_targetTitle,
+    );
+  }
+
+  @protected
   TriageProposalDto sse_decode_triage_proposal_dto(
     SseDeserializer deserializer,
   ) {
@@ -18090,6 +18254,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       task: var_task,
       mergedVersion: var_mergedVersion,
     );
+  }
+
+  @protected
+  TriageRunDto sse_decode_triage_run_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_task = sse_decode_String(deserializer);
+    var var_actions = sse_decode_list_triage_action_dto(deserializer);
+    return TriageRunDto(task: var_task, actions: var_actions);
   }
 
   @protected
@@ -20621,6 +20793,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_triage_action_dto(
+    List<TriageActionDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_triage_action_dto(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_triage_proposal_dto(
     List<TriageProposalDto> self,
     SseSerializer serializer,
@@ -20629,6 +20813,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_triage_proposal_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_triage_run_dto(
+    List<TriageRunDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_triage_run_dto(item, serializer);
     }
   }
 
@@ -21470,6 +21666,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_triage_action_dto(
+    TriageActionDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.kind, serializer);
+    sse_encode_String(self.pageId, serializer);
+    sse_encode_String(self.pageTitle, serializer);
+    sse_encode_String(self.target, serializer);
+    sse_encode_String(self.targetTitle, serializer);
+  }
+
+  @protected
   void sse_encode_triage_proposal_dto(
     TriageProposalDto self,
     SseSerializer serializer,
@@ -21486,6 +21695,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_64(self.createdMs, serializer);
     sse_encode_String(self.task, serializer);
     sse_encode_opt_String(self.mergedVersion, serializer);
+  }
+
+  @protected
+  void sse_encode_triage_run_dto(TriageRunDto self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.task, serializer);
+    sse_encode_list_triage_action_dto(self.actions, serializer);
   }
 
   @protected
