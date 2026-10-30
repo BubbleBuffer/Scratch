@@ -173,7 +173,11 @@ void main() {
 
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await settle(tester);
-      expect(focusIsIn(find.byKey(const ValueKey('kanban-panel-close'))), isTrue);
+      expect(
+        focusIsIn(find.byKey(_assign)),
+        isTrue,
+        reason: 'Tab leaves the title for the first control after it',
+      );
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await settle(tester);
