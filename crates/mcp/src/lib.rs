@@ -4,10 +4,6 @@
 //!
 //! - [`McpServer`]: JSON-RPC handling and the vault tools ([`tools`]).
 //! - [`stdio`]: newline-delimited JSON-RPC over stdin/stdout.
-//! - [`http`]: streamable HTTP (`POST /mcp`, JSON responses) with a bearer
-//!   token, bound to 127.0.0.1 by default.
-//! - [`endpoint`]: the vault's MCP token and the running endpoint's address
-//!   (`.vault/mcp/`), so `notes-mcp` can reach the app that holds the vault.
 //! - [`tasks`]: AI tasks stored in the vault (answered by the BubblePaw
 //!   agent on the desktop or the hub; the app starts no other AI program).
 //! - [`merge`]: the prompt and answer format for an agent merging a sync
@@ -15,12 +11,9 @@
 //!
 //! Design notes: `wiki/integrations/ai-assistants.md`.
 
-pub mod endpoint;
-pub mod http;
 pub mod jobs;
 pub mod merge;
 pub use vault_tools::props;
-pub mod proxy;
 pub mod runners;
 mod server;
 pub mod stdio;
@@ -75,11 +68,4 @@ pub type Result<T> = std::result::Result<T, McpError>;
 
 pub(crate) fn err<T>(msg: impl Into<String>) -> Result<T> {
     Err(McpError(msg.into()))
-}
-
-/// 32 random bytes as hex.
-pub(crate) fn random_hex() -> Result<String> {
-    let mut b = [0u8; 32];
-    getrandom::fill(&mut b).map_err(|e| McpError(format!("random: {e}")))?;
-    Ok(b.iter().map(|x| format!("{x:02x}")).collect())
 }

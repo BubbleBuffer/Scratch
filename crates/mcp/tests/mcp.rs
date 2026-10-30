@@ -1,6 +1,5 @@
 //! The MCP server end to end on temporary vaults: JSON-RPC over stdio (in
-//! process, and the real `notes-mcp` binary over pipes), streamable HTTP
-//! with the bearer token, the stdio-to-app forwarding, and every tool.
+//! process, and the real `notes-mcp` binary over pipes), and every tool.
 
 use std::fs;
 use std::io::{BufRead, BufReader, Cursor, Write};
@@ -10,9 +9,6 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 use vault_core::*;
-use vault_mcp::endpoint;
-use vault_mcp::http::{HttpOptions, McpHttp};
-use vault_mcp::proxy::McpClient;
 use vault_mcp::{stdio, tools, McpServer};
 
 struct Temp(PathBuf);
@@ -523,153 +519,6 @@ fn tools_cover_the_vault() {
     assert!(!v.list_versions(home).unwrap().is_empty());
 }
 
-fn http_server(t: &Temp) -> (Arc<Vault>, McpHttp, String) {
-    let v = Arc::new(Vault::open(t.root()).unwrap());
-    let token = endpoint::token(&t.root()).unwrap();
-    let h = McpHttp::serve(
-        "127.0.0.1:0",
-        Arc::new(McpServer::new(v.clone())),
-        token.clone(),
-        HttpOptions::default(),
-    )
-    .unwrap();
-    (v, h, token)
-}
-
-fn raw(url: &str, method: &str, headers: &[(&str, &str)], body: &str) -> u16 {
-    let agent = ureq::config::Config::builder()
-        .http_status_as_error(false)
-        .build()
-        .new_agent();
-    let r = match method {
-        "GET" => {
-            let mut rb = agent.get(url);
-            for (k, v) in headers {
-                rb = rb.header(*k, *v);
-            }
-            rb.call()
-        }
-        _ => {
-            let mut rb = agent.post(url);
-            for (k, v) in headers {
-                rb = rb.header(*k, *v);
-            }
-            rb.send(body.as_bytes())
-        }
-    };
-    r.unwrap().status().as_u16()
-}
-
-#[test]
-fn http_transport_with_token() {
-    let t = Temp::new();
-    let (v, h, token) = http_server(&t);
-    assert!(h.addr().ip().is_loopback());
-    let url = h.url();
-    let c = McpClient::new(&url, &token);
-    let init = c.initialize().unwrap();
-    assert_eq!(init["result"]["protocolVersion"], "2025-06-18");
-    let (status, list) = c
-        .post(&json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }))
-        .unwrap();
-    assert_eq!(status, 200);
-    let names = list.unwrap();
-    assert_eq!(listed_names(&names), LISTED);
-    let created = c
-        .call_tool(
-            "create_page",
-            json!({ "title": "Over HTTP", "markdown": "Body text" }),
-        )
-        .unwrap();
-    let id = id_in(&created);
-    let read = c.call_tool("read_page", json!({ "page": id })).unwrap();
-    assert!(read.contains("Body text"));
-    c.call_tool(
-        "edit_page",
-        json!({ "page": id, "op": "append", "markdown": "- more" }),
-    )
-    .unwrap();
-    assert_eq!(v.load_page(id.clone()).unwrap().blocks.len(), 2);
-    assert!(c
-        .call_tool("read_page", json!({ "page": "missing page" }))
-        .is_err());
-
-    let path = "desktop/sub/note";
-    c.call_tool("memory_write", json!({
-        "path":path, "description":"Desktop memory", "type":"reference", "body":"desktopmemoryneedle"
-    })).unwrap();
-    let index = c
-        .call_tool("memory_search", json!({"scope":"desktop"}))
-        .unwrap();
-    // Search output names a memory by its title and location, not its path.
-    assert!(index.contains("in Memory / desktop / sub"), "{index}");
-    let search = c
-        .call_tool("memory_search", json!({"query":"desktopmemoryneedle"}))
-        .unwrap();
-    assert!(
-        search.contains("in Memory / desktop / sub") && search.contains("desktopmemoryneedle"),
-        "{search}"
-    );
-    c.call_tool(
-        "memory_update",
-        json!({"path":path,"append":"A second paragraph."}),
-    )
-    .unwrap();
-    let memory = c.call_tool("memory_read", json!({"path":path})).unwrap();
-    assert!(memory.contains("desktopmemoryneedle"), "{memory}");
-    assert!(memory.contains("A second paragraph."), "{memory}");
-    c.call_tool("memory_delete", json!({"path":path})).unwrap();
-    assert!(c.call_tool("memory_read", json!({"path":path})).is_err());
-
-    // Batches.
-    let (_, batch) = c
-        .post(&json!([{ "jsonrpc": "2.0", "id": 1, "method": "ping" }, { "jsonrpc": "2.0", "method": "notifications/x" }]))
-        .unwrap();
-    assert_eq!(batch.unwrap().as_array().unwrap().len(), 1);
-
-    // Unauthorized: no token, a wrong token, a bad origin, GET.
-    let body = json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }).to_string();
-    assert_eq!(
-        raw(&url, "POST", &[("Content-Type", "application/json")], &body),
-        401
-    );
-    let wrong = format!("Bearer {}", "0".repeat(64));
-    assert_eq!(raw(&url, "POST", &[("Authorization", &wrong)], &body), 401);
-    assert!(McpClient::new(&url, &"1".repeat(64))
-        .forward(&json!({ "jsonrpc": "2.0", "id": 1, "method": "ping" }))
-        .is_err());
-    let good = format!("Bearer {token}");
-    assert_eq!(
-        raw(
-            &url,
-            "POST",
-            &[("Authorization", &good), ("Origin", "https://evil.example")],
-            &body
-        ),
-        403
-    );
-    assert_eq!(
-        raw(
-            &url,
-            "POST",
-            &[
-                ("Authorization", &good),
-                ("Origin", "http://localhost:3000")
-            ],
-            &body
-        ),
-        200
-    );
-    assert_eq!(raw(&url, "GET", &[("Authorization", &good)], ""), 405);
-    assert_eq!(
-        raw(&url, "POST", &[("Authorization", &good)], "{not json"),
-        400
-    );
-    let health = url.replace("/mcp", "/health");
-    assert_eq!(raw(&health, "GET", &[], ""), 200);
-    h.stop();
-}
-
 /// Talks to `notes-mcp` over its stdin/stdout.
 struct Proc {
     child: Child,
@@ -740,18 +589,22 @@ fn binary_over_stdio_opens_the_vault_per_call() {
     let v = Vault::open(t.root()).unwrap();
     assert!(v.is_owner());
     assert_eq!(v.load_page(id).unwrap().title, "From stdio");
-    // While another program holds it without an endpoint, calls fail clearly.
+    // While another program holds the vault, calls fail and say what to do.
     let (e, text) = p.tool("search_notes", json!({ "query": "stdio" }));
-    assert!(e && text.contains("open in another program"), "{text}");
+    assert!(
+        e && text.contains("open in another program") && text.contains("Close that program"),
+        "{text}"
+    );
     drop(v);
+    // Once it lets go, the next call works again.
+    let (e, text) = p.tool("search_notes", json!({ "query": "stdio" }));
+    assert!(!e && text.contains("From stdio"), "{text}");
 }
 
 #[test]
 fn feedback_over_real_stdio_is_hidden_and_records_transport() {
     let t = Temp::new();
     let token = "a1".repeat(32);
-    fs::create_dir_all(endpoint::mcp_dir(&t.root())).unwrap();
-    fs::write(endpoint::mcp_dir(&t.root()).join("token"), &token).unwrap();
     let mut p = Proc::start(&t.root());
     let list = p.send(json!({"jsonrpc":"2.0", "id":1, "method":"tools/list"}));
     assert!(listed_names(&list).contains(&"feedback_submit"));
@@ -781,27 +634,6 @@ fn feedback_over_real_stdio_is_hidden_and_records_transport() {
     assert!(text.contains("source: mcp"), "{text}");
     assert!(text.contains("Steps:"), "{text}");
     assert!(!text.contains(&token), "report leaked the seeded token");
-}
-
-#[test]
-fn binary_over_stdio_forwards_to_the_running_app() {
-    let t = Temp::new();
-    // The "app": holds the vault and serves the endpoint.
-    let (v, h, _) = http_server(&t);
-    endpoint::write_endpoint(&t.root(), &h.url()).unwrap();
-    let mut p = Proc::start(&t.root());
-    let (e, text) = p.tool("create_page", json!({ "title": "Via the app" }));
-    assert!(!e, "{text}");
-    // The app's vault has it at once (same process, same Vault).
-    assert_eq!(v.load_page(id_in(&text)).unwrap().title, "Via the app");
-    // A stopped endpoint (stale endpoint file) falls back to opening the
-    // vault, which still fails here because the "app" holds it.
-    h.stop();
-    let (e, text) = p.tool("search_notes", json!({ "query": "app" }));
-    assert!(e && text.contains("open in another program"), "{text}");
-    drop(v);
-    let (e, text) = p.tool("search_notes", json!({ "query": "app" }));
-    assert!(!e && text.contains("Via the app"), "{text}");
 }
 
 /// A plain (not gzipped) tar holding one regular file.
