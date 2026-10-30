@@ -1,6 +1,6 @@
-# Settings redesign (proposal, 2026-10-23)
+# Settings redesign (approved 2026-10-23)
 
-**Status:** mockup for review. Nothing here is built in the app.
+**Status:** approved 2026-10-23 and built. This folder is the approved reference. How Settings works now: [wiki/product/settings.md](../../wiki/product/settings.md).
 
 The user found Settings, and Settings › AI in particular, "horrid ux" and "largely incomprehensible": options are shown with no explanation of what they do or when to change them. This proposal reorganises the options that exist today. It adds no options or features. [audit.md](audit.md) lists every current option, what it does in code, its default, and the bugs found.
 
@@ -69,3 +69,10 @@ Dropping the local endpoint (open question 2) removes code in these places. The 
 ## Decisions
 
 - **2026-10-23: one Connectors page replaces AI apps.** The owner asked for one Connectors page with collapsible panels, replacing AI apps: Tools for the agent, Apps that use your vault, and This computer for hub apps, all collapsed by default. MCP servers move there from Agent, and the lock line on the Tools panel links back to Agent. The page id is `connectors`, and the URL hash keeps the open panels as `open=tools,apps,hub`. On a phone the three panels stack.
+
+## Placement decisions made while building (2026-10-30)
+
+- **Shared links** (added to the app after this mockup) sits in the Your vault group, after Storage. It is listed only while the device is signed in to a hub.
+- **Updates** (Windows only) is a section of About, under the version.
+- **Trusted certificates** and the **host rename** stay on Sync and devices.
+- **Computer names** (the names of the computers that run tasks) sits on the Agent page above Recent tasks.
