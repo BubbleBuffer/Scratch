@@ -69,10 +69,12 @@ class _DbListViewState extends State<DbListView> {
     }
 
     final add = AddRowButton(key: const ValueKey('list-new'), label: 'New page', onTap: _add, height: h - 2);
+    // Rows reach 6 into the gutter; a view block in the text column has none.
+    final side = math.max(0.0, a.gutter - 6);
     if (a.inline) {
       final shown = math.min(n, _limit);
       return Padding(
-        padding: EdgeInsets.only(left: a.gutter - 6),
+        padding: EdgeInsets.only(left: side),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
           for (var i = 0; i < shown; i++) row(i),
           if (n > shown) LoadMore(onTap: () => setState(() => _limit += inlinePage)),
@@ -83,7 +85,7 @@ class _DbListViewState extends State<DbListView> {
     return ListView.builder(
       key: const ValueKey('list-rows'),
       controller: _v,
-      padding: EdgeInsets.fromLTRB(a.gutter - 6, 0, a.gutter - 6, 120),
+      padding: EdgeInsets.fromLTRB(side, 0, side, 120),
       itemCount: n + 1,
       itemExtent: h,
       itemBuilder: (context, i) => i < n ? row(i) : add,
