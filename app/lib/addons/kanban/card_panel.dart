@@ -23,6 +23,7 @@ class KanbanCardPanel extends StatefulWidget {
     required this.onClose,
     required this.onOpenNote,
     required this.onAssign,
+    this.onStatus,
     this.onAccept,
     this.onMarkFailed,
     this.onAddStep,
@@ -46,6 +47,10 @@ class KanbanCardPanel extends StatefulWidget {
 
   /// Opens the Run on picker under [anchor], the Assign button.
   final void Function(Rect anchor) onAssign;
+
+  /// Opens the choice of column under [anchor], the Status row. Null: the
+  /// row only shows the status.
+  final void Function(Rect anchor)? onStatus;
 
   /// Accepts the run's result; the card moves to the board's last column.
   final VoidCallback? onAccept;
@@ -164,10 +169,16 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                 const SizedBox(height: 16),
                 _Prop(
                   label: 'Status',
-                  child: Text(
-                    widget.status,
-                    key: const ValueKey('kanban-panel-status'),
-                    style: ts(const TypeSpec(14, 20, 400), c.textPrimary),
+                  child: _ChoiceRow(
+                    key: const ValueKey('kanban-panel-status-row'),
+                    label: 'Status',
+                    value: widget.status,
+                    onTap: widget.onStatus,
+                    child: Text(
+                      widget.status,
+                      key: const ValueKey('kanban-panel-status'),
+                      style: ts(const TypeSpec(14, 20, 400), c.textPrimary),
+                    ),
                   ),
                 ),
                 if (runners != null)
@@ -177,15 +188,21 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                       listenable: runners,
                       builder: (context, _) {
                         final a = runners.of(widget.cardId);
-                        return a == null
-                            ? Text(
-                                'Not assigned',
-                                style: ts(
-                                  const TypeSpec(14, 20, 400),
-                                  c.textSecondary,
-                                ),
-                              )
-                            : RunnerChip(assignment: a);
+                        return _ChoiceRow(
+                          key: const ValueKey('kanban-panel-runner-row'),
+                          label: 'Runner',
+                          value: a == null ? 'Not assigned' : runnerChipText(a),
+                          onTap: widget.onAssign,
+                          child: a == null
+                              ? Text(
+                                  'Not assigned',
+                                  style: ts(
+                                    const TypeSpec(14, 20, 400),
+                                    c.textSecondary,
+                                  ),
+                                )
+                              : RunnerChip(assignment: a),
+                        );
                       },
                     ),
                   ),
@@ -396,4 +413,93 @@ class _Prop extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// A property row that is a button: it takes keyboard focus (Space or Enter
+/// activates it), shows a ring while focus comes from the keyboard, and is
+/// one semantics node named [label] with [value]. [onTap] gets the row's
+/// rectangle, to place the choice under it; null makes the row plain.
+class _ChoiceRow extends StatefulWidget {
+  const _ChoiceRow({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onTap,
+    required this.child,
+  });
+
+  final String label;
+  final String value;
+  final void Function(Rect anchor)? onTap;
+  final Widget child;
+
+  @override
+  State<_ChoiceRow> createState() => _ChoiceRowState();
+}
+
+class _ChoiceRowState extends State<_ChoiceRow> {
+  bool _highlight = false;
+
+  void _activate() {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    widget.onTap?.call(box.localToGlobal(Offset.zero) & box.size);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final visual = ExcludeSemantics(child: widget.child);
+    if (widget.onTap == null) {
+      return Semantics(
+        container: true,
+        label: widget.label,
+        value: widget.value,
+        child: visual,
+      );
+    }
+    return Semantics(
+      container: true,
+      button: true,
+      label: widget.label,
+      value: widget.value,
+      onTap: _activate,
+      child: FocusableActionDetector(
+        onShowFocusHighlight: (v) => setState(() => _highlight = v),
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+          SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+        },
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              _activate();
+              return null;
+            },
+          ),
+        },
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              borderRadius: Radii.field,
+              border: Border.all(
+                color: _highlight ? c.focus : const Color(0x00000000),
+                width: 2,
+              ),
+            ),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _activate,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                child: visual,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

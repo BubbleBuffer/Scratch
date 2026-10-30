@@ -28,6 +28,7 @@ class BoardRenderer extends StatefulWidget {
     this.addCardLabel = 'New page',
     this.cardBuilder,
     this.onCardMenu,
+    this.cardLabel,
     this.columnLabelBuilder,
     this.columnMenu,
     this.trailing,
@@ -48,6 +49,11 @@ class BoardRenderer extends StatefulWidget {
   /// on a focused card. [anchor] is the card's rectangle; [focus] is the
   /// card's focus node, which gets focus back when the menu closes.
   final BoardCardMenuOpener? onCardMenu;
+
+  /// The accessible name of a card. With it, a card is one semantics node
+  /// (the board's focus stop) named by it; the card's body should leave its
+  /// own text out of semantics. Without it, the body's semantics stand.
+  final String Function(BoardCard card)? cardLabel;
   final BoardColumnLabelBuilder? columnLabelBuilder;
   final BoardColumnMenu? columnMenu;
   final Widget? trailing;
@@ -228,6 +234,7 @@ class _BoardRendererState extends State<BoardRenderer> {
       key: ValueKey('board-card-${card.id}'),
       cardId: card.id,
       board: this,
+      label: widget.cardLabel?.call(card),
       onOpen: () => widget.source.openCard(context, card),
       onMenu: widget.onCardMenu == null
           ? null
@@ -339,12 +346,14 @@ class _BoardCardSurface extends StatefulWidget {
     super.key,
     required this.cardId,
     required this.board,
+    required this.label,
     required this.onOpen,
     required this.onMenu,
     required this.child,
   });
   final String cardId;
   final _BoardRendererState board;
+  final String? label;
   final VoidCallback onOpen;
   final void Function(Rect anchor, FocusNode focus)? onMenu;
   final Widget child;
@@ -388,7 +397,7 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
   }
 
   @override
-  Widget build(BuildContext context) => FocusableActionDetector(
+  Widget build(BuildContext context) => _named(FocusableActionDetector(
     focusNode: _focus,
     onShowFocusHighlight: (highlight) => setState(() => _highlight = highlight),
     shortcuts: {
@@ -447,7 +456,22 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
         ),
       ),
     ),
-  );
+  ));
+
+  /// With a label the card is one named semantics node: the focus stop's
+  /// focusable flag and the tap merge into it (they sit below it and are not
+  /// containers), while the card's own controls stay separate nodes.
+  Widget _named(Widget child) {
+    final label = widget.label;
+    if (label == null) return child;
+    return Semantics(
+      container: true,
+      button: true,
+      label: label,
+      onTap: widget.onOpen,
+      child: child,
+    );
+  }
 }
 
 /// Same inset-independent focus outline used by the UI-kit Hover surface.
