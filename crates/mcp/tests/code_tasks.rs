@@ -34,8 +34,8 @@ fn an_older_tasks_database_gains_the_project_properties_and_keeps_its_own() {
         .collect();
     for d in old.iter_mut().filter(|d| d.key == "status") {
         d.options.push(SelectOption {
-            id: "review".into(),
-            name: "Review".into(),
+            id: "waiting".into(),
+            name: "Waiting".into(),
             color: "blue".into(),
         });
     }
@@ -61,7 +61,7 @@ fn an_older_tasks_database_gains_the_project_properties_and_keeps_its_own() {
     v.set_property(
         existing_row.clone(),
         "status".into(),
-        PropValue::Select("review".into()),
+        PropValue::Select("waiting".into()),
     )
     .unwrap();
     v.set_property(

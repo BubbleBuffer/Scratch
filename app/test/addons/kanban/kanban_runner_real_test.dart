@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' as w;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/kanban/api.dart';
-import 'package:notes_app/addons/kanban/runner_chip.dart' show runnerChipText;
 import 'package:notes_app/ui/tokens.dart';
 import 'package:notes_app/services/addon_services.dart'
     show AiRunnerBridge, AiTask, AiTaskSource;
