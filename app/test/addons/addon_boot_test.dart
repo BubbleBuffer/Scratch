@@ -82,8 +82,11 @@ void main() {
     final ctx = AddonContext();
     bootAddons(addonList.map((entry) => entry.addon), ctx);
     final menu = ctx.blockKinds.menuTypes.map((type) => type.kind).toList();
-    expect(menu.indexOf('database'), menu.indexOf(Kinds.numbered) + 1);
-    expect(menu.indexOf(Kinds.callout), menu.indexOf('database') + 1);
+    // The `/` menu offers View where Database was; old database blocks
+    // still render but are not offered.
+    expect(menu, isNot(contains('database')));
+    expect(menu.indexOf('view'), menu.indexOf(Kinds.numbered) + 1);
+    expect(menu.indexOf(Kinds.callout), menu.indexOf('view') + 1);
     expect(ctx.views.all.map((type) => type.kind), [
       ViewKind.table,
       ViewKind.board,

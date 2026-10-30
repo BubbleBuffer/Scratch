@@ -442,6 +442,22 @@ Future<List<ViewDef>> viewBlocksOf(WidgetTester tester, String page) async {
   });
 }
 
+/// Rewrites the settings of [page]'s view block named [name] in the core
+/// (for a page that is not open; an open view saves through its store).
+Future<void> updateViewBlock(WidgetTester tester, String page, String name, ViewDef Function(ViewDef v) f) =>
+    core(tester, (v) async {
+      final p = await v.run((x) => x.loadPage(id: page));
+      for (final b in p.blocks) {
+        if (b.kind != 'view') continue;
+        final def = await v.run((x) => x.viewBlockDef(id: b.id, text: b.text));
+        if (def.name != name) continue;
+        final text = await v.run((x) => x.viewBlockText(view: f(def)));
+        await v.apply(page, [BOp(op: OpKind.setText, id: b.id, kind: b.kind, text: text, marks: const [], checked: false)]);
+        return;
+      }
+      throw StateError('no view block $name on $page');
+    });
+
 DatabaseViewState dbState(WidgetTester tester) => tester.state<DatabaseViewState>(find.byType(DatabaseView).first);
 
 /// Moves a mouse over [f] (desktop hover effects).
