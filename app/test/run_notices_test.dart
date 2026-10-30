@@ -31,6 +31,8 @@ AiTask task(
   project: '',
   worktreeBranch: '',
   worktreePath: '',
+  cancelRequested: false,
+  stale: false,
 );
 
 class _Source extends ChangeNotifier implements AiTaskSource {
@@ -44,6 +46,10 @@ class _Source extends ChangeNotifier implements AiTaskSource {
   Future<void> refresh() async {}
   @override
   void Function()? onDelegated;
+  @override
+  Future<void> cancel(String id) async {}
+  @override
+  Future<void> sendUpdate(String id) async {}
 
   void set(List<AiTask> next) {
     tasks = next;

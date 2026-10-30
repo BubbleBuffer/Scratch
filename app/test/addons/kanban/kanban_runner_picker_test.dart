@@ -131,7 +131,7 @@ void main() {
 
     record(AssignState.cancelling);
     await settle(tester);
-    expect(find.text('Studio-PC · cancelling'), findsOneWidget);
+    expect(find.text('Studio-PC · cancellation requested'), findsOneWidget);
 
     record(AssignState.done);
     await settle(tester);

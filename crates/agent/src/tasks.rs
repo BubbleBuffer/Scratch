@@ -10,9 +10,11 @@ use anyhow::{bail, ensure, Context, Result};
 use async_trait::async_trait;
 use bubblepaw_sdk::approvals::{Approval, ApprovalMode};
 use bubblepaw_sdk::core::Run;
+use bubblepaw_sdk::events::EventKind;
 use bubblepaw_sdk::harness::{ClientInfo, Harness, RunOptions};
 use bubblepaw_sdk::tools::{Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult};
 use serde_json::{json, Value};
+use tokio::sync::broadcast::error::RecvError;
 use vault_core::{PropValue, Vault};
 use vault_mcp::jobs::NODE_HUB;
 use vault_mcp::tasks::{self, attempts, PromptTools, Task};
@@ -29,6 +31,10 @@ pub const RUN_LIMIT: Duration = Duration::from_secs(60 * 60);
 
 /// How often a run's wait looks at its task row for a cancel.
 const WATCH_EVERY: Duration = Duration::from_millis(500);
+
+/// A run looks for the user's steering (new to-dos under the task, a requested
+/// update of the note) on every this-many-th watch.
+const STEER_EVERY: u32 = 4;
 
 const DELEGATED_PROMPT: &str = " Use report_progress to keep the user informed while working. Plan multi-step work with todo, passing the whole list each time as {\"items\": [...]}, and keep the list current; it appears as subtasks in the note, mirrored by Scratch, so do not write those subtasks yourself.";
 
@@ -188,6 +194,88 @@ pub fn limit_error(limit: Duration) -> String {
 /// The task's text when it was cancelled while its run was starting.
 const CANCELLED_TEXT: &str = "the task was cancelled";
 
+/// Writes `steering_acknowledged` into the attempt's history when the engine
+/// accepts a steering message for the task's session.
+fn note_steering_accepted(
+    vault: &Vault,
+    task_id: &str,
+    session: &str,
+    event: &std::result::Result<bubblepaw_sdk::events::HarnessEvent, RecvError>,
+) {
+    if let Ok(event) = event {
+        if event.session_id == session {
+            if let EventKind::SteeringAccepted { text } = &event.kind {
+                let _ = attempts::event(
+                    vault,
+                    task_id,
+                    None,
+                    attempts::kind::STEERING_ACKNOWLEDGED,
+                    text,
+                );
+            }
+        }
+    }
+}
+
+impl Agent {
+    /// Gives the running worker what the user added to its task: each new
+    /// to-do under the task goes onto the worker's own todo list and is sent
+    /// as a steering message, and a requested update of the note is sent as
+    /// the note's current content. Failures are logged; the run goes on.
+    fn deliver_steering(
+        &self,
+        vault: &Vault,
+        task_id: &str,
+        session: &str,
+        run_id: &str,
+        harness: &Harness,
+    ) {
+        let attempt = attempts::current_id(vault, task_id).ok().flatten();
+        let steps = tasks::pending_steps(vault, task_id).unwrap_or_default();
+        for step in steps {
+            let Some(attempt) = attempt.as_deref() else {
+                break;
+            };
+            // Marked first: the subtask mirror takes the user's to-do for the
+            // worker's own item with the same text, instead of adding a copy.
+            if attempts::mark_steered(vault, task_id, attempt, &step.block).is_err() {
+                continue;
+            }
+            let item = step.text.clone();
+            let listed = self
+                .store
+                .update_host_state(session, run_id, "todo", |previous| {
+                    let mut items = match previous {
+                        Some(Value::Array(items)) => items,
+                        _ => Vec::new(),
+                    };
+                    ensure!(items.len() < 50, "the todo list is full");
+                    items.push(json!({"text": item, "status": "pending"}));
+                    Ok(Value::Array(items))
+                });
+            if let Err(error) = listed {
+                eprintln!("task {task_id}: could not add the step to the todo list: {error}");
+            }
+            let message = format!(
+                "The user added a step to your task: {}
+It is on your todo list now. Do it as part of this task, and keep it in the list when you update the list.",
+                step.text
+            );
+            if let Err(error) = harness.steer(session, message) {
+                eprintln!("task {task_id}: could not send the step: {error}");
+            }
+        }
+        if let Ok(Some((message, rev))) = tasks::update_message(vault, task_id) {
+            match harness.steer(session, message) {
+                Ok(_) => {
+                    let _ = tasks::update_sent(vault, task_id, attempt.as_deref(), &rev);
+                }
+                Err(error) => eprintln!("task {task_id}: could not send the update: {error}"),
+            }
+        }
+    }
+}
+
 /// How a task's wait ended.
 enum Ended {
     Run(Run),
@@ -328,6 +416,8 @@ impl Agent {
         }
         let harness = self.task_harness(task_id, session)?;
         let mut mirror = TodoMirror::new(self.vault.clone(), task_id, session, &harness);
+        // Whatever is under the task now is the user's own, not steering.
+        let _ = tasks::record_baseline(vault, task_id);
         self.runtime.block_on(async {
             // Cancelled after the session was saved, before the engine starts.
             if is_cancelled(vault, task_id) {
@@ -350,6 +440,7 @@ impl Agent {
             let mut watch = tokio::time::interval(WATCH_EVERY);
             watch.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             let mut events_open = true;
+            let mut ticks = 0u32;
             loop {
                 tokio::select! {
                     outcome = wait.as_mut() => {
@@ -371,8 +462,13 @@ impl Agent {
                             mirror.drain(&harness).await;
                             return Ok(Ended::Cancelled);
                         }
+                        ticks = ticks.wrapping_add(1);
+                        if ticks % STEER_EVERY == 0 {
+                            self.deliver_steering(vault, task_id, session, &mirror.run_id, &harness);
+                        }
                     }
                     event = events.recv(), if events_open => {
+                        note_steering_accepted(vault, task_id, session, &event);
                         events_open = mirror.on_event(event, &harness).await;
                     }
                 }
@@ -420,6 +516,7 @@ impl Agent {
         system_prompt.push_str(DELEGATED_PROMPT);
         let harness = self.task_harness(task_id, session)?;
         let mut mirror = TodoMirror::new(self.vault.clone(), task_id, session, &harness);
+        let _ = tasks::record_baseline(&self.vault, task_id);
         self.runtime.block_on(async {
             let mut events = harness.subscribe();
             let run = harness.start(
@@ -436,10 +533,16 @@ impl Agent {
             mirror.run_id = run.id;
             let mut wait = pin!(tokio::time::timeout(limit, harness.wait_for_idle(session)));
             let mut events_open = true;
+            let mut watch = tokio::time::interval(WATCH_EVERY * STEER_EVERY);
+            watch.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             let outcome = loop {
                 tokio::select! {
                     outcome = wait.as_mut() => break outcome,
+                    _ = watch.tick() => {
+                        self.deliver_steering(&self.vault, task_id, session, &mirror.run_id, &harness);
+                    }
                     event = events.recv(), if events_open => {
+                        note_steering_accepted(&self.vault, task_id, session, &event);
                         events_open = mirror.on_event(event, &harness).await;
                     }
                 }
