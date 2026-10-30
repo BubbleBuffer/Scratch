@@ -141,6 +141,19 @@ pub fn check_project(v: &Vault, runner_id: &str, project: &str) -> Result<()> {
     Ok(())
 }
 
+/// Checks that `runner_id` is `hub` or the device id of a PC.
+pub fn check_runner(v: &Vault, runner_id: &str) -> Result<()> {
+    if runner_id != jobs::NODE_HUB
+        && !v
+            .device_records()?
+            .iter()
+            .any(|r| r.id == runner_id && is_pc(&r.kind))
+    {
+        return err(format!("unknown runner {runner_id:?}"));
+    }
+    Ok(())
+}
+
 /// Creates a real AI task and its placeholder, pinned before it is queued.
 /// `block` is an optional block in `page`, using the existing creation path's
 /// placement/reuse behavior. Offline runners accept queued assignments.
@@ -154,14 +167,7 @@ pub fn assign(
     runner_id: &str,
     project: Option<&str>,
 ) -> Result<tasks::Task> {
-    if runner_id != jobs::NODE_HUB
-        && !v
-            .device_records()?
-            .iter()
-            .any(|r| r.id == runner_id && is_pc(&r.kind))
-    {
-        return err(format!("unknown runner {runner_id:?}"));
-    }
+    check_runner(v, runner_id)?;
     let page_id = page.to_owned();
     if let Some(block) = block {
         fn contains(blocks: &[Block], id: &str) -> bool {

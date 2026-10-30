@@ -148,7 +148,7 @@ pub(crate) fn group(changes: &[ChangeInfo], device: &dyn Fn(u64) -> String) -> V
     groups
 }
 
-fn encode_frontiers(f: &Frontiers) -> String {
+pub(crate) fn encode_frontiers(f: &Frontiers) -> String {
     let mut ids: Vec<String> = f
         .iter()
         .map(|id| format!("{}@{}", id.peer, id.counter))
