@@ -229,6 +229,7 @@ void main() {
       await enterField(tester, 'connect-hub-field', code);
       expect(tester.widget<EditableText>(find.descendant(of: key('connect-token-field'), matching: find.byType(EditableText))).controller.text,
           isEmpty, reason: 'a code link fills only the hub; connecting redeems the code');
+      await tester.ensureVisible(key('connect-button'));
       await tester.tap(key('connect-button'));
       final sync = tv.app.sync;
       await settleUntil(tester, () => sync.status.lastOkMs != null, timeout: const Duration(seconds: 20));

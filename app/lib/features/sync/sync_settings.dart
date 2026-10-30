@@ -526,9 +526,15 @@ class HubSettings extends StatefulWidget {
 }
 
 class _HubSettingsState extends State<HubSettings> {
-  late final _addr = TextEditingController(text: AppSettings.read(context).hubAddress);
+  late final TextEditingController _addr;
   List<(String, String)> _urls = const [];
   String? _urlsFor;
+
+  @override
+  void initState() {
+    super.initState();
+    _addr = TextEditingController(text: AppSettings.read(context).hubAddress);
+  }
 
   @override
   void dispose() {
