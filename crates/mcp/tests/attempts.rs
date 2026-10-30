@@ -298,7 +298,7 @@ fn an_old_ended_job_loses_its_session_but_keeps_its_row_and_attempts() {
         .unwrap()
         .is_empty());
     let kept = jobs::get(&v, &job.id).unwrap().unwrap();
-    assert_eq!(kept.status, "done");
+    assert_eq!(kept.status, "completed");
     assert!(kept.session.is_empty());
     assert!(!attempts::list(&v, &job.id).unwrap().is_empty());
 }

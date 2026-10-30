@@ -538,7 +538,7 @@ async fn queue_wait_and_run_limits() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn ended_jobs_are_trashed_after_the_keep_time() {
+async fn an_ended_jobs_session_expires_after_the_keep_time_but_the_row_stays() {
     let limits = JobLimits {
         keep: Duration::from_secs(1),
         ..fast_limits()
@@ -549,24 +549,31 @@ async fn ended_jobs_are_trashed_after_the_keep_time() {
     let done = env.finished(&env.writer, &id).await;
     assert_eq!(done["status"], "completed", "{done}");
 
+    // The session (transcript and logs) expires; the row and its outcome stay.
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
-        match env.jobs(&env.writer, json!({"action":"get", "job":id})).await {
-            Err(e) => {
-                assert!(e.contains("no such job"), "{e}");
-                break;
-            }
-            Ok(_) => {
-                assert!(Instant::now() < deadline, "the job was never trashed");
-                tokio::time::sleep(Duration::from_millis(100)).await;
-            }
+        let vault = env.vault().clone();
+        let job_id = id.clone();
+        let cleared = std::thread::spawn(move || {
+            vault_mcp::jobs::get(&vault, &job_id)
+                .unwrap()
+                .map(|j| j.session.is_empty())
+        })
+        .join()
+        .unwrap();
+        if cleared == Some(true) {
+            break;
         }
+        assert!(Instant::now() < deadline, "the session never expired");
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
+    let kept = env.finished(&env.writer, &id).await;
+    assert_eq!(kept["status"], "completed", "{kept}");
     let vault = env.vault().clone();
     let trashed = std::thread::spawn(move || vault.load_page(id).unwrap().in_trash)
         .join()
         .unwrap();
-    assert!(trashed);
+    assert!(!trashed);
 }
 
 #[tokio::test(flavor = "multi_thread")]
