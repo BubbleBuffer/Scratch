@@ -694,7 +694,7 @@ mod tests {
         let ca_key = KeyPair::generate().unwrap();
         let mut ca = params("Test CA");
         ca.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
-        ca.self_signed(&ca_key).unwrap();
+        let ca_cert = ca.self_signed(&ca_key).unwrap();
         let issuer = rcgen::Issuer::new(ca, ca_key);
         let key = KeyPair::generate().unwrap();
         let leaf = params("hub.test").signed_by(&key, &issuer).unwrap();
