@@ -124,6 +124,7 @@ class AppRemoteBackend implements RemoteBackend {
     if (found == null) {
       throw RemoteError(404, 'no page with id or exact title "$page"');
     }
+    // ignore: use_build_context_synchronously
     final ctx = _context();
     unawaited(
       openPage(ctx, found.id, found.title).catchError((Object e) {
@@ -135,6 +136,7 @@ class AppRemoteBackend implements RemoteBackend {
 
   @override
   Future<void> navigate(String route) async {
+    // ignore: use_build_context_synchronously
     final ctx = _context();
     if (route.startsWith('page/')) {
       await open(route.substring(5));

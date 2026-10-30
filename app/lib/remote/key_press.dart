@@ -85,6 +85,7 @@ _Key _resolve(KeyCombo combo) {
 /// Presses and releases [combo]: modifiers down, the key down and up,
 /// modifiers up. Throws a 500 [RemoteError] when the app is not ready.
 void pressKeyCombo(KeyCombo combo) {
+  // ignore: deprecated_member_use
   final manager = ServicesBinding.instance.keyEventManager;
   final key = _resolve(combo);
   final mods = [
@@ -95,6 +96,7 @@ void pressKeyCombo(KeyCombo combo) {
 
   void send(ui.KeyEventType type, _Key k, {String? character}) {
     stamp += const Duration(microseconds: 1);
+    // ignore: deprecated_member_use
     manager.handleKeyData(
       ui.KeyData(
         timeStamp: stamp,
