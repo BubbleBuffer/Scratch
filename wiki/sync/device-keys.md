@@ -34,7 +34,7 @@ The proof signs `relay_proof_hash("scratch/session/v1", viewer, origin, nonce, k
 
 **Sign-in and pairing.**
 - OIDC: `/auth/redeem` takes optional `pubkey` and `key_id`; with them the new entry is key-bound from the start.
-- Add a device: `Hub::pair` (Settings, `vault-hub --pair`, `notes-hub --pair`) issues a one-time code: random, single use, valid 10 minutes, stored hashed as a pending entry that never works as a bearer. The link is `notes://pair?hub=…&code=…`; the device redeems it with its key (bridge `redeem_pairing_code`). Old `token=` links still parse; the first sync upgrades that token.
+- Add a device: `Hub::pair` (Settings > Sync and devices, `vault-hub --pair`, `notes-hub --pair`) issues a one-time code: random, single use, valid 10 minutes, stored hashed as a pending entry that never works as a bearer. The link is `notes://pair?hub=…&code=…`; the device redeems it with its key (bridge `redeem_pairing_code`). Old `token=` links still parse; the first sync upgrades that token.
 
 **The client** (`crates/sync/src/session.rs`, `DeviceSession`): one provider per (vault, hub origin, token), shared by the sync client, the agent and host sockets, the `notes setup` CLI and the app's HTTP calls (bridge `hub_bearer` / `hub_bearer_invalidate`; Dart retries once on 401). It asks `/health`, upgrades the token if `.vault/hub-client.json` doesn't list it as bound (keyed by the token's SHA-256), proves for a session, and renews it shortly before expiry or after a 401. A hub without device keys gets the bare token, as before. The app keeps storing the token.
 

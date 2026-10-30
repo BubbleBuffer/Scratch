@@ -1,7 +1,7 @@
-// Settings > AI > Connect an agent: the section shows the command for Claude
-// Code and for Codex, Copy puts the Codex command on the clipboard, and phones
-// show the section too. Nothing here calls a hub: the agent tokens section
-// gets no client (AgentTokensSection.debugClientFor).
+// Settings > Connectors > Apps that use your vault > Quick setup: the section
+// shows the command for Claude Code and for Codex, Copy puts the Codex command
+// on the clipboard, and phones leave it out. Nothing here calls a hub: the
+// agent tokens section gets no client (AgentTokensSection.debugClientFor).
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -15,9 +15,16 @@ Finder key(String k) => find.byKey(ValueKey(k));
 
 String textOf(WidgetTester t, String k) => t.widget<Text>(key(k)).data!;
 
-Future<void> openAiSettings(WidgetTester t) async {
-  await tapAndSettle(t, key('sidebar-settings'));
-  await tapAndSettle(t, key('settings-nav-ai'));
+/// Opens Settings > Connectors with "Apps that use your vault" open.
+Future<void> openAppsPanel(WidgetTester t, {bool mobile = false}) async {
+  if (mobile) {
+    await openMobileSettings(t);
+  } else {
+    await tapAndSettle(t, key('sidebar-settings'));
+  }
+  await tapAndSettle(t, key('settings-nav-connectors'));
+  await t.ensureVisible(key('connectors-apps'));
+  await tapAndSettle(t, key('connectors-apps'));
   await real(t, () => Future<void>.delayed(const Duration(milliseconds: 20)));
   await settle(t);
 }
@@ -36,10 +43,10 @@ void main() {
 
   appTest('desktop shows the Claude Code and Codex commands', (t) async {
     await pumpApp(t, mobile: false);
-    await openAiSettings(t);
+    await openAppsPanel(t);
     await showSection(t);
 
-    expect(find.text('Connect an agent'), findsOneWidget);
+    expect(find.text('Quick setup'), findsOneWidget);
     expect(
       find.descendant(
         of: key('connect-agent-row-claude'),
@@ -83,7 +90,7 @@ void main() {
       ),
     );
     await pumpApp(t, mobile: false);
-    await openAiSettings(t);
+    await openAppsPanel(t);
     await showSection(t);
 
     final copy = find.descendant(
@@ -101,13 +108,10 @@ void main() {
   appTest('phones do not show the connect an agent section: its commands '
       'run in a desktop terminal', (t) async {
     await pumpApp(t, mobile: true);
-    await openMobileSettings(t);
-    await tapAndSettle(t, key('settings-nav-ai'));
-    await real(t, () => Future<void>.delayed(const Duration(milliseconds: 20)));
-    await settle(t);
+    await openAppsPanel(t, mobile: true);
 
     expect(find.byKey(const ValueKey('connect-agent'), skipOffstage: false),
         findsNothing);
-    expect(find.text('Agent tokens', skipOffstage: false), findsOneWidget);
+    expect(find.text('Access tokens', skipOffstage: false), findsOneWidget);
   });
 }

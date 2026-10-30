@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/features/reminders/reminder_plan.dart';
-import 'package:notes_app/features/settings/controls.dart';
+import 'package:notes_app/features/settings/settings_kit.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
 
 import 'harness.dart';
@@ -76,7 +76,7 @@ void main() {
           await tapAndSettle(tester, key('sidebar-settings'));
         }
         await tapAndSettle(tester, key('settings-nav-reminders'));
-        expect(find.text('10 min'), findsOneWidget);
+        expect(find.text('10 min before'), findsOneWidget);
         expect(find.text('08:00'), findsOneWidget);
 
         await tapAndSettle(tester, key('reminders-lead'));
@@ -90,20 +90,20 @@ void main() {
         await tapAndSettle(tester, key('reminders-enabled'));
         expect(tv.app.settings.reminders.enabled, isFalse);
         expect(
-          tester.widget<SelectButton<int>>(key('reminders-lead')).onChanged,
+          tester.widget<SSelect<int>>(key('reminders-lead')).onChanged,
           isNull,
         );
         expect(
-          tester.widget<SelectButton<int>>(key('reminders-morning')).onChanged,
+          tester.widget<SSelect<int>>(key('reminders-morning')).onChanged,
           isNull,
         );
         await tapAndSettle(tester, key('reminders-lead'));
-        expect(find.text('5 min'), findsNothing);
+        expect(find.text('5 min before'), findsNothing);
         await tapAndSettle(tester, key('reminders-morning'));
         expect(find.text('05:00'), findsNothing);
         await tapAndSettle(tester, key('reminders-enabled'));
         expect(
-          tester.widget<SelectButton<int>>(key('reminders-lead')).onChanged,
+          tester.widget<SSelect<int>>(key('reminders-lead')).onChanged,
           isNotNull,
         );
         expect(tv.app.settings.reminders.leadMinutes, 0);
@@ -118,7 +118,7 @@ void main() {
     await openMobileSettings(tester);
     await tapAndSettle(tester, key('settings-nav-reminders'));
     expect(
-      find.text('Notifications are off for Scratch in Android settings.'),
+      find.textContaining('Notifications are off for Scratch in Android settings.'),
       findsOneWidget,
     );
   });

@@ -7,7 +7,6 @@
 //   page;
 // - a legacy unpinned task queued on another device runs here and syncs back;
 // - a row that names a removed runner is answered by the agent;
-// - the MCP endpoint from settings: bearer token required.
 
 import 'dart:convert';
 import 'dart:io';
@@ -57,7 +56,7 @@ bool _ended(AiTask t) => !AiStatus.active(t.status);
 
 void main() {
   setUpAll(initCore);
-  // Real HTTP (the MCP endpoint), not the binding's stand-in client.
+  // Real HTTP, not the binding's stand-in client.
   setUp(() => HttpOverrides.global = null);
 
   test('settings from before 2026-10-22 with the removed runners load; '
@@ -73,15 +72,11 @@ void main() {
         'deepSeekModel': 'deepseek-chat',
         'deepSeekUrl': 'https://api.deepseek.com',
         'timeoutMinutes': 5,
-        'mcpEnabled': true,
-        'mcpAddress': '127.0.0.1:47199',
         'agentEnabled': true,
       }));
     final s = AiSettings.load(file);
-    expect(s.mcpEnabled, isTrue, reason: 'the other keys still load');
-    expect(s.mcpAddress, '127.0.0.1:47199');
-    expect(s.answersAskAi, agentPlatform);
-    s.update((s) => s.mcpEnabled = false);
+    expect(s.answersAskAi, agentPlatform, reason: 'the other keys still load');
+    s.update((s) => s.desktopTools = false);
     final saved = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
     for (final k in [
       'runner',
@@ -94,7 +89,7 @@ void main() {
     ]) {
       expect(saved.containsKey(k), isFalse, reason: k);
     }
-    expect(saved['mcpAddress'], '127.0.0.1:47199');
+    expect(saved['desktopTools'], isFalse);
   });
 
   appTest('Ask AI from the / menu on this computer: the agent answers into the page', (tester) async {
@@ -178,56 +173,4 @@ void main() {
       }
     });
   }
-
-  appTest('the MCP endpoint from settings requires the token', (tester) async {
-    await pumpApp(tester, mobile: false);
-    final store = await aiStore(tester, settings: AiSettings()
-      ..agentEnabled = false
-      ..mcpAddress = '127.0.0.1:0');
-    try {
-      await tapAndSettle(tester, key('sidebar-settings'));
-      await tapAndSettle(tester, key('settings-nav-ai'));
-      expect(key('ai-mcp-url'), findsNothing);
-      await tester.tap(key('ai-mcp-toggle'));
-      await settleUntil(tester, () => key('ai-mcp-url').evaluate().isNotEmpty);
-      final url = textOf(tester, 'ai-mcp-url');
-      expect(url, startsWith('http://127.0.0.1:'));
-      final endpointFile = File('${current.vault.root}/.vault/mcp/endpoint.json');
-      expect(endpointFile.existsSync(), isTrue);
-
-      final token = await real(tester, store.token);
-      Future<(int, String)> post(String? bearer) async {
-        final c = HttpClient();
-        try {
-          final req = await c.postUrl(Uri.parse(url));
-          req.headers.contentType = ContentType.json;
-          if (bearer != null) req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $bearer');
-          final bytes = utf8.encode(jsonEncode(
-              {'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': {'name': 'list_pages', 'arguments': {}}}));
-          // Match the native clients' framed requests. An early 401 can race
-          // chunked body delivery and look like an unsolicited response.
-          req.contentLength = bytes.length;
-          req.persistentConnection = false;
-          req.add(bytes);
-          final res = await req.close();
-          return (res.statusCode, await utf8.decoder.bind(res).join());
-        } finally {
-          c.close(force: true);
-        }
-      }
-
-      final (denied, _) = await real(tester, () => post('wrong'));
-      expect(denied, 401);
-      final (ok, body) = await real(tester, () => post(token));
-      expect(ok, 200);
-      expect(body, contains('Garden plan'));
-
-      await tester.tap(key('ai-mcp-toggle'));
-      await settleUntil(tester, () => key('ai-mcp-url').evaluate().isEmpty);
-      expect(store.mcpRunning, isFalse);
-      expect(endpointFile.existsSync(), isFalse);
-    } finally {
-      await closeAi(tester, store);
-    }
-  });
 }

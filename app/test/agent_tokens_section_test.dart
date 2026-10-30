@@ -1,6 +1,6 @@
-// Settings > AI > Agent tokens: the hub's tokens are listed, a new one's
-// secret is shown once with a Copy button, and Revoke removes one after a
-// confirmation. The hub is an in-memory fake client
+// Settings > Connectors > Apps that use your vault > Access tokens: the hub's
+// tokens are listed, a new one's secret is shown once with a Copy button, and
+// Revoke removes one after a confirmation. The hub is an in-memory fake client
 // (`AgentTokensSection.debugClientFor`); the HTTP side is covered by
 // agent_token_client_test.dart and the hub's own tests.
 
@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/clock.dart';
 import 'package:notes_app/features/ai/agent_token_client.dart';
 import 'package:notes_app/features/ai/agent_tokens_section.dart';
-import 'package:notes_app/features/settings/controls.dart';
+import 'package:notes_app/features/settings/settings_kit.dart';
 import 'package:notes_app/ui/format.dart';
 
 import 'harness.dart';
@@ -68,9 +68,16 @@ class _FakeHub extends AgentTokenClient {
   }
 }
 
-Future<void> openAiSettings(WidgetTester t) async {
-  await tapAndSettle(t, key('sidebar-settings'));
-  await tapAndSettle(t, key('settings-nav-ai'));
+/// Opens Settings > Connectors with "Apps that use your vault" open.
+Future<void> openAppsPanel(WidgetTester t, {bool mobile = false}) async {
+  if (mobile) {
+    await openMobileSettings(t);
+  } else {
+    await tapAndSettle(t, key('sidebar-settings'));
+  }
+  await tapAndSettle(t, key('settings-nav-connectors'));
+  await t.ensureVisible(key('connectors-apps'));
+  await tapAndSettle(t, key('connectors-apps'));
   await real(t, () => Future<void>.delayed(const Duration(milliseconds: 20)));
   await settle(t);
 }
@@ -129,14 +136,15 @@ void main() {
         expired: true,
       ),
     ]);
-    await openAiSettings(t);
+    await openAppsPanel(t);
     await showSection(t);
 
     expect(key('agent-token-laptop-claude'), findsOneWidget);
     expect(find.text('laptop-claude'), findsOneWidget);
+    // The summary line, not the "Read and write" tag beside the name.
     final laptop = find.descendant(
       of: key('agent-token-laptop-claude'),
-      matching: find.textContaining('Read and write'),
+      matching: find.textContaining('Read and write · Created'),
     );
     expect(laptop, findsOneWidget);
     final summary = t.widget<Text>(laptop).data!;
@@ -189,7 +197,7 @@ void main() {
       ),
     );
     await pumpApp(t, mobile: false);
-    await openAiSettings(t);
+    await openAppsPanel(t);
     await showSection(t);
     expect(key('agent-tokens-empty'), findsOneWidget);
 
@@ -232,15 +240,14 @@ void main() {
     t,
   ) async {
     await pumpApp(t, mobile: false);
-    await openAiSettings(t);
+    await openAppsPanel(t);
     await showSection(t);
     await tapKey(t, 'agent-token-new');
-    final picker = t.widget<SelectButton<String>>(key('agent-token-scope'));
+    final picker = t.widget<SSegmented<String>>(key('agent-token-scope'));
     expect(picker.options, ['read', 'write', 'everything']);
     expect(picker.value, 'write');
 
-    await tapKey(t, 'agent-token-scope');
-    await tapAndSettle(t, find.text('Everything').last);
+    await tapKey(t, 'agent-token-scope-everything');
     await typeInto(t, 'agent-token-name', 'all-tools');
     await tapKey(t, 'agent-token-create');
     await real(t, () => Future<void>.delayed(const Duration(milliseconds: 20)));
@@ -262,7 +269,7 @@ void main() {
       AgentTokenInfo(name: 'taken', scope: 'read', created: 1),
     );
     await pumpApp(t, mobile: false);
-    await openAiSettings(t);
+    await openAppsPanel(t);
     await showSection(t);
     await tapKey(t, 'agent-token-new');
     await typeInto(t, 'agent-token-name', 'taken');
@@ -278,7 +285,7 @@ void main() {
       AgentTokenInfo(name: 'drop-me', scope: 'write', created: 2),
     ]);
     await pumpApp(t, mobile: false);
-    await openAiSettings(t);
+    await openAppsPanel(t);
     await showSection(t);
 
     // Cancelling the confirmation revokes nothing.
@@ -301,7 +308,7 @@ void main() {
   appTest('a device not signed in to a hub is told to sign in', (t) async {
     AgentTokensSection.debugClientFor = (_) => null;
     await pumpApp(t, mobile: false);
-    await openAiSettings(t);
+    await openAppsPanel(t);
     await showSection(t);
     expect(key('agent-tokens-signed-out'), findsOneWidget);
     expect(key('agent-token-new'), findsNothing);
@@ -310,10 +317,7 @@ void main() {
   appTest('phones manage tokens too', (t) async {
     hub.tokens.add(AgentTokenInfo(name: 'phone-made', scope: 'read', created: 1));
     await pumpApp(t, mobile: true);
-    await openMobileSettings(t);
-    await tapAndSettle(t, key('settings-nav-ai'));
-    await real(t, () => Future<void>.delayed(const Duration(milliseconds: 20)));
-    await settle(t);
+    await openAppsPanel(t, mobile: true);
     await showSection(t);
     expect(key('agent-token-phone-made'), findsOneWidget);
     expect(key('agent-token-new'), findsOneWidget);

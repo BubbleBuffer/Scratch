@@ -1,6 +1,7 @@
-// Android (platform override, phone size): Settings > AI > Agent is the Hub's
-// sign-in, connection status and default model; a signed-out Agent chat
-// offers Sign in instead of "The agent is off".
+// Android (platform override, phone size): Settings > Agent shows the agent's
+// connection, default model and tool set; the Hub sign-in is on Settings >
+// Sync and devices, and a signed-out Agent chat offers Sign in instead of
+// "The agent is off".
 //
 // No Hub is contacted: the login is a fake, the signed-in state is set on
 // the settings directly (the agent is never opened) and the models are stubs.
@@ -11,6 +12,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/features/sync/hub_auth.dart';
+import 'package:notes_app/features/sync/sync_settings.dart';
 import 'package:notes_app/shell/home.dart';
 import 'package:notes_app/ui/ui.dart';
 
@@ -45,10 +47,10 @@ class _FakeLogin extends HubAuthService {
   }
 }
 
-/// A full-screen page with the Hub section (fake login), as Settings shows it.
-class _HubAgentPage extends StatelessWidget {
-  const _HubAgentPage(this.store, this.auth);
-  final AgentStore store;
+/// A full-screen page with the Hub sign-in (fake login), as Settings > Sync
+/// and devices shows it.
+class _HubSignInPage extends StatelessWidget {
+  const _HubSignInPage(this.auth);
   final HubAuthService auth;
 
   @override
@@ -56,7 +58,7 @@ class _HubAgentPage extends StatelessWidget {
     color: context.colors.bgPrimary,
     child: SingleChildScrollView(
       padding: const EdgeInsets.all(24),
-      child: MobileAgentSettings(store: store, auth: auth),
+      child: HubSignInSettings(auth: auth),
     ),
   );
 }
@@ -71,44 +73,52 @@ void signInFixture(TestVault tv, {String? account}) {
   });
 }
 
-Future<void> openAiSettings(WidgetTester tester) async {
+Future<void> openAgentSettings(WidgetTester tester) async {
   await openMobileSettings(tester);
-  await tapAndSettle(tester, key('settings-nav-ai'));
+  await tapAndSettle(tester, key('settings-nav-agent'));
+}
+
+/// Settings > Sync and devices, where the Hub sign-in lives.
+Future<void> openSyncSettings(WidgetTester tester) async {
+  await openMobileSettings(tester);
+  await tapAndSettle(tester, key('settings-nav-sync'));
 }
 
 void main() {
   setUpAll(initCore);
 
-  appTest('Android Settings > AI shows the Hub agent section signed out', (
+  appTest('Android Settings > Agent shows the sign-in notice signed out', (
     tester,
   ) async {
     await pumpApp(tester, mobile: true);
-    await openAiSettings(tester);
+    await openAgentSettings(tester);
 
     expect(find.text('Agent'), findsOneWidget);
-    expect(key('hub-sign-in-url'), findsOneWidget);
-    expect(key('hub-sign-in'), findsOneWidget);
     expect(
-      find.text('Not connected. Sign in to the Hub to use the agent.'),
+      find.text(
+        'Not connected. Sign in to your hub under Sync and devices to use the agent.',
+      ),
       findsOneWidget,
     );
+    expect(key('agent-open-sync'), findsOneWidget);
     // Run AI on is the vault's choice, also on the phone; the hub's model
     // and tool set need a signed-in Hub.
     expect(key('agent-host'), findsOneWidget);
     expect(key('agent-hub-model'), findsNothing);
     expect(key('agent-host-info'), findsNothing);
-    // Desktop-only controls stay off the phone.
+    // Desktop-only controls stay off the phone. The local MCP endpoint's
+    // toggle is gone from the Agent page, so it is no longer checked here.
     expect(key('ai-runner'), findsNothing);
     expect(key('agent-enabled-toggle'), findsNothing);
-    expect(key('ai-mcp-toggle'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
+  // The Hub address moved from the Agent page to Settings > Sync and devices.
   appTest('the Hub address is editable and saved on the device', (
     tester,
   ) async {
     final tv = await pumpApp(tester, mobile: true);
-    await openAiSettings(tester);
+    await openSyncSettings(tester);
 
     await enterField(tester, 'hub-sign-in-url', 'https://hub.example.test');
     expect(tv.app.settings.hubSignInUrl, 'https://hub.example.test');
@@ -166,19 +176,22 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  // Sync now moved off this page (it is not on Sync and devices either), so
+  // its check is dropped. What stays: the connection line follows the
+  // agent's open state, and Retry only shows after a failed open.
   appTest(
-    'Sync now waits for a connected sync, and signed-out has no Agent row',
+    'signed in, the Connection row says the agent is not open yet; signed out it has no row',
     (tester) async {
       final tv = await pumpApp(tester, mobile: true);
-      await openAiSettings(tester);
-      expect(key('hub-sync-now'), findsNothing);
+      await openAgentSettings(tester);
+      expect(key('agent-connection-status'), findsNothing);
       expect(key('agent-retry-connection'), findsNothing);
 
       signInFixture(tv, account: 'alice');
       await settle(tester);
       // Signed in but the sync loop is not running in this fixture.
-      expect(key('hub-sync-now'), findsOneWidget);
-      expect(tester.widget<SecondaryButton>(key('hub-sync-now')).onTap, isNull);
+      expect(key('agent-connection-status'), findsOneWidget);
+      expect(find.text('Not connected'), findsOneWidget);
       expect(find.text('Agent not connected yet.'), findsOneWidget);
       expect(key('agent-retry-connection'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -198,7 +211,7 @@ void main() {
       s.clientDeviceLabel = 'Android';
     });
     store.openError = 'stale failure';
-    await openAiSettings(tester);
+    await openAgentSettings(tester);
 
     expect(find.text('Agent could not connect: stale failure'), findsOneWidget);
     await tapAndSettle(tester, key('agent-retry-connection'));
@@ -216,11 +229,10 @@ void main() {
     final label = account ?? 'older Hub';
     appTest('Hub sign in and sign out on Android ($label)', (tester) async {
       final tv = await pumpApp(tester, mobile: true);
-      final store = AgentStore.of(tv.app);
       final auth = _FakeLogin();
       Navigator.of(tester.element(find.byType(HomeScreen))).push(
         PageRouteBuilder<void>(
-          pageBuilder: (_, _, _) => _HubAgentPage(store, auth),
+          pageBuilder: (_, _, _) => _HubSignInPage(auth),
         ),
       );
       await settle(tester);
@@ -267,7 +279,9 @@ void main() {
     });
   }
 
-  appTest('a signed-in Hub shows its account and the models it exposes', (
+  // The account moved to Settings > Sync and devices; the agent's models and
+  // tool set stay on the Agent page.
+  appTest('a signed-in Hub shows its models on Agent and its account on Sync', (
     tester,
   ) async {
     final tv = await pumpApp(tester, mobile: true);
@@ -281,13 +295,11 @@ void main() {
       AgentStore.debugHostModels = null;
       AgentStore.debugHostDefaultModel = null;
     });
-    await openAiSettings(tester);
+    await openAgentSettings(tester);
 
-    expect(find.text('Signed in to hub.test as alice'), findsOneWidget);
-    expect(key('hub-sign-out'), findsOneWidget);
-    expect(key('hub-sign-in'), findsNothing);
-    // The fake state never connects: the status says so.
-    expect(find.text('Not connected to the Hub right now.'), findsOneWidget);
+    // The fake state never connects: the connection line says so.
+    expect(find.text('Not connected'), findsOneWidget);
+    expect(find.text('Agent not connected yet.'), findsOneWidget);
     expect(key('agent-hub-model'), findsOneWidget);
     await settleUntil(
       tester,
@@ -295,6 +307,12 @@ void main() {
     );
     expect(key('agent-hub-unreachable'), findsNothing);
     expect(key('agent-tool-set-hub'), findsOneWidget);
+
+    await tapAndSettle(tester, key('back'));
+    await tapAndSettle(tester, key('settings-nav-sync'));
+    expect(find.text('Signed in to hub.test as alice'), findsOneWidget);
+    expect(key('hub-sign-out'), findsOneWidget);
+    expect(key('hub-sign-in'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -306,15 +324,18 @@ void main() {
     // No Hub list and none cached: the model row says the Hub can't be reached.
     AgentStore.debugHostModels = (h) async => throw StateError('no hub here');
     addTearDown(() => AgentStore.debugHostModels = null);
-    await openAiSettings(tester);
+    await openAgentSettings(tester);
 
-    expect(find.text('Signed in to hub.test as Android'), findsOneWidget);
     expect(key('agent-hub-model'), findsOneWidget);
     await settleUntil(
       tester,
       () => key('agent-hub-unreachable').evaluate().isNotEmpty,
     );
     expect(find.text("Can't reach the hub."), findsOneWidget);
+
+    await tapAndSettle(tester, key('back'));
+    await tapAndSettle(tester, key('settings-nav-sync'));
+    expect(find.text('Signed in to hub.test as Android'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

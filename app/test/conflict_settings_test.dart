@@ -8,7 +8,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/models.dart';
 import 'package:notes_app/editor/page_screen.dart';
-import 'package:notes_app/features/settings/controls.dart';
+import 'package:notes_app/features/settings/settings_kit.dart';
 import 'package:notes_app/features/sync/conflicts.dart';
 import 'package:notes_app/ui/format.dart';
 
@@ -81,9 +81,9 @@ void main() {
       // On.
       final first = await makeSectionPage(tester, other, 'Lisbon trip');
       await openConflictSettings(tester);
-      expect(tester.widget<Toggle>(key('conflict-auto-resolve')).value, isFalse, reason: 'the switch shows off');
+      expect(tester.widget<SSwitch>(key('conflict-auto-resolve')).value, isFalse, reason: 'the switch shows off');
       await tapAndSettle(tester, key('conflict-auto-resolve'));
-      expect(tester.widget<Toggle>(key('conflict-auto-resolve')).value, isTrue);
+      expect(tester.widget<SSwitch>(key('conflict-auto-resolve')).value, isTrue);
       expect(await core(tester, (v) => v.run((n) => n.conflictAutoResolve())), isTrue);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await settle(tester);
@@ -99,9 +99,9 @@ void main() {
 
       // Off.
       await openConflictSettings(tester);
-      expect(tester.widget<Toggle>(key('conflict-auto-resolve')).value, isTrue, reason: 'reopened settings show the saved value');
+      expect(tester.widget<SSwitch>(key('conflict-auto-resolve')).value, isTrue, reason: 'reopened settings show the saved value');
       await tapAndSettle(tester, key('conflict-auto-resolve'));
-      expect(tester.widget<Toggle>(key('conflict-auto-resolve')).value, isFalse);
+      expect(tester.widget<SSwitch>(key('conflict-auto-resolve')).value, isFalse);
       expect(await core(tester, (v) => v.run((n) => n.conflictAutoResolve())), isFalse);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await settle(tester);
@@ -151,14 +151,14 @@ void main() {
     try {
       await pairOther(tester, other);
       await openConflictSettings(tester);
-      expect(tester.widget<Toggle>(key('conflict-auto-resolve')).value, isFalse);
+      expect(tester.widget<SSwitch>(key('conflict-auto-resolve')).value, isFalse);
 
       // The other device turns the vault-wide switch on and syncs; settings
       // stays open here, with no reopen.
       await real(tester, () => other.vault.run((v) => v.setConflictAutoResolve(enabled: true), writes: true));
       await real(tester, () => other.client!.syncOnce());
-      await settleUntil(tester, () => tester.widget<Toggle>(key('conflict-auto-resolve')).value);
-      expect(tester.widget<Toggle>(key('conflict-auto-resolve')).value, isTrue, reason: 'the open switch updates itself');
+      await settleUntil(tester, () => tester.widget<SSwitch>(key('conflict-auto-resolve')).value);
+      expect(tester.widget<SSwitch>(key('conflict-auto-resolve')).value, isTrue, reason: 'the open switch updates itself');
       expect(await core(tester, (v) => v.run((n) => n.conflictAutoResolve())), isTrue);
       expect(tv.app.sync.conflicts, isEmpty);
     } finally {
@@ -170,7 +170,7 @@ void main() {
     await pumpApp(tester, mobile: false);
     await openConflictSettings(tester);
     expect(key('no-conflicts'), findsOneWidget);
-    expect(find.text('Nothing changed on two devices.'), findsOneWidget);
-    expect(find.byType(Toggle), findsOneWidget, reason: 'the auto-resolve switch is still shown with nothing pending');
+    expect(find.text('No page has changed on two devices at once.'), findsOneWidget);
+    expect(find.byType(SSwitch), findsOneWidget, reason: 'the auto-resolve switch is still shown with nothing pending');
   });
 }

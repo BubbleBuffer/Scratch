@@ -1,11 +1,11 @@
-// Registered search sources with no add-on behind them: the app boots with the
-// agent add-on disabled, and fake sources (plain AddonSearchSource subclasses,
-// not the chat source) are registered into the app's search registry. Ctrl+K
-// groups a source's rows under its own group and type chip, with no Chats
-// group, and opens them with the source's opaque target. A cached agent row in
-// the vault index is excluded because no registered source owns it. The
-// indexed path is covered with a fake indexed source whose rows live in the
-// vault index.
+// Registered search sources with no add-on behind them: fake sources (plain
+// AddonSearchSource subclasses, not the chat source) are registered into the
+// app's search registry beside the built-in add-ons. Ctrl+K groups a source's
+// rows under its own group and type chip and opens them with the source's
+// opaque target. A cached row in the vault index whose source is not
+// registered is excluded because no registered source owns it. The indexed
+// path is covered with a fake indexed source whose rows live in the vault
+// index.
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -144,7 +144,7 @@ Future<void> _indexRow(
 
 void main() {
   setUpAll(() async {
-    registerBuiltins(disabledAddons: {'agent'});
+    registerBuiltins();
     await initCore();
     appAddonContext.searchSources.register(kit);
     appAddonContext.searchSources.register(indexed);
@@ -155,11 +155,10 @@ void main() {
     indexed.reset();
   });
 
-  appTest('boots with agent disabled and both fake sources registered', (
+  appTest('boots with the agent add-on and both fake sources registered', (
     tester,
   ) async {
-    expect(activeAddonContext!.installedIds, isNot(contains('agent')));
-    expect(appAddonContext.searchSources.of('agent'), isNull);
+    expect(activeAddonContext!.installedIds, contains('agent'));
     expect(identical(appAddonContext.searchSources.of('kit'), kit), isTrue);
     expect(
       identical(appAddonContext.searchSources.of('fake-index'), indexed),
@@ -197,7 +196,7 @@ void main() {
         findsOneWidget,
       );
 
-      // No chat group exists when no chat source is registered.
+      // The vault holds no chats, so no Chats group appears.
       expect(find.byKey(const ValueKey('search-group-chats')), findsNothing);
       expect(find.text('CHATS'), findsNothing);
 
@@ -246,18 +245,18 @@ void main() {
   });
 
   appTest(
-    'a cached agent row is excluded while its source is unregistered; pages and the kit still show',
+    'a cached row is excluded while its source is unregistered; pages and the kit still show',
     (tester) async {
       final tv = await pumpApp(tester, mobile: false, empty: true);
       final page = await real(
         tester,
         () => tv.app.vault.createPage(title: 'Lantern page'),
       );
-      // A chat row cached by an earlier run of the agent add-on.
+      // A row cached for a source that is no longer registered.
       await _indexRow(
         tester,
         tv,
-        source: 'agent',
+        source: 'retired',
         id: 'chat:cached',
         title: 'Lantern chat',
         pageType: 'chat',
@@ -277,7 +276,7 @@ void main() {
       await settleUntil(tester, () => row.evaluate().isNotEmpty);
 
       expect(find.byKey(ValueKey('hit-$page')), findsOneWidget);
-      expect(find.byKey(const ValueKey('hit-agent/chat:cached')), findsNothing);
+      expect(find.byKey(const ValueKey('hit-retired/chat:cached')), findsNothing);
       expect(find.text('Lantern chat'), findsNothing);
       expect(find.byKey(const ValueKey('search-group-chats')), findsNothing);
 
@@ -288,7 +287,7 @@ void main() {
   );
 
   appTest(
-    'the indexed path keeps a registered indexed row and still excludes the unregistered agent row',
+    'the indexed path keeps a registered indexed row and still excludes the unregistered row',
     (tester) async {
       final tv = await pumpApp(tester, mobile: false, empty: true);
       final page = await real(
@@ -298,7 +297,7 @@ void main() {
       await _indexRow(
         tester,
         tv,
-        source: 'agent',
+        source: 'retired',
         id: 'chat:cached',
         title: 'Lantern chat',
         pageType: 'chat',
@@ -337,7 +336,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('INDEXED KIT'), findsOneWidget);
-      expect(find.byKey(const ValueKey('hit-agent/chat:cached')), findsNothing);
+      expect(find.byKey(const ValueKey('hit-retired/chat:cached')), findsNothing);
       expect(find.byKey(const ValueKey('search-group-chats')), findsNothing);
 
       await tester.tap(row);

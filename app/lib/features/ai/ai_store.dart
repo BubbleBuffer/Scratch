@@ -1,4 +1,4 @@
-// AI on this device: the vault's MCP endpoint and AI tasks.
+// AI on this device: AI tasks.
 //
 // - Tasks are rows of the synced "AI tasks" collection (vault_mcp::tasks).
 //   "Ask AI" (the `/` menu, the selection toolbar, the block menu and the
@@ -15,10 +15,8 @@
 //   the task in an agent session of its own and writes the answer itself.
 //   Rows that name a runner removed on 2026-10-22 (`claude`, `codex`,
 //   `deepseek`) are answered by the agent too. Claude Code, Codex and
-//   other apps reach the vault from outside, through the MCP endpoint or
-//   agent tokens; the app never starts them.
-// - The MCP endpoint is served on the configured address when enabled in
-//   settings.
+//   other apps reach the vault from outside, through the hub and agent
+//   tokens; the app never starts them.
 //
 // One store per open vault ([AiStore.of]); boot attaches the device's
 // settings and starts it.
@@ -154,9 +152,6 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   /// (boot sets it).
   Future<void> Function()? syncBeforeHubJob;
 
-  NotesMcp? _mcp;
-  String? mcpUrl;
-  String? mcpError;
   bool _started = false, _disposed = false, _pumping = false;
   Timer? _debounce;
 
@@ -171,13 +166,12 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   String? runningId;
   String? _collection;
 
-  /// Starts the endpoint (if enabled), fails tasks this device left
-  /// running, loads the task list and runs queued tasks.
+  /// Fails tasks this device left running, loads the task list and runs
+  /// queued tasks.
   Future<void> start() async {
     if (_started) return;
     _started = true;
     if (canRun) {
-      if (settings.mcpEnabled) await _startMcp();
       try {
         await vault.run((v) => aiRecoverTasks(vault: v), writes: true);
       } catch (_) {}
@@ -186,61 +180,12 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
     unawaited(pump());
   }
 
-  bool get mcpRunning => mcpUrl != null;
-
   /// Whether this device runs tasks: its agent is on and can run them.
   bool get canAnswer => canRun && settings.answersAskAi && _agents.canRunTasks;
 
   void _onAgentChanged() {
     _notify();
     if (_started && _agents.canRunTasks) unawaited(pump());
-  }
-
-  // ---------------------------------------------------------------- MCP
-
-  Future<String?> _startMcp() async {
-    final addr = settings.mcpEnabled ? settings.mcpAddress : '127.0.0.1:0';
-    try {
-      final m = _mcp ??= NotesMcp(vault: vault.raw);
-      mcpUrl = await m.start(addr: addr);
-      mcpError = null;
-    } catch (e) {
-      mcpUrl = null;
-      mcpError = '$e';
-    }
-    _notify();
-    return mcpUrl;
-  }
-
-  Future<void> _stopMcp() async {
-    await _mcp?.stop();
-    mcpUrl = null;
-    _notify();
-  }
-
-  /// Turns the endpoint on [settings.mcpAddress] on or off.
-  Future<void> setMcpEnabled(bool on) async {
-    settings.update((s) => s.mcpEnabled = on);
-    await _stopMcp();
-    if (on) await _startMcp();
-  }
-
-  Future<void> setMcpAddress(String addr) async {
-    settings.update((s) => s.mcpAddress = addr);
-    if (settings.mcpEnabled) {
-      await _stopMcp();
-      await _startMcp();
-    }
-  }
-
-  /// The endpoint's bearer token.
-  Future<String> token() => (_mcp ??= NotesMcp(vault: vault.raw)).token();
-
-  /// A new token; AI apps set up with the old one must be updated.
-  Future<String> rotateToken() async {
-    final t = await (_mcp ??= NotesMcp(vault: vault.raw)).rotateToken();
-    _notify();
-    return t;
   }
 
   // -------------------------------------------------------------- tasks
@@ -466,14 +411,8 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
     if (!_disposed) notifyListeners();
   }
 
-  /// Stops the endpoint, then disposes the store.
-  Future<void> close() async {
-    final m = _mcp;
-    _mcp = null;
-    await m?.stop();
-    m?.dispose();
-    dispose();
-  }
+  /// Disposes the store.
+  Future<void> close() async => dispose();
 
   @override
   void dispose() {
@@ -482,9 +421,6 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
     feed?.removeListener(_onChanges);
     _settings.removeListener(notifyListeners);
     _agents.removeListener(_onAgentChanged);
-    final m = _mcp;
-    _mcp = null;
-    if (m != null) m.stop().whenComplete(m.dispose);
     _stores[vault] = null;
     super.dispose();
   }
