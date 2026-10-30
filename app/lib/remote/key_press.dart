@@ -3,6 +3,7 @@
 // state, focus handlers and app shortcuts see an ordinary key press.
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 import 'remote_handler.dart';
 
@@ -123,9 +124,23 @@ void pressKeyCombo(KeyCombo combo) {
   try {
     send(true, key, character: key.character);
     send(false, key);
+    if (combo.key == 'enter' && combo.modifiers.isEmpty) submitFocusedTextField();
   } finally {
     for (final m in mods.reversed) {
       send(false, m);
     }
   }
+}
+
+/// On a desktop keyboard Enter reaches a text field twice: as a key event and
+/// as the platform's text-input action, which is what submits the field. Key
+/// events alone never produce the action, so a remote Enter sends it to the
+/// focused field itself, unless the field is multiline (Enter is a newline).
+void submitFocusedTextField() {
+  final context = FocusManager.instance.primaryFocus?.context;
+  final field = context?.findAncestorStateOfType<EditableTextState>();
+  if (field == null) return;
+  final widget = field.widget;
+  if (widget.maxLines != 1) return;
+  field.performAction(widget.textInputAction ?? TextInputAction.done);
 }
