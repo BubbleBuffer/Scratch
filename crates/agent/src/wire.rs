@@ -3,11 +3,11 @@
 //! the hub sends as `data.kind`.
 
 use bubblepaw_sdk::approvals::ApprovalRecord;
-use bubblepaw_sdk::events::{EventKind, HarnessEvent};
-use bubblepaw_sdk::store::{Message, Session};
 use bubblepaw_sdk::core::{ModelInfo, Run};
-use bubblepaw_sdk::providers::{ProviderError, ProviderErrorKind, Usage};
+use bubblepaw_sdk::events::{EventKind, HarnessEvent};
 use bubblepaw_sdk::harness::SessionBusy;
+use bubblepaw_sdk::providers::{ProviderError, ProviderErrorKind, Usage};
+use bubblepaw_sdk::store::{Message, Session};
 use bubblepaw_sdk::tools::ToolCall;
 use notes_agent_wire as w;
 use serde_json::Value;
@@ -256,6 +256,9 @@ pub fn event(ev: HarnessEvent) -> w::AgentEvent {
             out.reason = reason;
         }
         EventKind::Output { .. }
+        // These SDK notifications retain their full payload in `out.json`.
+        | EventKind::ContextCompaction { .. }
+        | EventKind::ChildRunStateChanged { .. }
         | EventKind::SessionSettled {}
         | EventKind::HostStateChanged { .. }
         | EventKind::ModelRequestStarted {}

@@ -71,6 +71,8 @@ pub struct FlatBlock {
     pub color: Option<String>,
     /// Image width in percent of the text column, None for the full width.
     pub width: Option<u32>,
+    /// First number of a numbered-list run; None uses the default start of 1.
+    pub numbered_start: Option<u32>,
 }
 
 /// A page with its blocks and metadata.
@@ -294,6 +296,7 @@ pub enum OpKind {
     SetTarget,
     SetColor,
     SetWidth,
+    SetNumberedStart,
 }
 
 /// One edit of a page's block tree. Which fields matter depends on `op`
@@ -312,6 +315,9 @@ pub struct BOp {
     pub target: Option<String>,
     pub color: Option<String>,
     pub width: Option<u32>,
+    /// Initial start for Insert, or the value for SetNumberedStart.
+    /// None or 1 clears an explicit start for SetNumberedStart.
+    pub numbered_start: Option<u32>,
 }
 
 // ------------------------------------------------------------- properties
@@ -883,6 +889,33 @@ pub struct PairedDevice {
     pub label: String,
     pub device: Option<String>,
     pub created_ms: i64,
+}
+
+/// A certificate the user trusted for one hub origin. Every hub client
+/// (sync, the agent and host relay sockets) takes the device's list.
+#[derive(Debug, Clone)]
+pub struct TrustedHubCertificate {
+    /// `scheme://host:port` it was trusted for.
+    pub origin: String,
+    /// SHA-256 of the hub's end-entity certificate (hex, any case, with or
+    /// without `:`): accepted for an unknown issuer.
+    pub sha256: String,
+    /// DER of the certificate that issued it, when the hub sent one: a
+    /// trust anchor for `origin` only, so a re-minted certificate from the
+    /// same CA (a TLS-inspecting proxy) is accepted too.
+    pub issuer_der: Option<Vec<u8>>,
+}
+
+impl TrustedHubCertificate {
+    pub(crate) fn to_sync(list: Vec<TrustedHubCertificate>) -> Vec<vault_sync::tls::TrustedCertificate> {
+        list.into_iter()
+            .map(|t| vault_sync::tls::TrustedCertificate {
+                origin: t.origin,
+                sha256: t.sha256,
+                issuer_der: t.issuer_der,
+            })
+            .collect()
+    }
 }
 
 /// A certificate a hub presented, for showing it before trusting it.

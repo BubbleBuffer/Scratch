@@ -33,15 +33,6 @@ import 'search.dart';
 import 'sidebar.dart';
 import 'today.dart';
 
-/// "Good morning" (5:00 to 11:59), "Good afternoon" (to 17:59), else
-/// "Good evening".
-String greetingFor(DateTime t) {
-  final h = t.hour;
-  if (h >= 5 && h < 12) return 'Good morning';
-  if (h >= 12 && h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
 // ---------------------------------------------------------------------------
 // Home
 

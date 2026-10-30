@@ -1,5 +1,22 @@
 import 'navigation.dart';
 
+import 'package:agent_kit_core/agent_kit_core.dart'
+    as kit
+    show
+        ActivityGroup,
+        AssistantMessage,
+        NoticeLine,
+        NoticeTone,
+        ToolRow,
+        WorkState;
+import 'package:agent_kit/agent_kit.dart'
+    as kit
+    show
+        ActivityGroupView,
+        AssistantProse,
+        FileEditRow,
+        NoticeLineView,
+        UndoRefused;
 import 'package:flutter/widgets.dart';
 
 import '../../state/app_state.dart';
@@ -9,6 +26,7 @@ import 'agent_cells.dart';
 import 'agent_markdown.dart';
 import 'agent_store.dart';
 import 'agent_transcript.dart';
+import 'kit_backend.dart' show kitFileEdit, kitToolKind;
 
 class AgentTurnView extends StatelessWidget {
   const AgentTurnView({super.key, required this.turn, required this.store});
@@ -24,24 +42,34 @@ class AgentTurnView extends StatelessWidget {
         for (final text in turn.texts)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: AgentMarkdown(
-              text.text,
+            child: KeyedSubtree(
               key: ValueKey('agent-msg-${text.id}'),
+              child: kit.AssistantProse(
+                kit.AssistantMessage(id: text.id, markdown: text.text),
+                renderer: const ScratchMarkdownRenderer(),
+              ),
             ),
           ),
         if (turn.streaming.trim().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: AgentMarkdown(
-              turn.streaming,
+            child: KeyedSubtree(
               key: const ValueKey('agent-msg-live'),
+              child: kit.AssistantProse(
+                kit.AssistantMessage(
+                  id: '${turn.id}-live',
+                  markdown: turn.streaming,
+                  streaming: true,
+                ),
+                renderer: const ScratchMarkdownRenderer(),
+              ),
             ),
           ),
         for (final edit in turn.edits)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: AgentEditRow(
-              key: ValueKey('agent-edit-${edit.id}'),
+              key: ValueKey('agent-edit-row-${edit.id}'),
               edit: edit,
               sessionId: store.openId,
               onUndo: () => store.undoEdit(edit.id),
@@ -71,17 +99,19 @@ class AgentTurnView extends StatelessWidget {
         if (turn.run?.status == 'cancelled')
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              'Stopped.',
-              style: ts(context.type.uiSmall, c.textTertiary),
+            child: kit.NoticeLineView(
+              kit.NoticeLine(id: '${turn.id}-stopped', text: 'Stopped.'),
             ),
           ),
         if ((turn.run?.error ?? '').isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              turn.run!.error!,
-              style: ts(context.type.uiSmall, c.inlineCodeText),
+            child: kit.NoticeLineView(
+              kit.NoticeLine(
+                id: '${turn.id}-error',
+                text: turn.run!.error!,
+                tone: kit.NoticeTone.danger,
+              ),
             ),
           ),
       ],
@@ -173,103 +203,89 @@ String workSummary(AgentTurn turn) {
   ].join(' · ');
 }
 
-class AgentWorkRow extends StatefulWidget {
+/// A turn's tool work: the kit's activity group under Scratch's verb line,
+/// with "Show code" for the turn's code cells once the group is open.
+class AgentWorkRow extends StatelessWidget {
   const AgentWorkRow({super.key, required this.turn});
   final AgentTurn turn;
+
+  kit.ActivityGroup _group() => kit.ActivityGroup(
+    id: turn.id,
+    rows: turn.activity.isEmpty
+        ? [
+            for (final cell in turn.cells)
+              kit.ToolRow(
+                id: cell.id,
+                name: cell.tool,
+                kind: kitToolKind(cell.tool),
+                target: cell.firstLine,
+                state: switch (cell.status) {
+                  CellStatus.failed => kit.WorkState.failed,
+                  _ => kit.WorkState.done,
+                },
+              ),
+          ]
+        : [
+            for (final a in turn.activity)
+              kit.ToolRow(
+                id: '${a.callId}-${a.order}',
+                name: a.name,
+                kind: kitToolKind(a.name),
+                target: a.summary,
+                state: a.isError ? kit.WorkState.failed : kit.WorkState.done,
+              ),
+          ],
+  );
+
   @override
-  State<AgentWorkRow> createState() => _AgentWorkRowState();
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(left: 6),
+    child: kit.ActivityGroupView(
+      _group(),
+      initiallyOpen: false,
+      summaryOf: (_) => workSummary(turn),
+      footer: turn.cells.isNotEmpty && !turn.live
+          ? _CodeDisclosure(turn: turn)
+          : null,
+    ),
+  );
 }
 
-class _AgentWorkRowState extends State<AgentWorkRow> {
-  bool _open = false, _code = false;
+class _CodeDisclosure extends StatefulWidget {
+  const _CodeDisclosure({required this.turn});
+  final AgentTurn turn;
   @override
-  Widget build(BuildContext context) {
-    final turn = widget.turn;
-    final c = context.colors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Hover(
-          key: ValueKey('agent-work-${turn.id}-toggle'),
-          onTap: () => setState(() => _open = !_open),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-          radius: Radii.md,
-          child: Row(
-            children: [
-              Icon20(
-                _open ? Ico.chevronDown : Ico.chevronRight,
-                size: 13,
-                color: c.iconTertiary,
-              ),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text.rich(
-                  TextSpan(
-                    children: [
-                      for (final part in workSummary(turn).split(' · ').indexed)
-                        TextSpan(
-                          text: '${part.$1 == 0 ? '' : ' · '}${part.$2}',
-                          style: ts(
-                            context.type.uiSmall,
-                            part.$2.endsWith('failed')
-                                ? c.inlineCodeText
-                                : c.textTertiary,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+  State<_CodeDisclosure> createState() => _CodeDisclosureState();
+}
+
+class _CodeDisclosureState extends State<_CodeDisclosure> {
+  bool _code = false;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextBtn(
+          _code ? 'Hide code' : 'Show code',
+          key: ValueKey('agent-work-${widget.turn.id}-code'),
+          height: 28,
+          onTap: () => setState(() => _code = !_code),
         ),
-        if (_open)
+      ),
+      if (_code)
+        for (final cell in widget.turn.cells)
           Padding(
-            padding: const EdgeInsets.only(left: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final activity in turn.activity)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      activity.summary,
-                      key: ValueKey(
-                        'agent-activity-${activity.callId}-${activity.order}',
-                      ),
-                      style: ts(
-                        context.type.uiSmall,
-                        activity.isError ? c.inlineCodeText : c.textSecondary,
-                      ),
-                    ),
-                  ),
-                if (turn.cells.isNotEmpty && !turn.live)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextBtn(
-                      _code ? 'Hide code' : 'Show code',
-                      key: ValueKey('agent-work-${turn.id}-code'),
-                      height: 28,
-                      onTap: () => setState(() => _code = !_code),
-                    ),
-                  ),
-                if (_code && !turn.live)
-                  for (final cell in turn.cells)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: CodeCellRow(
-                        key: ValueKey('agent-${cell.id}'),
-                        cell: cell,
-                      ),
-                    ),
-              ],
-            ),
+            padding: const EdgeInsets.only(bottom: 6),
+            child: CodeCellRow(key: ValueKey('agent-${cell.id}'), cell: cell),
           ),
-      ],
-    );
-  }
+    ],
+  );
 }
 
+/// A page edit as the kit's edit row: Scratch's wording, "Open" at the
+/// changed blocks, and an undo that finishes later (the row shows
+/// "Undoing…"; a refusal's reason shows under the row).
 class AgentEditRow extends StatefulWidget {
   const AgentEditRow({
     super.key,
@@ -285,9 +301,8 @@ class AgentEditRow extends StatefulWidget {
 }
 
 class _AgentEditRowState extends State<AgentEditRow> {
-  bool _open = false, _all = false, _undoing = false;
   AgentEdit? _result;
-  String? _refusal;
+
   @override
   void didUpdateWidget(AgentEditRow oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -295,21 +310,11 @@ class _AgentEditRowState extends State<AgentEditRow> {
   }
 
   Future<void> _undo() async {
-    setState(() {
-      _undoing = true;
-      _refusal = null;
-    });
     try {
       final result = await widget.onUndo();
       if (mounted) setState(() => _result = result);
     } catch (e) {
-      if (mounted) {
-        setState(
-          () => _refusal = '$e'.replaceFirst(RegExp(r'^Exception: '), ''),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _undoing = false);
+      throw kit.UndoRefused('$e'.replaceFirst(RegExp(r'^Exception: '), ''));
     }
   }
 
@@ -321,181 +326,28 @@ class _AgentEditRowState extends State<AgentEditRow> {
       edit.pageTitle,
       firstLine: pages.meta(edit.pageId)?.firstLine ?? '',
     );
-    final c = context.colors;
-    final green = c.dark ? const Color(0xFF93BD9B) : const Color(0xFF397748);
-    final red = c.dark ? const Color(0xFFE0A3A3) : const Color(0xFFAD4B4B);
-    final label = switch (edit.kind) {
-      'created' => 'Created $pageName',
-      'trashed' => 'Moved $pageName to trash',
-      'row' => 'Updated a row in $pageName',
-      _ => 'Edited $pageName',
-    };
-    final lines = [for (final h in edit.hunks) ...h.lines];
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: c.borderSubtle),
-        borderRadius: Radii.field,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            child: LayoutBuilder(
-              builder: (context, bounds) => Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 4,
-                children: [
-                  Hover(
-                    key: ValueKey('agent-edit-${edit.id}-toggle'),
-                    onTap: lines.isEmpty
-                        ? null
-                        : () => setState(() => _open = !_open),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 2,
-                      vertical: 4,
-                    ),
-                    radius: Radii.sm,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon20(
-                          _open ? Ico.chevronDown : Ico.chevronRight,
-                          size: 12,
-                          color: c.iconTertiary,
-                        ),
-                        const SizedBox(width: 4),
-                        Icon20(
-                          edit.kind == 'trashed'
-                              ? Ico.trash
-                              : edit.kind == 'created'
-                              ? Ico.plus
-                              : Ico.compose,
-                          size: 14,
-                          color: c.iconSecondary,
-                        ),
-                        const SizedBox(width: 5),
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: (bounds.maxWidth - 39)
-                                .clamp(0.0, 250.0)
-                                .toDouble(),
-                          ),
-                          child: Text(
-                            label,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: ts(
-                              context.type.uiSmall,
-                              edit.undone ? c.textTertiary : c.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (edit.kind != 'created' && edit.kind != 'trashed') ...[
-                    Text(
-                      '+${edit.added}',
-                      style: ts(context.type.uiSmall, green),
-                    ),
-                    Text(
-                      '−${edit.removed}',
-                      style: ts(context.type.uiSmall, red),
-                    ),
-                  ],
-                  IntrinsicWidth(
-                    child: TextBtn(
-                      'Open',
-                      key: ValueKey('agent-edit-${edit.id}-open'),
-                      height: 28,
-                      onTap: () => openAgentPage(
-                        context,
-                        edit.pageId,
-                        edit.pageTitle,
-                        blocks: edit.changedBlocks,
-                        sessionId: widget.sessionId,
-                      ),
-                    ),
-                  ),
-                  if (edit.undone || edit.undoable)
-                    IntrinsicWidth(
-                      child: TextBtn(
-                        edit.undone
-                            ? 'Undone'
-                            : _undoing
-                            ? 'Undoing…'
-                            : 'Undo',
-                        key: ValueKey('agent-edit-${edit.id}-undo'),
-                        height: 28,
-                        color: edit.undone ? c.textTertiary : null,
-                        onTap: edit.undone || _undoing ? null : _undo,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          if (_refusal != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: Text(
-                _refusal!,
-                key: ValueKey('agent-edit-${edit.id}-refusal'),
-                style: ts(context.type.uiSmall, c.textTertiary),
-              ),
-            ),
-          if (_open)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 2, 10, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final (i, line)
-                      in (_all ? lines : lines.take(12)).indexed)
-                    Container(
-                      color: line.tag == '+'
-                          ? c.okBg
-                          : line.tag == '-'
-                          ? c.dangerBg
-                          : null,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 1,
-                      ),
-                      child: Text(
-                        '${line.tag == '=' ? ' ' : line.tag} ${line.text}',
-                        key: ValueKey('agent-edit-${edit.id}-line-$i'),
-                        style:
-                            ts(
-                              context.type.code,
-                              line.tag == '+'
-                                  ? green
-                                  : line.tag == '-'
-                                  ? red
-                                  : c.textSecondary,
-                              mono: true,
-                            ).copyWith(
-                              decoration: line.tag == '-'
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                      ),
-                    ),
-                  if (!_all && lines.length > 12)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextBtn(
-                        'Show all',
-                        key: ValueKey('agent-edit-${edit.id}-all'),
-                        height: 28,
-                        onTap: () => setState(() => _all = true),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-        ],
+    return KeyedSubtree(
+      key: ValueKey('agent-edit-${edit.id}'),
+      child: kit.FileEditRow(
+        kitFileEdit(
+          edit,
+          label: switch (edit.kind) {
+            'created' => 'Created $pageName',
+            'trashed' => 'Moved $pageName to trash',
+            'row' => 'Updated a row in $pageName',
+            _ => 'Edited $pageName',
+          },
+          path: pageName,
+        ),
+        openEveryEdit: true,
+        onOpen: () => openAgentPage(
+          context,
+          edit.pageId,
+          edit.pageTitle,
+          blocks: edit.changedBlocks,
+          sessionId: widget.sessionId,
+        ),
+        onUndo: _undo,
       ),
     );
   }

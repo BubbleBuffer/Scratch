@@ -11,9 +11,12 @@
 //! See wiki/integrations/agent.md, build step 3.
 
 pub mod claude;
+pub mod compacted_history;
 mod context;
+mod episode_actions;
 mod gateway;
 pub mod mcp;
+mod outline_lcm;
 mod outline_titles;
 /// Explicitly renamed sessions retain their complete display name.
 pub fn session_user_named_ids_at(data_dir: &std::path::Path) -> anyhow::Result<Vec<String>> {
@@ -52,9 +55,7 @@ use bubblepaw_sdk::providers::{
     ProviderRegistry, ResponsesProvider, ScriptedProvider, ScriptedStep, TextCallback,
 };
 use bubblepaw_sdk::runner::provider::ChatCompletionsProvider;
-use bubblepaw_sdk::store::{
-    LogPosition, Message, QueuedInput, Session, Store, EVENTS_AFTER_LIMIT,
-};
+use bubblepaw_sdk::store::{LogPosition, Message, QueuedInput, Session, Store, EVENTS_AFTER_LIMIT};
 use bubblepaw_sdk::tools::{CodeMode, Tool, ToolRegistry};
 use bubblepaw_sdk::HostBuilder;
 use vault_core::Vault;
@@ -204,8 +205,8 @@ pub enum Forwarded {
 
 /// The outline of `session` in `store`, with its notes-owned file at `outline_path`.
 /// The notes-owned outline wins whenever one was saved for the session, even an
-/// empty one. Otherwise BubblePaw's context chapters are returned without sections,
-/// each ending at its last message. Empty when neither exists.
+/// empty one. Otherwise LCM subject chapters with episode sections take precedence
+/// over legacy context chapters without sections. Empty when none exist.
 pub fn read_session_outline(
     store: &Store,
     outline_path: &Path,
@@ -215,6 +216,9 @@ pub fn read_session_outline(
     if let Some(chapters) = vault_tools::outline::OutlineStore::read_session(outline_path, session)?
     {
         return Ok(vault_tools::outline::ChatOutline { chapters });
+    }
+    if let Some(outline) = outline_lcm::read(store, session)? {
+        return Ok(outline);
     }
     let chapters = store.context_chapters(session)?;
     if chapters.is_empty() {
@@ -263,6 +267,24 @@ pub fn session_outline_at(
     let (store, outline_path) = agent_store_at(data_dir)?;
     outline_titles::refresh(&store, &outline_path, session)?;
     read_session_outline(&store, &outline_path, session)
+}
+
+/// Read durable context cards and canonical message gaps without changing the
+/// notes-owned outline, automatic titles, or serving view.
+pub fn session_compacted_history_at(
+    data_dir: &Path,
+    session: &str,
+) -> Result<compacted_history::CompactedHistory> {
+    let (store, _) = agent_store_at(data_dir)?;
+    read_session_compacted_history(&store, session)
+}
+
+/// See [`compacted_history`] for range and overlap semantics.
+pub fn read_session_compacted_history(
+    store: &Store,
+    session: &str,
+) -> Result<compacted_history::CompactedHistory> {
+    compacted_history::read(store, session)
 }
 
 /// The agent store in `data_dir` and the outline file beside it. Errors, instead of
@@ -699,20 +721,22 @@ impl Agent {
                 ))
             })
             .summarize(summary_config)
-            .context(move |mut summary: SummarizingContext| -> Arc<dyn ContextPreparation> {
-                if let Some((model, cache)) = &model_metadata {
-                    summary = summary.with_model_metadata(model.clone(), cache.clone());
-                }
-                let context: Arc<dyn ContextPreparation> = match &desktop_context {
-                    Some(desktop) => Arc::new(DesktopContext {
-                        inner: summary,
-                        desktop: desktop.clone(),
-                    }),
-                    None => Arc::new(summary),
-                };
-                let _ = wrapped_context.set(context.clone());
-                context
-            })
+            .context(
+                move |mut summary: SummarizingContext| -> Arc<dyn ContextPreparation> {
+                    if let Some((model, cache)) = &model_metadata {
+                        summary = summary.with_model_metadata(model.clone(), cache.clone());
+                    }
+                    let context: Arc<dyn ContextPreparation> = match &desktop_context {
+                        Some(desktop) => Arc::new(DesktopContext {
+                            inner: summary,
+                            desktop: desktop.clone(),
+                        }),
+                        None => Arc::new(summary),
+                    };
+                    let _ = wrapped_context.set(context.clone());
+                    context
+                },
+            )
             .config(harness_config.clone())
             .build()?;
         let _ = base_slot.set(host.tools.clone());
@@ -1052,11 +1076,21 @@ impl Agent {
         self.store.list_sessions()
     }
 
-    /// The session's outline: the notes-owned one when saved, else BubblePaw's context
-    /// chapters. See [`read_session_outline`]. Errors for an unknown session.
+    /// The session's outline: notes-owned when saved, then LCM subject chapters,
+    /// then legacy context chapters. See [`read_session_outline`]. Errors for an
+    /// unknown session.
     pub fn session_outline(&self, session: &str) -> Result<vault_tools::outline::ChatOutline> {
         outline_titles::refresh(&self.store, &self.outline_path, session)?;
         read_session_outline(&self.store, &self.outline_path, session)
+    }
+
+    /// Read durable summaries with raw canonical message gaps. This does not
+    /// consult or refresh the notes-owned outline or automatic session title.
+    pub fn session_compacted_history(
+        &self,
+        session: &str,
+    ) -> Result<compacted_history::CompactedHistory> {
+        read_session_compacted_history(&self.store, session)
     }
 
     pub fn create_session(&self, title: &str) -> Result<Session> {
@@ -1629,7 +1663,12 @@ impl ContextPreparation for DesktopContext {
         self.inner
             .validate_prepared_request(session_id, request, provider)
     }
-    fn observe_request(&self, session_id: &str, request: &ModelRequest, provider: Arc<dyn Provider>) {
+    fn observe_request(
+        &self,
+        session_id: &str,
+        request: &ModelRequest,
+        provider: Arc<dyn Provider>,
+    ) {
         self.inner.observe_request(session_id, request, provider);
     }
     fn cold_message_indexes(&self, session_id: &str, request: &ModelRequest) -> Result<Vec<usize>> {

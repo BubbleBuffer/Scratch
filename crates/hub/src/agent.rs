@@ -1,6 +1,6 @@
 //! The hub's agent: `vault_agent` over the hub's own vault replica, served
 //! at `GET /agent/ws` as JSON-RPC 2.0 over a WebSocket (one text frame per
-//! message). Protocol: `wiki/architecture/hub.md` (`/agent/ws`).
+//! message). Protocol: `wiki/sync/hub.md` (`/agent/ws`).
 //!
 //! - Auth: the upgrade request's `Authorization: Bearer <token>` and
 //!   `X-Device`, checked by `Hub::handle` itself, exactly as for sync.
@@ -81,6 +81,8 @@ impl Drop for Shared {
 
 struct Socket {
     token_hash: String,
+    /// The device that opened it (its sessions and token end together).
+    device: String,
     close: CancellationToken,
 }
 
@@ -237,13 +239,14 @@ impl AgentHost {
         }
     }
 
-    fn register(&self, token: &str) -> (u64, CancellationToken) {
+    fn register(&self, token: &str, device: &str) -> (u64, CancellationToken) {
         let id = self.next_socket.fetch_add(1, Ordering::Relaxed);
         let close = CancellationToken::new();
         self.sockets.lock().unwrap().insert(
             id,
             Socket {
                 token_hash: sha256_hex(token.as_bytes()),
+                device: device.to_string(),
                 close: close.clone(),
             },
         );
@@ -255,6 +258,15 @@ impl AgentHost {
     }
 
     /// Closes the sockets opened with `token` (its device signed out).
+    /// Closes the sockets `device` opened, with its token or a session.
+    pub(crate) fn close_device(&self, device: &str) {
+        for s in self.sockets.lock().unwrap().values() {
+            if s.device == device {
+                s.close.cancel();
+            }
+        }
+    }
+
     pub(crate) fn close_token(&self, token: &str) {
         let hash = sha256_hex(token.as_bytes());
         for s in self.sockets.lock().unwrap().values() {
@@ -360,7 +372,7 @@ pub(crate) async fn ws(
         id: device.clone(),
         name: label,
     };
-    let (id, close) = state.agent.register(&token);
+    let (id, close) = state.agent.register(&token, &device);
     upgrade.on_upgrade(move |socket| async move {
         let conn = Conn {
             agent,

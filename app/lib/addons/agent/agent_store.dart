@@ -43,12 +43,15 @@ import '../../core/vault.dart';
 import '../../ui/app_name.dart';
 import '../../src/rust/api/agent.dart' hide AgentPermissionMode;
 import '../../src/rust/api/agent.dart' as bridge show AgentPermissionMode;
-import '../../src/rust/api/vault.dart' as bridge
+import '../../src/rust/api/vault.dart'
+    as bridge
     show VaultAgentDefaults, VaultAgentModel;
 import '../../state/app_state.dart';
 import 'dev_replay.dart';
+import '../../src/rust/api/types.dart' show TrustedHubCertificate;
 import 'host_relay_link.dart';
 import 'agent_chat_prefs.dart';
+import 'agent_event_feed.dart';
 import 'agent_search_source.dart';
 import 'agent_search_vault.dart';
 import 'outline_names.dart';
@@ -220,8 +223,7 @@ class AgentStore extends ChangeNotifier {
       final view = VaultAgentDefaultsView(
         host: AgentHost.ofRunner(d.runner),
         models: {
-          for (final m in d.models)
-            ?AgentHost.ofRunner(m.runner): m.model,
+          for (final m in d.models) ?AgentHost.ofRunner(m.runner): m.model,
         },
         toolSets: {
           for (final e in sets.entries)
@@ -330,6 +332,15 @@ class AgentStore extends ChangeNotifier {
         File('${_folder()}${Platform.pathSeparator}settings.json'),
       ));
 
+  /// What this device trusts for the hub at [url] beyond the public roots
+  /// (Settings > Sync > Trusted certificates), as sync does.
+  List<TrustedHubCertificate> _hubTrust(String url) =>
+      _appSettings().trustedCertificates.trustFor(url);
+
+  /// The same trust for the hub at [url], for other hub clients (the AI
+  /// store's hub jobs).
+  List<TrustedHubCertificate> hubTrust(String url) => _hubTrust(url);
+
   /// The vault's hub when the agent can run there (null: it cannot).
   HubLink? get hubLink =>
       HubLink.of(_appSettings(), allowLoopback: hubAgentPlatform && kDebugMode);
@@ -371,10 +382,12 @@ class AgentStore extends ChangeNotifier {
   }
 
   AgentChatPrefs? _chatPrefs;
-  AgentChatPrefs get _prefs => _chatPrefs ??= AgentChatPrefs.load(
-    _dataDir == null && settings.file == null
+  AgentChatPrefs get _prefs => _chatPrefs ??= AgentChatPrefs(
+    storage: _dataDir == null && settings.file == null
         ? null
-        : File('${_folder()}${Platform.pathSeparator}agent_chats.json'),
+        : AgentChatPrefsFile(
+            File('${_folder()}${Platform.pathSeparator}agent_chats.json'),
+          ),
   );
 
   /// The host chat [id] was created on, if this device recorded it.
@@ -414,6 +427,7 @@ class AgentStore extends ChangeNotifier {
   bool get requiresHubSignIn => hubAgentPlatform && hubLink == null;
 
   NotesAgent? _agent;
+  final _eventFeed = AgentEventFeed();
   Future<NotesAgent?>? _opening;
   StreamSubscription<AgentEvent>? _sub;
   StreamSubscription<AgentEvent>? _uiSub;
@@ -437,6 +451,10 @@ class AgentStore extends ChangeNotifier {
 
   /// Whether the agent is open.
   bool get isOpen => _agent != null && !_resetHubState;
+
+  /// Read-only consumers follow this connection across local subscription
+  /// replacement. A closed connection never switches to a newer agent.
+  Stream<AgentEvent> eventsFor(NotesAgent agent) => _eventFeed.eventsFor(agent);
 
   /// Every chat, newest first.
   List<AgentSession> sessions = const [];
@@ -520,7 +538,10 @@ class AgentStore extends ChangeNotifier {
   ({List<String>? ids, bool unavailable}) defaultHostModels() {
     final r = runnerModels(defaultHost);
     if (r.live) {
-      return (ids: {for (final m in r.models) m.id}.toList(), unavailable: false);
+      return (
+        ids: {for (final m in r.models) m.id}.toList(),
+        unavailable: false,
+      );
     }
     return (ids: null, unavailable: r.unreachable);
   }
@@ -634,10 +655,7 @@ class AgentStore extends ChangeNotifier {
     final agent = await _count(() => _connect(hub));
     try {
       final info = await _count(agent.hostInfo);
-      return (
-        _withExtras(await _count(agent.models), info),
-        info.defaultModel,
-      );
+      return (_withExtras(await _count(agent.models), info), info.defaultModel);
     } finally {
       await agent.closeEvents();
       agent.dispose();
@@ -722,6 +740,13 @@ class AgentStore extends ChangeNotifier {
 
   /// The chat whose outline [outline] holds, once that load has finished.
   String? outlineFor;
+
+  /// The open chat's compacted history (cards and the boundary), loaded with
+  /// its outline; null while loading, on a failed read, or for a remote chat.
+  CompactedHistory? compacted;
+
+  /// The chat whose history [compacted] holds.
+  String? compactedFor;
 
   /// The message list the outline was loaded for. The outline only changes
   /// with messages, so a snapshot that adds none does not load it again.
@@ -856,6 +881,16 @@ class AgentStore extends ChangeNotifier {
     return ids.contains(def) ? def : ids.first;
   }
 
+  /// Whether chat [id] shows older history as summary cards (off by default).
+  bool historyCompacted(String? id) =>
+      id != null && (_prefs[id]?.compacted ?? false);
+
+  /// Turns compacted history on or off for chat [id].
+  void setHistoryCompacted(String id, bool value) {
+    _prefs.setCompacted(id, host, value);
+    _notify();
+  }
+
   void pickModel(String? id, String model) {
     _modelBySession[id ?? ''] = model;
     if (id != null) _prefs.pickModel(id, host, model);
@@ -965,8 +1000,10 @@ class AgentStore extends ChangeNotifier {
       if (globalCancelled != null) await globalCancelled;
       if (cancelled != null) await cancelled;
       if (_disposed || !identical(agent, _agent)) return;
-      _sub = agent.subscribe().listen(
-        _onEvent,
+      _sub = _eventFeed.bind(
+        agent,
+        agent.subscribe(),
+        onEvent: _onEvent,
         onError: (Object e) => AppLog.info('agent events: $e'),
       );
       if (id != null) {
@@ -992,6 +1029,8 @@ class AgentStore extends ChangeNotifier {
         url: hub.url,
         device: vault.deviceId,
         token: hub.token,
+        trusted: _hubTrust(hub.url),
+        vaultRoot: vault.root,
       );
       if (_disposed || !identical(agent, _agent) || visibleSessionId != id) {
         await connection.closeEvents();
@@ -1079,6 +1118,10 @@ class AgentStore extends ChangeNotifier {
       host,
       hub?.url,
       hub?.token,
+      // Trusting or revoking the hub's certificate reconnects with it.
+      hub == null
+          ? ''
+          : _appSettings().trustedCertificates.trustKeyFor(hub.url),
       resolvedModel(AgentHost.local).model ?? '',
       settings.agentBunPath.trim(),
       settings.agentClaudeCodeDir.trim(),
@@ -1126,6 +1169,9 @@ class AgentStore extends ChangeNotifier {
       url: hub.url,
       device: vault.deviceId,
       token: hub.token,
+      trusted: _hubTrust(hub.url),
+      vaultRoot: vault.root,
+      trustKey: app.trustedCertificates.trustKeyFor(hub.url),
       open: () => NotesAgent.open(
         vault: vault.raw,
         dataDir: dataDir,
@@ -1237,9 +1283,7 @@ class AgentStore extends ChangeNotifier {
       final taken = settings.agentMcpServers;
       final added = <String, Map<String, dynamic>>{
         for (final e in found.entries)
-          if (e.key is String &&
-              e.value is Map &&
-              !taken.containsKey(e.key))
+          if (e.key is String && e.value is Map && !taken.containsKey(e.key))
             e.key as String: Map<String, dynamic>.from(e.value as Map),
       };
       AppLog.info(
@@ -1338,6 +1382,8 @@ class AgentStore extends ChangeNotifier {
             url: hub.url,
             device: vault.deviceId,
             token: hub.token,
+            trusted: _hubTrust(hub.url),
+            vaultRoot: vault.root,
           )
         : NotesAgent.open(
             vault: vault.raw,
@@ -1382,6 +1428,7 @@ class AgentStore extends ChangeNotifier {
         return null;
       }
       _agent = agent;
+      _eventFeed.open(agent);
       _agentOnHub = hub != null;
       _search ??= _newSearchIndex();
       _syncOutlinePoll();
@@ -1394,8 +1441,10 @@ class AgentStore extends ChangeNotifier {
         _mcpSent = null;
         await _sendMcp(agent, _mcpJson);
       }
-      _sub = agent.subscribe().listen(
-        _onEvent,
+      _sub = _eventFeed.bind(
+        agent,
+        agent.subscribe(),
+        onEvent: _onEvent,
         onError: (Object e) => AppLog.info('agent events: $e'),
       );
       _subscribedSession = null;
@@ -1549,11 +1598,17 @@ class AgentStore extends ChangeNotifier {
   /// it. Tests only. The view subscription reloads the database's session when
   /// a chat mounts, so a fixture must come after the mount has settled.
   @visibleForTesting
-  void seedFixture(AgentSessionState snapshot, ChatOutline chapters) {
+  void seedFixture(
+    AgentSessionState snapshot,
+    ChatOutline chapters, {
+    CompactedHistory? history,
+  }) {
     final id = snapshot.session.id;
     state = snapshot;
     outline = chapters;
     outlineFor = id;
+    compacted = history;
+    compactedFor = history == null ? null : id;
     _notify();
   }
 
@@ -1619,6 +1674,8 @@ class AgentStore extends ChangeNotifier {
   void _clearOutline() {
     outline = ChatOutline(chapters: const []);
     outlineFor = null;
+    compacted = null;
+    compactedFor = null;
     _outlineKey = null;
     _outlineRevision = null;
     _outlineLoads++;
@@ -1837,6 +1894,15 @@ class AgentStore extends ChangeNotifier {
       next = ChatOutline(chapters: const []);
     }
     if (!current()) return;
+    CompactedHistory? history;
+    try {
+      history = await _count(() => a.compactedHistory(sessionId: id));
+    } catch (_) {
+      history = null;
+    }
+    if (!current()) return;
+    compacted = history;
+    compactedFor = id;
     outline = next;
     outlineFor = id;
     _outlineKey = key;
@@ -1975,7 +2041,12 @@ class AgentStore extends ChangeNotifier {
     final t = text.trim();
     if (id == null || t.isEmpty) return;
     final a = await ensureOpen();
-    if (a == null) return;
+    if (a == null) {
+      // Nothing was sent: say so, so the composer keeps the draft.
+      error = openError ?? 'The agent is not available.';
+      _notify();
+      return;
+    }
     error = null;
     try {
       // On Android the tools read the Hub replica. Finish local saves and a
@@ -1999,7 +2070,9 @@ class AgentStore extends ChangeNotifier {
           return;
         }
         if (synced == null || !app.sync.connected) {
-          throw StateError('$appName disconnected from the Hub before the turn.');
+          throw StateError(
+            '$appName disconnected from the Hub before the turn.',
+          );
         }
       }
       // send queues a follow-up while busy and preserves its structured
@@ -2121,6 +2194,7 @@ class AgentStore extends ChangeNotifier {
     if (opening != null) await opening;
     final a = _agent;
     _agent = null;
+    if (a != null) _eventFeed.close(a);
     final sub = _sub;
     _sub = null;
     // Cancelling waits until the stream yields again: closing it on the

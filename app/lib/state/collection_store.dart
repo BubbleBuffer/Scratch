@@ -191,14 +191,39 @@ class GroupSource {
   final RowSource rows;
 }
 
+/// Views kept outside the collection's saved views: the view blocks of a
+/// page. The store reads [views] instead of `list_views` and writes view
+/// changes here; listeners hear when the views changed elsewhere (an edit
+/// of the blocks, undo, sync).
+abstract class ViewSource extends ChangeNotifier {
+  List<ViewDef> get views;
+
+  /// Saves [v] (same id).
+  Future<void> save(ViewDef v);
+
+  /// Adds [v] after view [after] (null: after the last) and returns its id.
+  Future<String> add(ViewDef v, {String? after});
+
+  Future<void> delete(ViewDef v);
+}
+
 class CollectionStore extends ChangeNotifier {
   /// [withRows] false: only the schema, views and template (page
-  /// property rows).
-  CollectionStore(this.vault, this.feed, this.collection, {this.withRows = true}) {
+  /// property rows). [viewSource]: the views come from there (view
+  /// blocks), not from the collection's saved views.
+  CollectionStore(this.vault, this.feed, this.collection, {this.withRows = true, this.viewSource}) {
     feed.addListener(_onChanges);
     vault.addCloseListener(_onVaultClosed);
     main = RowSource(this, null, const []);
+    final src = viewSource;
+    if (src != null) {
+      views = src.views;
+      src.addListener(_onSourceViews);
+    }
   }
+
+  /// Where the views live when they are not the saved views (null).
+  final ViewSource? viewSource;
 
   final Vault vault;
   final ChangeFeed feed;
@@ -310,15 +335,16 @@ class CollectionStore extends ChangeNotifier {
 
   Future<void> _loadMeta() async {
     if (_inactive) return;
+    final src = viewSource;
     final r = await Future.wait([
       vault.run((v) => v.getSchema(collection: collection)),
-      vault.run((v) => v.listViews(collection: collection)),
+      src != null ? Future.value(src.views) : vault.run((v) => v.listViews(collection: collection)),
       vault.run((v) => v.defaultTemplate(collection: collection)),
       vault.run((v) => v.loadPage(id: collection)),
     ]);
     if (_inactive) return;
     schema = r[0] as List<PropDef>;
-    views = r[1] as List<ViewDef>;
+    views = src != null ? src.views : r[1] as List<ViewDef>;
     templateId = r[2] as String?;
     final p = r[3] as PageData;
     final ancestors = <String>{collection};
@@ -490,6 +516,28 @@ class CollectionStore extends ChangeNotifier {
 
   // ---------------------------------------------------------------- views
 
+  /// The view blocks changed: take their views, reloading rows when the
+  /// shown view's query changed.
+  void _onSourceViews() {
+    if (_inactive) return;
+    final old = view;
+    views = viewSource!.views;
+    final now = view;
+    if (old == null || now == null || old.id != now.id || _requery(old, now)) {
+      if (old?.kind != now?.kind || old?.dateProp != now?.dateProp || old?.id != now?.id) rangeProp = null;
+      if (loaded) _loadRows();
+    } else {
+      _changed();
+    }
+  }
+
+  static bool _requery(ViewDef old, ViewDef v) =>
+      old.filter != v.filter ||
+      !listEquals(old.sorts, v.sorts) ||
+      old.groupBy != v.groupBy ||
+      old.kind != v.kind ||
+      old.dateProp != v.dateProp;
+
   void selectView(String id) {
     if (activeView == id) return;
     activeView = id;
@@ -509,17 +557,14 @@ class CollectionStore extends ChangeNotifier {
   Future<void> updateView(ViewDef v) async {
     final old = views.firstWhere((x) => x.id == v.id, orElse: () => v);
     views = [for (final x in views) x.id == v.id ? v : x];
-    final requery = old.filter != v.filter ||
-        !listEquals(old.sorts, v.sorts) ||
-        old.groupBy != v.groupBy ||
-        old.kind != v.kind ||
-        old.dateProp != v.dateProp;
-    if (requery && v.id == view?.id) {
+    if (_requery(old, v) && v.id == view?.id) {
       if (old.kind != v.kind || old.dateProp != v.dateProp) rangeProp = null;
       _loadRows();
     } else {
       _changed();
     }
+    final src = viewSource;
+    if (src != null) return src.save(v);
     await _write((r) => r.updateView(collection: collection, view: v));
   }
 
@@ -546,14 +591,23 @@ class CollectionStore extends ChangeNotifier {
       cardCover: null,
       config: '',
     );
-    final id = await _write((r) => r.addView(collection: collection, view: v));
-    views = [...views, v.copyWith(id: id)];
+    final src = viewSource;
+    final id = src != null ? await src.add(v) : await _write((r) => r.addView(collection: collection, view: v));
+    views = [...views.where((x) => x.id != id), v.copyWith(id: id)];
     selectView(id);
     return id;
   }
 
   Future<void> duplicateView(ViewDef v) async {
     final copy = v.copyWith(id: '', name: '${v.name} (copy)');
+    final src = viewSource;
+    if (src != null) {
+      final id = await src.add(copy, after: v.id);
+      final i = views.indexWhere((x) => x.id == v.id);
+      views = [...views.where((x) => x.id != id)]..insert(i + 1, copy.copyWith(id: id));
+      selectView(id);
+      return;
+    }
     final id = await _write((r) => r.addView(collection: collection, view: copy));
     final i = views.indexWhere((x) => x.id == v.id);
     views = [...views, copy.copyWith(id: id)];
@@ -562,7 +616,20 @@ class CollectionStore extends ChangeNotifier {
     selectView(id);
   }
 
+  /// Whether view [v] can be deleted: saved views keep at least one; a view
+  /// block can always go (it is a block of the page).
+  bool canDeleteView(ViewDef v) => viewSource != null || views.length > 1;
+
   Future<void> deleteView(ViewDef v) async {
+    final src = viewSource;
+    if (src != null) {
+      final rest = [for (final x in views) if (x.id != v.id) x];
+      if (rest.isNotEmpty && (activeView == v.id || view?.id == v.id)) {
+        final i = views.indexWhere((x) => x.id == v.id);
+        activeView = rest[(i - 1).clamp(0, rest.length - 1)].id;
+      }
+      return src.delete(v);
+    }
     if (views.length <= 1) return;
     final i = views.indexWhere((x) => x.id == v.id);
     views = [for (final x in views) if (x.id != v.id) x];
@@ -582,6 +649,7 @@ class CollectionStore extends ChangeNotifier {
     rest.insert(index.clamp(0, rest.length), v);
     views = rest;
     _changed();
+    if (viewSource != null) return;
     await _write((r) => r.moveView(collection: collection, viewId: id, index: index));
   }
 
@@ -757,22 +825,30 @@ class CollectionStore extends ChangeNotifier {
   Future<List<PropDef>> setSchema(List<PropDef> next) async {
     schema = next;
     _changed();
+    final promotes = loaded && pageType == documentType;
     final r = await _write((v) => v.setSchema(collection: collection, schema: next));
+    if (promotes) pageType = databaseType;
     if (_inactive) return r;
     schema = r;
     _changed();
     return r;
   }
 
-  /// Adds a property of [kind] and shows it in [inView] (all table views
-  /// when null) at [index] (the end when null). Returns its key.
-  Future<String> addProperty(PropKind kind, {String? name, ViewDef? inView, int? index}) async {
+  /// [name] (or the kind's default name), numbered when the schema has it.
+  String freePropName(PropKind kind, {String? name}) {
     final base = name ?? defaultPropName(kind);
     var n = base;
     var i = 1;
     while (schema.any((d) => d.name == n)) {
       n = '$base ${i++}';
     }
+    return n;
+  }
+
+  /// Adds a property of [kind] and shows it in [inView] (all table views
+  /// when null) at [index] (the end when null). Returns its key.
+  Future<String> addProperty(PropKind kind, {String? name, ViewDef? inView, int? index}) async {
+    final n = freePropName(kind, name: name);
     final before = schema.map((d) => d.key).toSet();
     final r = await setSchema([
       ...schema,
@@ -983,6 +1059,7 @@ class CollectionStore extends ChangeNotifier {
   @override
   void dispose() {
     vault.removeCloseListener(_onVaultClosed);
+    viewSource?.removeListener(_onSourceViews);
     _disposed = true;
     _reload.cancel();
     feed.removeListener(_onChanges);

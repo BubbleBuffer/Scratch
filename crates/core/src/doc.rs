@@ -819,6 +819,11 @@ impl PageDoc {
                 }
                 _ => None,
             },
+            numbered_start: match m.get("numbered_start") {
+                Some(ValueOrContainer::Value(LoroValue::I64(n)))
+                    if (0..=u32::MAX as i64).contains(&n) && n != 1 => Some(n as u32),
+                _ => None,
+            },
         })
     }
 
@@ -906,7 +911,8 @@ impl PageDoc {
                 BlockOp::SetChecked { id, .. }
                 | BlockOp::SetTarget { id, .. }
                 | BlockOp::SetColor { id, .. }
-                | BlockOp::SetWidth { id, .. } => sim.require(id)?,
+                | BlockOp::SetWidth { id, .. }
+                | BlockOp::SetNumberedStart { id, .. } => sim.require(id)?,
             }
         }
         // Check the final tree so a replacement can turn a parent into a
@@ -1053,6 +1059,21 @@ impl PageDoc {
                 }
                 Ok(())
             }
+            BlockOp::SetNumberedStart { id, numbered_start } => {
+                let m = self.tree.get_meta(self.node(id)?)?;
+                let start = numbered_start.filter(|start| *start != 1);
+                let cur = match m.get("numbered_start") {
+                    Some(ValueOrContainer::Value(LoroValue::I64(n))) => Some(n),
+                    _ => None,
+                };
+                if cur != start.map(i64::from) {
+                    match start {
+                        Some(start) => m.insert("numbered_start", i64::from(start))?,
+                        None => m.delete("numbered_start")?,
+                    }
+                }
+                Ok(())
+            }
         }
     }
 
@@ -1104,14 +1125,17 @@ pub(crate) fn embed_title(target: Option<&str>, titles: &dyn Fn(&str) -> Option<
 }
 
 /// All block texts joined by newlines, in document order (for search). An
-/// embed contributes its target's title, as drawn; a query contributes no text.
+/// embed contributes its target's title, as drawn; queries and view settings
+/// contribute no text.
 pub(crate) fn plain_text(blocks: &[Block], titles: &dyn Fn(&str) -> Option<String>) -> String {
     fn walk(b: &[Block], titles: &dyn Fn(&str) -> Option<String>, out: &mut String) {
         for x in b {
             if x.kind == BlockKind::Query {
                 continue;
             }
-            let text = if x.kind == BlockKind::Embed {
+            let text = if x.kind == BlockKind::View {
+                std::borrow::Cow::Borrowed("")
+            } else if x.kind == BlockKind::Embed {
                 std::borrow::Cow::Owned(embed_title(x.target.as_deref(), titles))
             } else {
                 std::borrow::Cow::Borrowed(x.text.as_str())
@@ -1221,7 +1245,7 @@ fn check_marks(text: &str, marks: &[Mark]) -> Result<()> {
 /// The page type stored in a page's meta map. A `type` string wins; without
 /// one, the old `collection: true` flag reads as a database; otherwise a
 /// document.
-fn read_page_type(m: &LoroMap) -> String {
+pub(crate) fn read_page_type(m: &LoroMap) -> String {
     if let Some(t) = map_str(m, "type") {
         return t;
     }

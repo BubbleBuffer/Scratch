@@ -188,7 +188,7 @@ fn main() {
         let client_dir = work.join(format!("client-{}", vault_core::new_id()));
         let client_vault =
             Arc::new(Vault::open(client_dir.to_string_lossy().into_owned()).unwrap());
-        let client = SyncClient::new(client_vault.clone(), &url, &hub.pair("bench").unwrap());
+        let client = SyncClient::new(client_vault.clone(), &url, &hub.pair_legacy_token("bench").unwrap());
         reset_metrics();
         let t = Instant::now();
         let r = client.sync_once().unwrap();

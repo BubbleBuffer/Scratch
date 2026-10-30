@@ -1,7 +1,7 @@
 #!/bin/sh
 # Deploys one notes-hub image on the VPS. Installed as /opt/notes-hub/deploy.sh
 # and run only as the forced command of CI's deploy key in root's
-# authorized_keys (see wiki/architecture/hub-deploy.md, "CI deploys").
+# authorized_keys (see wiki/sync/hub-deploy.md, "CI deploys").
 #   SSH_ORIGINAL_COMMAND  the image tag: the 40-hex commit sha
 #   stdin, first line     a GHCR token for this pull (CI's job token)
 # The token only lives in a temporary DOCKER_CONFIG that is removed on exit.

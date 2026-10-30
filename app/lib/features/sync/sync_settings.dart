@@ -13,6 +13,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../addons/agent/api.dart' show AgentStore, HostRelayDetails;
 import '../../state/app_state.dart';
+import '../../src/rust/api/sync.dart' show redeemPairingCode;
 import '../../state/sync_store.dart';
 import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
@@ -218,6 +219,8 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
                 token: s.clientToken ?? '',
                 deviceId: deviceId,
                 name: name,
+                vault: context.read<SyncStore>().vault.raw,
+                trusted: trustedFor(settings, s.clientUrl!),
               );
               settings.update((s) => s.clientDeviceLabel = used);
             },
@@ -340,6 +343,10 @@ class _ConnectSettingsState extends State<ConnectSettings> {
 
   /// The hub of the last failed connect (for an untrusted certificate).
   String? _failedUrl;
+
+  /// The one-time code of the last pasted code link (the hub field then
+  /// keeps only its address); redeemed on connect unless a token is typed.
+  String? _pastedCode;
   bool _busy = false;
 
   @override
@@ -353,6 +360,7 @@ class _ConnectSettingsState extends State<ConnectSettings> {
   void _hubChanged(String v) {
     final p = Pairing.parse(v);
     if (p != null) {
+      _pastedCode = p.code;
       _hub.text = p.url;
       _token.text = p.token;
     }
@@ -362,14 +370,26 @@ class _ConnectSettingsState extends State<ConnectSettings> {
   Future<void> _connect() async {
     final p = Pairing.parse(_hub.text);
     final url = p?.url ?? normalizeHubUrl(_hub.text);
-    final token = p?.token ?? _token.text.trim();
-    if (url.isEmpty || token.isEmpty) {
+    final typed = p?.token ?? _token.text.trim();
+    final code = p?.code ?? (typed.isEmpty ? _pastedCode : null);
+    if (url.isEmpty || (code == null && typed.isEmpty)) {
       setState(() => _error = 'Enter the hub address and the token, or paste a pairing code.');
       return;
     }
     setState(() => _busy = true);
     try {
-      await connectToHub(context.read<SyncStore>(), AppSettings.read(context), url, token);
+      final sync = context.read<SyncStore>();
+      final settings = AppSettings.read(context);
+      // A code link is redeemed for the device's token; an older link has it.
+      final token = code != null
+          ? await redeemPairingCode(
+              vault: sync.vault.raw,
+              hubUrl: url,
+              code: code,
+              trusted: trustedFor(settings, url),
+            )
+          : typed;
+      await connectToHub(sync, settings, url, token);
       _hub.clear();
       _token.clear();
       _error = null;
@@ -395,9 +415,14 @@ class _ConnectSettingsState extends State<ConnectSettings> {
     final url = _failedUrl, chain = _failedChain();
     if (url == null || chain.isEmpty) return false;
     final fp = untrustedFingerprintOf(_error) ?? chain.first.sha256;
-    if (!await confirmTrustCertificate(context, host: serverHostOf(url), fingerprint: fp)) return false;
+    final sync = context.read<SyncStore>();
+    final issuerDer = sync.hubUrl == url && sync.untrustedChain != null ? sync.untrustedIssuerDer : null;
+    if (!await confirmTrustCertificate(context, host: serverHostOf(url), fingerprint: fp, issuer: chain.first.issuer)) {
+      return false;
+    }
     if (!mounted) return false;
-    await trustCertificate(this.context.read<SyncStore>(), AppSettings.read(this.context), url, chain, fingerprint: fp);
+    await trustCertificate(this.context.read<SyncStore>(), AppSettings.read(this.context), url, chain,
+        fingerprint: fp, issuerDer: issuerDer);
     if (mounted) await _connect();
     return true;
   }
@@ -576,6 +601,36 @@ class TrustedCertificatesSettings extends StatelessWidget {
     );
   }
 
+  /// The row's text: the issuing CA's CN, its O · OU, then `for HOST ·
+  /// FINGERPRINT · valid until …`. An issuer without a CN keeps the
+  /// host as the title.
+  Widget _pinSummary(BuildContext context, String origin, PinnedCertificate pin) {
+    final c = context.colors;
+    final m = context.mobile;
+    final host = serverHostOf(origin);
+    final name = pin.issuerName;
+    final cn = name.cn;
+    final org = [?name.o, ?name.ou].join(' · ');
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(cn ?? host,
+          key: ValueKey('cert-pin-title-$origin'), style: tsRaw(m ? 16 : 14, 20, 500, c.textPrimary)),
+      if (cn != null && org.isNotEmpty) ...[
+        const SizedBox(height: 2),
+        Text(org, key: ValueKey('cert-pin-org-$origin'), style: tsRaw(12, 16, 400, c.textSecondary)),
+      ],
+      const SizedBox(height: 2),
+      Text.rich(
+        key: ValueKey('cert-pin-detail-$origin'),
+        TextSpan(children: [
+          if (cn != null) TextSpan(text: 'for $host · '),
+          TextSpan(text: shortFingerprint(pin.sha256), style: ts(const TypeSpec(12, 16, 400), c.textSecondary, mono: true)),
+          if (pin.notAfterMs > 0) TextSpan(text: ' · valid until ${formatCertDate(pin.notAfterMs)}'),
+        ]),
+        style: tsRaw(12, 16, 400, c.textSecondary),
+      ),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -599,19 +654,7 @@ class TrustedCertificatesSettings extends StatelessWidget {
                 onTap: () => _open(context, origin, pin),
                 radius: Radii.md,
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(serverHostOf(origin), style: tsRaw(m ? 16 : 14, 20, 500, c.textPrimary)),
-                  const SizedBox(height: 2),
-                  Text.rich(
-                    TextSpan(children: [
-                      TextSpan(
-                          text: shortFingerprint(pin.sha256),
-                          style: ts(const TypeSpec(12, 16, 400), c.textSecondary, mono: true)),
-                      if (pin.notAfterMs > 0) TextSpan(text: ' · valid until ${formatCertDate(pin.notAfterMs)}'),
-                    ]),
-                    style: tsRaw(12, 16, 400, c.textSecondary),
-                  ),
-                ]),
+                child: _pinSummary(context, origin, pin),
               ),
             ),
             const SizedBox(width: 8),
@@ -804,7 +847,7 @@ class _AddDeviceViewState extends State<AddDeviceView> {
       ]);
     } else {
       final url = _url ?? 'http://127.0.0.1:47100';
-      final code = Pairing(url, token).encode();
+      final code = Pairing.code(url, token).encode();
       children.addAll([
         Text('On the device, open $appName › Settings › Sync › Connect to a hub, and scan or paste this code. '
             'The token works for one device and is shown only now.', style: body),

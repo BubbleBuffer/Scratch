@@ -1,6 +1,6 @@
 //! The jobs API: outside agents start agent runs on the hub through the
 //! `jobs` registry tool (`/mcp` with an agent token or OAuth, `/mcp/agent`,
-//! and `notes jobs`). Reference: `wiki/architecture/hub.md` (Jobs).
+//! and `notes jobs`). Reference: `wiki/sync/hub.md` (Jobs).
 //!
 //! - A job is a row of the "AI tasks" database ([`vault_mcp::jobs`]) with
 //!   node `hub`. Its owner is the principal that created it

@@ -5,7 +5,6 @@ import 'dart:convert';
 import '../core/clock.dart';
 import '../core/models.dart';
 import '../core/vault.dart';
-import '../ui/app_name.dart';
 import '../ui/database/values.dart';
 
 const gettingStartedTitle = 'Getting started';
@@ -15,7 +14,7 @@ BOp _block(String id, String? after, String kind, String text, {bool checked = f
 
 List<BOp> gettingStartedOps() {
   final spec = <(String, String, bool)>[
-    (Kinds.paragraph, 'Welcome to $appName. Everything here is saved on this device as you type.', false),
+    (Kinds.paragraph, 'Everything here is saved on this device as you type.', false),
     (Kinds.heading2, 'The basics', false),
     (Kinds.todo, 'Click anywhere and just start typing', false),
     (Kinds.todo, 'Type / for headings, lists, to-dos, quotes, code and dividers', false),
@@ -26,11 +25,11 @@ List<BOp> gettingStartedOps() {
     (Kinds.todo, 'Type @ or [[ and a page name to link it.', false),
     (Kinds.todo, 'Pages that link here are listed at the bottom.', false),
     (Kinds.todo, 'Pages open on top of each other. Click the edge on the left, or press Esc, to go back.', false),
-    (Kinds.heading2, 'Databases', false),
-    (Kinds.paragraph, 'Tasks and Calendar are databases: every row is a page with properties.', false),
-    (Kinds.todo, 'Switch views (Table, Board, Calendar) with the tabs above.', false),
-    (Kinds.todo, 'Add a property with the + at the end of the header.', false),
-    (Kinds.todo, 'Type /database to make your own.', false),
+    (Kinds.heading2, 'Pages inside pages', false),
+    (Kinds.paragraph, 'Any page can hold other pages. Tasks and Calendar are pages too: each task and event is a page inside them.', false),
+    (Kinds.todo, 'Type /view to list the pages inside a page. Choose List, Table, Board or Calendar in the view’s menu.', false),
+    (Kinds.todo, 'Switch between a page’s views with the tabs above them.', false),
+    (Kinds.todo, 'Add a property such as Status or Due to one page, then add it to the pages next to it.', false),
     (Kinds.heading2, 'Plan your day with Today', false),
     (
       Kinds.paragraph,
@@ -39,7 +38,7 @@ List<BOp> gettingStartedOps() {
     ),
     (
       Kinds.paragraph,
-      'Give any to-do a date by typing @today or @tomorrow, or choose Set date in its block menu. It will appear in Today alongside the Tasks and Calendar databases.',
+      'Give any to-do a date by typing @today or @tomorrow, or choose Set date in its block menu. It will appear in Today alongside Tasks and Calendar.',
       false,
     ),
     (
@@ -60,6 +59,21 @@ List<BOp> gettingStartedOps() {
 
 PropDef _def(String name, PropKind kind, {List<SelectOption> options = const [], String config = ''}) =>
     PropDef(key: '', name: name, kind: kind, options: options, config: config);
+
+/// Replaces the saved views a new collection starts with by view blocks on
+/// the page, in order, so the page needs no migration when it opens.
+Future<void> seedViewBlocks(Vault vault, String page, List<ViewDef> views) async {
+  for (final v in await vault.run((x) => x.listViews(collection: page))) {
+    await vault.run((x) => x.deleteView(collection: page, viewId: v.id), writes: true);
+  }
+  String? after;
+  for (final v in views) {
+    final block = newId();
+    final prev = after;
+    await vault.run((x) => x.insertViewBlock(pageId: page, id: block, after: prev, view: v), writes: true);
+    after = block;
+  }
+}
 
 /// The starter Tasks schema and views, also used by the demo seed.
 Future<String> createTasksDatabase(Vault vault, {String? parent, bool sampleRows = true}) async {
@@ -89,21 +103,10 @@ Future<String> createTasksDatabase(Vault vault, {String? parent, bool sampleRows
   );
   final status = schema.firstWhere((d) => d.name == 'Status');
   final due = schema.firstWhere((d) => d.name == 'Due');
-  final views = await vault.run((v) => v.listViews(collection: id));
-  await vault.run(
-    (v) => v.updateView(
-      collection: id,
-      view: views.first.copyWith(name: 'Table', visibleProps: [status.key, due.key]),
-    ),
-    writes: true,
-  );
-  await vault.run(
-    (v) => v.addView(
-      collection: id,
-      view: ViewDef(id: '', name: 'Board', kind: ViewKind.board, sorts: const [], groupBy: status.key, visibleProps: [due.key], config: ''),
-    ),
-    writes: true,
-  );
+  await seedViewBlocks(vault, id, [
+    ViewDef(id: '', name: 'Table', kind: ViewKind.table, sorts: const [], visibleProps: [status.key, due.key], config: ''),
+    ViewDef(id: '', name: 'Board', kind: ViewKind.board, sorts: const [], groupBy: status.key, visibleProps: [due.key], config: ''),
+  ]);
   await vault.setIcon(id, '☑️');
   if (sampleRows) {
     final today = Day.of(clockNow());
@@ -122,22 +125,10 @@ Future<String> createCalendarDatabase(Vault vault, {String? parent, bool sampleR
   await vault.run((v) => v.makeCollection(page: id), writes: true);
   final schema = await vault.run((v) => v.setSchema(collection: id, schema: [_def('When', PropKind.date)]), writes: true);
   final when = schema.single.key;
-  final views = await vault.run((v) => v.listViews(collection: id));
-  await vault.run(
-    (v) => v.updateView(
-      collection: id,
-      view: views.first.copyWith(name: 'Table', visibleProps: [when]),
-    ),
-    writes: true,
-  );
-  final calendar = await vault.run(
-    (v) => v.addView(
-      collection: id,
-      view: ViewDef(id: '', name: 'Calendar', kind: ViewKind.calendar, sorts: const [], dateProp: when, visibleProps: const [], config: ''),
-    ),
-    writes: true,
-  );
-  await vault.run((v) => v.moveView(collection: id, viewId: calendar, index: 0), writes: true);
+  await seedViewBlocks(vault, id, [
+    ViewDef(id: '', name: 'Calendar', kind: ViewKind.calendar, sorts: const [], dateProp: when, visibleProps: const [], config: ''),
+    ViewDef(id: '', name: 'Table', kind: ViewKind.table, sorts: const [], visibleProps: [when], config: ''),
+  ]);
   await vault.setIcon(id, '📅');
   if (sampleRows) {
     final now = clockNow();
@@ -158,4 +149,30 @@ Future<String> createGettingStarted(Vault vault, {bool createTasks = true}) asyn
   if (createTasks) await createTasksDatabase(vault);
   await createCalendarDatabase(vault);
   return id;
+}
+
+/// Boot-time starter pages for a fresh vault. Without a hub they are created
+/// now; with one configured they wait for [seedStarterPagesAfterPull].
+Future<bool> seedStarterPagesAtBoot(Vault vault, {required bool syncing, bool createTasks = true}) async {
+  if (syncing) return false;
+  await createGettingStarted(vault, createTasks: createTasks);
+  await vault.flush();
+  return true;
+}
+
+/// Whether the sidebar shows any page. Hidden system pages (nodes, calendars,
+/// feedback) are not top-level, and device node records are children of the
+/// nodes page, so none of them count.
+Future<bool> _hasVisiblePages(Vault vault) async => (await vault.listChildren(null, limit: 1)).isNotEmpty;
+
+/// Creates the starter pages once [firstPull] succeeds, and only if the vault
+/// still shows no pages, so synced pages are never joined by a second set. A
+/// pull that fails seeds nothing this launch.
+Future<bool> seedStarterPagesAfterPull(Vault vault, Future<bool> firstPull, {bool createTasks = true}) async {
+  if (!await firstPull) return false;
+  await vault.flush();
+  if (await _hasVisiblePages(vault)) return false;
+  await createGettingStarted(vault, createTasks: createTasks);
+  await vault.flush();
+  return true;
 }

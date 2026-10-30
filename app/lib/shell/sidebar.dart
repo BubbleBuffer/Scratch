@@ -25,6 +25,7 @@ import '../addons/agent/api.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/sync/conflicts.dart' show ConflictRailGroup;
 import '../features/trash/trash_panel.dart';
+import '../features/updates/updates_settings.dart' show UpdateRailRow;
 import '../state/app_state.dart';
 import '../state/tree_store.dart';
 import '../state/pages_store.dart';
@@ -62,7 +63,8 @@ bool _standsInForSidebar(BuildContext context) {
 
 /// Semantic label for the feedback buttons. Their visible tooltip is AppTooltip
 /// with "Send feedback" and the shortcut from the registry (command feedback.send).
-const feedbackButtonLabel = 'Send feedback (Ctrl+Shift+F)';
+String get feedbackButtonLabel =>
+    'Send feedback (${shortcutHint('Ctrl+Shift+F')})';
 
 /// Runs the `feedback.send` command (the feedback sheet).
 void sendFeedback(BuildContext context) =>
@@ -695,6 +697,7 @@ class _SidebarState extends State<Sidebar> {
                       ),
                     ),
                     const ConflictRailGroup(),
+                    const UpdateRailRow(),
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -924,7 +927,7 @@ class _NavRowState extends State<_NavRow> {
                 Opacity(
                   opacity: 0.7,
                   child: Text(
-                    'Ctrl K',
+                    shortcutHint('Ctrl K'),
                     style: ts(
                       const TypeSpec(11, 15, 400),
                       c.railMuted,

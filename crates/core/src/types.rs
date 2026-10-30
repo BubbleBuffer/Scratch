@@ -277,9 +277,10 @@ pub struct Block {
     pub children: Vec<Block>,
     /// What the block points at: the page of a `LinkToPage`, the attachment
     /// of an `Image` or `File`, the URL of a `Bookmark`, or the fence info
-    /// string (language and optional flags) of a `Code` block. Set with
-    /// [`BlockOp::SetTarget`]. For these kinds `text` is the caption (for a
-    /// `File`, its display name).
+    /// string (language and optional flags) of a `Code` block, or the source
+    /// page of a `View` (None means the containing page). Set with
+    /// [`BlockOp::SetTarget`]. Link and media blocks use `text` as their
+    /// caption (for a `File`, its display name); a view stores settings JSON.
     #[serde(default)]
     pub target: Option<String>,
     /// Text or background colour of the whole block, by name:
@@ -291,6 +292,11 @@ pub struct Block {
     /// None for the full width. Set with [`BlockOp::SetWidth`].
     #[serde(default)]
     pub width: Option<u32>,
+    /// Starting number of a numbered-list run, on its first item only.
+    /// None means 1; following items continue the run. Set with
+    /// [`BlockOp::SetNumberedStart`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub numbered_start: Option<u32>,
 }
 
 // Keep variants, wire names and the exhaustive built-in test list together.
@@ -375,6 +381,10 @@ block_kinds! {
     /// the block has no children and contributes no body text to search.
     #[serde(rename = "query")]
     Query => "query",
+    /// A saved contents view. `target` is the source page id (None means
+    /// this page); `text` holds ViewDef JSON with `source: "contents"`.
+    #[serde(rename = "view")]
+    View => "view",
 }
 
 /// An inline mark. `start` and `end` count Unicode scalar values (Rust
@@ -494,6 +504,11 @@ pub enum BlockOp {
     SetWidth {
         id: BlockId,
         width: Option<u32>,
+    },
+    /// Sets a numbered-list run's first number; None or 1 clears it.
+    SetNumberedStart {
+        id: BlockId,
+        numbered_start: Option<u32>,
     },
 }
 
@@ -1317,6 +1332,7 @@ mod chat_ref_tests {
             target: Some(target.into()),
             color: None,
             width: None,
+            numbered_start: None,
         };
         assert_eq!(BlockKind::ChatRef.as_str(), "chat_ref");
         assert_eq!(BlockKind::parse("chat_ref"), BlockKind::ChatRef);

@@ -377,8 +377,10 @@ class _PageStackChromeState extends State<PageStackChrome> {
   @override
   Widget build(BuildContext context) {
     if (context.mobile) return widget.child;
+    // No store scope before the vault opens: there is no pile to show yet.
+    final tree = context.maybeWatch<TreeStore>();
+    if (tree == null) return widget.child;
     final stack = PageStackScope.of(context);
-    final tree = context.watch<TreeStore>();
     final pages = context.watch<PagesStore>();
     final rail = tree.sidebarCollapsed ? 0.0 : tree.sidebarWidth;
     final c = context.colors;
@@ -478,10 +480,16 @@ class _PageStackChromeState extends State<PageStackChrome> {
           ],
           if (_fan && showPile) ...[
             Positioned.fill(
-              child: GestureDetector(
+              // A Listener, not a GestureDetector: a tap recognizer here is the
+              // top entry in the gesture arena and would reject the tap that
+              // the button underneath (the sidebar's feedback button, say)
+              // needs. The barrier closes on pointer down and lets the hit
+              // through, so that button's own tap still fires.
+              child: Listener(
                 key: const ValueKey('stack-fan-barrier'),
-                behavior: HitTestBehavior.opaque,
-                onTap: _closeFan,
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (_) => _closeFan(),
+                child: const SizedBox.expand(),
               ),
             ),
             Positioned(

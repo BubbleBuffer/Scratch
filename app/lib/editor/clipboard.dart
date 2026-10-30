@@ -136,6 +136,16 @@ List<Node> markdownToNodes(String md) {
     while (stack.isNotEmpty && stack.last.$1 >= indent) {
       stack.removeLast();
     }
+    if (n.kind == Kinds.numbered) {
+      // A run's first item keeps its typed number when that isn't one; the
+      // items after it continue the run and store nothing.
+      final typed = int.tryParse(_numbered.firstMatch(body)?.group(1) ?? '');
+      final siblings = stack.isEmpty ? roots : stack.last.$2.children;
+      final startsRun = siblings.isEmpty || siblings.last.kind != Kinds.numbered;
+      if (typed != null && typed != 1 && typed <= maxNumberedStart && startsRun) {
+        n.numberedStart = typed;
+      }
+    }
     if (stack.isEmpty) {
       roots.add(n);
     } else {
@@ -147,7 +157,7 @@ List<Node> markdownToNodes(String md) {
   return roots;
 }
 
-final _numbered = RegExp(r'^\d+[.)] ');
+final _numbered = RegExp(r'^(\d+)[.)] ');
 final _media = RegExp(r'^(!?)\[([^\]]*)\]\(([^)]*)\)$');
 
 /// Reads the core's annotated embed fallback without copying its title into

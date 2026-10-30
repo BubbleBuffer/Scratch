@@ -64,6 +64,13 @@ class AppSettings extends ChangeNotifier {
   /// Phones: a shake opens the feedback sheet. Device-local, on by default.
   bool shakeToSend = true;
 
+  /// Windows updates: also offer nightly builds. Off by default.
+  bool updatesIncludeNightly = false;
+
+  /// Windows updates: download a new version in the background (it is only
+  /// installed on the user's click). On by default.
+  bool updatesAutoDownload = true;
+
   String hubAddress = defaultHubAddress;
 
   /// The hub this device syncs with, and its pairing token.
@@ -124,6 +131,8 @@ class AppSettings extends ChangeNotifier {
     scheduleRunsHere = (j['scheduleRunsHere'] as bool?) ?? false;
     hubUsesThisComputer = (j['hubUsesThisComputer'] as bool?) ?? false;
     shakeToSend = (j['shakeToSend'] as bool?) ?? true;
+    updatesIncludeNightly = (j['updatesIncludeNightly'] as bool?) ?? false;
+    updatesAutoDownload = (j['updatesAutoDownload'] as bool?) ?? true;
     hubAddress = (j['hubAddress'] as String?) ?? defaultHubAddress;
     clientUrl = j['clientUrl'] as String?;
     clientToken = j['clientToken'] as String?;
@@ -165,6 +174,8 @@ class AppSettings extends ChangeNotifier {
     'scheduleRunsHere': scheduleRunsHere,
     'hubUsesThisComputer': hubUsesThisComputer,
     'shakeToSend': shakeToSend,
+    'updatesIncludeNightly': updatesIncludeNightly,
+    'updatesAutoDownload': updatesAutoDownload,
     'hubAddress': hubAddress,
     'clientUrl': ?clientUrl,
     'clientToken': ?clientToken,

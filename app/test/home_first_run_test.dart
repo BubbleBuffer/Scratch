@@ -67,7 +67,7 @@ void main() {
   });
 
   group('/ menu', () {
-    test('leads with the everyday blocks, Database and Callout early', () {
+    test('leads with the everyday blocks, View and Callout early', () {
       registerBuiltins();
       final labels = [for (final t in blockRegistry.filter('')) t.menuLabel];
       expect(labels.take(17).toList(), [
@@ -79,7 +79,7 @@ void main() {
         'Heading 3',
         'Bulleted list',
         'Numbered list',
-        'Database',
+        'View',
         'Callout',
         'Quote',
         'Divider',
@@ -94,12 +94,12 @@ void main() {
 
     test('filtered entries sit under one Results header', () {
       registerBuiltins();
-      final hits = blockRegistry.filter('data');
-      expect(hits.map((t) => t.kind), contains('database'));
+      final hits = blockRegistry.filter('view');
+      expect(hits.map((t) => t.kind), contains('view'));
       expect(hits.every((t) => t.group == BlockRegistry.resultsGroup), isTrue);
       expect(BlockRegistry.resultsGroup, 'Results');
       // The registered types keep their own sections.
-      expect(blockRegistry.of('database').group, 'Basic blocks');
+      expect(blockRegistry.of('view').group, 'Basic blocks');
     });
 
     appTest('the menu shows Results while filtering', (tester) async {
@@ -121,7 +121,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      await typeText(tester, 'data');
+      await typeText(tester, 'view');
       expect(
         find.descendant(of: key('slash-menu'), matching: find.text('Results')),
         findsOneWidget,
@@ -133,7 +133,7 @@ void main() {
         ),
         findsNothing,
       );
-      expect(key('slash-database'), findsOneWidget);
+      expect(key('slash-view'), findsOneWidget);
     });
   });
 

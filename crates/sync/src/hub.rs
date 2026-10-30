@@ -2,8 +2,18 @@
 //! transport-free [`HubRequest`]; [`Hub::serve`] runs it over plain HTTP
 //! (tiny_http), one thread per request.
 //!
-//! Routes (all but `/health` need `Authorization: Bearer <token>` and the
-//! client vault's device id in `X-Device`):
+//! Device keys (`wiki/sync/device-keys.md`), all `POST` with JSON:
+//! - `/auth/challenge` -> `{nonce}`: 32 random bytes (hex), single use, 60 s
+//! - `/auth/session` [`SessionProof`] -> `{session, expires_in}`, when the
+//!   device's entry holds that public key and the proof verifies
+//! - `/auth/upgrade`: the legacy device token as the bearer plus a proof;
+//!   binds the key to that token's entry and returns a session
+//! - `/auth/pair` `{code, device, pubkey, key_id}` -> `{token, label}`:
+//!   redeems a one-time pairing code ([`Hub::pair`]) for a key-bound entry
+//!
+//! Routes (all others but `/health` need `Authorization: Bearer <token>`
+//! and the client vault's device id in `X-Device`; the bearer is a session
+//! token, or a device token whose entry is not key-bound yet):
 //! - `POST /sync`: [`SyncRequest`] -> [`SyncResponse`]
 //! - `POST /push`: [`PushRequest`] -> [`PushResponse`]
 //! - `GET /changes?since=<epoch>:<seq>&wait=<ms>`: long-poll ->
@@ -28,14 +38,19 @@ use std::time::{Duration, Instant};
 use tiny_http::{Header, Request, Response, Server};
 use vault_core::{version_includes, Change, PageId, PageUpdate, Vault, VaultError};
 
-use crate::auth::{PairedDevice, Tokens};
+use bubblebuffer_device_key::{DeviceId, RelayProof};
+
+use crate::auth::{BoundKey, PairedDevice, Tokens};
+use crate::device_key::{SessionProof, PROOF_LABEL, PROOF_ROLE};
 use crate::encoding;
+use crate::keys::{host_origin, origin_of, KeyAuth, KeyPolicy};
 use crate::wire::{
     ChangesResponse, PageBytes, PushRequest, PushRequestV2, PushResponse, SyncRequest,
     SyncRequestV2, SyncResponse, SyncResponseV2, PURGE_PROTOCOL,
 };
 use crate::{
-    pct_decode, pct_encode, random_u64, Result, SyncError, DEVICE_HEADER, NAME_HEADER,
+    hex_decode, hex_encode, pct_decode, pct_encode, random_u64, Result, SyncError,
+    DEVICE_HEADER, DEVICE_KEYS_CAPABILITY, DEVICE_KEYS_CAPABILITY_HEADER, NAME_HEADER,
     PURGE_CAPABILITY, PURGE_CAPABILITY_HEADER, PURGE_DEVICE_CAPABILITY,
     PURGE_DEVICE_CAPABILITY_HEADER,
 };
@@ -46,12 +61,17 @@ const MAX_BODY: u64 = 512 << 20;
 const MAX_WAIT_MS: u64 = 60_000;
 /// Budget of a sync response when the request sets none.
 const DEFAULT_BUDGET: u64 = 8 << 20;
+/// Largest `/auth/*` body.
+const MAX_AUTH_BODY: u64 = 64 << 10;
 
 /// A hub serving one vault. Create it with [`Hub::new`], pair devices with
 /// [`Hub::pair`] and start serving with [`Hub::serve`].
 pub struct Hub {
     vault: Arc<Vault>,
     tokens: Tokens,
+    keys: KeyAuth,
+    /// Test hook: pairing code lifetime (ms); None is 10 minutes.
+    pair_code_ttl_ms: std::sync::Mutex<Option<i64>>,
     epoch: u64,
     device: String,
 }
@@ -225,6 +245,27 @@ fn purge_device_flag(headers: &[(String, String)]) -> Result<bool> {
     }
 }
 
+/// `N` bytes from hex, or 400 naming `what`.
+fn hex_array<const N: usize>(text: &str, what: &str) -> Result<[u8; N]> {
+    hex_decode(text.trim())
+        .and_then(|b| <[u8; N]>::try_from(b).ok())
+        .ok_or_else(|| SyncError::Status(400, format!("bad {what}")))
+}
+
+/// A public key (32 bytes, hex) and its key id, checked to belong
+/// together; the id in its canonical form.
+fn bound_key(pubkey: &str, key_id: &str) -> Result<BoundKey> {
+    let public: [u8; 32] = hex_array(pubkey, "pubkey")?;
+    let id = DeviceId::parse(key_id.trim()).map_err(|_| SyncError::Status(400, "bad key_id".into()))?;
+    if id != DeviceId::from_public_key(&public) {
+        return Err(SyncError::Status(400, "key_id is not this public key's".into()));
+    }
+    Ok(BoundKey {
+        pubkey: hex_encode(&public),
+        key_id: id.to_string(),
+    })
+}
+
 fn not_found(e: VaultError) -> SyncError {
     match e {
         VaultError::NotFound(m) => SyncError::Status(404, m),
@@ -241,6 +282,8 @@ impl Hub {
             device: vault.device_id(),
             vault,
             tokens,
+            keys: KeyAuth::new(),
+            pair_code_ttl_ms: std::sync::Mutex::new(None),
             epoch: random_u64()?,
         }))
     }
@@ -249,29 +292,95 @@ impl Hub {
         &self.vault
     }
 
-    /// Creates a pairing token for a device named `label`. The token is
-    /// shown once (only its hash is stored); the device's `SyncClient`
-    /// uses it.
+    /// Creates a one-time pairing code for a device named `label` (shown
+    /// once; only its hash is stored). It is redeemable once, for 10
+    /// minutes, at `POST /auth/pair` with the new device's public key,
+    /// which returns the device's token, already key-bound.
     pub fn pair(&self, label: &str) -> Result<String> {
-        self.tokens.pair(label)
+        let ttl = *self.pair_code_ttl_ms.lock().unwrap_or_else(|p| p.into_inner());
+        self.tokens.pair(label, ttl)
+    }
+
+    /// The old pairing: a long-lived device token, not key-bound (a
+    /// `SyncClient` upgrades it on its first sync). Tests and benchmarks.
+    #[doc(hidden)]
+    pub fn pair_legacy_token(&self, label: &str) -> Result<String> {
+        self.tokens.pair_legacy(label)
+    }
+
+    /// Test hook: how long pairing codes stay redeemable.
+    #[doc(hidden)]
+    pub fn set_pair_code_ttl(&self, ttl: Duration) {
+        *self.pair_code_ttl_ms.lock().unwrap_or_else(|p| p.into_inner()) = Some(ttl.as_millis() as i64);
+    }
+
+    /// Test hook: challenge nonce and session lifetimes (60 s and 1 h).
+    #[doc(hidden)]
+    pub fn set_auth_ttls(&self, nonce: Duration, session: Duration) {
+        self.keys.set_ttls(nonce, session);
+    }
+
+    /// Test hook: forgets every session and challenge, as a restart does.
+    #[doc(hidden)]
+    pub fn drop_sessions(&self) {
+        self.keys.drop_all();
+    }
+
+    /// The origin proofs must name, and whether unbound device tokens are
+    /// refused.
+    pub fn set_key_policy(&self, policy: KeyPolicy) {
+        self.keys.set_policy(policy);
+    }
+
+    pub fn key_policy(&self) -> KeyPolicy {
+        self.keys.policy()
     }
 
     /// After a login: a token for the vault with device id `device`,
     /// named `name` (made unique with a ` (2)`-style suffix), replacing the
-    /// device's earlier tokens. Returns the token (shown once) and the
-    /// label used.
+    /// device's earlier tokens and ending their sessions. Returns the token
+    /// (shown once) and the label used.
     pub fn login_device(&self, device: &str, name: &str) -> Result<(String, String)> {
-        self.tokens.login(name, device, &self.device)
+        let made = self.tokens.login(name, device, &self.device)?;
+        self.keys.drop_device(device);
+        Ok(made)
     }
 
-    /// Drops `token` (a device signing out). Returns whether it existed.
+    /// Binds the public key `pubkey` (32 bytes, hex) with id `key_id` to
+    /// the entry of `token`, used by `device`: the entry is key-bound from
+    /// then on. Refused when it is already.
+    pub fn bind_device_key(&self, token: &str, device: &str, pubkey: &str, key_id: &str) -> Result<()> {
+        let key = bound_key(pubkey, key_id)?;
+        self.tokens.bind_key(token, device, &self.device, &key)?;
+        self.keys.drop_device(device);
+        Ok(())
+    }
+
+    /// Drops `token` (a device signing out) and ends the device's
+    /// sessions. A key-bound entry's token works here too. Returns whether
+    /// it existed.
     pub fn sign_out(&self, token: &str) -> Result<bool> {
-        self.tokens.revoke(token)
+        Ok(self.sign_out_device(token)?.is_some())
     }
 
-    /// Revokes the tokens labelled `label`; returns how many.
+    /// Like [`Hub::sign_out`]: None for an unknown token, else the device
+    /// the token was bound to (if it was used yet), so its sockets can end.
+    pub fn sign_out_device(&self, token: &str) -> Result<Option<Option<String>>> {
+        let revoked = self.tokens.revoke(token)?;
+        if let Some(Some(d)) = &revoked {
+            self.keys.drop_device(d);
+        }
+        Ok(revoked)
+    }
+
+    /// Revokes the tokens labelled `label`, ending their devices'
+    /// sessions; returns how many.
     pub fn unpair(&self, label: &str) -> Result<usize> {
-        self.tokens.unpair(label)
+        let (n, devices) = self.tokens.unpair(label)?;
+        for d in devices {
+            self.keys.drop_device(&d);
+        }
+        Ok(n)
     }
 
     pub fn devices(&self) -> Vec<PairedDevice> {
@@ -381,7 +490,19 @@ impl Hub {
                 PURGE_DEVICE_CAPABILITY_HEADER.into(),
                 PURGE_DEVICE_CAPABILITY.into(),
             ));
+            response.headers.push((
+                DEVICE_KEYS_CAPABILITY_HEADER.into(),
+                DEVICE_KEYS_CAPABILITY.into(),
+            ));
             return Ok(response);
+        }
+        if method == "POST"
+            && matches!(
+                path.as_str(),
+                "/auth/challenge" | "/auth/session" | "/auth/upgrade" | "/auth/pair"
+            )
+        {
+            return self.auth_route(&path, req);
         }
         // The bounce page for `notes://` links: public, like /health, and
         // one segment only (the same route as notes-hub's axum router).
@@ -400,7 +521,7 @@ impl Hub {
             .trim()
             .to_string();
         let device = req.header(DEVICE_HEADER).unwrap_or("").to_string();
-        measure!("hub.auth.check", self.tokens.check(&token, &device, &self.device)?);
+        measure!("hub.auth.check", self.authorize(&token, &device)?);
         // The negotiation is checked before any body is read or decoded.
         match (method.as_str(), path.as_str()) {
             ("POST", "/sync") => {
@@ -459,6 +580,135 @@ impl Hub {
             }
             _ => Err(SyncError::Status(404, format!("no route {method} {path}"))),
         }
+    }
+
+    /// A request's bearer and device: a live session of that device, or a
+    /// device token whose entry is not key-bound (and, with
+    /// `require_device_keys`, none).
+    fn authorize(&self, token: &str, device: &str) -> Result<()> {
+        if let Some(verdict) = self.keys.check_session(token, device) {
+            let pubkey = verdict?;
+            // tokens.json may have changed under a running hub (an unpair
+            // from the CLI, a re-pair with a new key): a session lives only
+            // while its device stays bound to the key that bought it.
+            let bound = self.tokens.key_of(device)?;
+            if !bound.is_some_and(|b| crate::ct_eq(b.pubkey.as_bytes(), pubkey.as_bytes())) {
+                self.keys.drop_device(device);
+                return Err(SyncError::Status(401, "this device is no longer paired".into()));
+            }
+            return Ok(());
+        }
+        let require = self.keys.policy().require_device_keys;
+        self.tokens.check(token, device, &self.device, require)
+    }
+
+    fn auth_route(&self, path: &str, mut req: HubRequest<'_>) -> Result<HubResponse> {
+        let json = |v: serde_json::Value| HubResponse {
+            status: 200,
+            content_type: "application/json".into(),
+            headers: vec![("Cache-Control".into(), "no-store".into())],
+            body: v.to_string().into_bytes(),
+        };
+        if path == "/auth/challenge" {
+            let nonce = self.keys.challenge()?;
+            return Ok(json(serde_json::json!({ "nonce": hex_encode(&nonce) })));
+        }
+        if req.body_len.is_some_and(|n| n > MAX_AUTH_BODY) {
+            return Err(SyncError::Status(413, "request too large".into()));
+        }
+        let mut body = Vec::new();
+        (&mut req.body).take(MAX_AUTH_BODY + 1).read_to_end(&mut body)?;
+        if body.len() as u64 > MAX_AUTH_BODY {
+            return Err(SyncError::Status(413, "request too large".into()));
+        }
+        let bad = |e: serde_json::Error| SyncError::Status(400, format!("bad request: {e}"));
+        match path {
+            "/auth/pair" => {
+                #[derive(serde::Deserialize)]
+                struct PairBody {
+                    code: String,
+                    device: String,
+                    pubkey: String,
+                    key_id: String,
+                }
+                let b: PairBody = serde_json::from_slice(&body).map_err(bad)?;
+                let key = bound_key(&b.pubkey, &b.key_id)?;
+                let (token, label) = self.tokens.redeem_code(b.code.trim(), &b.device, &self.device, &key)?;
+                // A new key for this device id: its earlier sessions end.
+                self.keys.drop_device(&b.device);
+                Ok(json(serde_json::json!({ "token": token, "label": label })))
+            }
+            "/auth/session" | "/auth/upgrade" => {
+                let proof: SessionProof = serde_json::from_slice(&body).map_err(bad)?;
+                let (key, nonce) = self.verify_proof(&proof, req.header("Host"))?;
+                if path == "/auth/upgrade" {
+                    let token = req
+                        .header("Authorization")
+                        .and_then(|v| v.strip_prefix("Bearer "))
+                        .map(str::trim)
+                        .filter(|t| !t.is_empty())
+                        .ok_or_else(|| SyncError::Status(401, "missing token".into()))?
+                        .to_string();
+                    if self.keys.policy().require_device_keys {
+                        return Err(SyncError::Status(
+                            401,
+                            "this hub requires device keys; sign in or pair this device again".into(),
+                        ));
+                    }
+                    self.tokens.bind_key(&token, &proof.device, &self.device, &key)?;
+                    self.keys.drop_device(&proof.device);
+                } else {
+                    let bound = self.tokens.key_of(&proof.device)?;
+                    let matches = bound.is_some_and(|b| {
+                        crate::ct_eq(b.pubkey.as_bytes(), key.pubkey.as_bytes())
+                    });
+                    if !matches {
+                        return Err(SyncError::Status(
+                            401,
+                            "this key is not bound to this device".into(),
+                        ));
+                    }
+                }
+                // Recorded only now, after the proof is verified and
+                // authorized, so unauthenticated callers can't grow the set.
+                if !self.keys.use_nonce(&nonce)? {
+                    return Err(SyncError::Status(401, "this challenge was used already".into()));
+                }
+                let (session, expires_in) = self.keys.create_session(&proof.device, &key.pubkey)?;
+                Ok(json(serde_json::json!({ "session": session, "expires_in": expires_in })))
+            }
+            _ => Err(SyncError::Status(404, format!("no route POST {path}"))),
+        }
+    }
+
+    /// Checks a session proof: the origin this hub answers at, a live
+    /// challenge this hub issued and the signature. Returns the key it
+    /// proves and the nonce; the caller records the nonce as used once the
+    /// proof is also authorized.
+    fn verify_proof(&self, p: &SessionProof, host: Option<&str>) -> Result<(BoundKey, [u8; 32])> {
+        let refused = |m: &str| SyncError::Status(401, m.to_string());
+        let nonce: [u8; 32] = hex_array(&p.nonce, "nonce")?;
+        if !self.keys.nonce_is_live(&nonce) {
+            return Err(refused("unknown or expired challenge"));
+        }
+        let origin_ok = match &self.keys.policy().public_url {
+            Some(url) => origin_of(url).is_some_and(|o| o == p.origin),
+            None => host.is_some_and(|h| {
+                ["http", "https"]
+                    .iter()
+                    .any(|s| host_origin(s, h).is_some_and(|o| o == p.origin))
+            }),
+        };
+        if !origin_ok {
+            return Err(refused("the proof names another origin"));
+        }
+        let key = bound_key(&p.pubkey, &p.key_id)?;
+        let pubkey: [u8; 32] = hex_array(&p.pubkey, "pubkey")?;
+        let sig: [u8; 64] = hex_array(&p.sig, "sig")?;
+        let id = DeviceId::parse(&key.key_id).map_err(|_| SyncError::Status(400, "bad key_id".into()))?;
+        RelayProof::verify(PROOF_LABEL, PROOF_ROLE, &p.origin, nonce, id, pubkey, sig)
+            .map_err(|_| refused("the proof does not verify"))?;
+        Ok((key, nonce))
     }
 
     /// The hub's current change feed position.

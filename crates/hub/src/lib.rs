@@ -2,7 +2,7 @@
 //! [`vault_sync::Hub::handle`], and device tokens issued after an OIDC
 //! login (Authentik), behind a TLS proxy (Caddy).
 //!
-//! Routes, config and the login sequence: `wiki/architecture/hub.md`.
+//! Routes, config and the login sequence: `wiki/sync/hub.md`.
 
 pub mod agent;
 mod agent_token_api;
@@ -77,7 +77,13 @@ pub fn open_hub(config: &Config) -> Result<Arc<Hub>, String> {
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let vault = Vault::open(dir.to_string_lossy().into_owned())
         .map_err(|e| format!("open vault {}: {e}", dir.display()))?;
-    Hub::new(Arc::new(vault)).map_err(|e| e.to_string())
+    let hub = Hub::new(Arc::new(vault)).map_err(|e| e.to_string())?;
+    // Session proofs name the public URL's origin; without one, the Host.
+    hub.set_key_policy(vault_sync::KeyPolicy {
+        public_url: Some(config.public_url.trim().to_string()).filter(|u| !u.is_empty()),
+        require_device_keys: config.require_device_keys,
+    });
+    Ok(hub)
 }
 
 /// A running `notes-hub`.
@@ -336,6 +342,10 @@ fn router(state: Arc<AppState>) -> Router {
                         (
                             vault_sync::PURGE_DEVICE_CAPABILITY_HEADER,
                             vault_sync::PURGE_DEVICE_CAPABILITY,
+                        ),
+                        (
+                            vault_sync::DEVICE_KEYS_CAPABILITY_HEADER,
+                            vault_sync::DEVICE_KEYS_CAPABILITY,
                         ),
                     ],
                     "notes-hub",

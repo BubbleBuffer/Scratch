@@ -399,7 +399,10 @@ fn own_ops(current: &Block, target: &Block) -> Vec<crate::types::BlockOp> {
         ops.push(BlockOp::SetColor { id: id.clone(), color: target.color.clone() });
     }
     if current.width != target.width {
-        ops.push(BlockOp::SetWidth { id, width: target.width });
+        ops.push(BlockOp::SetWidth { id: id.clone(), width: target.width });
+    }
+    if current.numbered_start != target.numbered_start {
+        ops.push(BlockOp::SetNumberedStart { id, numbered_start: target.numbered_start });
     }
     ops
 }

@@ -14,7 +14,7 @@
 use flutter_rust_bridge::frb;
 
 use crate::agent_impl::Inner;
-use crate::api::types::FlatBlock;
+use crate::api::types::{FlatBlock, TrustedHubCertificate};
 use crate::api::vault::NotesVault;
 use crate::frb_generated::StreamSink;
 
@@ -403,6 +403,361 @@ pub struct AgentSchedulePreview {
     pub occurrences: Vec<AgentScheduleOccurrence>,
 }
 
+/// Read-only compacted history. Ranges use zero-based, half-open canonical message
+/// indices (before UI notice filtering). On overlap, compactable is false and
+/// segments is empty. Otherwise the final segment is always Messages, even empty.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompactedHistory {
+    pub compactable: bool,
+    pub boundary: u32,
+    pub message_count: u32,
+    /// Canonical index-to-ID map, including notices hidden by the UI.
+    pub message_ids: Vec<String>,
+    pub segments: Vec<HistorySegment>,
+}
+
+/// Canonical message indices: start inclusive, end exclusive.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MessageRange {
+    pub start: u32,
+    pub end: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LegacyCard {
+    pub id: String,
+    pub kind: LegacyKind,
+    pub title: Option<String>,
+    pub summary: String,
+    pub started_at: String,
+    pub ended_at: String,
+    pub first_message_id: String,
+    pub last_message_id: String,
+    pub range: MessageRange,
+    pub message_count: u32,
+}
+
+#[frb(non_opaque)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChapterCard {
+    pub id: String,
+    pub status: ChapterStatus,
+    pub title: String,
+    pub summary: Option<String>,
+    /// One-based part number and total parts for this chapter.
+    pub part: u32,
+    pub parts: u32,
+    pub started_at: String,
+    pub ended_at: String,
+    pub first_message_id: String,
+    pub last_message_id: String,
+    pub range: MessageRange,
+    /// Whole-chapter footer totals, present only on the last part.
+    pub message_count: Option<u32>,
+    pub episode_count: Option<u32>,
+    /// Closed-chapter metadata, populated only on the last part.
+    #[frb(default = "const []")]
+    pub decisions: Vec<String>,
+    #[frb(default = "const []")]
+    pub sections: Vec<ChapterSection>,
+    pub episodes: Vec<EpisodeCard>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChapterSection {
+    pub name: String,
+    /// One-based episode ordinals within the whole chapter, inclusive.
+    pub first_episode: u32,
+    pub last_episode: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpisodeCard {
+    pub id: String,
+    pub started_at: String,
+    pub ended_at: String,
+    pub first_message_id: String,
+    pub last_message_id: String,
+    pub range: MessageRange,
+    pub message_count: u32,
+    pub title: String,
+    pub gist: Option<String>,
+    pub actions: Vec<EpisodeAction>,
+    pub action_count: u32,
+    pub flagged_count: u32,
+    pub error_count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpisodeAction {
+    pub verb: String,
+    pub target: String,
+    pub target_kind: TargetKind,
+    pub change_marker: Option<String>,
+    pub point_of_interest: Option<PointOfInterest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PointOfInterest {
+    pub kind: String,
+    pub reason: String,
+}
+
+/// Exactly one card payload is present for its kind; Messages has neither.
+/// This tagged representation keeps the bridge's plain Dart DTO convention.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HistorySegment {
+    pub kind: HistorySegmentKind,
+    pub range: MessageRange,
+    pub legacy: Option<LegacyCard>,
+    pub chapter: Option<ChapterCard>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HistorySegmentKind {
+    LegacyCard,
+    ChapterCard,
+    Messages,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LegacyKind {
+    Checkpoint,
+    Chapter,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChapterStatus {
+    Open,
+    Closed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetKind {
+    Path,
+    Page,
+    Command,
+    Question,
+    Other,
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+mod compacted_from_core {
+    use super::*;
+    use vault_agent::compacted_history as core;
+
+    impl From<core::CompactedHistory> for CompactedHistory {
+        fn from(value: core::CompactedHistory) -> Self {
+            Self {
+                compactable: value.compactable,
+                boundary: u32::try_from(value.boundary)
+                    .expect("session exceeds bridge message index capacity"),
+                message_count: u32::try_from(value.message_count)
+                    .expect("session exceeds bridge message index capacity"),
+                message_ids: value.message_ids,
+                segments: value.segments.into_iter().map(Into::into).collect(),
+            }
+        }
+    }
+
+    impl From<core::MessageRange> for MessageRange {
+        fn from(value: core::MessageRange) -> Self {
+            Self {
+                start: u32::try_from(value.start)
+                    .expect("session exceeds bridge message index capacity"),
+                end: u32::try_from(value.end)
+                    .expect("session exceeds bridge message index capacity"),
+            }
+        }
+    }
+
+    impl From<core::LegacyCard> for LegacyCard {
+        fn from(value: core::LegacyCard) -> Self {
+            Self {
+                id: value.id,
+                kind: value.kind.into(),
+                title: value.title,
+                summary: value.summary,
+                started_at: value.started_at,
+                ended_at: value.ended_at,
+                first_message_id: value.first_message_id,
+                last_message_id: value.last_message_id,
+                range: value.range.into(),
+                message_count: u32::try_from(value.message_count)
+                    .expect("session exceeds bridge message index capacity"),
+            }
+        }
+    }
+
+    impl From<core::ChapterCard> for ChapterCard {
+        fn from(value: core::ChapterCard) -> Self {
+            Self {
+                id: value.id,
+                status: value.status.into(),
+                title: value.title,
+                summary: value.summary,
+                part: u32::try_from(value.part)
+                    .expect("session exceeds bridge message index capacity"),
+                parts: u32::try_from(value.parts)
+                    .expect("session exceeds bridge message index capacity"),
+                started_at: value.started_at,
+                ended_at: value.ended_at,
+                first_message_id: value.first_message_id,
+                last_message_id: value.last_message_id,
+                range: value.range.into(),
+                message_count: value.message_count.map(|count| {
+                    u32::try_from(count).expect("session exceeds bridge message index capacity")
+                }),
+                episode_count: value.episode_count.map(|count| {
+                    u32::try_from(count).expect("session exceeds bridge message index capacity")
+                }),
+                decisions: value.decisions,
+                sections: value.sections.into_iter().map(Into::into).collect(),
+                episodes: value.episodes.into_iter().map(Into::into).collect(),
+            }
+        }
+    }
+
+    impl From<core::ChapterSection> for ChapterSection {
+        fn from(value: core::ChapterSection) -> Self {
+            Self {
+                name: value.name,
+                first_episode: u32::try_from(value.first_episode)
+                    .expect("chapter exceeds bridge episode index capacity"),
+                last_episode: u32::try_from(value.last_episode)
+                    .expect("chapter exceeds bridge episode index capacity"),
+            }
+        }
+    }
+
+    impl From<core::EpisodeCard> for EpisodeCard {
+        fn from(value: core::EpisodeCard) -> Self {
+            Self {
+                id: value.id,
+                started_at: value.started_at,
+                ended_at: value.ended_at,
+                first_message_id: value.first_message_id,
+                last_message_id: value.last_message_id,
+                range: value.range.into(),
+                message_count: u32::try_from(value.message_count)
+                    .expect("session exceeds bridge message index capacity"),
+                title: value.title,
+                gist: value.gist,
+                actions: value.actions.into_iter().map(Into::into).collect(),
+                action_count: u32::try_from(value.action_count)
+                    .expect("session exceeds bridge message index capacity"),
+                flagged_count: u32::try_from(value.flagged_count)
+                    .expect("session exceeds bridge message index capacity"),
+                error_count: u32::try_from(value.error_count)
+                    .expect("session exceeds bridge message index capacity"),
+            }
+        }
+    }
+
+    impl From<core::EpisodeAction> for EpisodeAction {
+        fn from(value: core::EpisodeAction) -> Self {
+            Self {
+                verb: value.verb,
+                target: value.target,
+                target_kind: value.target_kind.into(),
+                change_marker: value.change_marker,
+                point_of_interest: value.point_of_interest.map(Into::into),
+            }
+        }
+    }
+
+    impl From<core::PointOfInterest> for PointOfInterest {
+        fn from(value: core::PointOfInterest) -> Self {
+            Self {
+                kind: value.kind,
+                reason: value.reason,
+            }
+        }
+    }
+
+    impl From<core::LegacyKind> for LegacyKind {
+        fn from(value: core::LegacyKind) -> Self {
+            match value {
+                core::LegacyKind::Checkpoint => Self::Checkpoint,
+                core::LegacyKind::Chapter => Self::Chapter,
+            }
+        }
+    }
+
+    impl From<core::ChapterStatus> for ChapterStatus {
+        fn from(value: core::ChapterStatus) -> Self {
+            match value {
+                core::ChapterStatus::Open => Self::Open,
+                core::ChapterStatus::Closed => Self::Closed,
+            }
+        }
+    }
+
+    impl From<core::TargetKind> for TargetKind {
+        fn from(value: core::TargetKind) -> Self {
+            match value {
+                core::TargetKind::Path => Self::Path,
+                core::TargetKind::Page => Self::Page,
+                core::TargetKind::Command => Self::Command,
+                core::TargetKind::Question => Self::Question,
+                core::TargetKind::Other => Self::Other,
+            }
+        }
+    }
+
+    impl From<core::HistorySegment> for HistorySegment {
+        fn from(value: core::HistorySegment) -> Self {
+            match value {
+                core::HistorySegment::LegacyCard(card) => Self {
+                    kind: HistorySegmentKind::LegacyCard,
+                    range: card.range.into(),
+                    legacy: Some(card.into()),
+                    chapter: None,
+                },
+                core::HistorySegment::ChapterCard(card) => Self {
+                    kind: HistorySegmentKind::ChapterCard,
+                    range: card.range.into(),
+                    legacy: None,
+                    chapter: Some(card.into()),
+                },
+                core::HistorySegment::Messages(range) => Self {
+                    kind: HistorySegmentKind::Messages,
+                    range: range.into(),
+                    legacy: None,
+                    chapter: None,
+                },
+            }
+        }
+    }
+}
+
+/// Local-only projection. A remote host has no local store to inspect, so the
+/// caller must display full history.
+fn compacted_at(data_dir: Option<&str>, session_id: &str) -> Result<CompactedHistory, String> {
+    let Some(dir) = data_dir else {
+        return Ok(CompactedHistory {
+            compactable: false,
+            boundary: 0,
+            message_count: 0,
+            message_ids: Vec::new(),
+            segments: Vec::new(),
+        });
+    };
+    local_compacted(dir, session_id)
+}
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+fn local_compacted(data_dir: &str, session_id: &str) -> Result<CompactedHistory, String> {
+    vault_agent::session_compacted_history_at(std::path::Path::new(data_dir), session_id)
+        .map(Into::into)
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+fn local_compacted(_data_dir: &str, _session_id: &str) -> Result<CompactedHistory, String> {
+    Err("The agent is not available on this device".into())
+}
+
 /// One session's outline, chapters in order. The notes-owned outline when one was
 /// saved (even an empty one), else BubblePaw's context chapters without sections.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -736,9 +1091,26 @@ impl NotesAgent {
     /// the first connection fails. Later drops reconnect with backoff and
     /// push a `gap` event; calls while disconnected fail with "hub
     /// unreachable". `close_events` (or dropping it) closes the socket.
-    pub fn connect(url: String, device: String, token: String) -> Result<NotesAgent, String> {
+    ///
+    /// `trusted`: the device's trusted hub certificates, as for
+    /// `NotesSync::with_trusted_certificates`. `vault_root`: the vault
+    /// whose device key proves this device (the bearer is a session, as for
+    /// sync); empty sends the bare token.
+    pub fn connect(
+        url: String,
+        device: String,
+        token: String,
+        trusted: Vec<TrustedHubCertificate>,
+        vault_root: String,
+    ) -> Result<NotesAgent, String> {
         Ok(NotesAgent {
-            inner: Inner::connect(url, device, token)?,
+            inner: Inner::connect(
+                url,
+                device,
+                token,
+                TrustedHubCertificate::to_sync(trusted),
+                vault_root,
+            )?,
             data_dir: None,
         })
     }
@@ -748,8 +1120,33 @@ impl NotesAgent {
     /// `/mcp/agent?host=<this device's name>` runs this agent's tools here
     /// (desktop pack included, no approval prompts). Restarts a running
     /// relay; drops reconnect with backoff. Fails on a hub connection.
-    pub fn host_relay_start(&self, url: String, device: String, token: String) -> Result<(), String> {
-        self.inner.host_relay_start(url, device, token)
+    /// `trusted`: the device's trusted hub certificates, as for
+    /// `NotesSync::with_trusted_certificates`. `vault_root`: as for
+    /// `connect`.
+    pub fn host_relay_start(
+        &self,
+        url: String,
+        device: String,
+        token: String,
+        trusted: Vec<TrustedHubCertificate>,
+        vault_root: String,
+    ) -> Result<(), String> {
+        self.inner.host_relay_start(
+            url,
+            device,
+            token,
+            TrustedHubCertificate::to_sync(trusted),
+            vault_root,
+        )
+    }
+
+    /// Gives the running host relay the device's trusted hub certificates
+    /// after the user trusted or revoked one: its next connection attempt
+    /// uses them, and a relay waiting to retry tries again at once. A no-op
+    /// when no relay runs.
+    pub fn host_relay_set_trust(&self, trusted: Vec<TrustedHubCertificate>) {
+        self.inner
+            .host_relay_set_trust(TrustedHubCertificate::to_sync(trusted))
     }
 
     /// Stops the host relay: the socket closes and running calls are
@@ -787,6 +1184,12 @@ impl NotesAgent {
     /// Empty on a hub: its store is not on this device.
     pub fn session_outline(&self, session_id: String) -> Result<ChatOutline, String> {
         outline_at(self.data_dir.as_deref(), &session_id)
+    }
+
+    /// LCM and legacy summary cards interleaved with uncovered canonical messages.
+    /// Never reads the notes-owned outline. Remote hosts return compactable=false.
+    pub fn compacted_history(&self, session_id: String) -> Result<CompactedHistory, String> {
+        compacted_at(self.data_dir.as_deref(), &session_id)
     }
 
     /// The session's outline revision: 0 until the outline first changes, then one
@@ -1117,12 +1520,123 @@ mod outline_tests {
     use super::*;
 
     #[test]
+    fn compacted_history_on_a_hub_falls_back_to_full_messages() {
+        let result = compacted_at(None, "any-session").unwrap();
+        assert!(!result.compactable);
+        assert!(result.segments.is_empty());
+        assert_eq!(result.boundary, 0);
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    #[test]
+    fn compacted_history_bridge_preserves_card_variants_and_empty_live_end() {
+        use vault_agent::compacted_history as core;
+        let range = core::MessageRange { start: 0, end: 2 };
+        let history: CompactedHistory = core::CompactedHistory {
+            compactable: true,
+            boundary: 2,
+            message_count: 2,
+            message_ids: vec!["m0".into(), "m1".into()],
+            segments: vec![
+                core::HistorySegment::LegacyCard(core::LegacyCard {
+                    id: "checkpoint".into(),
+                    kind: core::LegacyKind::Checkpoint,
+                    title: None,
+                    summary: "Saved summary".into(),
+                    started_at: "first-time".into(),
+                    ended_at: "last-time".into(),
+                    first_message_id: "m0".into(),
+                    last_message_id: "m1".into(),
+                    range,
+                    message_count: 2,
+                }),
+                core::HistorySegment::Messages(core::MessageRange { start: 2, end: 2 }),
+            ],
+        }
+        .into();
+        assert!(history.compactable);
+        assert_eq!(history.boundary, 2);
+        assert_eq!(history.message_count, 2);
+        let card = &history.segments[0];
+        assert_eq!(card.kind, HistorySegmentKind::LegacyCard);
+        assert_eq!(card.range, MessageRange { start: 0, end: 2 });
+        assert!(card.chapter.is_none());
+        let legacy = card.legacy.as_ref().unwrap();
+        assert_eq!(legacy.kind, LegacyKind::Checkpoint);
+        assert_eq!(legacy.title, None);
+        assert_eq!(legacy.summary, "Saved summary");
+        assert_eq!(legacy.first_message_id, "m0");
+        assert_eq!(legacy.last_message_id, "m1");
+        assert_eq!(legacy.started_at, "first-time");
+        assert_eq!(legacy.ended_at, "last-time");
+        assert_eq!(legacy.message_count, 2);
+        let tail = &history.segments[1];
+        assert_eq!(tail.kind, HistorySegmentKind::Messages);
+        assert_eq!(tail.range, MessageRange { start: 2, end: 2 });
+        assert!(tail.chapter.is_none() && tail.legacy.is_none());
+    }
+
+    #[test]
     fn a_hub_has_no_local_outline() {
         assert_eq!(
             outline_at(None, "any-session").unwrap(),
             ChatOutline {
                 chapters: Vec::new()
             }
+        );
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    #[test]
+    fn compacted_history_bridge_keeps_footer_only_on_final_part() {
+        use vault_agent::compacted_history as core;
+        let first = core::ChapterCard {
+            id: "chapter".into(),
+            status: core::ChapterStatus::Closed,
+            title: "Chapter title".into(),
+            summary: Some("Chapter summary".into()),
+            part: 1,
+            parts: 2,
+            started_at: "first-time".into(),
+            ended_at: "last-time".into(),
+            first_message_id: "m0".into(),
+            last_message_id: "m1".into(),
+            range: core::MessageRange { start: 0, end: 2 },
+            message_count: None,
+            episode_count: None,
+            decisions: Vec::new(),
+            sections: Vec::new(),
+            episodes: Vec::new(),
+        };
+        let last = core::ChapterCard {
+            part: 2,
+            message_count: Some(3),
+            episode_count: Some(2),
+            decisions: vec!["Keep canonical history".into()],
+            sections: vec![core::ChapterSection {
+                name: "Implementation".into(),
+                first_episode: 1,
+                last_episode: 2,
+            }],
+            ..first.clone()
+        };
+        let first: ChapterCard = first.into();
+        let last: ChapterCard = last.into();
+        assert_eq!(first.id, last.id);
+        assert_eq!((first.part, first.parts), (1, 2));
+        assert_eq!((last.part, last.parts), (2, 2));
+        assert_eq!((first.message_count, first.episode_count), (None, None));
+        assert_eq!((last.message_count, last.episode_count), (Some(3), Some(2)));
+        assert!(first.decisions.is_empty());
+        assert!(first.sections.is_empty());
+        assert_eq!(last.decisions, ["Keep canonical history"]);
+        assert_eq!(
+            last.sections,
+            [ChapterSection {
+                name: "Implementation".into(),
+                first_episode: 1,
+                last_episode: 2,
+            }]
         );
     }
 
@@ -1183,6 +1697,19 @@ mod outline_tests {
             chapter.sections[0].decisions,
             ["No context boundary selected from 3 candidates"]
         );
+
+        // A saved outline does not become a compacted-history card, even when
+        // its imported anchors are absent from the canonical store.
+        let compacted = compacted_at(Some(&data), &session.id).unwrap();
+        assert!(compacted.compactable);
+        assert!(compacted.message_ids.is_empty());
+        assert_eq!(compacted.segments.len(), 1);
+        assert_eq!(compacted.segments[0].kind, HistorySegmentKind::Messages);
+        assert_eq!(
+            compacted.segments[0].range,
+            MessageRange { start: 0, end: 0 }
+        );
+        assert!(compacted_at(Some(&data), "missing").is_err());
 
         drop(store);
         let _ = std::fs::remove_dir_all(&dir);

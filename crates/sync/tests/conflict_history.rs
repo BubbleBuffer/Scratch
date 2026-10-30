@@ -44,8 +44,8 @@ impl Network {
         let hub = Hub::new(dirs[0].open()).unwrap();
         let server = hub.serve("127.0.0.1:0").unwrap();
         let url = format!("http://{}", server.addr());
-        let a_token = hub.pair("A").unwrap();
-        let b_token = hub.pair("B").unwrap();
+        let a_token = hub.pair_legacy_token("A").unwrap();
+        let b_token = hub.pair_legacy_token("B").unwrap();
         let a = Some(SyncClient::new(dirs[1].open(), &url, &a_token));
         let b = Some(SyncClient::new(dirs[2].open(), &url, &b_token));
         Self { hub, _server: server, a, b, url, b_token, dirs }

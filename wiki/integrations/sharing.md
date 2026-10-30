@@ -14,7 +14,7 @@ Built 2026-10-23 on branch `lane/note-sharing`. The hub renders pages as small, 
 - the **web viewer** at `/open/<id>`, for people signed in to the hub;
 - **share links** at `/s/<token>`, made from the app or the viewer.
 
-Routes, config and security for the hub as a whole are in [Hub server](../architecture/hub.md).
+Routes, config and security for the hub as a whole are in [Hub server](../sync/hub.md).
 
 ## Rendering
 

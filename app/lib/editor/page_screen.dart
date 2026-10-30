@@ -26,7 +26,7 @@ import '../addons/agent/api.dart';
 import '../features/ai/ask_ai.dart';
 import '../features/bakeoff.dart';
 import '../features/backlinks/backlinks.dart';
-import '../addons/database/api.dart' show PageProperties;
+import '../addons/database/api.dart' show PageChildrenView, PageProperties;
 import '../registry/note_type_registry.dart';
 import '../registry/addon_registry.dart' show AddonInlineMark, NoteTitleChips;
 import '../registry/block_codecs.dart';
@@ -104,7 +104,7 @@ class PageScreen extends StatefulWidget {
 }
 
 class PageEditorState extends State<PageScreen>
-    implements BlockHost, HeadingProgressHost, HeadingCompletionHost {
+    implements BlockEditingHost, HeadingProgressHost, HeadingCompletionHost {
   Doc? doc;
   // The focusable first line of an empty page stays local until a block edit.
   // Its insert is sent before that edit, in the same transaction.
@@ -1269,6 +1269,31 @@ class PageEditorState extends State<PageScreen>
   List<Node> get readingOrder => doc?.reading ?? const [];
 
   @override
+  List<Node> siblingsOf(Node n) => doc?.siblingsOf(n) ?? const [];
+
+  @override
+  String insertBlock(Node after, String kind, String text, {String? target}) {
+    final block = Node(id: newBlockId(), kind: kind, text: text, target: target);
+    if (readOnly || doc == null) return block.id;
+    rec('Add block', () => _push(doc!.insertAfter(after, block)));
+    setState(() {});
+    return block.id;
+  }
+
+  /// Appends a [kind] block holding [text] at the end of the page and
+  /// returns its id (a database page's implicit view, made real).
+  String appendBlock(String kind, String text) {
+    final block = Node(id: newBlockId(), kind: kind, text: text);
+    if (readOnly || doc == null) return block.id;
+    rec('Add block', () => _push(doc!.insertLastChild(null, block)));
+    setState(() {});
+    return block.id;
+  }
+
+  @override
+  void deleteBlock(Node n) => _deleteBlocks([n]);
+
+  @override
   void revealBlock(Node n) {
     final d = doc;
     if (d == null) return;
@@ -1584,11 +1609,24 @@ class PageEditorState extends State<PageScreen>
     focusBlock(n, ctl(n).selection.baseOffset);
   }
 
+  /// The start number and `N. ` prefix typed before [caret] when [text]
+  /// begins with one, or null. `1. ` is not one of these: the registry's
+  /// numbered prefix already handles it.
+  (int, String)? _typedNumberedAt(String text, int caret) {
+    final m = RegExp(r'^(\d+)\. ').firstMatch(text);
+    if (m == null || m.end != caret) return null;
+    final start = int.tryParse(m.group(1)!);
+    if (start == null || start > maxNumberedStart) return null;
+    return (start, m.group(0)!);
+  }
+
   bool _markdownShortcut(Node n, TextEditingValue v) {
     if (n.kind != Kinds.paragraph || !v.selection.isCollapsed) return false;
     final hit = blockRegistry.markdownAt(n.text, v.selection.baseOffset);
-    if (hit == null) return false;
-    final (type, prefix) = hit;
+    final typed = hit == null ? _typedNumberedAt(n.text, v.selection.baseOffset) : null;
+    if (hit == null && typed == null) return false;
+    final type = hit?.$1 ?? blockRegistry.of(Kinds.numbered);
+    final prefix = hit?.$2 ?? typed!.$2;
     final d = doc!;
     final c = ctl(n);
     rec('Turn into', () {
@@ -1603,7 +1641,14 @@ class PageEditorState extends State<PageScreen>
       if (!type.editable) {
         _push([n.setTextOp(), ..._turnInto(n, type.kind)]);
       } else {
-        _push([n.setTextOp(), ...d.setKind(n, type.kind)]);
+        final ops = [n.setTextOp(), ...d.setKind(n, type.kind)];
+        // A typed start joins the run above when there is one, and otherwise
+        // starts a new run at that number.
+        final start = typed?.$1;
+        if (start != null && start != 1 && d.prevSibling(n)?.kind != Kinds.numbered) {
+          ops.addAll(d.setNumberedStart(n, start));
+        }
+        _push(ops);
       }
     });
     _typingEntry = null;
@@ -2450,7 +2495,7 @@ class PageEditorState extends State<PageScreen>
       if (target != null && m.start <= offset && offset < m.end) {
         if (focusedId == n.id &&
             !readOnly &&
-            HardwareKeyboard.instance.isControlPressed) {
+            isCommandKeyPressed) {
           return false;
         }
         openPage(target);
@@ -3971,7 +4016,14 @@ class PageEditorState extends State<PageScreen>
         final geo = _geo(box.maxWidth, mobile);
         _lastGeo = geo;
         // One empty state: starters under the title, the cat below the body.
+        // A former database without view blocks lists its children under
+        // the body; the list is written as a block once it is changed.
+        final implicitChildren =
+            !preview &&
+            _page?.pageType == databaseType &&
+            !d.byId.values.any((n) => n.kind == 'view');
         final empty =
+            !implicitChildren &&
             _emptyPage &&
             !widget.embedded &&
             !preview &&
@@ -4039,6 +4091,21 @@ class PageEditorState extends State<PageScreen>
                   },
                 ),
               ),
+              if (implicitChildren)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(left: geo.textLeft, top: 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: PageChildrenView(
+                        key: ValueKey('page-children-view-${widget.pageId}'),
+                        pageId: widget.pageId,
+                        append: appendBlock,
+                        width: geo.textWidth,
+                      ),
+                    ),
+                  ),
+                ),
               if (empty)
                 SliverToBoxAdapter(
                   child: GestureDetector(

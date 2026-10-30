@@ -27,6 +27,8 @@ AgentTokenClient? defaultAgentTokenClient(BuildContext context) {
     hubUrl: url,
     token: token,
     deviceId: app.vault.deviceId,
+    vault: app.vault.raw,
+    trusted: s.trustedCertificates.trustFor(url),
   );
 }
 

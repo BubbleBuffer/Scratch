@@ -1,4 +1,4 @@
-// Import checker for the add-on layer. Rules: wiki/architecture/addons.md.
+// Import checker for the add-on layer. Rules: wiki/app/addons.md.
 //
 //   dart scripts/check-addon-imports.dart
 //   dart scripts/check-addon-imports.dart --self-test

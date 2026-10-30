@@ -89,13 +89,7 @@ pub(crate) fn refresh(store: &Store, path: &Path, session: &str) -> Result<()> {
             return Ok(());
         }
     }
-    let title = match OutlineStore::read_session(path, session)? {
-        Some(chapters) => chapters.last().map(|c| c.title.clone()),
-        None => store
-            .context_chapters(session)?
-            .last()
-            .map(|c| c.title.clone()),
-    };
+    let title = automatic_title(store, path, session)?;
     if title
         .as_ref()
         .is_none_or(|t| t.trim().is_empty() || t == &current.title)
@@ -113,13 +107,7 @@ pub(crate) fn refresh(store: &Store, path: &Path, session: &str) -> Result<()> {
         .optional()?
         .unwrap_or(false);
     if !sticky {
-        let title = match OutlineStore::read_session(path, session)? {
-            Some(chapters) => chapters.last().map(|c| c.title.clone()),
-            None => store
-                .context_chapters(session)?
-                .last()
-                .map(|c| c.title.clone()),
-        };
+        let title = automatic_title(store, path, session)?;
         if let Some(title) = title.filter(|t| !t.trim().is_empty()) {
             if store.session(session)?.title != title {
                 store.rename_session(session, title)?;
@@ -128,6 +116,19 @@ pub(crate) fn refresh(store: &Store, path: &Path, session: &str) -> Result<()> {
     }
     tx.commit()?;
     Ok(())
+}
+
+fn automatic_title(store: &Store, path: &Path, session: &str) -> Result<Option<String>> {
+    if let Some(chapters) = OutlineStore::read_session(path, session)? {
+        return Ok(chapters.last().map(|chapter| chapter.title.clone()));
+    }
+    if let Some(title) = crate::outline_lcm::latest_title(store, session)? {
+        return Ok(Some(title));
+    }
+    Ok(store
+        .context_chapters(session)?
+        .last()
+        .map(|chapter| chapter.title.clone()))
 }
 
 #[cfg(test)]

@@ -1,12 +1,15 @@
 // Starting the app: open (or create) the vault, build the stores, show home.
 //
 // - A new vault (its folder missing or empty) gets a "Getting started" page.
+//   With sync configured, those starter pages wait for the first successful
+//   pull and are created only if the vault still has no pages then.
 // - Built with `--dart-define=SEED_BENCH=true`, a new vault is instead the
 //   bench vault: 10,000 generated pages, a 2,000-block "Big page" and the
 //   showcase page (for measure.ps1).
 // - Built with `--dart-define=SEED_TASKS=<rows>`, a new vault also gets the
 //   "Tasks" database with that many rows (seed_tasks).
 // - The core's writer is flushed whenever the app may be killed.
+// - On Windows, the update checker starts (features/updates).
 
 import 'dart:async';
 import 'dart:io';
@@ -21,6 +24,7 @@ import '../core/vault.dart';
 import '../features/bakeoff.dart';
 import '../features/settings/settings_store.dart';
 import '../features/sync/sync_control.dart';
+import '../features/updates/update_controller.dart';
 import '../features/getting_started.dart';
 import '../features/showcase.dart';
 import '../features/demo.dart';
@@ -58,6 +62,13 @@ class _NotesAppState extends State<NotesApp> {
   void initState() {
     super.initState();
     registerBuiltins(disabledAddons: _settings.disabledAddons);
+    if (Platform.isWindows) {
+      UpdateController.current = UpdateController(
+        currentTag: effectiveReleaseTag(),
+        updatesDir: '${widget.dataDir}${Platform.pathSeparator}updates',
+        settings: _settings,
+      )..start();
+    }
     _lifecycle = AppLifecycleListener(
       onPause: _flush,
       onHide: _flush,
@@ -87,6 +98,10 @@ class _NotesAppState extends State<NotesApp> {
     final root = _settings.vaultPath ?? vaultRootIn(widget.dataDir);
     try {
       final fresh = _isNew(root);
+      // Sync configured: the hub's pages may be on their way, so starter pages
+      // wait for the first pull. Not gated by [fresh]: Vault.open creates
+      // `.vault/`, so a launch that failed its pull would look non-fresh next time.
+      final syncing = _settings.clientUrl != null && _settings.clientToken != null;
       if (fresh && seedBench && !seedDemo) await _seedBench(root);
       if (fresh && seedTaskRows > 0 && !seedDemo) await NotesVault.seedTasks(root: root, rows: seedTaskRows);
       final vault = await Vault.open(root, dataDir: widget.dataDir);
@@ -97,7 +112,7 @@ class _NotesAppState extends State<NotesApp> {
         } else if (seedBench) {
           await createShowcase(vault);
         } else {
-          await createGettingStarted(vault, createTasks: seedTaskRows == 0);
+          await seedStarterPagesAtBoot(vault, syncing: syncing, createTasks: seedTaskRows == 0);
         }
         await vault.flush();
       }
@@ -113,6 +128,12 @@ class _NotesAppState extends State<NotesApp> {
       }
       setState(() => _app = app);
       unawaited(startSyncAtBoot(app.sync, _settings));
+      if (syncing && !seedDemo && !seedBench) {
+        unawaited(seedStarterPagesAfterPull(vault, app.sync.firstSyncOk(), createTasks: seedTaskRows == 0).catchError((Object e) {
+          AppLog.info('starter pages after pull failed: $e');
+          return false;
+        }));
+      }
     } catch (e) {
       AppLog.info('open failed: $e');
       if (mounted) setState(() => _error = '$e');
@@ -137,6 +158,8 @@ class _NotesAppState extends State<NotesApp> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    UpdateController.current?.dispose();
+    UpdateController.current = null;
     _app?.dispose();
     super.dispose();
   }

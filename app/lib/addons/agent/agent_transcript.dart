@@ -1,6 +1,6 @@
 // What the chat shows, built from a session snapshot: user and assistant
 // text, compact assistant turns with edits and work, quiet lines for failed
-// or stopped runs, the reply being written, and pending approvals. Tool
+// or stopped runs and the reply being written. Tool
 // messages supply code-cell results, behind the optional code disclosure.
 
 import 'dart:convert';
@@ -79,7 +79,6 @@ List<ChatItem> agentTurns(
   AgentSessionState? s, {
   String streaming = '',
   String? error,
-  List<AgentApproval> approvals = const [],
   Map<String, String>? anchorOf,
   Map<String, String>? segmentOf,
 }) {
@@ -236,7 +235,6 @@ List<ChatItem> agentTurns(
     for (final e in out) e.$3,
     if (s == null && streaming.trim().isNotEmpty)
       AssistantText('live', streaming, live: true),
-    for (final a in approvals) ApprovalItem(a),
     if (error != null && error.isNotEmpty) RunNote('error', error),
   ];
 }
@@ -281,10 +279,6 @@ class RunNote extends ChatItem {
   final bool error;
 }
 
-class ApprovalItem extends ChatItem {
-  ApprovalItem(this.approval) : super('approval-${approval.id}');
-  final AgentApproval approval;
-}
 
 /// The code of a `js` call (its `code` argument), or the arguments as
 /// JSON for any other tool.
@@ -329,12 +323,11 @@ String prettyJson(String raw) {
 }
 
 /// The chat's items in order. [streaming] is the live reply, [error] a
-/// command error, [approvals] the pending approvals.
+/// command error.
 List<ChatItem> chatItems(
   AgentSessionState? s, {
   String streaming = '',
   String? error,
-  List<AgentApproval> approvals = const [],
 }) {
   final out = <(String, int, ChatItem)>[];
   var order = 0;
@@ -389,7 +382,6 @@ List<ChatItem> chatItems(
     for (final e in out) e.$3,
     if (streaming.trim().isNotEmpty)
       AssistantText('live', streaming, live: true),
-    for (final a in approvals) ApprovalItem(a),
     if (error != null && error.isNotEmpty) RunNote('error', error),
   ];
 }

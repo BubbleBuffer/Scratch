@@ -3,7 +3,7 @@
 //! the `[oidc]` table, `NOTES_HUB_MCP_OAUTH_<KEY>` for `[mcp_oauth]`,
 //! `NOTES_HUB_AGENT_<KEY>` for `[agent]`, and
 //! `NOTES_HUB_SCHEDULES_<KEY>` for `[schedules]`). List values in variables are separated by commas
-//! or spaces. Reference: `wiki/architecture/hub.md`.
+//! or spaces. Reference: `wiki/sync/hub.md`.
 
 use std::path::{Path, PathBuf};
 
@@ -32,6 +32,10 @@ pub struct Config {
     /// True by default, since the hub runs behind Caddy; set it to false
     /// when the hub is reachable directly.
     pub trust_proxy: bool,
+    /// Refuse device tokens that are not bound to a device key yet
+    /// (`wiki/sync/device-keys.md`). Off by default: an unbound
+    /// token works, and its client upgrades it on the next sync.
+    pub require_device_keys: bool,
     /// Maximum tar archive bytes per markdown source, before base64.
     pub import_source_limit_bytes: usize,
     pub oidc: OidcConfig,
@@ -176,6 +180,7 @@ impl Default for Config {
             android_package: String::new(),
             android_sha256_certs: Vec::new(),
             trust_proxy: true,
+            require_device_keys: false,
             import_source_limit_bytes: 64 << 20,
             oidc: OidcConfig::default(),
             mcp_oauth: McpOAuthConfig::default(),
@@ -298,6 +303,9 @@ impl Config {
         }
         if let Some(v) = var("TRUST_PROXY") {
             self.trust_proxy = boolean("NOTES_HUB_TRUST_PROXY", &v)?;
+        }
+        if let Some(v) = var("REQUIRE_DEVICE_KEYS") {
+            self.require_device_keys = boolean("NOTES_HUB_REQUIRE_DEVICE_KEYS", &v)?;
         }
         if let Some(v) = var("IMPORT_SOURCE_LIMIT_BYTES") {
             self.import_source_limit_bytes = v.parse().map_err(|_| {
@@ -708,6 +716,14 @@ mod tests {
         .unwrap();
         assert_eq!(c.listen, "127.0.0.1:9000");
         assert!(!c.trust_proxy);
+        // Off by default; the env var turns it on and rejects non-booleans.
+        assert!(!c.require_device_keys);
+        c.apply_env(|k| (k == "NOTES_HUB_REQUIRE_DEVICE_KEYS").then(|| "true".into()))
+            .unwrap();
+        assert!(c.require_device_keys);
+        assert!(c
+            .apply_env(|k| (k == "NOTES_HUB_REQUIRE_DEVICE_KEYS").then(|| "maybe".into()))
+            .is_err());
         assert_eq!(c.oidc.allowed_users, ["a@example.com", "b"]);
         assert_eq!(c.oidc.scopes(), ["openid", "email"]);
         c.validate().unwrap();

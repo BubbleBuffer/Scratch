@@ -11,7 +11,7 @@
 //!   [`SyncClient::start`] for a background loop.
 //! - [`wire`] is the protocol's message encoding.
 //!
-//! Design, protocol and limits: `wiki/architecture/sync-state.md`.
+//! Design, protocol and limits: `wiki/sync/sync-state.md`.
 
 // Instrumentation for the `storage-metrics` feature. Without it, each macro
 // is its plain expression or nothing, so default builds are unchanged.
@@ -60,10 +60,13 @@ macro_rules! count_bytes {
 
 mod auth;
 mod client;
+pub mod device_key;
 mod encoding;
 mod hub;
+mod keys;
 pub mod open;
-mod tls;
+pub mod session;
+pub mod tls;
 pub mod wire;
 
 use std::fmt;
@@ -71,6 +74,8 @@ use std::fmt;
 pub use auth::PairedDevice;
 pub use client::{BackgroundSync, SyncClient, SyncOptions, SyncReport};
 pub use hub::{Hub, HubRequest, HubResponse, HubServer};
+pub use keys::{origin_of, KeyPolicy};
+pub use session::DeviceSession;
 pub use open::{bounce_page, bounce_page_with};
 pub use tls::CertificateInfo;
 
@@ -84,6 +89,12 @@ pub const CAPABILITY_HEADER: &str = "X-Sync-Capability";
 /// The zstd capability's exact token. Once the hub confirms it, `/sync` and
 /// `/push` bodies may be zstd-compressed.
 pub const ZSTD_CAPABILITY: &str = "zstd-v1";
+
+/// The hub's `/health` advertises device keys (`/auth/challenge`,
+/// `/auth/session`, `/auth/upgrade`, `/auth/pair`) with this header. A hub
+/// without it takes the bare device token, as before.
+pub const DEVICE_KEYS_CAPABILITY_HEADER: &str = "X-Device-Keys";
+pub const DEVICE_KEYS_CAPABILITY: &str = "1";
 
 /// Negotiates causal purge recovery before the first sync mutation.
 pub const PURGE_CAPABILITY_HEADER: &str = "X-Purge-Protocol";
@@ -187,6 +198,22 @@ pub(crate) fn random_hex() -> Result<String> {
     let mut b = [0u8; 32];
     getrandom::fill(&mut b).map_err(|e| SyncError::Io(format!("random: {e}")))?;
     Ok(b.iter().map(|x| format!("{x:02x}")).collect())
+}
+
+/// Lowercase hex of `bytes`.
+pub(crate) fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+/// Bytes from hex (either case); None if it is not hex.
+pub(crate) fn hex_decode(text: &str) -> Option<Vec<u8>> {
+    if text.len() % 2 != 0 {
+        return None;
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(text.get(i..i + 2)?, 16).ok())
+        .collect()
 }
 
 /// Compares two byte strings in time that depends only on their lengths.

@@ -4,7 +4,7 @@
 //
 // Sections: Preferences (theme), Sync (hub, connection, attachments),
 // Devices (desktop: devices paired with the hub), Conflicts, AI, Vault
-// (location; desktop: mounted folders) and About.
+// (location; desktop: mounted folders), Updates (Windows) and About.
 
 import 'dart:io';
 
@@ -28,6 +28,7 @@ import '../sync/sync_icons.dart';
 import '../share/share_popup.dart' show shareClientOf;
 import '../share/shared_links_settings.dart';
 import '../sync/sync_settings.dart';
+import '../updates/updates_settings.dart';
 import 'controls.dart';
 import 'settings_store.dart';
 
@@ -42,17 +43,19 @@ enum SettingsSection {
   conflicts('Conflicts'),
   ai('AI'),
   vault('Vault'),
+  updates('Updates'),
   about('About');
 
   const SettingsSection(this.label);
   final String label;
 
   /// Devices are the hub's, so only desktop lists them. Shared links show
-  /// only while this device is signed in to a hub.
+  /// only while this device is signed in to a hub. Updates are Windows-only.
   static List<SettingsSection> visibleFor(BuildContext context) => [
     for (final s in values)
       if ((s != devices || SyncStore.canHost) &&
-          (s != sharedLinks || shareClientOf(context) != null))
+          (s != sharedLinks || shareClientOf(context) != null) &&
+          (s != updates || updatesAvailableHere()))
         s,
   ];
 }
@@ -67,6 +70,7 @@ Widget sectionIcon(SettingsSection s, Color color, double size) => switch (s) {
       SettingsSection.ai =>
         SizedBox.square(dimension: size, child: Center(child: AiMark(size: size * 0.9, color: color))),
       SettingsSection.vault => SyncIcon(SyncIco.folder, size: size, color: color),
+      SettingsSection.updates => Icon20(Ico.arrowDown, size: size, color: color),
       SettingsSection.about => SyncIcon(SyncIco.info, size: size, color: color),
     };
 
@@ -79,6 +83,7 @@ Widget sectionBody(SettingsSection s) => switch (s) {
       SettingsSection.conflicts => const ConflictsBody(),
       SettingsSection.ai => const AiSettingsBody(),
       SettingsSection.vault => const VaultBody(),
+      SettingsSection.updates => const UpdatesBody(),
       SettingsSection.about => const AboutBody(),
     };
 
@@ -378,7 +383,6 @@ class PreferencesBody extends StatelessWidget {
       const SettingsHeading('Preferences', primary: true),
       SettingsRow(
         label: 'Appearance',
-        description: 'Customize how $appName looks on this device.',
         trailing: SelectButton<ThemePref>(
           key: const ValueKey('theme-select'),
           title: 'Appearance',

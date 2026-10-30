@@ -8,6 +8,13 @@ environment:
 
 dependencies:
   app_links: 7.2.2
+  # UI tokens and primitives from bb-ui (wiki/app/agent-kit.md).
+  # bb_tokens comes with bb_ui; don't declare it here.
+  bb_ui:
+    git:
+      url: https://github.com/BubbleBuffer/bb-ui
+      ref: v0.6.0
+      path: packages/bb_ui
   device_info_plus: ^13.3.0
   file_picker: ^13.1.0
   lucide_icons_flutter: 3.1.25
@@ -21,6 +28,19 @@ dependencies:
   url_launcher: 6.3.3
   notes_bridge:
     path: rust_builder
+  # The shared agent kit, pinned to the commit of kit tag v0.16.0 plus agent-kit PR 49 (repin to the next tag once it is released):
+  # agent_kit_core remains a path dependency of agent_kit, so both direct
+  # refs must be the same full commit SHA. The chat's outline and the dev pane use them.
+  agent_kit:
+    git:
+      url: https://github.com/BubbleBuffer/agent-kit.git
+      ref: 0e9f58e81b0b61b421009d0aa4d270e17e8400f0
+      path: packages/agent_kit
+  agent_kit_core:
+    git:
+      url: https://github.com/BubbleBuffer/agent-kit.git
+      ref: 0e9f58e81b0b61b421009d0aa4d270e17e8400f0
+      path: packages/agent_kit_core
 
 dev_dependencies:
   flutter_test:

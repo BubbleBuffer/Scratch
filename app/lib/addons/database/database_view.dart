@@ -1,8 +1,8 @@
-// The database frame around a view: the title, the view tabs (or the
-// mobile view switcher), the toolbar (filter, sort, search, view settings,
-// "New" with templates), the bar of filter and sort pills, and the view's
-// body from the view registry. Used for full-page databases (the page body
-// of a database page) and inline database blocks.
+// The frame around a view: the title, the view tabs (or the mobile view
+// switcher), the toolbar (filter, sort, search, view settings, "New" with
+// templates), the bar of filter and sort pills, and the view's body from the
+// view registry. Used for view blocks (tabs without a title, the views read
+// from the blocks through a [ViewSource]) and old inline database blocks.
 
 import 'package:flutter/widgets.dart';
 
@@ -20,6 +20,10 @@ import '../../ui/database/values.dart';
 import 'view_settings.dart';
 import '../../ui/database/widgets.dart';
 
+/// The active tab of each group of view blocks in this session: the
+/// group's first block id -> the shown view's block id.
+final viewBlockTabs = <String, String>{};
+
 class DatabaseView extends StatefulWidget {
   const DatabaseView({
     super.key,
@@ -29,10 +33,24 @@ class DatabaseView extends StatefulWidget {
     this.onTitleChanged,
     this.left = 0,
     this.width,
+    this.viewSource,
+    this.tabsKey,
+    this.onActiveView,
   });
 
-  /// The database page.
+  /// The page whose child pages are shown.
   final String collection;
+
+  /// View blocks: the views come from the blocks; no title is shown.
+  final ViewSource? viewSource;
+
+  /// View blocks: the key of the active tab in [viewBlockTabs].
+  final String? tabsKey;
+
+  /// View blocks: called with the shown view's id when it changes.
+  final ValueChanged<String>? onActiveView;
+
+  bool get blocks => viewSource != null;
 
   /// An inline database block (sized by its content, inside a page).
   final bool inline;
@@ -65,8 +83,13 @@ class DatabaseViewState extends State<DatabaseView> {
     super.didChangeDependencies();
     if (_store == null) {
       final app = context.app;
-      _historyEntry = MobilePageEntryScope.maybeOf(context);
-      _store = CollectionStore(app.vault, app.feed, widget.collection);
+      _store = CollectionStore(app.vault, app.feed, widget.collection, viewSource: widget.viewSource);
+      final tabs = widget.tabsKey;
+      if (widget.blocks && tabs != null) {
+        store.activeView = viewBlockTabs[tabs];
+        store.addListener(_rememberTab);
+      }
+      _historyEntry = widget.blocks ? null : MobilePageEntryScope.maybeOf(context);
       final entry = _historyEntry;
       if (entry != null) {
         store.activeView = entry.entry.databaseViews[widget.collection];
@@ -77,6 +100,16 @@ class DatabaseViewState extends State<DatabaseView> {
     }
   }
 
+  String? _lastTab;
+
+  void _rememberTab() {
+    final id = store.view?.id;
+    if (id == null || id == _lastTab) return;
+    _lastTab = id;
+    viewBlockTabs[widget.tabsKey!] = id;
+    widget.onActiveView?.call(id);
+  }
+
   void _rememberView() {
     final id = store.view?.id;
     if (id != null) _historyEntry!.entry.databaseViews[widget.collection] = id;
@@ -85,6 +118,7 @@ class DatabaseViewState extends State<DatabaseView> {
   @override
   void dispose() {
     store.removeListener(_rememberView);
+    store.removeListener(_rememberTab);
     store.dispose();
     _search.dispose();
     _searchFocus.dispose();
@@ -103,7 +137,11 @@ class DatabaseViewState extends State<DatabaseView> {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: store,
-      builder: (context, _) => widget.inline ? _inlineFrame(context) : _pageFrame(context),
+      builder: (context, _) => widget.blocks
+          ? _blocksFrame(context)
+          : widget.inline
+              ? _inlineFrame(context)
+              : _pageFrame(context),
     );
   }
 
@@ -167,6 +205,29 @@ class DatabaseViewState extends State<DatabaseView> {
 
   final _titleFocus = FocusNode();
 
+  // ---------------------------------------------------------- view blocks
+
+  /// The tabs, the rules bar and the view; the page's own title and body
+  /// are above.
+  Widget _blocksFrame(BuildContext context) {
+    final w = widget.width ?? 600;
+    final v = store.view;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+      Padding(
+        padding: EdgeInsets.only(left: widget.left, right: 8),
+        child: SizedBox(
+          width: w,
+          child: context.mobile ? _mobileBar(context) : _tabsBar(context, w),
+        ),
+      ),
+      if (v != null) _rulesBar(context, v, widget.left),
+      _body(context, widget.left),
+    ]);
+  }
+
+  /// A new List view after the view blocks, shown at once.
+  Future<void> addListView() => store.addView(ViewKind.list);
+
   // --------------------------------------------------------------- inline
 
   Widget _inlineFrame(BuildContext context) {
@@ -190,7 +251,7 @@ class DatabaseViewState extends State<DatabaseView> {
           width: w,
           child: Stack(children: [
             if (_inlineTitle!.text.isEmpty)
-              Positioned.fill(child: IgnorePointer(child: Text('New database', style: style.copyWith(color: c.textTertiary)))),
+              Positioned.fill(child: IgnorePointer(child: Text('Untitled', style: style.copyWith(color: c.textTertiary)))),
             EditableText(
               key: const ValueKey('db-inline-title'),
               controller: _inlineTitle!,
@@ -222,12 +283,14 @@ class DatabaseViewState extends State<DatabaseView> {
 
   Widget _body(BuildContext context, double gutter) {
     final v = store.view;
-    if (!store.loaded || v == null) return widget.inline ? const SizedBox(height: 120) : const SizedBox.shrink();
+    if (!store.loaded || v == null) {
+      return widget.inline || widget.blocks ? const SizedBox(height: 120) : const SizedBox.shrink();
+    }
     final t = viewRegistry.of(v.kind);
     if (t == null) return const SizedBox.shrink();
     return KeyedSubtree(
       key: ValueKey('view-${v.id}'),
-      child: t.build(context, ViewArgs(store: store, view: v, ctl: ctl, inline: widget.inline, gutter: gutter)),
+      child: t.build(context, ViewArgs(store: store, view: v, ctl: ctl, inline: widget.inline || widget.blocks, gutter: gutter)),
     );
   }
 
@@ -249,7 +312,8 @@ class DatabaseViewState extends State<DatabaseView> {
     final active = store.view;
     // Room for the tabs: the toolbar, the "+" and, when some tabs do not
     // fit, the "N more…" button.
-    const plus = 32.0, more = 84.0;
+    final plus = widget.blocks ? 96.0 : 32.0;
+    const more = 84.0;
     final avail = width - (_searching ? _toolbarWidth + 150 : _toolbarWidth) - plus - 8;
     final widths = {for (final v in views) v.id: _tabWidth(context, v)};
     final total = widths.values.fold(0.0, (a, b) => a + b);
@@ -295,15 +359,31 @@ class DatabaseViewState extends State<DatabaseView> {
                   ),
                 ),
               ),
-            Builder(
-              builder: (b) => IconBtn(Ico.plus,
-                  key: const ValueKey('add-view'),
-                  size: 28,
-                  glyph: 16,
-                  semanticLabel: 'Add a view',
-                  color: context.colors.iconTertiary,
-                  onTap: () => showAddView(b, store)),
-            ),
+            if (widget.blocks)
+              Hover(
+                key: const ValueKey('add-view'),
+                onTap: addListView,
+                radius: 16,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: SizedBox(
+                  height: 32,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon20(Ico.plus, size: 14, color: context.colors.iconTertiary),
+                    const SizedBox(width: 4),
+                    Text('Add view', style: ts(context.type.ui, context.colors.textTertiary, weight: 400)),
+                  ]),
+                ),
+              )
+            else
+              Builder(
+                builder: (b) => IconBtn(Ico.plus,
+                    key: const ValueKey('add-view'),
+                    size: 28,
+                    glyph: 16,
+                    semanticLabel: 'Add a view',
+                    color: context.colors.iconTertiary,
+                    onTap: () => showAddView(b, store)),
+              ),
           ]),
           ),
         ),
@@ -771,7 +851,14 @@ class _ViewsSheet extends StatelessWidget {
                   builder: (b) => Hover(
                     key: const ValueKey('sheet-add-view'),
                     radius: 0,
-                    onTap: () => showAddView(b, store),
+                    onTap: () {
+                      if (db.widget.blocks) {
+                        Navigator.of(context).pop();
+                        db.addListView();
+                      } else {
+                        showAddView(b, store);
+                      }
+                    },
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: SizedBox(
                       height: 45,

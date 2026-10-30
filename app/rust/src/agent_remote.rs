@@ -30,6 +30,8 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 use crate::api::agent::*;
+use vault_sync::tls::{Trust, TrustedCertificate};
+use vault_sync::DeviceSession;
 
 const PING_EVERY: Duration = Duration::from_secs(30);
 const SILENCE: Duration = Duration::from_secs(90);
@@ -59,6 +61,43 @@ struct Target {
     url: String,
     device: String,
     token: String,
+    /// The device's trusted hub certificates (`vault_sync::tls`).
+    trust: Arc<Trust>,
+    /// Session bearers for the device token (device keys); None sends the
+    /// bare token (no vault path given).
+    session: Option<Arc<DeviceSession>>,
+}
+
+/// The session provider shared with the sync client for the vault at
+/// `vault_root`, the hub at `base` (its http(s) URL) and `token`. None
+/// without a vault path.
+pub(crate) fn device_session(
+    vault_root: &str,
+    base: &str,
+    device: &str,
+    token: &str,
+    trust: &Arc<Trust>,
+) -> Option<Arc<DeviceSession>> {
+    if vault_root.trim().is_empty() {
+        return None;
+    }
+    DeviceSession::shared(vault_root, device, base, token, Some(trust.clone())).ok()
+}
+
+/// The bearer for a socket: a session from `session` (handshaking off the
+/// async runtime), or the bare token.
+async fn socket_bearer(session: &Option<Arc<DeviceSession>>, token: &str) -> Result<String, String> {
+    let Some(s) = session.clone() else {
+        return Ok(token.to_string());
+    };
+    match tokio::task::spawn_blocking(move || s.bearer()).await {
+        Ok(Ok(b)) => Ok(b),
+        Ok(Err(vault_sync::SyncError::Status(code @ (401 | 403), m))) => {
+            Err(format!("the hub refused this device ({code}): {}", m.trim()))
+        }
+        Ok(Err(e)) => Err(format!("hub unreachable: {e}")),
+        Err(e) => Err(format!("hub unreachable: {e}")),
+    }
 }
 
 enum Link {
@@ -116,51 +155,66 @@ pub(crate) fn host_ws_url(base: &str) -> Result<String, String> {
 }
 
 /// Opens a socket to `url` as `device` with its device token, like the
-/// agent connection does (same TLS roots, timeout and refusal messages).
+/// agent connection does (same TLS trust, timeout and refusal messages).
 #[cfg_attr(not(any(target_os = "windows", target_os = "linux")), allow(dead_code))]
 pub(crate) async fn open_device_socket(
     url: &str,
     device: &str,
     token: &str,
+    trust: Arc<Trust>,
+    session: Option<Arc<DeviceSession>>,
 ) -> Result<Socket, String> {
     open_socket(&Target {
         url: url.to_owned(),
         device: device.to_owned(),
         token: token.to_owned(),
+        trust,
+        session,
     })
     .await
 }
 
-fn tls() -> tokio_tungstenite::Connector {
-    let roots = rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    let config = rustls::ClientConfig::builder_with_provider(Arc::new(
-        rustls::crypto::ring::default_provider(),
-    ))
-    .with_safe_default_protocol_versions()
-    .expect("rustls protocol versions")
-    .with_root_certificates(roots)
-    .with_no_client_auth();
-    tokio_tungstenite::Connector::Rustls(Arc::new(config))
+/// The TLS of every hub socket: the sync client's (public webpki roots,
+/// then the issuer anchored for this hub's origin and the leaf pins the
+/// user trusted; `vault_sync::tls`).
+pub(crate) fn tls(trust: &Arc<Trust>) -> tokio_tungstenite::Connector {
+    tokio_tungstenite::Connector::Rustls(vault_sync::tls::client_config(trust))
 }
 
+/// Opens `t`'s socket; a session the hub refuses (401: expired, or the
+/// hub restarted) is renewed once.
 async fn open_socket(t: &Target) -> Result<Socket, String> {
+    let bearer = socket_bearer(&t.session, &t.token).await?;
+    match open_socket_with(t, &bearer).await {
+        Err((401, _)) if t.session.is_some() && bearer != t.token => {
+            if let Some(s) = &t.session {
+                s.invalidate(&bearer);
+            }
+            let bearer = socket_bearer(&t.session, &t.token).await?;
+            open_socket_with(t, &bearer).await.map_err(|(_, e)| e)
+        }
+        r => r.map_err(|(_, e)| e),
+    }
+}
+
+async fn open_socket_with(t: &Target, bearer: &str) -> Result<Socket, (u16, String)> {
     use tokio_tungstenite::tungstenite::Error as E;
     let mut req = t
         .url
         .as_str()
         .into_client_request()
-        .map_err(|e| format!("hub unreachable: {e}"))?;
+        .map_err(|e| (0, format!("hub unreachable: {e}")))?;
     let h = req.headers_mut();
-    let auth = HeaderValue::from_str(&format!("Bearer {}", t.token))
-        .map_err(|_| "the device token is not valid text".to_string())?;
+    let auth = HeaderValue::from_str(&format!("Bearer {bearer}"))
+        .map_err(|_| (0, "the device token is not valid text".to_string()))?;
     h.insert("Authorization", auth);
     let device = HeaderValue::from_str(&t.device)
-        .map_err(|_| "the device id is not valid text".to_string())?;
+        .map_err(|_| (0, "the device id is not valid text".to_string()))?;
     h.insert("X-Device", device);
     let connecting =
-        tokio_tungstenite::connect_async_tls_with_config(req, None, false, Some(tls()));
+        tokio_tungstenite::connect_async_tls_with_config(req, None, false, Some(tls(&t.trust)));
     match tokio::time::timeout(Duration::from_secs(20), connecting).await {
-        Err(_) => Err("hub unreachable: connecting timed out".into()),
+        Err(_) => Err((0, "hub unreachable: connecting timed out".into())),
         Ok(Ok((socket, _))) => Ok(socket),
         Ok(Err(E::Http(r))) => {
             let status = r.status();
@@ -169,13 +223,16 @@ async fn open_socket(t: &Target) -> Result<Socket, String> {
                 .as_ref()
                 .map(|b| String::from_utf8_lossy(b).trim().to_string())
                 .unwrap_or_default();
-            Err(match status.as_u16() {
-                401 | 403 => format!("the hub refused this device ({status}): {body}"),
-                503 => format!("the hub's agent is not available: {body}"),
-                _ => format!("the hub answered {status}: {body}"),
-            })
+            Err((
+                status.as_u16(),
+                match status.as_u16() {
+                    401 | 403 => format!("the hub refused this device ({status}): {body}"),
+                    503 => format!("the hub's agent is not available: {body}"),
+                    _ => format!("the hub answered {status}: {body}"),
+                },
+            ))
         }
-        Ok(Err(e)) => Err(format!("hub unreachable: {e}")),
+        Ok(Err(e)) => Err((0, format!("hub unreachable: {e}"))),
     }
 }
 
@@ -283,11 +340,23 @@ impl Shared {
 }
 
 impl Remote {
-    pub(crate) fn connect(url: String, device: String, token: String) -> Result<Remote, String> {
+    /// `vault_root`: the vault whose device key proves this device (empty:
+    /// the bare token, for a hub without device keys).
+    pub(crate) fn connect(
+        url: String,
+        device: String,
+        token: String,
+        trusted: Vec<TrustedCertificate>,
+        vault_root: String,
+    ) -> Result<Remote, String> {
+        let trust = Trust::for_hub(&url, &trusted);
+        let session = device_session(&vault_root, &url, &device, &token, &trust);
         let target = Target {
             url: ws_url(&url)?,
             device,
             token,
+            trust,
+            session,
         };
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
@@ -959,14 +1028,14 @@ mod tests {
     #[test]
     fn a_remote_agent_lists_runs_streams_and_reconnects_with_a_gap() {
         let h = hub();
-        let token = h.server.as_ref().unwrap().hub().pair("laptop").unwrap();
+        let token = h.server.as_ref().unwrap().hub().pair_legacy_token("laptop").unwrap();
 
-        match Remote::connect(h.url.clone(), "dev-remote".into(), "bad".into()) {
+        match Remote::connect(h.url.clone(), "dev-remote".into(), "bad".into(), Vec::new(), String::new()) {
             Err(e) => assert!(e.contains("refused"), "{e}"),
             Ok(_) => panic!("connected with a bad token"),
         }
 
-        let remote = Remote::connect(h.url.clone(), "dev-remote".into(), token).unwrap();
+        let remote = Remote::connect(h.url.clone(), "dev-remote".into(), token, Vec::new(), String::new()).unwrap();
         let info = remote.host_info().unwrap();
         assert_eq!(info.kind, "hub");
         assert!(info.packs.is_empty());
@@ -1048,5 +1117,113 @@ mod tests {
         remote.close_events().unwrap();
         let closed = remote.sessions().unwrap_err();
         assert!(closed.starts_with("hub unreachable"), "{closed}");
+    }
+
+    // ---- TLS trust of the hub sockets (agent and host relay) ----
+
+    /// A leaf for `host` issued by `ca` (with its key), served with `ca`.
+    fn served(host: &str, ca: &rcgen::Certificate, ca_key: &rcgen::KeyPair) -> (Vec<Vec<u8>>, Vec<u8>) {
+        let key = rcgen::KeyPair::generate().unwrap();
+        let leaf = rcgen::CertificateParams::new(vec![host.to_string()])
+            .unwrap()
+            .signed_by(&key, ca, ca_key)
+            .unwrap();
+        (vec![leaf.der().to_vec(), ca.der().to_vec()], key.serialize_der())
+    }
+
+    /// An in-memory handshake of `client` with a server presenting `chain`.
+    fn handshake(
+        client: Arc<rustls::ClientConfig>,
+        host: &str,
+        (chain, key): &(Vec<Vec<u8>>, Vec<u8>),
+    ) -> Result<(), rustls::Error> {
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName};
+        let server = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(
+            chain.iter().map(|c| CertificateDer::from(c.clone())).collect(),
+            PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key.clone())),
+        )
+        .unwrap();
+        let name = ServerName::try_from(host.to_string()).unwrap();
+        let mut c = rustls::ClientConnection::new(client, name)?;
+        let mut s = rustls::ServerConnection::new(Arc::new(server)).unwrap();
+        for _ in 0..16 {
+            if !c.is_handshaking() && !s.is_handshaking() {
+                return Ok(());
+            }
+            let mut buf = Vec::new();
+            while c.wants_write() {
+                c.write_tls(&mut buf).unwrap();
+            }
+            let mut r = &buf[..];
+            while !r.is_empty() {
+                s.read_tls(&mut r).unwrap();
+            }
+            s.process_new_packets()?;
+            let mut buf = Vec::new();
+            while s.wants_write() {
+                s.write_tls(&mut buf).unwrap();
+            }
+            let mut r = &buf[..];
+            while !r.is_empty() {
+                c.read_tls(&mut r).unwrap();
+            }
+            c.process_new_packets()?;
+        }
+        panic!("the handshake did not finish");
+    }
+
+    fn rustls_config(trust: &Arc<Trust>) -> Arc<rustls::ClientConfig> {
+        match tls(trust) {
+            tokio_tungstenite::Connector::Rustls(config) => config,
+            _ => panic!("hub sockets use rustls"),
+        }
+    }
+
+    #[test]
+    fn hub_trust_websocket_tls_accepts_a_trusted_chain() {
+        let ca_key = rcgen::KeyPair::generate().unwrap();
+        let mut ca = rcgen::CertificateParams::new(Vec::<String>::new()).unwrap();
+        ca.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+        let ca = ca.self_signed(&ca_key).unwrap();
+        let first = served("notes.example.test", &ca, &ca_key);
+        let reminted = served("notes.example.test", &ca, &ca_key);
+        let other = served("other.example.test", &ca, &ca_key);
+
+        // Untrusted: the public roots only, as before.
+        let none = Trust::for_hub("https://notes.example.test", &[]);
+        assert!(handshake(rustls_config(&none), "notes.example.test", &first).is_err());
+
+        // What the app passes after the user trusted the first chain: the
+        // agent socket (`Remote::connect` builds it from the base URL) and
+        // the host relay (from `/host/ws`) both accept a re-minted leaf.
+        let entry = TrustedCertificate {
+            origin: "https://notes.example.test:443".into(),
+            sha256: vault_sync::CertificateInfo::from_der(&first.0[0]).unwrap().sha256,
+            issuer_der: Some(first.0[1].clone()),
+        };
+        let relay_url = host_ws_url("https://notes.example.test").unwrap();
+        for url in ["https://notes.example.test", relay_url.as_str()] {
+            let trust = Trust::for_hub(url, std::slice::from_ref(&entry));
+            let config = rustls_config(&trust);
+            handshake(config.clone(), "notes.example.test", &first).unwrap();
+            handshake(config.clone(), "notes.example.test", &reminted).unwrap();
+            assert!(handshake(config, "other.example.test", &other).is_err());
+        }
+
+        // A leaf pin alone (an entry saved before issuers were kept).
+        let pinned = TrustedCertificate {
+            issuer_der: None,
+            ..entry
+        };
+        let trust = Trust::for_hub(&relay_url, &[pinned]);
+        let config = rustls_config(&trust);
+        handshake(config.clone(), "notes.example.test", &first).unwrap();
+        assert!(handshake(config, "notes.example.test", &reminted).is_err());
     }
 }

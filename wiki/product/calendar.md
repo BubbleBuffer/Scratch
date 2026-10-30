@@ -24,9 +24,9 @@ status: current
 - **Core:** `crates/core/src/agenda.rs` indexes:
   - task notes, from type data `tasks` (status, date as ISO, `duration_min`, assignee, calendar; the checkbox flag controls presentation);
   - the first date mark of each non-to-do block, as kind `Mention`;
-  - database rows and dated to-dos, as before.
+  - database rows and dated to-dos, as before. An undated to-do in a day note is indexed as dated to that note's day; other undated to-dos are not indexed.
 - **Queries:**
-  - `calendar_items` returns everything for the calendar;
+  - `calendar_items` returns everything for the calendar, day-note to-dos included;
   - `agenda`, `overdue`, `overdue_count` and `done_since` exclude mentions.
 - **Model:** `AgendaItem` has `calendar` and `assignee`.
 - **Tests:** `crates/core/tests/calendar_source.rs`.
@@ -38,6 +38,7 @@ status: current
 - 2026-10-12: one `task` note type holds everything dated; there is no separate event type.
 - 2026-10-13: calendars are categories, stored in a hidden system page (role `calendars`).
 - 2026-10-13: a plain `@date` mention shows in the calendar but not in Today; a dated to-do stays in Today.
+- 2026-10-29: an undated to-do in a day note counts as dated to that note's day (so it can be Overdue); undated to-dos in other pages stay out of the agenda.
 - 2026-10-13: calendar and tasks use the short item card; the paged Today portion is withdrawn.
 
 Plans, open questions and the full decision record are in the internal wiki (notes vault, notes-app > Product > Calendar).

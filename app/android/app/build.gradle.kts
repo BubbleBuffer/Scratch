@@ -1,6 +1,6 @@
 import java.util.Properties
 
-// Release key lives outside the repo (see wiki/architecture/android-release.md).
+// Release key lives outside the repo (see wiki/releases/android-release.md).
 val releaseProps = Properties().apply {
     val local = System.getenv("LOCALAPPDATA")
     val f = if (local != null) file("$local/Notes/android-keystore/keystore.properties") else null

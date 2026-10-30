@@ -10,8 +10,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'types.dart';
 import 'vault.dart';
 
-// These functions are ignored because they are not marked as `pub`: `local_close_chapter`, `local_outline_revision`, `local_outline`, `local_replay_control`, `local_replay_load`, `local_replay_status`, `local_upsert_chapter`, `local_upsert_section`, `outline_at`, `outline_data_dir`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These functions are ignored because they are not marked as `pub`: `compacted_at`, `local_close_chapter`, `local_compacted`, `local_outline_revision`, `local_outline`, `local_replay_control`, `local_replay_load`, `local_replay_status`, `local_upsert_chapter`, `local_upsert_section`, `outline_at`, `outline_data_dir`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 /// Runs the claimed AI task `task_id` with the agent (runner `agent`) in a
 /// session of its own, and writes the result or the error back to the task.
@@ -70,19 +70,32 @@ abstract class NotesAgent implements RustOpaqueInterface {
     required String endedAt,
   });
 
+  /// LCM and legacy summary cards interleaved with uncovered canonical messages.
+  /// Never reads the notes-owned outline. Remote hosts return compactable=false.
+  Future<CompactedHistory> compactedHistory({required String sessionId});
+
   /// Connects to the agent of the hub at `url` (its base URL; `https://`
   /// gives `wss://`), as device `device` with its device token. Fails if
   /// the first connection fails. Later drops reconnect with backoff and
   /// push a `gap` event; calls while disconnected fail with "hub
   /// unreachable". `close_events` (or dropping it) closes the socket.
+  ///
+  /// `trusted`: the device's trusted hub certificates, as for
+  /// `NotesSync::with_trusted_certificates`. `vault_root`: the vault
+  /// whose device key proves this device (the bearer is a session, as for
+  /// sync); empty sends the bare token.
   static Future<NotesAgent> connect({
     required String url,
     required String device,
     required String token,
+    required List<TrustedHubCertificate> trusted,
+    required String vaultRoot,
   }) => RustLib.instance.api.crateApiAgentNotesAgentConnect(
     url: url,
     device: device,
     token: token,
+    trusted: trusted,
+    vaultRoot: vaultRoot,
   );
 
   Future<AgentSession> createSession({required String title});
@@ -109,15 +122,28 @@ abstract class NotesAgent implements RustOpaqueInterface {
   /// Capabilities of the connected host.
   Future<AgentHostInfo> hostInfo();
 
+  /// Gives the running host relay the device's trusted hub certificates
+  /// after the user trusted or revoked one: its next connection attempt
+  /// uses them, and a relay waiting to retry tries again at once. A no-op
+  /// when no relay runs.
+  Future<void> hostRelaySetTrust({
+    required List<TrustedHubCertificate> trusted,
+  });
+
   /// "Let the hub use this computer": keeps one socket open to the hub at
   /// `url` (`/host/ws`) as device `device` with its device token, so
   /// `/mcp/agent?host=<this device's name>` runs this agent's tools here
   /// (desktop pack included, no approval prompts). Restarts a running
   /// relay; drops reconnect with backoff. Fails on a hub connection.
+  /// `trusted`: the device's trusted hub certificates, as for
+  /// `NotesSync::with_trusted_certificates`. `vault_root`: as for
+  /// `connect`.
   Future<void> hostRelayStart({
     required String url,
     required String device,
     required String token,
+    required List<TrustedHubCertificate> trusted,
+    required String vaultRoot,
   });
 
   /// The PC host relay's connection state ("off" when not started).
@@ -1508,6 +1534,120 @@ class AgentUiAction {
           blockIds == other.blockIds;
 }
 
+class ChapterCard {
+  final String id;
+  final ChapterStatus status;
+  final String title;
+  final String? summary;
+
+  /// One-based part number and total parts for this chapter.
+  final int part_;
+  final int parts;
+  final String startedAt;
+  final String endedAt;
+  final String firstMessageId;
+  final String lastMessageId;
+  final MessageRange range;
+
+  /// Whole-chapter footer totals, present only on the last part.
+  final int? messageCount;
+  final int? episodeCount;
+
+  /// Closed-chapter metadata, populated only on the last part.
+  final List<String> decisions;
+  final List<ChapterSection> sections;
+  final List<EpisodeCard> episodes;
+
+  const ChapterCard({
+    required this.id,
+    required this.status,
+    required this.title,
+    this.summary,
+    required this.part_,
+    required this.parts,
+    required this.startedAt,
+    required this.endedAt,
+    required this.firstMessageId,
+    required this.lastMessageId,
+    required this.range,
+    this.messageCount,
+    this.episodeCount,
+    this.decisions = const [],
+    this.sections = const [],
+    required this.episodes,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      status.hashCode ^
+      title.hashCode ^
+      summary.hashCode ^
+      part_.hashCode ^
+      parts.hashCode ^
+      startedAt.hashCode ^
+      endedAt.hashCode ^
+      firstMessageId.hashCode ^
+      lastMessageId.hashCode ^
+      range.hashCode ^
+      messageCount.hashCode ^
+      episodeCount.hashCode ^
+      decisions.hashCode ^
+      sections.hashCode ^
+      episodes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChapterCard &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          status == other.status &&
+          title == other.title &&
+          summary == other.summary &&
+          part_ == other.part_ &&
+          parts == other.parts &&
+          startedAt == other.startedAt &&
+          endedAt == other.endedAt &&
+          firstMessageId == other.firstMessageId &&
+          lastMessageId == other.lastMessageId &&
+          range == other.range &&
+          messageCount == other.messageCount &&
+          episodeCount == other.episodeCount &&
+          decisions == other.decisions &&
+          sections == other.sections &&
+          episodes == other.episodes;
+}
+
+class ChapterSection {
+  final String name;
+
+  /// One-based episode ordinals within the whole chapter, inclusive.
+  final int firstEpisode;
+  final int lastEpisode;
+
+  const ChapterSection({
+    required this.name,
+    required this.firstEpisode,
+    required this.lastEpisode,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^ firstEpisode.hashCode ^ lastEpisode.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChapterSection &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          firstEpisode == other.firstEpisode &&
+          lastEpisode == other.lastEpisode;
+}
+
+enum ChapterStatus { open, closed }
+
 /// One session's outline, chapters in order. The notes-owned outline when one was
 /// saved (even an empty one), else BubblePaw's context chapters without sections.
 class ChatOutline {
@@ -1524,6 +1664,256 @@ class ChatOutline {
       other is ChatOutline &&
           runtimeType == other.runtimeType &&
           chapters == other.chapters;
+}
+
+/// Read-only compacted history. Ranges use zero-based, half-open canonical message
+/// indices (before UI notice filtering). On overlap, compactable is false and
+/// segments is empty. Otherwise the final segment is always Messages, even empty.
+class CompactedHistory {
+  final bool compactable;
+  final int boundary;
+  final int messageCount;
+
+  /// Canonical index-to-ID map, including notices hidden by the UI.
+  final List<String> messageIds;
+  final List<HistorySegment> segments;
+
+  const CompactedHistory({
+    required this.compactable,
+    required this.boundary,
+    required this.messageCount,
+    required this.messageIds,
+    required this.segments,
+  });
+
+  @override
+  int get hashCode =>
+      compactable.hashCode ^
+      boundary.hashCode ^
+      messageCount.hashCode ^
+      messageIds.hashCode ^
+      segments.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CompactedHistory &&
+          runtimeType == other.runtimeType &&
+          compactable == other.compactable &&
+          boundary == other.boundary &&
+          messageCount == other.messageCount &&
+          messageIds == other.messageIds &&
+          segments == other.segments;
+}
+
+class EpisodeAction {
+  final String verb;
+  final String target;
+  final TargetKind targetKind;
+  final String? changeMarker;
+  final PointOfInterest? pointOfInterest;
+
+  const EpisodeAction({
+    required this.verb,
+    required this.target,
+    required this.targetKind,
+    this.changeMarker,
+    this.pointOfInterest,
+  });
+
+  @override
+  int get hashCode =>
+      verb.hashCode ^
+      target.hashCode ^
+      targetKind.hashCode ^
+      changeMarker.hashCode ^
+      pointOfInterest.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EpisodeAction &&
+          runtimeType == other.runtimeType &&
+          verb == other.verb &&
+          target == other.target &&
+          targetKind == other.targetKind &&
+          changeMarker == other.changeMarker &&
+          pointOfInterest == other.pointOfInterest;
+}
+
+class EpisodeCard {
+  final String id;
+  final String startedAt;
+  final String endedAt;
+  final String firstMessageId;
+  final String lastMessageId;
+  final MessageRange range;
+  final int messageCount;
+  final String title;
+  final String? gist;
+  final List<EpisodeAction> actions;
+  final int actionCount;
+  final int flaggedCount;
+  final int errorCount;
+
+  const EpisodeCard({
+    required this.id,
+    required this.startedAt,
+    required this.endedAt,
+    required this.firstMessageId,
+    required this.lastMessageId,
+    required this.range,
+    required this.messageCount,
+    required this.title,
+    this.gist,
+    required this.actions,
+    required this.actionCount,
+    required this.flaggedCount,
+    required this.errorCount,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      startedAt.hashCode ^
+      endedAt.hashCode ^
+      firstMessageId.hashCode ^
+      lastMessageId.hashCode ^
+      range.hashCode ^
+      messageCount.hashCode ^
+      title.hashCode ^
+      gist.hashCode ^
+      actions.hashCode ^
+      actionCount.hashCode ^
+      flaggedCount.hashCode ^
+      errorCount.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EpisodeCard &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          startedAt == other.startedAt &&
+          endedAt == other.endedAt &&
+          firstMessageId == other.firstMessageId &&
+          lastMessageId == other.lastMessageId &&
+          range == other.range &&
+          messageCount == other.messageCount &&
+          title == other.title &&
+          gist == other.gist &&
+          actions == other.actions &&
+          actionCount == other.actionCount &&
+          flaggedCount == other.flaggedCount &&
+          errorCount == other.errorCount;
+}
+
+/// Exactly one card payload is present for its kind; Messages has neither.
+/// This tagged representation keeps the bridge's plain Dart DTO convention.
+class HistorySegment {
+  final HistorySegmentKind kind;
+  final MessageRange range;
+  final LegacyCard? legacy;
+  final ChapterCard? chapter;
+
+  const HistorySegment({
+    required this.kind,
+    required this.range,
+    this.legacy,
+    this.chapter,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^ range.hashCode ^ legacy.hashCode ^ chapter.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HistorySegment &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          range == other.range &&
+          legacy == other.legacy &&
+          chapter == other.chapter;
+}
+
+enum HistorySegmentKind { legacyCard, chapterCard, messages }
+
+class LegacyCard {
+  final String id;
+  final LegacyKind kind;
+  final String? title;
+  final String summary;
+  final String startedAt;
+  final String endedAt;
+  final String firstMessageId;
+  final String lastMessageId;
+  final MessageRange range;
+  final int messageCount;
+
+  const LegacyCard({
+    required this.id,
+    required this.kind,
+    this.title,
+    required this.summary,
+    required this.startedAt,
+    required this.endedAt,
+    required this.firstMessageId,
+    required this.lastMessageId,
+    required this.range,
+    required this.messageCount,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      kind.hashCode ^
+      title.hashCode ^
+      summary.hashCode ^
+      startedAt.hashCode ^
+      endedAt.hashCode ^
+      firstMessageId.hashCode ^
+      lastMessageId.hashCode ^
+      range.hashCode ^
+      messageCount.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LegacyCard &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          kind == other.kind &&
+          title == other.title &&
+          summary == other.summary &&
+          startedAt == other.startedAt &&
+          endedAt == other.endedAt &&
+          firstMessageId == other.firstMessageId &&
+          lastMessageId == other.lastMessageId &&
+          range == other.range &&
+          messageCount == other.messageCount;
+}
+
+enum LegacyKind { checkpoint, chapter }
+
+/// Canonical message indices: start inclusive, end exclusive.
+class MessageRange {
+  final int start;
+  final int end;
+
+  const MessageRange({required this.start, required this.end});
+
+  @override
+  int get hashCode => start.hashCode ^ end.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MessageRange &&
+          runtimeType == other.runtimeType &&
+          start == other.start &&
+          end == other.end;
 }
 
 /// A span of a chat, from `first_message_id` to `last_message_id` (both inclusive).
@@ -1630,6 +2020,24 @@ class OutlineSection {
           lastMessageId == other.lastMessageId;
 }
 
+class PointOfInterest {
+  final String kind;
+  final String reason;
+
+  const PointOfInterest({required this.kind, required this.reason});
+
+  @override
+  int get hashCode => kind.hashCode ^ reason.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PointOfInterest &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          reason == other.reason;
+}
+
 /// Dev replay status (`vault_agent::replay::ReplayStatus`). Replay needs `NOTES_DEV_REPLAY=1`.
 class ReplayStatus {
   /// The recorded user messages, in send order.
@@ -1664,3 +2072,5 @@ class ReplayStatus {
           state == other.state &&
           error == other.error;
 }
+
+enum TargetKind { path, page, command, question, other }

@@ -46,6 +46,15 @@ fn titled(v: &Vault, title: &str) -> PageSummary {
         .unwrap_or_else(|| panic!("no page titled {title}"))
 }
 
+// Type-persistence tests use a real property so first-open view migration
+// keeps these databases. Title-only conversion is covered in view_blocks.rs.
+fn with_property(v: &Vault, id: &str) {
+    v.set_schema(id.into(), vec![PropDef {
+        key: "value".into(), name: "Value".into(), kind: PropKind::Text,
+        options: vec![], config: String::new(),
+    }]).unwrap();
+}
+
 #[test]
 fn pages_are_documents_until_made_databases() {
     let t = TempDir::new("default");
@@ -57,6 +66,7 @@ fn pages_are_documents_until_made_databases() {
     assert_eq!(titled(&v, "Plain").page_type, PAGE_TYPE_DOCUMENT);
 
     v.make_collection(id.clone()).unwrap();
+    with_property(&v, &id);
     // Already a database: nothing changes.
     v.make_collection(id.clone()).unwrap();
     assert_eq!(
@@ -82,6 +92,7 @@ fn database_type_survives_an_index_from_an_older_schema() {
         let v = t.open();
         let id = v.create_page(None, "Tasks".into()).unwrap();
         v.make_collection(id.clone()).unwrap();
+        with_property(&v, &id);
         v.flush().unwrap();
         id
     };
@@ -136,6 +147,7 @@ fn an_edited_file_changes_the_type_only_when_it_declares_one() {
     let v = t.open();
     let id = v.create_page(None, "Ledger".into()).unwrap();
     v.make_collection(id.clone()).unwrap();
+    with_property(&v, &id);
     v.flush().unwrap();
 
     // Dropping the type line says nothing about the type: still a database.

@@ -1,0 +1,173 @@
+# Nightly Windows builds for the updater's "Include nightly builds" channel.
+#
+# Daily at 02:30 UTC (and by hand), when main has moved since the last
+# nightly: builds main's Windows installer the way release.yml does
+# (scripts/build-windows-installer.sh) and publishes it as a GitHub
+# pre-release tagged v<base>-nightly.<YYYYMMDD>, where <base> is the version
+# core of the newest non-nightly release (v0.1.0-prealpha.11 gives 0.1.0).
+#
+# Assets: Scratch-Setup-<base>-nightly.<YYYYMMDD>.exe and SHA256SUMS.txt only
+# (no APK, no CLI). Nightly releases beyond the newest 7 are deleted with
+# their tags; only tags containing "-nightly." are ever touched.
+#
+# The tag is created by GITHUB_TOKEN, so it does not trigger release.yml.
+# See wiki/releases/repository-and-releases.md, "Nightly builds".
+name: nightly
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Build even if main has not changed since the last nightly
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  KEEP_NIGHTLIES: 7
+
+jobs:
+  plan:
+    name: decide
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.p.outputs.build }}
+      tag: ${{ steps.p.outputs.tag }}
+      numeric: ${{ steps.p.outputs.numeric }}
+      code: ${{ steps.p.outputs.code }}
+      sha: ${{ steps.p.outputs.sha }}
+    steps:
+      - id: p
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force || false }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          releases="$(gh api "repos/$repo/releases?per_page=100")"
+          newest() {
+            jq -r --arg want "$1" '[.[] | select(.draft | not)
+              | select((.tag_name | contains("-nightly.")) == ($want == "nightly"))]
+              | sort_by(.published_at) | last | .tag_name // ""' <<<"$releases"
+          }
+          base_tag="$(newest release)"
+          if ! [[ $base_tag =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            echo "::error::no release tag to take the version from (got '$base_tag')"
+            exit 1
+          fi
+          numeric=${BASH_REMATCH[1]}
+          sha="$(gh api "repos/$repo/commits/main" --jq .sha)"
+          last="$(newest nightly)"
+          last_sha=""
+          if [[ -n $last ]]; then
+            last_sha="$(gh api "repos/$repo/commits/$last" --jq .sha)"
+          fi
+          tag="v$numeric-nightly.$(date -u +%Y%m%d)"
+          build=true
+          if [[ $sha == "$last_sha" && $FORCE != true ]]; then
+            echo "main ($sha) is the last nightly's commit ($last); nothing to build"
+            build=false
+          elif gh api "repos/$repo/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag already exists; nothing to build"
+            build=false
+          fi
+          {
+            echo "build=$build"
+            echo "tag=$tag"
+            echo "numeric=$numeric"
+            echo "code=$(( $(date +%s) / 60 ))"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+          echo "base $base_tag, last nightly ${last:-none} (${last_sha:-n/a}), main $sha, tag $tag, build $build"
+
+  windows:
+    name: windows installer
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: release-windows
+          save-if: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.47.5
+          cache: true
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - name: Build app and installer
+        run: |
+          bash scripts/build-windows-installer.sh "${{ needs.plan.outputs.tag }}" "${{ needs.plan.outputs.numeric }}" "${{ needs.plan.outputs.code }}" dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nightly-windows
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: publish nightly
+    needs: [plan, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: nightly-windows
+          path: dist
+      - name: Create the pre-release
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          SHA: ${{ needs.plan.outputs.sha }}
+        run: |
+          set -euo pipefail
+          sha256sum -- * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          notes="Nightly build of main at ${SHA::7}. Less tested than releases; offered by the Windows app only when \"Include nightly builds\" is on."
+          # gh uploads the assets to a draft and publishes it afterwards, so
+          # the updater never sees a nightly without its installer.
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$SHA" \
+            --prerelease --latest=false --title "Nightly $(date -u +%Y-%m-%d)" --notes "$notes" -- *
+      - name: Prune old nightlies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq \
+            '[.[] | select(.draft | not) | select(.tag_name | contains("-nightly."))]
+             | sort_by(.published_at) | reverse | .['"$KEEP_NIGHTLIES"':][] | .tag_name' |
+          while read -r old; do
+            # Belt and braces: never delete anything but a nightly.
+            [[ $old == *-nightly.* ]] || continue
+            echo "deleting $old"
+            gh release delete "$old" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          done

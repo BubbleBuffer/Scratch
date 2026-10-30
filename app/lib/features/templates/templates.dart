@@ -4,7 +4,7 @@
 // starts from.
 //
 // - An empty page shows one row of starters under the title ([PageStarters]:
-//   "Blank", "Database", one chip per template of its parent, "+ Template");
+//   "Blank", one chip per template of its parent, "+ Template");
 //   picking a template copies it into the page.
 // - An open template says so in a banner, with "Set as default" and "Turn
 //   into page".
@@ -22,7 +22,6 @@ import '../../shell/navigation.dart' as nav;
 import '../../state/app_state.dart';
 import '../../state/pages_store.dart' show firstLineOfTexts;
 import '../../ui/ui.dart';
-import '../../addons/database/api.dart';
 import '../../ui/database/db_icons.dart';
 import '../../ui/database/widgets.dart';
 
@@ -215,7 +214,7 @@ Future<Map<String, String>> _firstLinesOf(NotesVault v, List<PageRow> rows) asyn
     };
 
 /// The one empty state of an empty page, under its title: "Blank" (focuses
-/// the body), "Database" (turns the page into one), one chip per template
+/// the body), one chip per template
 /// of its parent, and "+ Template" (a new template for the parent).
 class PageStarters extends StatefulWidget {
   const PageStarters({
@@ -331,12 +330,6 @@ class _PageStartersState extends State<PageStarters> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               chip('start-blank', 'Blank', DbIco.text, widget.onBlank),
-              chip(
-                'start-database',
-                'Database',
-                DbIco.table,
-                () => makeDatabase(context.app.vault, widget.pageId),
-              ),
               for (final t in _templates)
                 chip(
                   'template-pick-${_nameOf(t)}',

@@ -15,6 +15,11 @@ Finder itemRow(AgendaItem item) =>
     key('today-item-${AgendaStore.itemKey(item)}');
 Finder itemCheck(AgendaItem item) =>
     find.descendant(of: itemRow(item), matching: find.byType(StacksCheckbox));
+Finder rowsInPage(String page) => find.byWidgetPredicate(
+  (widget) =>
+      widget.key is ValueKey<String> &&
+      (widget.key! as ValueKey<String>).value.startsWith('today-item-$page/'),
+);
 Future<void> showItem(WidgetTester tester, AgendaItem item) async {
   while (itemRow(item).evaluate().isEmpty &&
       key('today-more').evaluate().isNotEmpty) {
@@ -260,8 +265,7 @@ void main() {
         (i) => i.title == 'Return library books',
       );
       final itemKey = AgendaStore.itemKey(item);
-      expect(itemRow(item), findsNothing);
-      await tapAndSettle(tester, key('today-overdue'));
+      expect(itemRow(item), findsOneWidget);
       await showItem(tester, item);
       await tapAndSettle(tester, itemCheck(item));
       await settleUntil(
@@ -402,26 +406,67 @@ void main() {
               'today-item-$id/',
             ),
       );
-      expect(rows, findsNothing);
       expect(f.app.agenda.overdueItems.length, 50);
-      await reveal(tester, key('today-overdue'));
-      await tapAndSettle(tester, key('today-overdue'));
       expect(rows, findsNWidgets(5));
       for (var count = 10; count <= 55; count += 5) {
-        await reveal(tester, key('today-more'));
-        await tapAndSettle(tester, key('today-more'));
+        await reveal(tester, key('today-overdue-more'));
+        await tapAndSettle(tester, key('today-overdue-more'));
         expect(rows, findsNWidgets(count));
       }
       expect(f.app.agenda.overdueItems.length, 55);
-      expect(key('today-more'), findsNothing);
+      expect(key('today-overdue-more'), findsNothing);
       await reveal(tester, key('today-date-2026-10-07'));
       await tapAndSettle(tester, key('today-date-2026-10-07'));
       expect(key('today-overdue'), findsNothing);
       await tapAndSettle(tester, key('today-back'));
-      expect(rows, findsNothing);
+      // Overdue re-expands on the day change, with its budget of five again.
+      expect(rows, findsNWidgets(5));
+      expect(key('today-overdue-more'), findsOneWidget);
       expect(f.app.agenda.overdueLimit, 50);
     },
   );
+
+  for (final overdueCount in [3, 7]) {
+    appTest(
+      'overdue rows have their own budget beside Today rows with $overdueCount overdue',
+      (tester) async {
+        final f = await pumpApp(tester, mobile: false, empty: true);
+        final (late, today) = await core(tester, (v) async {
+          final late = await v.createPage(title: 'Late groups');
+          await v.apply(
+            late,
+            datedTasks(overdueCount, DateTime(2026, 10, 5), prefix: 'Late'),
+          );
+          final today = await v.createPage(title: 'Today groups');
+          await v.apply(today, datedTasks(5, fixedNow, prefix: 'Now'));
+          return (late, today);
+        });
+        final shownLate = overdueCount > 5 ? 5 : overdueCount;
+        await settleUntil(
+          tester,
+          () =>
+              rowsInPage(late).evaluate().length == shownLate &&
+              rowsInPage(today).evaluate().length == 5,
+        );
+        expect(f.app.agenda.overdueCount, overdueCount);
+        expect(key('today-overdue'), findsOneWidget);
+        expect(rowsInPage(today), findsNWidgets(5));
+        expect(rowsInPage(late), findsNWidgets(shownLate));
+        expect(key('today-more'), findsNothing);
+        if (overdueCount > 5) {
+          expect(key('today-overdue-more'), findsOneWidget);
+          expect(find.text('Show ${overdueCount - 5} more'), findsOneWidget);
+          await reveal(tester, key('today-overdue-more'));
+          await tapAndSettle(tester, key('today-overdue-more'));
+          expect(rowsInPage(late), findsNWidgets(overdueCount));
+          expect(rowsInPage(today), findsNWidgets(5));
+          expect(key('today-overdue-more'), findsNothing);
+        } else {
+          expect(key('today-overdue-more'), findsNothing);
+        }
+      },
+    );
+  }
 
   appTest(
     'midnight advances today, reloads and keeps an independently selected day',

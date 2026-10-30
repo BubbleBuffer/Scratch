@@ -6,9 +6,10 @@ export 'agent_cells.dart';
 export 'agent_chat.dart';
 export 'agent_composer.dart';
 export 'agent_markdown.dart';
+export 'agent_mcp_controller.dart';
+export 'agent_mcp_draft.dart';
 export 'agent_mcp_settings.dart';
 export 'agent_outline.dart';
-export 'agent_outline_view.dart';
 export 'agent_panel.dart';
 export 'agent_screen.dart';
 export 'agent_search_source.dart';
@@ -45,8 +46,10 @@ import 'blocks/chat_ref.dart';
 import 'commands.dart';
 import 'chat_type.dart';
 import 'chat_search.dart';
+import 'kit_pane.dart';
 export 'chat_search.dart'
-    show AgentChatSearchSource, ChatSearchTarget, openChatHit;
+    show AgentChatSearchSource, ChatSearchTargetNavigation, openChatHit;
+export 'chat_search_target.dart' show ChatSearchTarget;
 export 'chat_type.dart' show chatNoteType, chatChip, chatCard, chatEmbed;
 import 'navigation.dart';
 
@@ -86,7 +89,8 @@ class AgentAddon extends Addon {
           final app = AppScope.maybeOf(context);
           return app != null && AgentStore.of(app).enabled;
         },
-        build: (_) => const AgentScreen(),
+        build: (_) =>
+            agentKitPane ? const AgentKitScreen() : const AgentScreen(),
         wrap: (_, child) => AgentPanelShell(child: child),
         headerAction: (_) => const AgentPanelToggle(),
       ),
