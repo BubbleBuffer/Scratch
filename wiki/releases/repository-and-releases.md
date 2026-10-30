@@ -15,7 +15,7 @@ status: current
 - **BubbleBuffer/Scratch (public)** is the only source repo. Development, CI and pre-alpha releases happen here. Its CI runs on GitHub-hosted runners only.
 - **BubbleBuffer/notes-app (private)** is archived. Scratch is no longer an export of it: `scripts/publish-public.sh` is gone. Runs in the former private repo are cited as "run N in the former private repo".
 - **BubbleBuffer/scratch-ops (private)** holds the private operations: the hub deploy, the APK publishing and the private patterns file (`private-strings.txt`). Its workflows run only on the home build server.
-- **BubblePaw-Core (public)** supplies the agent crates. `crates/agent` and `crates/tools` depend on its `bubblepaw-sdk` crate by git (and `crates/agent` on `bubblepaw-mcp`), pinned to tag `v0.2.1` in `Cargo.toml`. Bump the tag to upgrade.
+- **BubblePaw-Core (public)** supplies the agent crates. `crates/agent` depends on its `bubblepaw-sdk` and `bubblepaw-mcp` crates by git, and `crates/tools` on `bubblepaw-core`, all pinned to tag `v0.3.1` in their `Cargo.toml`. Bump the tag to upgrade.
 - **Licence:** `AGPL-3.0-or-later`, in [LICENSE](../../LICENSE). Bundled third-party code and assets are listed in [THIRD_PARTY.md](../../THIRD_PARTY.md).
 - **Hosts stay out of this repo.** Deploy targets live in scratch-ops. Docs use placeholders such as `notes.example.com`.
 
@@ -62,7 +62,7 @@ The tag must look like `v<major>.<minor>.<patch>` with an optional `-<pre-releas
 - `notes-cli-<version>-windows-x64.exe` and `notes-cli-<version>-linux-x64.tar.gz`, the CLI
 - `SHA256SUMS.txt`
 
-The Android versionCode is the build time in epoch minutes, so each release is newer than the last. The GitHub APK is not release-signed; see below.
+The Android versionCode is the build time in epoch minutes, so each release is newer than the last. The GitHub APK is signed with a separate pre-alpha key when the `PREALPHA_*` secrets are set, and ships as `...-unsigned.apk` otherwise. It is never signed with the release key, so a pre-alpha install and a release-signed install cannot update each other; see [Android release](android-release.md).
 
 ## Nightly builds
 
