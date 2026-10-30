@@ -34,7 +34,7 @@ mod ui;
 pub mod wire;
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::Duration;
 
@@ -448,6 +448,9 @@ pub struct Agent {
     system_prompt: String,
     /// Stops each running [`Agent::forward_events`] task.
     forwarders: Mutex<Vec<CancellationToken>>,
+    /// Set once this device's old task sessions were expired (the first task
+    /// run after the app starts does it).
+    sessions_expired: AtomicBool,
     runtime: tokio::runtime::Runtime,
 }
 
@@ -792,6 +795,7 @@ impl Agent {
             surfaces: RwLock::new(Arc::new(surfaces)),
             scheduler: Mutex::new(Ok(None)),
             records,
+            sessions_expired: AtomicBool::new(false),
             ui,
             host_info,
             desktop,
@@ -1103,6 +1107,25 @@ impl Agent {
 
     pub fn rename_session(&self, id: &str, title: &str) -> Result<Session> {
         outline_titles::rename_user(&self.store, &self.outline_path, id, title)
+    }
+
+    /// Deletes the sessions (transcripts and logs) of this device's ended
+    /// tasks that finished more than `keep_ms` ago, and clears each task's
+    /// `session`. The task row, its outcome and its attempt history stay.
+    /// Returns how many sessions went.
+    pub fn expire_task_sessions(&self, keep_ms: i64) -> Result<u32> {
+        let now = vault_mcp::jobs::now_ms();
+        let device = self.vault.device_id();
+        let mut n = 0;
+        for (t, session) in vault_mcp::tasks::expired_sessions(&self.vault, &device, keep_ms, now)
+            .map_err(anyhow::Error::msg)?
+        {
+            // A session that is already gone counts as expired.
+            let _ = self.delete_session(&session);
+            vault_mcp::tasks::session_expired(&self.vault, &t.id).map_err(anyhow::Error::msg)?;
+            n += 1;
+        }
+        Ok(n)
     }
 
     /// Deletes the session's history and drops the providers' mirrors of it.

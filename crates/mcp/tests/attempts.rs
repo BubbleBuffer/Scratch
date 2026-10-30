@@ -302,3 +302,192 @@ fn an_old_ended_job_loses_its_session_but_keeps_its_row_and_attempts() {
     assert!(kept.session.is_empty());
     assert!(!attempts::list(&v, &job.id).unwrap().is_empty());
 }
+
+#[test]
+fn a_reviewed_task_ends_in_review_and_accept_makes_it_done() {
+    let t = Temp::new();
+    let v = t.open();
+    let page = v.create_page(None, "Notes".into()).unwrap();
+    let me = v.device_id();
+    let task = vault_mcp::runners::assign(&v, "Plan it", &page, None, &me, None);
+    // This device is not a published PC runner here: use a plain row.
+    let id = match task {
+        Ok(t) => t.id,
+        Err(_) => {
+            let t = tasks::create(&v, "Plan it", &page, None, "agent").unwrap();
+            tasks::set_review(&v, &t.id).unwrap();
+            t.id
+        }
+    };
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    assert!(!tasks::accept(&v, &id).unwrap());
+    tasks::finish(&v, &id, Ok("The plan".into())).unwrap();
+    assert_eq!(tasks::get(&v, &id).unwrap().status, tasks::REVIEW);
+    assert!(tasks::accept(&v, &id).unwrap());
+    assert_eq!(tasks::get(&v, &id).unwrap().status, tasks::DONE);
+    assert!(!tasks::accept(&v, &id).unwrap());
+
+    // A task without the policy still ends in done.
+    let plain = tasks::create(&v, "Plain", &page, None, "agent").unwrap();
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    tasks::finish(&v, &plain.id, Ok("Done".into())).unwrap();
+    assert_eq!(tasks::get(&v, &plain.id).unwrap().status, tasks::DONE);
+}
+
+#[test]
+fn a_silent_runner_is_stalled_after_ten_minutes_and_only_then_can_be_failed() {
+    let t = Temp::new();
+    let v = t.open();
+    let (_, id) = running_task(&v, "Long");
+    let task = tasks::get(&v, &id).unwrap();
+    // claim_next wrote a heartbeat.
+    let beat = task.heartbeat_ms.expect("a heartbeat at claim");
+    assert_eq!(tasks::stalled_since(&task, beat + 1000), None);
+    assert_eq!(
+        tasks::stalled_since(&task, beat + tasks::STALL_MS + 1),
+        Some(beat)
+    );
+    // Not stalled now: refused, nothing changes.
+    assert!(!tasks::mark_failed(&v, &id).unwrap());
+    assert_eq!(tasks::get(&v, &id).unwrap().status, "running");
+
+    // An old heartbeat: stalled, and the user may mark it failed.
+    v.set_property(
+        id.clone(),
+        "heartbeat".into(),
+        PropValue::Text((jobs_now() - tasks::STALL_MS - 1000).to_string()),
+    )
+    .unwrap();
+    assert!(tasks::mark_failed(&v, &id).unwrap());
+    let failed = tasks::get(&v, &id).unwrap();
+    assert_eq!(failed.status, "failed");
+    assert!(failed.error.contains("stopped responding"));
+}
+
+fn jobs_now() -> i64 {
+    vault_mcp::jobs::now_ms()
+}
+
+#[test]
+fn an_old_ended_task_loses_its_session_but_keeps_its_row() {
+    let t = Temp::new();
+    let v = t.open();
+    let (_, id) = running_task(&v, "Old");
+    v.set_property(id.clone(), "session".into(), PropValue::Text("s-1".into()))
+        .unwrap();
+    tasks::finish(&v, &id, Ok("Result".into())).unwrap();
+    let me = v.device_id();
+    let day = 86_400_000;
+    let now = jobs_now();
+    assert!(tasks::expired_sessions(&v, &me, 30 * day, now).unwrap().is_empty());
+    let due = tasks::expired_sessions(&v, &me, 30 * day, now + 31 * day).unwrap();
+    assert_eq!(due.len(), 1);
+    assert_eq!(due[0].1, "s-1");
+    tasks::session_expired(&v, &id).unwrap();
+    assert!(tasks::expired_sessions(&v, &me, 30 * day, now + 31 * day)
+        .unwrap()
+        .is_empty());
+    assert_eq!(tasks::get(&v, &id).unwrap().status, "done");
+    assert!(!attempts::list(&v, &id).unwrap().is_empty());
+}
+
+fn board(v: &Vault, title: &str, columns: &[(&str, &str)], card: &str, in_col: &str) -> PageId {
+    let b = v.create_page(None, title.into()).unwrap();
+    v.set_page_type(b.clone(), "kanban".into()).unwrap();
+    let cols: Vec<_> = columns
+        .iter()
+        .map(|(id, t)| serde_json::json!({"id": id, "title": t}))
+        .collect();
+    v.type_data_set(b.clone(), "kanban".into(), vec!["columns".into()], serde_json::Value::Array(cols).to_string())
+        .unwrap();
+    for (id, _) in columns {
+        let list = if *id == in_col { serde_json::json!([card]) } else { serde_json::json!([]) };
+        v.type_data_set(b.clone(), "kanban".into(), vec!["cards".into(), (*id).into()], list.to_string())
+            .unwrap();
+    }
+    b
+}
+
+fn column_of(v: &Vault, b: &str, card: &str) -> String {
+    let d: serde_json::Value =
+        serde_json::from_str(&v.type_data(b.to_string(), "kanban".into()).unwrap()).unwrap();
+    d["cards"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .find(|(_, l)| l.as_array().unwrap().iter().any(|x| x == card))
+        .map(|(k, _)| k.clone())
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_reviewed_run_moves_its_card_to_review_and_accept_to_the_last_column() {
+    let t = Temp::new();
+    let v = t.open();
+    let card = v.create_page(None, "Card".into()).unwrap();
+    let with = board(
+        &v,
+        "With review",
+        &[("a", "To do"), ("b", "review "), ("c", "Done")],
+        &card,
+        "a",
+    );
+    let without = board(&v, "No review", &[("x", "Todo"), ("y", "Done")], &card, "x");
+    let t1 = tasks::create(&v, "Plan it", &card, None, "agent").unwrap();
+    tasks::set_review(&v, &t1.id).unwrap();
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    tasks::finish(&v, &t1.id, Ok("The plan".into())).unwrap();
+    assert_eq!(column_of(&v, &with, &card), "b");
+    assert_eq!(column_of(&v, &without, &card), "x", "no Review column: left alone");
+
+    // Moving again changes nothing.
+    assert_eq!(tasks::board::move_card(&v, &card, tasks::board::Target::Review).unwrap(), 0);
+
+    assert!(tasks::accept(&v, &t1.id).unwrap());
+    assert_eq!(column_of(&v, &with, &card), "c");
+    assert_eq!(column_of(&v, &without, &card), "y");
+    assert_eq!(tasks::board::move_card(&v, &card, tasks::board::Target::Last).unwrap(), 0);
+}
+
+#[test]
+fn a_question_is_open_until_the_reply_and_a_run_that_ends_waiting_is_not_failed() {
+    let t = Temp::new();
+    let v = t.open();
+    let (_, id) = running_task(&v, "Decide");
+    assert!(tasks::ask(&v, &id, "  ").is_err());
+    tasks::ask(&v, &id, "Which one?").unwrap();
+    assert_eq!(tasks::get(&v, &id).unwrap().question, "Which one?");
+    assert_eq!(tasks::get(&v, &id).unwrap().status, tasks::RUNNING);
+    assert_eq!(tasks::take_reply(&v, &id).unwrap(), None);
+    assert!(!tasks::reply(&v, &id, "  ").unwrap());
+    assert!(tasks::reply(&v, &id, "The first").unwrap());
+    assert!(!tasks::reply(&v, &id, "again").unwrap(), "no open question");
+    assert!(tasks::get(&v, &id).unwrap().question.is_empty());
+    assert_eq!(tasks::take_reply(&v, &id).unwrap().as_deref(), Some("The first"));
+    assert_eq!(tasks::take_reply(&v, &id).unwrap(), None);
+
+    // The run ends while it waits: the attempt says so and the row is not failed.
+    tasks::ask(&v, &id, "Still there?").unwrap();
+    tasks::finish_attempt(
+        &v,
+        &id,
+        None,
+        Err(format!("{}: no reply within the run limit", tasks::WAITING_FOR_INPUT)),
+    )
+    .unwrap();
+    let row = tasks::get(&v, &id).unwrap();
+    assert_eq!(row.status, tasks::INTERRUPTED);
+    assert_eq!(row.question, "Still there?");
+    let a = attempts::list(&v, &id).unwrap();
+    assert_eq!(a.last().unwrap().outcome.as_deref(), Some(tasks::WAITING_FOR_INPUT));
+    // A reply to it is not a dead end: a new attempt starts on the same row.
+    let before = row.attempt.clone();
+    assert!(tasks::reply(&v, &id, "Yes, go on").unwrap());
+    let again = tasks::get(&v, &id).unwrap();
+    assert_eq!(again.status, tasks::QUEUED);
+    assert!(again.question.is_empty());
+    assert!(again.prompt.contains("Still there?") && again.prompt.contains("Yes, go on"));
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    assert_ne!(tasks::get(&v, &id).unwrap().attempt, before);
+    assert!(!tasks::reply(&v, &id, "nothing open").unwrap());
+}

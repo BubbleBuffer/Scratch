@@ -1,6 +1,7 @@
 // The kanban's widgets: the full page (title, then the board) and the compact
 // board an embed draws. Both use the kit's BoardRenderer.
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
@@ -127,6 +128,28 @@ class _KanbanBoardState extends State<KanbanBoard> {
     return RunnerScope(assignments: assignments, child: content);
   }
 
+  /// Accepts the run's result. The task layer moves the card to the board's
+  /// last column; the board reloads from the change feed.
+  Future<void> _accept(
+    BuildContext context,
+    BoardCard card,
+    RunnerAssignments runners,
+  ) async {
+    try {
+      await runners.accept(card.id);
+    } on RunnerUnavailable catch (e) {
+      if (context.mounted) showToast(context, e.reason);
+    }
+  }
+
+  Future<void> _runCall(BuildContext context, Future<void> call) async {
+    try {
+      await call;
+    } on RunnerUnavailable catch (e) {
+      if (context.mounted) showToast(context, e.reason);
+    }
+  }
+
   /// The column that holds [cardId], or null when no loaded column does.
   BoardColumn? _columnOf(String cardId) {
     for (final column in _source.columns) {
@@ -213,6 +236,26 @@ class _KanbanBoardState extends State<KanbanBoard> {
       onAssign: (anchor) {
         if (runners != null) _assignCard(context, anchor, card, runners);
       },
+      onAccept: runners == null ? null : () => _accept(context, card, runners),
+      onMarkFailed: runners == null
+          ? null
+          : () => _runCall(context, runners.markFailed(card.id)),
+      onAddStep: runners == null
+          ? null
+          : (text) => _runCall(context, runners.addStep(card.id, text)),
+      onReply: runners == null
+          ? null
+          : (text) => _runCall(context, runners.reply(card.id, text)),
+      onOpenSession: runners == null
+          ? null
+          : () {
+              final session = runners.sessionOf(card.id);
+              if (session == null) return;
+              close();
+              unawaited(
+                const AddonServices().openAgentSession(this.context, session),
+              );
+            },
     );
   }
 

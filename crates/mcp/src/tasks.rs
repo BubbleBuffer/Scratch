@@ -35,6 +35,7 @@ use vault_core::{
 use crate::{err, Result};
 
 pub mod attempts;
+pub mod board;
 mod subtasks;
 
 #[cfg(test)]
@@ -57,6 +58,9 @@ pub(crate) const CANCELLING: &str = "cancelling";
 pub const QUEUED: &str = "queued";
 pub const RUNNING: &str = "running";
 pub const DONE: &str = "done";
+/// A finished run of a task with a review policy (see [`set_review`]): the
+/// result waits for the user's acceptance, which makes it `done`.
+pub const REVIEW: &str = "review";
 pub const FAILED: &str = "failed";
 /// Jobs only (see [`crate::jobs`]): cancelled by their owner.
 pub const CANCELLED: &str = "cancelled";
@@ -116,6 +120,18 @@ pub struct Task {
     /// "cancellation requested".
     #[serde(default)]
     pub cancel_requested_ms: Option<i64>,
+    /// The runner's last sign of life while it runs (ms), written about
+    /// every minute. None for a row whose runner does not write one.
+    #[serde(default)]
+    pub heartbeat_ms: Option<i64>,
+    /// The worker's open question to the user (see [`ask`]), empty when it
+    /// has none. A running task with a question is waiting for the user's
+    /// reply (`needs_input`).
+    #[serde(default)]
+    pub question: String,
+    /// The agent session of the run, empty until it starts or after it expired.
+    #[serde(default)]
+    pub session: String,
     pub created_ms: i64,
     pub updated_ms: i64,
 }
@@ -149,6 +165,7 @@ pub fn schema() -> Vec<PropDef> {
                 opt(QUEUED, "Queued", "gray"),
                 opt(RUNNING, "Running", "blue"),
                 opt(DONE, "Done", "green"),
+                opt(REVIEW, "Review", "purple"),
                 opt(FAILED, "Failed", "red"),
                 opt(CANCELLED, "Cancelled", "default"),
                 opt(INTERRUPTED, "Interrupted", "yellow"),
@@ -200,6 +217,12 @@ pub fn schema() -> Vec<PropDef> {
             PropKind::Text,
             vec![],
         ),
+        // The runner's last sign of life, and the review policy.
+        def(HEARTBEAT, "Heartbeat", PropKind::Text, vec![]),
+        def(REVIEW_POLICY, "Review", PropKind::Text, vec![]),
+        // The worker's question to the user and the user's reply.
+        def(QUESTION, "Question", PropKind::Text, vec![]),
+        def(REPLY, "Reply", PropKind::Text, vec![]),
     ]
 }
 
@@ -308,6 +331,9 @@ fn task_of(row: &PageSummary) -> Task {
         worktree_path: text(p, "worktree_path"),
         attempt: text(p, attempts::CURRENT),
         cancel_requested_ms: text(p, attempts::CANCEL_REQUESTED).parse().ok(),
+        heartbeat_ms: text(p, HEARTBEAT).parse().ok(),
+        question: text(p, QUESTION),
+        session: text(p, "session"),
         created_ms: row.created_ms,
         updated_ms: row.updated_ms,
     }
@@ -353,6 +379,7 @@ fn placeholder_text(status: &str, prompt: &str) -> String {
         CANCELLING => "AI task cancellation requested",
         INTERRUPTED => "AI task interrupted",
         DONE => "AI task done",
+        REVIEW => "AI task ready for review",
         _ => "AI task",
     };
     format!("{what}: {}", first_line(prompt, 100))
@@ -698,8 +725,183 @@ pub fn claim_next(v: &Vault, device: &str) -> Result<Option<Task>> {
         },
         &actor,
     )?;
+    let _ = heartbeat(v, &t.id);
     set_status(v, &t, RUNNING)?;
     Ok(Some(get(v, &t.id)?))
+}
+
+/// The row property holding the runner's last sign of life (ms).
+pub(crate) const HEARTBEAT: &str = "heartbeat";
+pub(crate) const QUESTION: &str = "question";
+pub(crate) const REPLY: &str = "reply";
+
+/// The most characters of a question or reply kept.
+pub const QUESTION_MAX: usize = 2000;
+
+/// A run that ended while it waited for the user's reply starts its error
+/// with this: the attempt's outcome is "waiting for input", not a failure.
+pub const WAITING_FOR_INPUT: &str = "waiting for input";
+
+/// The worker asks the user a question and waits (the `ask_user` tool). The
+/// task stays `running` with the question set; the card shows it with a reply
+/// field. Refused when the task is not running or a cancel is pending.
+pub fn ask(v: &Vault, id: &str, question: &str) -> Result<()> {
+    let t = get(v, id)?;
+    if t.status != RUNNING || t.cancel_requested_ms.is_some() {
+        return err("the task is not running");
+    }
+    let q: String = question.trim().chars().take(QUESTION_MAX).collect();
+    if q.is_empty() {
+        return err("ask_user needs a question");
+    }
+    v.remove_property(t.id.clone(), REPLY.into())?;
+    v.set_property(t.id.clone(), QUESTION.into(), PropValue::Text(q.clone()))?;
+    let _ = attempts::event(v, id, None, attempts::kind::QUESTION, &q);
+    Ok(())
+}
+
+/// The user answers the worker's question. The reply is stored for the
+/// waiting tool and the question is cleared, which puts the task back to
+/// plain `running`. A task whose run ended while it waited (`interrupted`,
+/// "waiting for input") starts a new attempt instead, with the question and
+/// the reply added to its prompt. False when there is no open question.
+pub fn reply(v: &Vault, id: &str, text_in: &str) -> Result<bool> {
+    let t = get(v, id)?;
+    let r: String = text_in.trim().chars().take(QUESTION_MAX).collect();
+    if t.question.is_empty() || r.is_empty() {
+        return Ok(false);
+    }
+    if t.status == INTERRUPTED && t.error.starts_with(WAITING_FOR_INPUT) {
+        // The run ended while it waited: a reply starts a new attempt on the
+        // same runner, with the question and the reply added to the brief.
+        let prompt = format!(
+            "{}
+
+Earlier in this task you asked the user: {}
+The user replied: {r}",
+            t.prompt, t.question
+        );
+        v.set_property(t.id.clone(), "prompt".into(), PropValue::Text(prompt))?;
+        let _ = attempts::event(v, id, None, attempts::kind::REPLY, &r);
+        retry(v, id)?;
+        return Ok(true);
+    }
+    if t.status != RUNNING {
+        return Ok(false);
+    }
+    v.set_property(t.id.clone(), REPLY.into(), PropValue::Text(r.clone()))?;
+    v.remove_property(t.id.clone(), QUESTION.into())?;
+    let _ = attempts::event(v, id, None, attempts::kind::REPLY, &r);
+    Ok(true)
+}
+
+/// What the waiting tool looks at: `Some(reply)` once the user answered (the
+/// reply is taken), `None` while the question is open, an error when the
+/// task is no longer running.
+pub fn take_reply(v: &Vault, id: &str) -> Result<Option<String>> {
+    let t = get(v, id)?;
+    if t.status != RUNNING || t.cancel_requested_ms.is_some() {
+        return err("the task is no longer running");
+    }
+    let row = v.load_page(t.id.clone())?;
+    let r = text(&row.properties, REPLY);
+    if t.question.is_empty() && !r.is_empty() {
+        v.remove_property(t.id.clone(), REPLY.into())?;
+        return Ok(Some(r));
+    }
+    Ok(None)
+}
+/// The row property that makes a successful run end in `review`.
+pub(crate) const REVIEW_POLICY: &str = "review";
+
+/// A run with no sign of life for this long is shown as stalled.
+pub const STALL_MS: i64 = 10 * 60 * 1000;
+
+/// Makes the task's successful runs end in `review` instead of `done`.
+pub fn set_review(v: &Vault, id: &str) -> Result<()> {
+    if let Some(c) = collection(v)? {
+        migrate_schema(v, &c)?;
+    }
+    v.set_property(id.to_string(), REVIEW_POLICY.into(), PropValue::Text("1".into()))?;
+    Ok(())
+}
+
+/// The user accepts a reviewed result: `review` becomes `done`. Returns
+/// whether the task was in review.
+pub fn accept(v: &Vault, id: &str) -> Result<bool> {
+    let t = get(v, id)?;
+    if t.status != REVIEW {
+        return Ok(false);
+    }
+    set_status(v, &t, DONE)?;
+    if let Some(card) = &t.page {
+        let _ = board::move_card(v, card, board::Target::Last);
+    }
+    Ok(true)
+}
+
+/// Records the runner's sign of life on a running task. Called about every
+/// minute by the runner while it works.
+pub fn heartbeat(v: &Vault, id: &str) -> Result<()> {
+    if let Some(c) = collection(v)? {
+        migrate_schema(v, &c)?;
+    }
+    v.set_property(
+        id.to_string(),
+        HEARTBEAT.into(),
+        PropValue::Text(crate::jobs::now_ms().to_string()),
+    )?;
+    Ok(())
+}
+
+/// When the runner was last heard from, if the task is `running`, writes a
+/// heartbeat and the last one is more than [`STALL_MS`] before `now`.
+pub fn stalled_since(t: &Task, now: i64) -> Option<i64> {
+    let beat = t.heartbeat_ms?;
+    (t.status == RUNNING && now.saturating_sub(beat) > STALL_MS).then_some(beat)
+}
+
+/// Fails a task whose runner stalled, from another device. Refused (false)
+/// when the task is not stalled; nothing ends a stalled task by itself.
+pub fn mark_failed(v: &Vault, id: &str) -> Result<bool> {
+    let t = get(v, id)?;
+    if stalled_since(&t, crate::jobs::now_ms()).is_none() {
+        return Ok(false);
+    }
+    finish(v, id, Err("the runner stopped responding".into()))?;
+    Ok(true)
+}
+
+/// This device's ended tasks whose session (transcript and logs) is older
+/// than `keep_ms`: the caller deletes each session and then calls
+/// [`session_expired`]. The row, outcome and attempt history stay for good.
+pub fn expired_sessions(
+    v: &Vault,
+    device: &str,
+    keep_ms: i64,
+    now: i64,
+) -> Result<Vec<(Task, String)>> {
+    let Some(c) = collection(v)? else {
+        return Ok(vec![]);
+    };
+    let rows = v.query(Some(c), None, vec![], 0, 5000)?.rows;
+    Ok(rows
+        .iter()
+        .map(|r| (task_of(r), text(&r.properties, "session")))
+        .filter(|(t, session)| {
+            !session.is_empty()
+                && t.device == device
+                && t.node != "hub"
+                && ![QUEUED, RUNNING].contains(&t.status.as_str())
+                && now.saturating_sub(t.updated_ms) >= keep_ms
+        })
+        .collect())
+}
+
+/// Clears a task's `session` once its session is deleted.
+pub fn session_expired(v: &Vault, id: &str) -> Result<()> {
+    v.remove_property(id.to_string(), "session".into())?;
+    Ok(())
 }
 
 /// Marks tasks this device was running as failed (after a restart).
@@ -740,6 +942,9 @@ pub fn retry(v: &Vault, id: &str) -> Result<()> {
     }
     v.remove_property(t.id.clone(), "error".into())?;
     v.remove_property(t.id.clone(), attempts::CANCEL_REQUESTED.into())?;
+    v.remove_property(t.id.clone(), HEARTBEAT.into())?;
+    v.remove_property(t.id.clone(), QUESTION.into())?;
+    v.remove_property(t.id.clone(), REPLY.into())?;
     // The last attempt's progress line belongs to that attempt.
     v.remove_property(t.id.clone(), "progress".into())?;
     v.remove_property(t.id.clone(), "progress_at".into())?;
@@ -952,7 +1157,14 @@ pub fn finish_attempt(
 ) -> Result<()> {
     let t = get(v, id)?;
     let summary = outcome_text(&result);
-    let outcome = if result.is_ok() { DONE } else { FAILED };
+    let waiting = matches!(&result, Err(m) if m.starts_with(WAITING_FOR_INPUT));
+    let outcome = if result.is_ok() {
+        DONE
+    } else if waiting {
+        WAITING_FOR_INPUT
+    } else {
+        FAILED
+    };
     let current = (!t.attempt.is_empty()).then(|| t.attempt.clone());
     let stale = match (attempt, &current) {
         (Some(a), Some(c)) => a != c,
@@ -997,6 +1209,10 @@ pub fn finish_attempt(
         let _ = attempts::event(v, id, attempt, attempts::kind::CANCEL_ACKNOWLEDGED, "");
         return Ok(());
     }
+    if !waiting {
+        v.remove_property(t.id.clone(), QUESTION.into())?;
+        v.remove_property(t.id.clone(), REPLY.into())?;
+    }
     let closed = attempts::close(v, id, attempt, outcome, Some(&summary), false);
     if let Err(e) = closed {
         // The history never blocks the task's own end.
@@ -1013,7 +1229,16 @@ pub fn finish_attempt(
             v.replace_markdown(t.id.clone(), vec![], body)?;
             write_result(v, &t, &md)?;
             v.remove_property(t.id.clone(), "error".into())?;
-            set_status(v, &t, DONE)
+            let row = v.load_page(t.id.clone())?;
+            if text(&row.properties, REVIEW_POLICY).is_empty() {
+                set_status(v, &t, DONE)
+            } else {
+                set_status(v, &t, REVIEW)?;
+                if let Some(card) = &t.page {
+                    let _ = board::move_card(v, card, board::Target::Review);
+                }
+                Ok(())
+            }
         }
         Err(msg) => {
             let msg = if msg.trim().is_empty() {
@@ -1022,13 +1247,10 @@ pub fn finish_attempt(
                 msg
             };
             v.set_property(t.id.clone(), "error".into(), PropValue::Text(msg.clone()))?;
-            v.set_property(
-                t.id.clone(),
-                "status".into(),
-                PropValue::Select(FAILED.into()),
-            )?;
+            let end = if waiting { INTERRUPTED } else { FAILED };
+            v.set_property(t.id.clone(), "status".into(), PropValue::Select(end.into()))?;
             let t = Task { error: msg, ..t };
-            set_placeholder(v, &t, FAILED)
+            set_placeholder(v, &t, end)
         }
     }
 }

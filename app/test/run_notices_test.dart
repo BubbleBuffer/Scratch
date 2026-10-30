@@ -15,6 +15,7 @@ AiTask task(
   String error = '',
   int updatedMs = 2000,
   String? page,
+  String question = '',
 }) => AiTask(
   id: id,
   prompt: 'p',
@@ -33,6 +34,9 @@ AiTask task(
   worktreePath: '',
   cancelRequested: false,
   stale: false,
+  stalledSinceMs: null,
+  session: '',
+  question: question,
 );
 
 class _Source extends ChangeNotifier implements AiTaskSource {
@@ -50,6 +54,14 @@ class _Source extends ChangeNotifier implements AiTaskSource {
   Future<void> cancel(String id) async {}
   @override
   Future<void> sendUpdate(String id) async {}
+  @override
+  Future<void> accept(String id) async {}
+  @override
+  Future<void> markFailed(String id) async {}
+  @override
+  Future<void> addStep(String id, String text) async {}
+  @override
+  Future<void> reply(String id, String text) async {}
 
   void set(List<AiTask> next) {
     tasks = next;
@@ -93,16 +105,59 @@ void main() {
   group('runNoticeOf', () {
     test('finished and failed runs call for a notice, other states none', () {
       expect(runNoticeOf(task('a', 'done')), RunNoticeKind.finished);
+      expect(runNoticeOf(task('a', 'review')), RunNoticeKind.review);
       expect(runNoticeOf(task('a', 'failed')), RunNoticeKind.failed);
       expect(runNoticeOf(task('a', 'interrupted')), RunNoticeKind.failed);
       expect(runNoticeOf(task('a', 'queued')), isNull);
       expect(runNoticeOf(task('a', 'running')), isNull);
+      expect(
+        runNoticeOf(task('a', 'running', question: 'Blue or green?')),
+        RunNoticeKind.needsInput,
+      );
+      expect(
+        runNoticeOf(task('a', 'interrupted', error: 'waiting for input: no reply')),
+        RunNoticeKind.needsInput,
+      );
       expect(runNoticeOf(task('a', 'cancelled')), isNull);
       expect(runNoticeOf(task('a', 'something-new')), isNull);
     });
   });
 
   group('planRunNotices', () {
+    test('a question is noticed once, and a second question again', () {
+      final first = task('a', 'running', question: 'Blue or green?');
+      var plan = planRunNotices(
+        tasks: [first],
+        seen: const {},
+        sinceMs: 0,
+        deviceId: 'phone',
+      );
+      expect(plan.notify, [first]);
+      plan = planRunNotices(
+        tasks: [first],
+        seen: plan.seen,
+        sinceMs: 0,
+        deviceId: 'phone',
+      );
+      expect(plan.notify, isEmpty);
+      // Answered: running again, forgotten; the next question is new.
+      plan = planRunNotices(
+        tasks: [task('a', 'running')],
+        seen: plan.seen,
+        sinceMs: 0,
+        deviceId: 'phone',
+      );
+      expect(plan.seen, isEmpty);
+      final second = task('a', 'running', question: 'Now which size?');
+      plan = planRunNotices(
+        tasks: [second],
+        seen: plan.seen,
+        sinceMs: 0,
+        deviceId: 'phone',
+      );
+      expect(plan.notify, [second]);
+    });
+
     test('the first look records the rows and notices none', () {
       final plan = planRunNotices(
         tasks: [task('a', 'done'), task('b', 'running')],

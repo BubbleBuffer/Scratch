@@ -22,6 +22,8 @@ import 'ai_store.dart';
 /// What a run's change says to the user.
 enum RunNoticeKind {
   finished('Task finished'),
+  review('Task ready for review'),
+  needsInput('Task needs your reply'),
   failed('Task failed');
 
   const RunNoticeKind(this.title);
@@ -32,10 +34,14 @@ enum RunNoticeKind {
 
 /// The notice that row [t] calls for, or null when it calls for none (queued,
 /// running, cancelled by the user, or a state this does not know). The one
-/// place that reads run states: the run states that need attention (blocked,
-/// moved to Review) are added here.
+/// place that reads run states: the run states that need attention (waiting
+/// for a reply, ready for review) are added here.
 RunNoticeKind? runNoticeOf(AiTask t) => switch (t.status) {
+  AiStatus.running when t.question.isNotEmpty => RunNoticeKind.needsInput,
+  AiStatus.interrupted when t.error.startsWith('waiting for input') =>
+    RunNoticeKind.needsInput,
   AiStatus.done => RunNoticeKind.finished,
+  AiStatus.review => RunNoticeKind.review,
   AiStatus.failed || AiStatus.interrupted => RunNoticeKind.failed,
   _ => null,
 };
@@ -43,7 +49,8 @@ RunNoticeKind? runNoticeOf(AiTask t) => switch (t.status) {
 /// Names the attempt state that was noticed, so the same one is never noticed
 /// twice but a retry that ends again is. Today the state is the status; an
 /// attempt number goes here when rows carry one.
-String runNoticeKey(AiTask t) => t.status;
+String runNoticeKey(AiTask t) =>
+    t.question.isEmpty ? t.status : '${t.status}:${t.question}';
 
 /// What a look at the task rows decided.
 class RunNoticePlan {

@@ -209,7 +209,7 @@ fn code_task_roots_native_and_js_tools_in_a_retained_worktree_and_retry_is_fresh
             "metadata was not present at the first provider action"
         );
         let done = tasks::get(&f.vault, &id).unwrap();
-        assert_eq!(done.status, tasks::DONE);
+        assert_eq!(done.status, tasks::REVIEW);
         assert_eq!(done.project, project.id);
         assert_eq!(done.worktree_branch, format!("bp/{}", run.session_id));
         let worktree = PathBuf::from(&done.worktree_path);
