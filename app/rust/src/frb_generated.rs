@@ -43,7 +43,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -917590006;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1124565645;
 
 // Section: executor
 
@@ -12299,6 +12299,58 @@ fn wire__crate__api__ai__ai_rename_device_impl(
         },
     )
 }
+fn wire__crate__api__ai__ai_reply_task_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ai_reply_task",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_vault = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesVault>,
+            >>::sse_decode(&mut deserializer);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            let api_text = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_vault_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_vault, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_vault_guard = Some(api_vault.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_vault_guard = api_vault_guard.unwrap();
+                    let output_ok =
+                        crate::api::ai::ai_reply_task(&*api_vault_guard, api_id, api_text)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__ai__ai_retry_task_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -18319,37 +18371,38 @@ fn pde_ffi_dispatcher_primary_impl(
         230 => wire__crate__api__ai__ai_mark_task_failed_impl(port, ptr, rust_vec_len, data_len),
         231 => wire__crate__api__ai__ai_recover_tasks_impl(port, ptr, rust_vec_len, data_len),
         232 => wire__crate__api__ai__ai_rename_device_impl(port, ptr, rust_vec_len, data_len),
-        233 => wire__crate__api__ai__ai_retry_task_impl(port, ptr, rust_vec_len, data_len),
-        234 => {
+        233 => wire__crate__api__ai__ai_reply_task_impl(port, ptr, rust_vec_len, data_len),
+        234 => wire__crate__api__ai__ai_retry_task_impl(port, ptr, rust_vec_len, data_len),
+        235 => {
             wire__crate__api__agent__ai_run_task_with_agent_impl(port, ptr, rust_vec_len, data_len)
         }
-        235 => wire__crate__api__ai__ai_send_update_impl(port, ptr, rust_vec_len, data_len),
-        236 => wire__crate__api__ai__ai_tasks_collection_impl(port, ptr, rust_vec_len, data_len),
-        238 => wire__crate__api__sync__device_key_id_impl(port, ptr, rust_vec_len, data_len),
-        240 => wire__crate__api__vault__first_option_in_impl(port, ptr, rust_vec_len, data_len),
-        241 => wire__crate__api__sync__hub_bearer_impl(port, ptr, rust_vec_len, data_len),
-        242 => {
+        236 => wire__crate__api__ai__ai_send_update_impl(port, ptr, rust_vec_len, data_len),
+        237 => wire__crate__api__ai__ai_tasks_collection_impl(port, ptr, rust_vec_len, data_len),
+        239 => wire__crate__api__sync__device_key_id_impl(port, ptr, rust_vec_len, data_len),
+        241 => wire__crate__api__vault__first_option_in_impl(port, ptr, rust_vec_len, data_len),
+        242 => wire__crate__api__sync__hub_bearer_impl(port, ptr, rust_vec_len, data_len),
+        243 => {
             wire__crate__api__sync__hub_bearer_invalidate_impl(port, ptr, rust_vec_len, data_len)
         }
-        243 => wire__crate__api__vault__init_app_impl(port, ptr, rust_vec_len, data_len),
-        246 => {
+        244 => wire__crate__api__vault__init_app_impl(port, ptr, rust_vec_len, data_len),
+        247 => {
             wire__crate__api__types__page_prefs_data_default_impl(port, ptr, rust_vec_len, data_len)
         }
-        247 => wire__crate__api__sync__redeem_pairing_code_impl(port, ptr, rust_vec_len, data_len),
-        248 => wire__crate__api__types__search_spec_to_query_string_impl(
+        248 => wire__crate__api__sync__redeem_pairing_code_impl(port, ptr, rust_vec_len, data_len),
+        249 => wire__crate__api__types__search_spec_to_query_string_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        250 => wire__crate__api__vault__sha256_hex_impl(port, ptr, rust_vec_len, data_len),
-        251 => wire__crate__api__vault__status_group_impl(port, ptr, rust_vec_len, data_len),
-        252 => wire__crate__api__types__sync_report_default_impl(port, ptr, rust_vec_len, data_len),
-        253 => wire__crate__api__types__sync_status_default_impl(port, ptr, rust_vec_len, data_len),
-        254 => wire__crate__api__update__update_check_impl(port, ptr, rust_vec_len, data_len),
-        255 => wire__crate__api__update__update_download_impl(port, ptr, rust_vec_len, data_len),
-        257 => wire__crate__api__update__update_install_impl(port, ptr, rust_vec_len, data_len),
-        258 => wire__crate__api__vault__version_includes_impl(port, ptr, rust_vec_len, data_len),
+        251 => wire__crate__api__vault__sha256_hex_impl(port, ptr, rust_vec_len, data_len),
+        252 => wire__crate__api__vault__status_group_impl(port, ptr, rust_vec_len, data_len),
+        253 => wire__crate__api__types__sync_report_default_impl(port, ptr, rust_vec_len, data_len),
+        254 => wire__crate__api__types__sync_status_default_impl(port, ptr, rust_vec_len, data_len),
+        255 => wire__crate__api__update__update_check_impl(port, ptr, rust_vec_len, data_len),
+        256 => wire__crate__api__update__update_download_impl(port, ptr, rust_vec_len, data_len),
+        258 => wire__crate__api__update__update_install_impl(port, ptr, rust_vec_len, data_len),
+        259 => wire__crate__api__vault__version_includes_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -18394,12 +18447,12 @@ fn pde_ffi_dispatcher_sync_impl(
         171 => wire__crate__api__vault__NotesVault_root_impl(ptr, rust_vec_len, data_len),
         178 => wire__crate__api__vault__NotesVault_seed_progress_impl(ptr, rust_vec_len, data_len),
         217 => wire__crate__api__agent__agent_markdown_blocks_impl(ptr, rust_vec_len, data_len),
-        237 => wire__crate__api__sync__default_sync_options_impl(ptr, rust_vec_len, data_len),
-        239 => wire__crate__api__clock__device_time_zone_impl(ptr, rust_vec_len, data_len),
-        244 => wire__crate__api__ai__mcp_default_addr_impl(ptr, rust_vec_len, data_len),
-        245 => wire__crate__api__vault__new_id_impl(ptr, rust_vec_len, data_len),
-        249 => wire__crate__api__clock__set_test_clock_impl(ptr, rust_vec_len, data_len),
-        256 => wire__crate__api__update__update_download_progress_impl(ptr, rust_vec_len, data_len),
+        238 => wire__crate__api__sync__default_sync_options_impl(ptr, rust_vec_len, data_len),
+        240 => wire__crate__api__clock__device_time_zone_impl(ptr, rust_vec_len, data_len),
+        245 => wire__crate__api__ai__mcp_default_addr_impl(ptr, rust_vec_len, data_len),
+        246 => wire__crate__api__vault__new_id_impl(ptr, rust_vec_len, data_len),
+        250 => wire__crate__api__clock__set_test_clock_impl(ptr, rust_vec_len, data_len),
+        257 => wire__crate__api__update__update_download_progress_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

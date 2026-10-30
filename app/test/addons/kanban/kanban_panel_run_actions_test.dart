@@ -34,6 +34,7 @@ class _Backend extends FakeRunnerBackend {
     runnerId: 'studio',
     runnerName: 'Studio-PC',
     state: state,
+    question: state == AssignState.needsInput ? 'Blue or green?' : null,
   );
 
   @override
@@ -41,6 +42,10 @@ class _Backend extends FakeRunnerBackend {
 
   @override
   Future<void> markFailed(String taskId) async => calls.add('failed');
+
+  @override
+  Future<void> reply(String taskId, String text) async =>
+      calls.add('reply:$text');
 
   @override
   Future<void> addStep(String taskId, String text) async =>
@@ -103,5 +108,23 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await settle(tester);
     expect(backend.calls, ['failed', 'step:Check the logs']);
+  });
+
+  appTest('a worker question shows on the card with a Reply field', (tester) async {
+    final backend = await _open(
+      tester,
+      AssignState.needsInput,
+      (g) => {'To do': [g], 'Done': []},
+    );
+    await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('kanban-panel-question'))).data,
+      'Blue or green?',
+    );
+    expect(find.byKey(const ValueKey('kanban-panel-add-step')), findsNothing);
+    await tester.enterText(find.byKey(const ValueKey('kanban-panel-reply')), 'Green');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await settle(tester);
+    expect(backend.calls, ['reply:Green']);
   });
 }

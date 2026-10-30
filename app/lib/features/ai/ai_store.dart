@@ -86,6 +86,9 @@ abstract interface class AiTaskSource implements Listenable {
 
   /// Adds a to-do under the running task; the runner gives it to the worker.
   Future<void> addStep(String id, String text);
+
+  /// Answers the worker's open question; the worker goes on with the reply.
+  Future<void> reply(String id, String text);
 }
 
 /// Starts and stops the agent's runs for add-ons (a task assigned to the
@@ -362,6 +365,16 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   Future<void> addStep(String id, String text) async {
     await vault.run((v) => aiAddStep(vault: v, id: id, text: text), writes: true);
     await refresh();
+  }
+
+  @override
+  Future<void> reply(String id, String text) async {
+    final taken = await vault.run(
+      (v) => aiReplyTask(vault: v, id: id, text: text),
+      writes: true,
+    );
+    await refresh();
+    if (!taken) throw 'The worker is no longer waiting for a reply.';
   }
 
   Future<void> retry(String id) async {

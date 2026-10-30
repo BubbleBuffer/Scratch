@@ -234,6 +234,9 @@ class _KanbanBoardState extends State<KanbanBoard> {
       onAddStep: runners == null
           ? null
           : (text) => _runCall(context, runners.addStep(card.id, text)),
+      onReply: runners == null
+          ? null
+          : (text) => _runCall(context, runners.reply(card.id, text)),
       onOpenSession: runners == null
           ? null
           : () {

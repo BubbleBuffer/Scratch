@@ -49,7 +49,10 @@ class RunnerChip extends StatelessWidget {
       AssignState.queued ||
       AssignState.cancelling ||
       AssignState.cancelled => c.bgSecondary,
-      AssignState.waiting || AssignState.review || AssignState.stalled => c.attnBg,
+      AssignState.waiting ||
+      AssignState.review ||
+      AssignState.needsInput ||
+      AssignState.stalled => c.attnBg,
       AssignState.running => c.infoBg,
       AssignState.done => c.okBg,
       AssignState.failed => c.dangerBg,

@@ -24,6 +24,7 @@ class KanbanCardPanel extends StatefulWidget {
     this.onAccept,
     this.onMarkFailed,
     this.onAddStep,
+    this.onReply,
     this.onOpenSession,
     this.sheet = false,
   });
@@ -52,6 +53,9 @@ class KanbanCardPanel extends StatefulWidget {
 
   /// Adds a step to the running task.
   final void Function(String text)? onAddStep;
+
+  /// Answers the worker's open question.
+  final void Function(String text)? onReply;
 
   /// Opens the chat of the run's session.
   final VoidCallback? onOpenSession;
@@ -186,10 +190,12 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                     listenable: runners,
                     builder: (context, _) => _RunActions(
                       state: runners.of(widget.cardId)?.state,
+                      question: runners.of(widget.cardId)?.question,
                       hasSession: runners.sessionOf(widget.cardId) != null,
                       onAccept: widget.onAccept,
                       onMarkFailed: widget.onMarkFailed,
                       onAddStep: widget.onAddStep,
+                      onReply: widget.onReply,
                       onOpenSession: widget.onOpenSession,
                     ),
                   ),
@@ -214,18 +220,22 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
 class _RunActions extends StatefulWidget {
   const _RunActions({
     required this.state,
+    required this.question,
     required this.hasSession,
     required this.onAccept,
     required this.onMarkFailed,
     required this.onAddStep,
+    required this.onReply,
     required this.onOpenSession,
   });
 
   final AssignState? state;
+  final String? question;
   final bool hasSession;
   final VoidCallback? onAccept;
   final VoidCallback? onMarkFailed;
   final void Function(String text)? onAddStep;
+  final void Function(String text)? onReply;
   final VoidCallback? onOpenSession;
 
   @override
@@ -235,11 +245,15 @@ class _RunActions extends StatefulWidget {
 class _RunActionsState extends State<_RunActions> {
   final _step = TextEditingController();
   final _stepFocus = FocusNode();
+  final _reply = TextEditingController();
+  final _replyFocus = FocusNode();
 
   @override
   void dispose() {
     _step.dispose();
     _stepFocus.dispose();
+    _reply.dispose();
+    _replyFocus.dispose();
     super.dispose();
   }
 
@@ -251,11 +265,41 @@ class _RunActionsState extends State<_RunActions> {
     add(text);
   }
 
+  void _answer(String value) {
+    final text = value.trim();
+    final reply = widget.onReply;
+    if (text.isEmpty || reply == null) return;
+    _reply.clear();
+    reply(text);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final state = widget.state;
     final children = <Widget>[];
+    if (state == AssignState.needsInput && widget.onReply != null) {
+      children.add(
+        Text(
+          widget.question ?? '',
+          key: const ValueKey('kanban-panel-question'),
+          style: ts(const TypeSpec(14, 20, 400), c.textPrimary),
+        ),
+      );
+      children.add(
+        InputBox(
+          child: PlainField(
+            key: const ValueKey('kanban-panel-reply'),
+            controller: _reply,
+            focusNode: _replyFocus,
+            style: ts(context.type.ui, c.textPrimary),
+            placeholder: 'Reply',
+            textInputAction: TextInputAction.done,
+            onSubmitted: _answer,
+          ),
+        ),
+      );
+    }
     if (state == AssignState.review && widget.onAccept != null) {
       children.add(
         PrimaryButton(

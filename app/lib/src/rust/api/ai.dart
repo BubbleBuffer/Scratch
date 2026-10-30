@@ -100,6 +100,18 @@ Future<bool> aiCancelTask({required NotesVault vault, required String id}) =>
 Future<bool> aiAcceptTask({required NotesVault vault, required String id}) =>
     RustLib.instance.api.crateApiAiAiAcceptTask(vault: vault, id: id);
 
+/// Answers the worker's open question. The worker gets the reply and the task
+/// is plain running again. Returns false when there was no open question.
+Future<bool> aiReplyTask({
+  required NotesVault vault,
+  required String id,
+  required String text,
+}) => RustLib.instance.api.crateApiAiAiReplyTask(
+  vault: vault,
+  id: id,
+  text: text,
+);
+
 /// Fails a task whose runner has been silent for over ten minutes. Returns
 /// false, and changes nothing, when the task is not stalled.
 Future<bool> aiMarkTaskFailed({
@@ -321,6 +333,10 @@ class AiTask {
   /// The agent session of the run, empty when it has none or it expired.
   final String session;
 
+  /// The worker's open question to the user, empty when it has none. A
+  /// running task with a question waits for `ai_reply_task`.
+  final String question;
+
   const AiTask({
     required this.id,
     required this.prompt,
@@ -342,6 +358,7 @@ class AiTask {
     required this.stale,
     this.stalledSinceMs,
     required this.session,
+    required this.question,
   });
 
   @override
@@ -365,7 +382,8 @@ class AiTask {
       cancelRequested.hashCode ^
       stale.hashCode ^
       stalledSinceMs.hashCode ^
-      session.hashCode;
+      session.hashCode ^
+      question.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -391,5 +409,6 @@ class AiTask {
           cancelRequested == other.cancelRequested &&
           stale == other.stale &&
           stalledSinceMs == other.stalledSinceMs &&
-          session == other.session;
+          session == other.session &&
+          question == other.question;
 }

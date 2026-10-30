@@ -166,6 +166,7 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
       projectName: _projectName(t.node, t.project),
       outdated: t.status == 'running' && !t.cancelRequested && t.stale,
       note: s.note,
+      question: s.state == AssignState.needsInput ? t.question : null,
     );
   }
 
@@ -181,6 +182,17 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
     if (t == null) return;
     try {
       await source.addStep(t.id, text);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  @override
+  Future<void> reply(String taskId, String text) async {
+    final t = _taskOf(taskId);
+    if (t == null) return;
+    try {
+      await source.reply(t.id, text);
     } catch (e) {
       throw RunnerUnavailable('$e');
     }
@@ -258,6 +270,9 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
             note: 'no contact since $hh:$mm',
           );
         }
+        if (t.question.isNotEmpty) {
+          return (state: AssignState.needsInput, reason: null, note: null);
+        }
         return (state: AssignState.running, reason: null, note: null);
       case 'review':
         return (state: AssignState.review, reason: null, note: null);
@@ -270,6 +285,13 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
           note: null,
         );
       case 'interrupted':
+        if (t.error.startsWith('waiting for input')) {
+          return (
+            state: AssignState.waiting,
+            reason: 'The run ended while it waited for your reply: ${t.question}',
+            note: null,
+          );
+        }
         return (
           state: AssignState.failed,
           reason: 'The run was interrupted before it finished.',

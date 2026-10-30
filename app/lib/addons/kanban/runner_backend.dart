@@ -54,6 +54,7 @@ enum AssignState {
   waiting('waiting'),
   running('running'),
   cancelling('cancellation requested'),
+  needsInput('needs your reply'),
   review('ready for review'),
   stalled('stalled'),
   done('done'),
@@ -83,6 +84,7 @@ class RunnerAssignment {
     this.projectName,
     this.outdated = false,
     this.note,
+    this.question,
   });
 
   final String taskId;
@@ -100,6 +102,9 @@ class RunnerAssignment {
   /// A short remark after the state, in brackets on the chip, for example
   /// "no contact since 14:05" on a stalled run.
   final String? note;
+
+  /// The worker's open question while the state is [AssignState.needsInput].
+  final String? question;
 
   /// True while the worker runs on an earlier version of the note. The user
   /// sends it the update; editing the note alone sends nothing.
@@ -150,6 +155,10 @@ abstract class RunnerBackend {
   Future<void> addStep(String taskId, String text) =>
       throw const RunnerUnavailable('This runner cannot take a step.');
 
+  /// Answers the open question of the card's run.
+  Future<void> reply(String taskId, String text) =>
+      throw const RunnerUnavailable('This runner has no question to answer.');
+
   /// The agent session of the card's run, or null when it has none.
   String? sessionOf(String taskId) => null;
 
@@ -191,6 +200,9 @@ class RunnerAssignments extends ChangeNotifier {
 
   Future<void> addStep(String taskId, String text) =>
       backend.addStep(taskId, text);
+
+  Future<void> reply(String taskId, String text) =>
+      backend.reply(taskId, text);
 
   String? sessionOf(String taskId) => backend.sessionOf(taskId);
 

@@ -64,6 +64,7 @@ AiTask _row(
   bool stale = false,
   int? stalledSinceMs,
   String session = '',
+  String question = '',
 }) => AiTask(
   project: project,
   worktreeBranch: '',
@@ -84,6 +85,7 @@ AiTask _row(
   stale: stale,
   stalledSinceMs: stalledSinceMs,
   session: session,
+  question: question,
 );
 
 /// Records the calls and answers from fixed data.
@@ -145,6 +147,7 @@ class _FakeSource extends ChangeNotifier implements AiTaskSource {
   final accepted = <String>[];
   final failedMarked = <String>[];
   final steps = <String>[];
+  final replies = <String>[];
 
   @override
   Future<void> accept(String id) async => accepted.add(id);
@@ -154,6 +157,9 @@ class _FakeSource extends ChangeNotifier implements AiTaskSource {
 
   @override
   Future<void> addStep(String id, String text) async => steps.add('$id:$text');
+
+  @override
+  Future<void> reply(String id, String text) async => replies.add('$id:$text');
 
   @override
   Future<void> refresh() async {
@@ -250,6 +256,23 @@ void main() {
       source.tasks = [_row('t2', 'card-s', 'running', stalledSinceMs: beat)];
       await backend.markFailed('card-s');
       expect(source.failedMarked, ['t2']);
+
+      source.tasks = [_row('t2', 'card-s', 'running', question: 'Blue or green?')];
+      final asking = backend.current('card-s')!;
+      expect(asking.state, AssignState.needsInput);
+      expect(asking.question, 'Blue or green?');
+      await backend.reply('card-s', 'Green');
+      expect(source.replies, ['t2:Green']);
+      source.tasks = [
+        _row(
+          't2',
+          'card-s',
+          'interrupted',
+          question: 'Blue or green?',
+          error: 'waiting for input: no reply within the run limit',
+        ),
+      ];
+      expect(backend.current('card-s')!.state, AssignState.waiting);
     });
 
     test('a card reads its newest row, and a card with no row has no assignment', () async {
