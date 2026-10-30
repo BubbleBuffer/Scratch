@@ -4,6 +4,8 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       github_actions:
         patterns:
@@ -12,6 +14,8 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       cargo:
         patterns:
@@ -20,6 +24,8 @@ updates:
     directory: "/app"
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       pub:
         patterns:
@@ -30,6 +36,8 @@ updates:
       - "/prototypes/tauri/src-tauri/gen/android"
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       gradle:
         patterns:
@@ -38,6 +46,8 @@ updates:
     directory: "/prototypes/tauri"
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       npm:
         patterns:
@@ -46,6 +56,8 @@ updates:
     directory: "/deploy/hub"
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     groups:
       docker:
         patterns:
