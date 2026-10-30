@@ -2,6 +2,7 @@
 // board an embed draws. Both use the kit's BoardRenderer.
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
@@ -81,12 +82,20 @@ class _KanbanBoardState extends State<KanbanBoard> {
   Widget build(BuildContext context) {
     _source.colors = context.colors;
     _source.cardOpener = widget.inline ? null : _showCard;
+    // With the panel docked beside it, the board gives up its wide gutters
+    // and keeps scrolling sideways in the space left.
+    final open = _open;
+    final docked =
+        open != null &&
+        !widget.inline &&
+        !context.mobile &&
+        _columnOf(open.id) != null;
     final board = ListenableBuilder(
       listenable: widget.noteTypes ?? noteTypeRegistry,
       builder: (context, _) => BoardRenderer(
         source: _source,
         inline: widget.inline,
-        gutter: widget.inline ? 0 : widget.gutter,
+        gutter: widget.inline ? 0 : (docked ? math.min(widget.gutter, 24) : widget.gutter),
         addCardLabel: 'New card',
         cardBuilder: _card,
         onCardMenu: (context, column, card, anchor, focus) =>
@@ -184,7 +193,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     final c = context.colors;
     return Container(
       key: const ValueKey('kanban-card-panel'),
-      width: 360,
+      width: 320,
       decoration: BoxDecoration(
         color: c.bgPrimary,
         border: Border(left: BorderSide(color: c.border)),
