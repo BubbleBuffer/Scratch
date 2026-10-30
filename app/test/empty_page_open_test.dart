@@ -36,9 +36,16 @@ void main() {
             final editor = tester.state<PageEditorState>(
               find.byType(PageScreen).last,
             );
+            final page = await core(tester, (v) => v.loadPage(editor.pageId));
+            if (title == 'Tasks') {
+              // A former database opens in the editor with its view blocks,
+              // as saved.
+              expect(page.blocks.map((b) => b.kind), everyElement('view'));
+              expect(editor.doc!.flat.map((n) => n.id), page.blocks.map((b) => b.id));
+              continue;
+            }
             expect(editor.doc!.flat.single.kind, Kinds.paragraph);
             expect(editor.doc!.flat.single.text, isEmpty);
-            final page = await core(tester, (v) => v.loadPage(editor.pageId));
             expect(page.blocks, isEmpty);
           } finally {
             db.app.pages.removeListener(changed);

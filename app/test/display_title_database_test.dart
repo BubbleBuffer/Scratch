@@ -57,20 +57,11 @@ Future<PropDef> addRelation(WidgetTester tester) async {
     ),
   );
   final added = saved.firstWhere((d) => !old.any((o) => o.key == d.key));
-  final views = await core(
+  await updateViewBlock(
     tester,
-    (v) => v.run((x) => x.listViews(collection: db.projects)),
-  );
-  final table = views.firstWhere((v) => v.name == 'Table');
-  await core(
-    tester,
-    (v) => v.run(
-      (x) => x.updateView(
-        collection: db.projects,
-        view: table.copyWith(visibleProps: [added.key, ...table.visibleProps]),
-      ),
-      writes: true,
-    ),
+    db.projects,
+    'Table',
+    (table) => table.copyWith(visibleProps: [added.key, ...table.visibleProps.where((k) => k != added.key)]),
   );
   return added;
 }

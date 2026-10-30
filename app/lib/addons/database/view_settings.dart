@@ -131,7 +131,10 @@ Future<void> showAddView(BuildContext anchor, CollectionStore store) async {
   if (k != null) await addViewOf(store, k);
 }
 
-/// The menu of the active tab: rename, edit view, duplicate, delete.
+/// The layouts in a tab's menu, in the order of the view block sketch.
+const tabLayoutOrder = [ViewKind.list, ViewKind.table, ViewKind.board, ViewKind.calendar, ViewKind.gallery, ViewKind.timeline];
+
+/// The menu of the active tab: rename, layout, edit view, duplicate, delete.
 Future<void> showViewMenu(BuildContext anchor, DbController ctl, ViewDef v) {
   final store = ctl.store;
   final name = TextEditingController(text: v.name);
@@ -154,6 +157,17 @@ Future<void> showViewMenu(BuildContext anchor, DbController ctl, ViewDef v) {
           onSubmitted: (_) => Navigator.of(ctx).pop(),
         ),
       ),
+      const MenuHeader('Layout'),
+      for (final k in tabLayoutOrder)
+        dbItem(ctx, viewLabel(k), layoutIcon(k),
+            key: ValueKey('view-layout-${k.name}'),
+            selected: k == v.kind,
+            trailing: k == v.kind ? Icon20(Ico.check, size: 16, color: ctx.colors.accent) : null, onTap: () {
+          Navigator.of(ctx).pop();
+          final cur = store.views.where((x) => x.id == v.id).firstOrNull ?? v;
+          changeLayout(store, cur, k);
+        }),
+      const MenuSeparator(),
       dbItem(ctx, 'Edit view', DbIco.sliders, key: const ValueKey('view-edit'), onTap: () {
         Navigator.of(ctx).pop();
         showViewSettings(anchor, ctl);
@@ -162,7 +176,7 @@ Future<void> showViewMenu(BuildContext anchor, DbController ctl, ViewDef v) {
         Navigator.of(ctx).pop();
         store.duplicateView(v);
       }),
-      if (store.views.length > 1)
+      if (store.canDeleteView(v))
         dbItem(ctx, 'Delete view', null, ico: Ico.trash, danger: true, key: const ValueKey('view-delete'), onTap: () {
           Navigator.of(ctx).pop();
           store.deleteView(v);
@@ -338,7 +352,7 @@ class _ViewSettingsState extends State<ViewSettings> {
         _close();
         store.duplicateView(v);
       }),
-      if (store.views.length > 1)
+      if (store.canDeleteView(v))
         dbItem(context, 'Delete view', null, ico: Ico.trash, danger: true, key: const ValueKey('settings-delete'), onTap: () {
           _close();
           store.deleteView(v);

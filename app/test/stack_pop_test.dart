@@ -13,7 +13,7 @@ import 'package:notes_app/shell/navigation.dart' as nav;
 import 'db_harness.dart';
 import 'stack_flow.dart';
 
-/// A new page made a database, with one new row open on top whose title is
+/// A new page with a table of its pages, with one new row open on top whose title is
 /// "Day 1". Returns (database, row).
 Future<(String, String)> _databaseWithRow(WidgetTester tester) async {
   unawaited(nav.createPage(tester.element(find.byType(HomeScreen))));
@@ -27,7 +27,7 @@ Future<(String, String)> _databaseWithRow(WidgetTester tester) async {
     'Lisbon trip',
   );
   await settle(tester);
-  await tapKey(tester, 'start-database');
+  await addViewBlock(tester, page);
   await settleUntil(tester, () => byKey('db-new').evaluate().isNotEmpty);
   await tapKey(tester, 'db-new');
   final row = stackOf(tester).topId!;

@@ -23,6 +23,8 @@
 //!   mentions `<time datetime="2026-10-01">`.
 //! - Query cards are fenced `query` blocks; inline query chips are
 //!   `<span data-query="…">label</span>` with an escaped query attribute.
+//! - View cards are fenced `view` JSON objects, with an optional `page` key
+//!   carrying the target page id alongside the stored settings and source.
 //! - Tables are written line by line as they were read, so their text
 //!   round-trips. Code fences open with the block's info string (`rust`);
 //!   an unlabelled fence has none.
@@ -620,25 +622,37 @@ pub(crate) fn render_blocks(
                     (String::new(), format!("<{t}> {cap}"))
                 }
             }
-            BlockKind::Code | BlockKind::Query => {
+            BlockKind::Code | BlockKind::Query | BlockKind::View => {
                 // The info string (`rust`) is the target; empty when unlabelled.
                 let query = b.kind == BlockKind::Query;
-                let info = if query {
+                let view = b.kind == BlockKind::View;
+                let mut body = b.text.clone();
+                if view {
+                    if let Some(page) = &b.target {
+                        if let Ok(serde_json::Value::Object(mut object)) = serde_json::from_str(&body) {
+                            object.insert("page".into(), serde_json::Value::String(page.clone()));
+                            body = serde_json::to_string(&object).expect("view JSON object");
+                        }
+                    }
+                }
+                let info = if view {
+                    "view"
+                } else if query {
                     "query"
                 } else {
                     b.target.as_deref().unwrap_or("")
                 };
-                let fence = if query {
-                    // A query can itself contain literal fences.
-                    "`".repeat(3.max(longest_backtick_run(&b.text) + 1))
+                let fence = if query || view {
+                    // Stored query/source text can itself contain literal fences.
+                    "`".repeat(3.max(longest_backtick_run(&body) + 1))
                 } else if b.text.contains("```") || info.contains('`') {
                     "~~~~".into()
                 } else {
                     "```".into()
                 };
                 out.push_str(&format!("{indent}{fence}{info}{}\n", meta_suffix(&meta)));
-                let lines: Vec<&str> = if query {
-                    b.text.split('\n').collect()
+                let lines: Vec<&str> = if query || view {
+                    body.split('\n').collect()
                 } else {
                     b.text.lines().collect()
                 };
@@ -655,7 +669,7 @@ pub(crate) fn render_blocks(
                 (String::new(), String::new())
             }
         };
-        if !matches!(b.kind, BlockKind::Code | BlockKind::Query | BlockKind::Table) {
+        if !matches!(b.kind, BlockKind::Code | BlockKind::Query | BlockKind::View | BlockKind::Table) {
             let generic = matches!(
                 b.kind,
                 BlockKind::ChatRef | BlockKind::Unknown(_) | BlockKind::Embed

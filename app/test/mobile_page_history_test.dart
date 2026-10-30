@@ -316,8 +316,10 @@ void main() {
     await databases.openView(t, 'Table', mobile: true);
     final host = history(t);
     final before = host.history.current.id;
+    // The table sits in the page's view block; its rows scroll sideways.
+    final firstRow = find.byKey(ValueKey('row-${databases.projectRows.first}'));
     final horizontal = find.ancestor(
-      of: find.byKey(const ValueKey('table-rows')),
+      of: firstRow,
       matching: find.byWidgetPredicate(
         (w) =>
             w is Scrollable &&
@@ -328,7 +330,7 @@ void main() {
     final scroller = t.state<ScrollableState>(horizontal.first);
     final offset = scroller.position.pixels;
     await t.dragFrom(
-      databases.visibleCenter(t, find.byKey(const ValueKey('table-rows'))),
+      databases.visibleCenter(t, firstRow),
       const Offset(-220, 0),
     );
     await databases.settle(t);
@@ -350,7 +352,7 @@ void main() {
     await gesture.moveBy(const Offset(60, 0));
     await databases.settle(t);
     expect(find.byType(DatabaseView), findsOneWidget);
-    expect(find.byKey(const ValueKey('table-rows')), findsOneWidget);
+    expect(firstRow, findsOneWidget);
     expect(pageStore.session(before), isNull);
     expect(pageStore.session(row.id), same(session));
     await gesture.cancel();

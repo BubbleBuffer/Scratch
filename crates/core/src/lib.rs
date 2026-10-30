@@ -56,6 +56,7 @@ mod tree;
 pub mod types;
 mod type_data;
 mod vault;
+mod view_blocks;
 
 pub use error::{Result, VaultError};
 pub use conflict_diff::{ConflictDiff, ConflictDiffSide, ConflictDiffBlock, ConflictDiffChange, ConflictDiffSpan};
@@ -74,4 +75,5 @@ pub use types::*;
 pub use search_query::{ParsedQuery, SearchExtras, SearchOperator, SearchSpec, SearchTerm, Token, TokenKind};
 pub use search_items::{ItemHit, ItemResults};
 pub use vault::Vault;
+pub use view_blocks::{view_block_text, ViewBlock};
 pub use live_query::LiveQuerySubscription;

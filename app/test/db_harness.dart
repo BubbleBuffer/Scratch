@@ -111,9 +111,8 @@ Future<String> _makeProjects(Vault vault) async {
   String opt(String p, String n) => by[p]!.options.firstWhere((o) => o.name == n).id;
   final keys = [for (final d in schema) d.key];
 
-  final views = await vault.run((v) => v.listViews(collection: id));
-  final table = views.first;
-  await vault.run((v) => v.updateView(collection: id, view: table.copyWith(visibleProps: keys)), writes: true);
+  final saved = await vault.run((v) => v.listViews(collection: id));
+  await vault.run((v) => v.updateView(collection: id, view: saved.first.copyWith(visibleProps: keys)), writes: true);
   ViewDef view(String name, ViewKind kind, {String? group, String? date, List<String>? props}) => ViewDef(
         id: '',
         name: name,
@@ -127,14 +126,26 @@ Future<String> _makeProjects(Vault vault) async {
         config: '',
       );
   final status = by['Status']!.key, due = by['Due']!.key, tags = by['Tags']!.key, prio = by['Priority']!.key;
-  for (final v in [
+  final views = [
+    view('Table', ViewKind.table),
     view('Board', ViewKind.board, group: status, props: [prio, tags, due]),
     view('Calendar', ViewKind.calendar, date: due, props: const []),
     view('Timeline', ViewKind.timeline, date: due, props: const []),
     view('List', ViewKind.list, props: [status, due]),
     view('Gallery', ViewKind.gallery, props: [status, tags]),
-  ]) {
+  ];
+  // The page shows its views as view blocks. The saved views stay, as the
+  // core keeps them for a page that got properties: old inline database
+  // blocks still read them.
+  for (final v in views.skip(1)) {
     await vault.run((x) => x.addView(collection: id, view: v), writes: true);
+  }
+  String? after;
+  for (final (i, v) in views.indexed) {
+    final block = 'pv${i + 1}';
+    final prev = after;
+    await vault.run((x) => x.insertViewBlock(pageId: id, id: block, after: prev, view: v), writes: true);
+    after = block;
   }
 
   const statuses = ['Done', 'In progress', 'Not started'];
@@ -268,6 +279,7 @@ Future<DbVault> pumpDb(WidgetTester tester, {required bool mobile, bool dark = f
   sansFamily = 'Atkinson Hyperlegible Next';
   monoFamily = 'Fragment Mono';
   Debounce.pending = 0; // none can be left from an earlier test's zone
+  viewBlockTabs.clear(); // active tabs are per session, keyed by block id
   // A steady caret: its blink phase would depend on how long settle pumped.
   EditableText.debugDeterministicCursor = true;
   debugDefaultTargetPlatformOverride = mobile ? TargetPlatform.android : TargetPlatform.windows;
@@ -408,9 +420,43 @@ Future<void> openView(WidgetTester tester, String view, {bool mobile = false}) a
     await tapKey(tester, 'sheet-view-$view');
     if (byKey('views-done').evaluate().isNotEmpty) await tapKey(tester, 'views-done');
   } else {
-    await tapKey(tester, 'tab-$view');
+    // Tabs past the text column's width sit under "N more…".
+    if (byKey('tab-$view').evaluate().isEmpty) {
+      await tapKey(tester, 'tabs-more');
+      await tapKey(tester, 'more-view-$view');
+    } else {
+      await tapKey(tester, 'tab-$view');
+    }
   }
 }
+
+/// The settings of [page]'s view blocks as the core has them, in order.
+Future<List<ViewDef>> viewBlocksOf(WidgetTester tester, String page) async {
+  await settle(tester);
+  return core(tester, (v) async {
+    final p = await v.run((x) => x.loadPage(id: page));
+    return [
+      for (final b in p.blocks)
+        if (b.kind == 'view') await v.run((x) => x.viewBlockDef(id: b.id, text: b.text)),
+    ];
+  });
+}
+
+/// Rewrites the settings of [page]'s view block named [name] in the core
+/// (for a page that is not open; an open view saves through its store).
+Future<void> updateViewBlock(WidgetTester tester, String page, String name, ViewDef Function(ViewDef v) f) =>
+    core(tester, (v) async {
+      final p = await v.run((x) => x.loadPage(id: page));
+      for (final b in p.blocks) {
+        if (b.kind != 'view') continue;
+        final def = await v.run((x) => x.viewBlockDef(id: b.id, text: b.text));
+        if (def.name != name) continue;
+        final text = await v.run((x) => x.viewBlockText(view: f(def)));
+        await v.apply(page, [BOp(op: OpKind.setText, id: b.id, kind: b.kind, text: text, marks: const [], checked: false)]);
+        return;
+      }
+      throw StateError('no view block $name on $page');
+    });
 
 DatabaseViewState dbState(WidgetTester tester) => tester.state<DatabaseViewState>(find.byType(DatabaseView).first);
 

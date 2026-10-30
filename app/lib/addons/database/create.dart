@@ -1,16 +1,9 @@
-// Making databases: turning a page into a full-page database, and the page
-// behind an inline database block.
-
-import 'package:flutter/foundation.dart';
+// The page behind an old targetless inline database block, made on first
+// render.
 
 import '../../core/models.dart';
 import '../../core/vault.dart';
 import '../../ui/database/values.dart';
-
-/// Pages turned into databases in this session. A page screen that is open
-/// on one switches to the database view at once (the page session does not
-/// report the change).
-final madeDatabases = ValueNotifier<Set<String>>({});
 
 /// Makes [page] a database: a "Table" view, the
 /// title column and a "Tags" multi-select.
@@ -31,7 +24,6 @@ Future<void> makeDatabase(Vault vault, String page) async {
       }
     }
   }
-  madeDatabases.value = {...madeDatabases.value, page};
 }
 
 /// Creates the database page of an inline database block in [host] and
