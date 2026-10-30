@@ -390,3 +390,30 @@ Future<void> expectOutline(
   expect(body, isNotNull, reason: 'the board has a readable body');
   expect(outlineOf(body!), expected);
 }
+
+/// The board's keyboard stop for the card at [index] in reading order (the
+/// first card by default). A card is one focus stop; its body is excluded.
+FocusNode cardFocus(WidgetTester tester, [int index = 0]) => tester
+    .widget<FocusableActionDetector>(
+      find
+          .descendant(
+            of: allCardSurfaces().at(index),
+            matching: find.byType(FocusableActionDetector),
+          )
+          .first,
+    )
+    .focusNode!;
+
+/// True when the keyboard focus is on, or inside, a widget found by [finder].
+bool focusIsIn(Finder finder) {
+  final context = FocusManager.instance.primaryFocus?.context;
+  if (context == null) return false;
+  final targets = finder.evaluate().toSet();
+  if (targets.contains(context)) return true;
+  var found = false;
+  context.visitAncestorElements((e) {
+    found = targets.contains(e);
+    return !found;
+  });
+  return found;
+}

@@ -11,12 +11,17 @@ class KeyboardMenu extends StatefulWidget {
     super.key,
     required this.child,
     this.restoreFocus,
+    this.focusFirst = true,
   });
 
   final Widget child;
 
   /// The node that takes focus when Esc closes the menu.
   final FocusNode? restoreFocus;
+
+  /// Whether focus starts on the first item. A menu that puts focus on an
+  /// item of its own (autofocus) sets this to false.
+  final bool focusFirst;
 
   @override
   State<KeyboardMenu> createState() => _KeyboardMenuState();
@@ -26,9 +31,11 @@ class _KeyboardMenuState extends State<KeyboardMenu> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) FocusScope.of(context).nextFocus();
-    });
+    if (widget.focusFirst) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) FocusScope.of(context).nextFocus();
+      });
+    }
   }
 
   void _close() {
