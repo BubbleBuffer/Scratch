@@ -13,6 +13,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../addons/agent/api.dart' show AgentStore, HostRelayDetails;
 import '../../state/app_state.dart';
+import '../../src/rust/api/sync.dart' show redeemPairingCode;
 import '../../state/sync_store.dart';
 import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
@@ -218,6 +219,8 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
                 token: s.clientToken ?? '',
                 deviceId: deviceId,
                 name: name,
+                vault: context.read<SyncStore>().vault.raw,
+                trusted: trustedFor(settings, s.clientUrl!),
               );
               settings.update((s) => s.clientDeviceLabel = used);
             },
@@ -340,6 +343,10 @@ class _ConnectSettingsState extends State<ConnectSettings> {
 
   /// The hub of the last failed connect (for an untrusted certificate).
   String? _failedUrl;
+
+  /// The one-time code of the last pasted code link (the hub field then
+  /// keeps only its address); redeemed on connect unless a token is typed.
+  String? _pastedCode;
   bool _busy = false;
 
   @override
@@ -353,6 +360,7 @@ class _ConnectSettingsState extends State<ConnectSettings> {
   void _hubChanged(String v) {
     final p = Pairing.parse(v);
     if (p != null) {
+      _pastedCode = p.code;
       _hub.text = p.url;
       _token.text = p.token;
     }
@@ -362,14 +370,26 @@ class _ConnectSettingsState extends State<ConnectSettings> {
   Future<void> _connect() async {
     final p = Pairing.parse(_hub.text);
     final url = p?.url ?? normalizeHubUrl(_hub.text);
-    final token = p?.token ?? _token.text.trim();
-    if (url.isEmpty || token.isEmpty) {
+    final typed = p?.token ?? _token.text.trim();
+    final code = p?.code ?? (typed.isEmpty ? _pastedCode : null);
+    if (url.isEmpty || (code == null && typed.isEmpty)) {
       setState(() => _error = 'Enter the hub address and the token, or paste a pairing code.');
       return;
     }
     setState(() => _busy = true);
     try {
-      await connectToHub(context.read<SyncStore>(), AppSettings.read(context), url, token);
+      final sync = context.read<SyncStore>();
+      final settings = AppSettings.read(context);
+      // A code link is redeemed for the device's token; an older link has it.
+      final token = code != null
+          ? await redeemPairingCode(
+              vault: sync.vault.raw,
+              hubUrl: url,
+              code: code,
+              trusted: trustedFor(settings, url),
+            )
+          : typed;
+      await connectToHub(sync, settings, url, token);
       _hub.clear();
       _token.clear();
       _error = null;
@@ -827,7 +847,7 @@ class _AddDeviceViewState extends State<AddDeviceView> {
       ]);
     } else {
       final url = _url ?? 'http://127.0.0.1:47100';
-      final code = Pairing(url, token).encode();
+      final code = Pairing.code(url, token).encode();
       children.addAll([
         Text('On the device, open $appName › Settings › Sync › Connect to a hub, and scan or paste this code. '
             'The token works for one device and is shown only now.', style: body),

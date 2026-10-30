@@ -19,6 +19,8 @@ path = "src/bin/notes.rs"
 
 [dependencies]
 vault_core = { path = "../core" }
+# notes setup: the device-key session bearer for POST /agent-tokens.
+vault_sync = { path = "../sync" }
 serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 rusqlite = { version = "0.40", features = ["bundled"] }

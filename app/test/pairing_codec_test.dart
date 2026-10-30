@@ -29,4 +29,25 @@ void main() {
       'http://192.168.0.5:47100',
     );
   });
+
+  test('a code link parses to a code, not a token', () {
+    const code = 'fedcba9876543210fedcba9876543210';
+    final p = Pairing.parse('notes://pair?hub=https://notes.example.com/&code=$code')!;
+    expect(p.url, 'https://notes.example.com');
+    expect(p.code, code);
+    expect(p.token, '');
+    expect(Pairing.parse(p.encode())!.code, code);
+    expect(p.encode(), 'notes://pair?hub=https://notes.example.com&code=$code');
+  });
+
+  test('a legacy token link still parses to a token', () {
+    final p = Pairing.parse('notes://pair?hub=http://192.168.0.5:47100&token=$token')!;
+    expect(p.token, token);
+    expect(p.code, isNull);
+  });
+
+  test('a link with neither code nor token is refused', () {
+    expect(Pairing.parse('notes://pair?hub=http://192.168.0.5:47100'), isNull);
+    expect(Pairing.parse('notes://pair?hub=http://192.168.0.5:47100&code='), isNull);
+  });
 }

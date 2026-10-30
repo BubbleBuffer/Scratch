@@ -40,11 +40,15 @@ class HostRelayConfig {
     required this.token,
     required this.open,
     required this.key,
+    required this.vaultRoot,
     this.trusted = const [],
     this.trustKey = '',
   });
 
   final String url, device, token;
+
+  /// The vault directory whose device key proves this device.
+  final String vaultRoot;
 
   /// What this device trusts for the hub beyond the public roots.
   final List<TrustedHubCertificate> trusted;
@@ -141,6 +145,7 @@ class HostRelayLink {
         device: config.device,
         token: config.token,
         trusted: config.trusted,
+        vaultRoot: config.vaultRoot,
       );
       if (_closed) {
         await agent.hostRelayStop();

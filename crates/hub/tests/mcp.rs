@@ -520,7 +520,7 @@ async fn reads_and_write_attribution_with_separate_actors() {
 #[tokio::test]
 async fn authentication_origin_method_and_live_revocation() {
     let env = Env::new().await;
-    let device = env.server.hub().pair("test-device").unwrap();
+    let device = env.server.hub().pair_legacy_token("test-device").unwrap();
     let request = json!({"jsonrpc":"2.0","id":1,"method":"tools/list"});
     for token in [None, Some("bad-token"), Some(device.as_str())] {
         let mut req = env.client.post(&env.url).json(&request);

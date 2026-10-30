@@ -81,17 +81,21 @@ abstract class NotesAgent implements RustOpaqueInterface {
   /// unreachable". `close_events` (or dropping it) closes the socket.
   ///
   /// `trusted`: the device's trusted hub certificates, as for
-  /// `NotesSync::with_trusted_certificates`.
+  /// `NotesSync::with_trusted_certificates`. `vault_root`: the vault
+  /// whose device key proves this device (the bearer is a session, as for
+  /// sync); empty sends the bare token.
   static Future<NotesAgent> connect({
     required String url,
     required String device,
     required String token,
     required List<TrustedHubCertificate> trusted,
+    required String vaultRoot,
   }) => RustLib.instance.api.crateApiAgentNotesAgentConnect(
     url: url,
     device: device,
     token: token,
     trusted: trusted,
+    vaultRoot: vaultRoot,
   );
 
   Future<AgentSession> createSession({required String title});
@@ -132,12 +136,14 @@ abstract class NotesAgent implements RustOpaqueInterface {
   /// (desktop pack included, no approval prompts). Restarts a running
   /// relay; drops reconnect with backoff. Fails on a hub connection.
   /// `trusted`: the device's trusted hub certificates, as for
-  /// `NotesSync::with_trusted_certificates`.
+  /// `NotesSync::with_trusted_certificates`. `vault_root`: as for
+  /// `connect`.
   Future<void> hostRelayStart({
     required String url,
     required String device,
     required String token,
     required List<TrustedHubCertificate> trusted,
+    required String vaultRoot,
   });
 
   /// The PC host relay's connection state ("off" when not started).

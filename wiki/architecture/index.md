@@ -19,6 +19,7 @@ These pages describe how the app works now. Plans, proposals and decisions are i
 - [Conflict format v2](conflict-format.md): Approved Block, Subtree and Page conflicts, edit-beats-delete, synced resolutions and undo, journal repair log and vault-wide auto-resolve.
 - [Core (state)](core-state.md): The built Rust core (vault_core): Loro page documents, properties, collections and queries, trash, links, attachments, history, import, index, bench.
 - [Data model](data-model.md): Everything is a page with blocks and properties; collections group pages; views are queries plus renderers; markdown is the file format.
+- [Device keys](device-keys.md): each device holds an Ed25519 key (bubblebuffer-device-key); the hub binds it to the device token, and sync, sockets and hub calls run on 1-hour sessions bought with a signed challenge; pairing links carry one-time codes. Agent tokens and MCP OAuth stay.
 - [Feedback capture (state)](feedback.md): Shake, Ctrl+Shift+F or a Send feedback button opens a sheet with a screenshot and diagnostics; reports are hidden child pages of the Feedback system page.
 - [Folder mounts](mounts.md): Any PC folder can be mounted at a vault path; devices see one logical vault, with no symlinks.
 - [Hub server (state)](hub.md): notes-hub, the server hub: sync over axum behind Caddy, device tokens from an Authentik (OIDC) login, the agent at /agent/ws (JSON-RPC over WebSocket); config, routes, protocol, security.

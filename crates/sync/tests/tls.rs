@@ -203,7 +203,7 @@ impl TlsHub {
 
     fn client(&self, label: &str, trusted: Vec<String>) -> (TempDir, SyncClient) {
         let dir = TempDir::new(label);
-        let token = self.hub.pair(label).unwrap();
+        let token = self.hub.pair_legacy_token(label).unwrap();
         let client = SyncClient::with_trusted(dir.open(), &self.front.url, &token, trusted);
         (dir, client)
     }
@@ -241,7 +241,7 @@ fn self_signed_hub_without_pins_is_untrusted() {
     let plain = SyncClient::new(
         TempDir::new("plain").open(),
         &hub.front.url,
-        &hub.hub.pair("plain").unwrap(),
+        &hub.hub.pair_legacy_token("plain").unwrap(),
     );
     assert_eq!(untrusted(&plain), id.leaf_fingerprint());
 }

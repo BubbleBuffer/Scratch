@@ -31,8 +31,8 @@ fn two_devices_see_names_and_successful_sync_times_in_the_same_exchange() {
     let hub = Hub::new(hv.clone()).unwrap();
     let server = hub.serve("127.0.0.1:0").unwrap();
     let url = format!("http://{}", server.addr());
-    let ac = SyncClient::new(a.clone(), &url, &hub.pair("Studio").unwrap());
-    let bc = SyncClient::new(b.clone(), &url, &hub.pair("Laptop").unwrap());
+    let ac = SyncClient::new(a.clone(), &url, &hub.pair_legacy_token("Studio").unwrap());
+    let bc = SyncClient::new(b.clone(), &url, &hub.pair_legacy_token("Laptop").unwrap());
     ac.sync_once().unwrap();
     // The timestamp written after the successful exchange reaches the hub
     // before sync_once returns, without a separate heartbeat protocol.
