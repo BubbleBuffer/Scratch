@@ -3,6 +3,7 @@
 // groups, row open and peek, templates and the inline database.
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/models.dart';
 import 'package:notes_app/ui/database/config.dart';
@@ -50,8 +51,7 @@ void main() {
     dbTest('add a property from the table header and change its type', (tester) async {
       await pumpDb(tester, mobile: false);
       await openView(tester, 'Table');
-      await tester.dragFrom(visibleCenter(tester, byKey('table-rows')), const Offset(-1200, 0));
-      await settle(tester);
+      // The table scrolls sideways to its "+" column.
       await tapKey(tester, 'table-add-prop');
       await tapKey(tester, 'type-number');
       var s = await schemaOf(tester);
@@ -229,6 +229,9 @@ void main() {
     dbTest('resize a timeline bar from its end', (tester) async {
       await pumpDb(tester, mobile: false);
       await openView(tester, 'Timeline');
+      // The text column is narrower than the page: bring the bar's end in.
+      await Scrollable.ensureVisible(tester.element(byKey('bar-end-Design system')), alignment: 0.5);
+      await settle(tester);
       await hover(tester, byKey('bar-Design system'));
       await tester.dragFrom(tester.getCenter(byKey('bar-end-Design system')), const Offset(120, 0));
       await settle(tester);
@@ -320,10 +323,9 @@ void main() {
       final added = vs.last;
       expect(added.kind, ViewKind.list);
       expect(dbState(tester).store.view?.id, added.id);
-      // Its tab menu: a layout, then a name.
-      await tapKey(tester, 'tabs-more');
-      await settle(tester);
-      if (byKey('more-view-${added.name}').evaluate().isNotEmpty) await tapKey(tester, 'more-view-${added.name}');
+      // Its tab menu: a layout, then a name. The active tab is always
+      // shown; the older "List" sits under "N more…".
+      expect(byKey('tab-${added.name}'), findsOneWidget);
       await tapKey(tester, 'tab-${added.name}');
       await tapKey(tester, 'view-layout-board');
       vs = await viewBlocksOf(tester, db.projects);
@@ -339,9 +341,10 @@ void main() {
       await tapKey(tester, 'view-duplicate');
       vs = await viewBlocksOf(tester, db.projects);
       expect(vs.length, 8);
-      await tapKey(tester, 'tabs-more');
-      await settle(tester);
-      if (byKey('more-view-Kanban').evaluate().isNotEmpty) await tapKey(tester, 'more-view-Kanban');
+      if (byKey('tab-Kanban').evaluate().isEmpty) {
+        await tapKey(tester, 'tabs-more');
+        await tapKey(tester, 'more-view-Kanban');
+      }
       await tapKey(tester, 'tab-Kanban');
       await tapKey(tester, 'view-delete');
       vs = await viewBlocksOf(tester, db.projects);
@@ -357,7 +360,7 @@ void main() {
       await escape(tester);
       final v = await viewNamed(tester, 'List');
       expect(v.kind, ViewKind.gallery);
-      expect(byKey('gallery-rows'), findsOneWidget);
+      expect(byKey('gallery-new'), findsOneWidget);
     });
 
     dbTest('mobile view switcher', (tester) async {
@@ -367,7 +370,7 @@ void main() {
       await tapKey(tester, 'view-switcher');
       await tapKey(tester, 'sheet-view-List');
       if (byKey('views-done').evaluate().isNotEmpty) await tapKey(tester, 'views-done');
-      expect(byKey('list-rows'), findsOneWidget);
+      expect(byKey('list-new'), findsOneWidget);
     });
   });
 

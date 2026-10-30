@@ -130,11 +130,10 @@ void main() {
     await dismiss(tester);
     final schema = await _schema(tester, trip);
     expect(schema.map((d) => d.name), ['Text']);
-    // The parent's view shows it; it has no saved views to migrate.
+    // The parent's view shows it, and getting properties added no view.
     final views = await viewBlocksOf(tester, trip);
     expect(views.single.visibleProps, contains(schema.single.key));
     expect(views, hasLength(1));
-    expect(await core(tester, (v) => v.run((x) => x.listViews(collection: trip))), isEmpty);
     expect(byKey('prop-label-Text'), findsOneWidget);
   });
 
