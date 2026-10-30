@@ -77,6 +77,111 @@ impl Tool for ReportProgress {
     }
 }
 
+/// Triage runs only: lists the pages in the run's scope. The scope comes from
+/// the task row, never from model arguments.
+struct TriagePages {
+    vault: Arc<Vault>,
+    session: String,
+    scope: vault_mcp::triage::Scope,
+}
+
+#[async_trait]
+impl Tool for TriagePages {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "triage_pages".into(),
+            description: "List the pages this triage run reviews, oldest first: id, title, page type, a short summary of the text and the creation time.".into(),
+            input_schema: json!({"type": "object", "properties": {}, "additionalProperties": false}),
+            read_only: true,
+            approval: Approval::None,
+        }
+    }
+
+    async fn invoke(&self, context: ToolContext, _input: Value) -> Result<ToolResult> {
+        if context.session_id != self.session {
+            return Ok(ToolResult::error("triage belongs to another task session"));
+        }
+        let (vault, scope) = (self.vault.clone(), self.scope.clone());
+        let result =
+            tokio::task::spawn_blocking(move || vault.triage_candidates(scope.root, scope.pages))
+                .await?;
+        Ok(match result {
+            Ok(pages) => ToolResult::text(serde_json::to_string(&pages)?),
+            Err(error) => ToolResult::error(error.to_string()),
+        })
+    }
+}
+
+/// Triage runs only: proposes merging two pages of the run's scope. The older
+/// page is kept whatever the model says.
+struct TriagePropose {
+    vault: Arc<Vault>,
+    task: String,
+    session: String,
+    scope: vault_mcp::triage::Scope,
+}
+
+#[async_trait]
+impl Tool for TriagePropose {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "triage_propose".into(),
+            description: "Propose merging two duplicate or overlapping pages from triage_pages. Both must be listed there and of the same page type. The older page is kept and the newer one is merged into it only if the user accepts; keep_id is optional and does not decide that. A pair already proposed or turned down comes back unchanged.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "a": {"type": "string", "description": "id of one page"},
+                    "b": {"type": "string", "description": "id of the other page"},
+                    "reason": {"type": "string", "description": "one sentence on why they overlap"},
+                    "keep_id": {"type": "string", "description": "optional, ignored: the older page is kept"}
+                },
+                "required": ["a", "b", "reason"],
+                "additionalProperties": false
+            }),
+            read_only: false,
+            approval: Approval::None,
+        }
+    }
+
+    async fn invoke(&self, context: ToolContext, input: Value) -> Result<ToolResult> {
+        if context.session_id != self.session {
+            return Ok(ToolResult::error("triage belongs to another task session"));
+        }
+        let text = |key: &str| {
+            input
+                .get(key)
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .unwrap_or("")
+                .to_owned()
+        };
+        let (a, b, reason) = (text("a"), text("b"), text("reason"));
+        if a.is_empty() || b.is_empty() {
+            return Ok(ToolResult::error("triage_propose needs the page ids a and b"));
+        }
+        let (vault, task, scope) = (self.vault.clone(), self.task.clone(), self.scope.clone());
+        let result = tokio::task::spawn_blocking(move || -> std::result::Result<String, String> {
+            let listed = vault
+                .triage_candidates(scope.root, scope.pages)
+                .map_err(|e| e.to_string())?;
+            for id in [&a, &b] {
+                if !listed.iter().any(|c| &c.id == id) {
+                    return Err(format!("page {id} is not in this triage run's scope"));
+                }
+            }
+            let p = vault
+                .triage_propose(a, b, reason, task)
+                .map_err(|e| e.to_string())?;
+            serde_json::to_string(&p).map_err(|e| e.to_string())
+        })
+        .await?;
+        Ok(match result {
+            Ok(text) => ToolResult::text(text),
+            Err(error) => ToolResult::error(error),
+        })
+    }
+}
+
 impl Agent {
     /// Prepare before admitting the provider: failures are written to the task
     /// by the same finish path as provider errors. A retry has a new session.
@@ -132,9 +237,30 @@ impl Agent {
             task: task.into(),
             session: session.into(),
         });
+        // A triage run (its row has a scope) also gets the triage tools.
+        let mut triage: Vec<Arc<dyn Tool>> = Vec::new();
+        if let Some(scope) = vault_mcp::triage::scope(&self.vault, task).ok().flatten() {
+            triage.push(Arc::new(TriagePages {
+                vault: self.vault.clone(),
+                session: session.into(),
+                scope: scope.clone(),
+            }));
+            triage.push(Arc::new(TriagePropose {
+                vault: self.vault.clone(),
+                task: task.into(),
+                session: session.into(),
+                scope,
+            }));
+        }
         let store = self.store.clone();
         let register = move |mut registry: ToolRegistry| -> Result<ToolRegistry> {
             registry.register_host(progress.clone())?;
+            for tool in &triage {
+                registry.register_host(tool.clone())?;
+            }
+            if !triage.is_empty() {
+                registry.show_always(["triage_pages", "triage_propose"]);
+            }
             // BubblePaw's todo tool: the same runs as before, and the state it
             // stores (the bare array under `todo`) is what the subtask mirror reads.
             bubblepaw_sdk::todo::register(&mut registry, store.clone())?;

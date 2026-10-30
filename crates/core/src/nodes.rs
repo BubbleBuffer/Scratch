@@ -488,7 +488,7 @@ impl Vault {
 
     /// The hidden Nodes page, created on first use. Called with the nodes
     /// mutex held.
-    fn nodes_page(&self) -> Result<PageId> {
+    pub(crate) fn nodes_page(&self) -> Result<PageId> {
         if let Some(id) = self.find_by_role(ROLE_PAGE.into())? {
             return Ok(id);
         }
