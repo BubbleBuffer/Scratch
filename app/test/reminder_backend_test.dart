@@ -248,7 +248,11 @@ void main() {
       plugin: plugin,
     );
     await backend.init();
-    expect(plugin.android.channels.map((c) => c.id), ['reminders', 'summary']);
+    expect(plugin.android.channels.map((c) => c.id), [
+      'reminders',
+      'agent-runs',
+      'summary',
+    ]);
     final item = reminder(1, now.add(const Duration(minutes: 5)));
     await backend.apply([item]);
     expect(plugin.canceled, [99]);

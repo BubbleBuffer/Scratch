@@ -17,8 +17,8 @@
 //!   engine that registers exactly that set's tools, with no approval prompts.
 //!   Read callers can't create jobs.
 //! - Limits ([`JobLimits`]): one running job per owner, 4 queued per hub,
-//!   `wait` at most 60 s, runs stopped and failed after 1 h, ended jobs trashed after
-//!   30 days. A restart marks running jobs interrupted; they are not queued
+//!   `wait` at most 60 s, runs stopped and failed after 1 h, ended jobs keep their outcome and lose their
+//!   transcript after 30 days. A restart marks running jobs interrupted; they are not queued
 //!   again.
 
 use std::collections::{HashMap, HashSet};
@@ -38,6 +38,10 @@ use vault_tools::ToolSet;
 use crate::agent::Shared;
 use crate::AppState;
 
+/// How long a cancel waits for the runner's acknowledgement before it
+/// answers with the job still running (cancel requested).
+const CANCEL_ACK_WAIT: Duration = Duration::from_secs(3);
+
 /// The jobs API's limits. Tests shorten them.
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,7 +52,8 @@ pub struct JobLimits {
     pub max_wait: Duration,
     /// A run still going after this is cancelled and the job fails.
     pub max_run: Duration,
-    /// Ended jobs older than this move to the trash.
+    /// An ended job's session (transcript and logs) is deleted after this long;
+    /// the job row stays.
     pub keep: Duration,
     /// How often the worker looks for work and old jobs without a wake-up.
     pub tick: Duration,
@@ -264,14 +269,33 @@ impl Jobs {
                 r.cancelled = true;
                 (r.engine.clone(), r.session.clone())
             });
-            jobs::finish(&self.vault, &job.id, End::Cancelled).map_err(|e| e.0)?;
+            let queued = jobs::get(&self.vault, &job.id)
+                .map_err(|e| e.0)?
+                .is_some_and(|j| j.status == QUEUED);
+            if queued {
+                // No run to stop: nothing to wait for.
+                jobs::finish(&self.vault, &job.id, End::Cancelled).map_err(|e| e.0)?;
+            } else {
+                // A running job stays running until its run stops; `end`
+                // acknowledges. Never report stopped work that still runs.
+                jobs::request_cancel(&self.vault, &job.id).map_err(|e| e.0)?;
+            }
             target
         };
         if let Some((Some(engine), Some(session))) = target {
             engine.cancel_as(&session, job_client());
         }
         self.wake.notify_one();
-        job_json(&self.owned(actor, a)?)
+        // A run usually stops within moments: give the acknowledgement a
+        // short time before answering with the job's state.
+        let start = Instant::now();
+        loop {
+            let now = self.owned(actor, a)?;
+            if now.ended() || start.elapsed() >= CANCEL_ACK_WAIT {
+                return job_json(&now);
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
     }
 
     fn list(&self, actor: &str, a: &Value) -> Result<String, String> {
@@ -326,14 +350,16 @@ impl Jobs {
         Ok(taken)
     }
 
-    /// Ends `id` unless it was cancelled through the API or the hub is
-    /// stopping, and forgets it.
+    /// Ends `id` unless the hub is stopping, and forgets it. A job whose
+    /// cancel was asked for ends as cancelled: this is the runner's
+    /// acknowledgement.
     fn end(&self, id: &str, end: End) {
         let mut running = self.running.lock().unwrap();
         let cancelled = running.remove(id).is_some_and(|r| r.cancelled);
-        if cancelled || self.stopping.load(Ordering::SeqCst) {
+        if self.stopping.load(Ordering::SeqCst) {
             return;
         }
+        let end = if cancelled { End::Cancelled } else { end };
         if let Err(e) = jobs::finish(&self.vault, id, end) {
             tracing::warn!("job {id}: could not save its end: {}", e.0);
         }
@@ -361,6 +387,11 @@ impl Jobs {
             };
             if r.cancelled {
                 running.remove(&job.id);
+                drop(running);
+                // Cancelled before its run started: acknowledge now.
+                if let Err(e) = jobs::finish(&self.vault, &job.id, End::Cancelled) {
+                    tracing::warn!("job {}: could not save its cancel: {}", job.id, e.0);
+                }
                 return;
             }
             r.engine = Some(engine.clone());
@@ -410,14 +441,34 @@ pub(crate) async fn run_worker(state: Arc<AppState>) {
             return;
         }
         let st = state.clone();
-        let taken = tokio::task::spawn_blocking(move || {
-            let keep = st.jobs.limits.keep.as_millis() as i64;
-            if let Err(e) = jobs::sweep(st.hub.vault(), NODE_HUB, keep, jobs::now_ms()) {
-                tracing::warn!("jobs: cleanup failed: {}", e.0);
+        let keep = st.jobs.limits.keep.as_millis() as i64;
+        let expired = {
+            let st = st.clone();
+            tokio::task::spawn_blocking(move || {
+                jobs::expired_sessions(st.hub.vault(), NODE_HUB, keep, jobs::now_ms())
+            })
+            .await
+        };
+        // Transcripts and logs expire; the job row, its outcome and its
+        // attempt history stay.
+        if let Ok(Ok(list)) = expired {
+            for job in list {
+                let set: ToolSet = job.tools.parse().unwrap_or(ToolSet::Read);
+                let Ok(engine) = state.agent.job_engine(set).await else {
+                    continue;
+                };
+                let st = state.clone();
+                let _ = tokio::task::spawn_blocking(move || {
+                    // A session that is already gone counts as expired.
+                    let _ = engine.delete_session(&job.session);
+                    if let Err(e) = jobs::session_expired(st.hub.vault(), &job.id) {
+                        tracing::warn!("jobs: cleanup failed: {}", e.0);
+                    }
+                })
+                .await;
             }
-            st.jobs.take_ready()
-        })
-        .await;
+        }
+        let taken = tokio::task::spawn_blocking(move || st.jobs.take_ready()).await;
         match taken {
             Ok(Ok(taken)) => {
                 for job in taken {

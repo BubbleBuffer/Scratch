@@ -7,6 +7,7 @@
 // Storage, Shared links (only while signed in to a hub); AI: Agent,
 // Connectors; About (with Updates on Windows).
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -592,6 +593,27 @@ class GeneralBody extends StatelessWidget {
               ),
           ],
         ),
+        if (defaultTargetPlatform == TargetPlatform.android)
+          SSection(
+            title: 'Agent runs',
+            children: [
+              SRow(
+                label: 'Notify when a run finishes or fails',
+                desc:
+                    'A notice when a task you delegated finishes or fails. It appears when the app syncs the change.',
+                scope: 'Phone',
+                control: SSwitch(
+                  key: const ValueKey('run-notices'),
+                  label: 'Notify when a run finishes or fails',
+                  value: s.runNotices,
+                  onChanged: (on) {
+                    s.update((s) => s.runNotices = on);
+                    if (on) unawaited(context.app.runNotices.enable());
+                  },
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }

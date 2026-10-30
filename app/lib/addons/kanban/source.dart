@@ -409,8 +409,22 @@ class KanbanBoardSource extends BoardSource {
     await _settle();
   });
 
+  /// What opening a card does on the board: the view sets it to show the card
+  /// panel. Without one, opening goes straight to the note.
+  void Function(BuildContext context, BoardCard card)? cardOpener;
+
   @override
-  void openCard(BuildContext context, BoardCard card) =>
+  void openCard(BuildContext context, BoardCard card) {
+    final opener = cardOpener;
+    if (opener != null) {
+      opener(context, card);
+    } else {
+      openNote(context, card);
+    }
+  }
+
+  /// Opens the card's note page.
+  void openNote(BuildContext context, BoardCard card) =>
       openPage(context, card.id, card.title);
 
   // ---- columns ----

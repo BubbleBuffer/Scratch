@@ -21,7 +21,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use vault_core::{PageId, PageSummary, PropValue, Sort, Vault};
 
-use crate::tasks::{self, text, CANCELLED, DONE, FAILED, INTERRUPTED, QUEUED, RUNNING};
+use crate::tasks::{self, attempts, text, CANCELLED, DONE, FAILED, INTERRUPTED, QUEUED, RUNNING};
 use crate::{err, Result};
 
 /// The node value of jobs the hub runs.
@@ -47,6 +47,10 @@ pub struct Job {
     pub session: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub error: String,
+    /// A cancel was asked for and the runner has not stopped the run yet:
+    /// the job is still `running`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub cancel_requested: bool,
     /// The page the job is about, whose placeholder gets its result.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<PageId>,
@@ -99,6 +103,7 @@ fn job_of(v: &Vault, row: &PageSummary, with_result: bool) -> Job {
         .then(|| v.load_page(row.id.clone()).ok())
         .flatten()
         .map(|page| v.blocks_markdown(page.blocks).trim().to_string());
+    let cancel_requested = status == RUNNING && !text(p, attempts::CANCEL_REQUESTED).is_empty();
     Job {
         id: row.id.clone(),
         prompt: text(p, "prompt"),
@@ -108,6 +113,7 @@ fn job_of(v: &Vault, row: &PageSummary, with_result: bool) -> Job {
         tools: text(p, "tools"),
         session: text(p, "session"),
         error: text(p, "error"),
+        cancel_requested,
         page: p
             .iter()
             .find(|x| x.key == "page")
@@ -271,12 +277,69 @@ pub fn mark_running(v: &Vault, id: &str, session: &str) -> Result<()> {
         "status".into(),
         PropValue::Select(RUNNING.into()),
     )?;
+    // The job's attempt record (a hub job is run once; a retry is a new job).
+    let t = tasks::get(v, id)?;
+    let owner = v
+        .load_page(id.to_string())
+        .map(|p| text(&p.properties, "owner"))
+        .unwrap_or_default();
+    attempts::begin(v, &t, &owner)?;
     placeholder(v, id, RUNNING)
 }
 
+/// Records a cancel command on a running job. The job stays `running`
+/// until its run stops and [`finish`] acknowledges with
+/// [`End::Cancelled`]. Returns false for a job that is not running.
+pub fn request_cancel(v: &Vault, id: &str) -> Result<bool> {
+    let t = tasks::get(v, id)?;
+    if t.status != RUNNING {
+        return Ok(false);
+    }
+    tasks::request_cancel(v, &t)?;
+    Ok(true)
+}
+
 /// Ends a job: the result goes into the row's body, an error into `error`.
+///
+/// A job whose cancel was asked for ends as `cancelled` whatever the run
+/// returned (the cancel is acknowledged; a result that came anyway is kept
+/// in the attempt's history). A job that already ended is not changed; the
+/// outcome goes to its history as a late result.
 pub fn finish(v: &Vault, id: &str, end: End) -> Result<()> {
     let id = id.to_string();
+    let t = tasks::get(v, &id)?;
+    let kept = match &end {
+        End::Completed(md) => Some(md.clone()),
+        End::Failed(msg) => Some(msg.clone()),
+        _ => None,
+    };
+    let outcome_of = |end: &End| match end {
+        End::Completed(_) => DONE,
+        End::Failed(_) => FAILED,
+        End::Cancelled => CANCELLED,
+        End::Interrupted => INTERRUPTED,
+    };
+    if t.status != QUEUED && t.status != RUNNING {
+        let _ = attempts::close(v, &id, None, outcome_of(&end), kept.as_deref(), true);
+        return Ok(());
+    }
+    let acknowledged = t.status == RUNNING && t.cancel_requested_ms.is_some();
+    let had_result = matches!(end, End::Completed(_));
+    let end = if acknowledged { End::Cancelled } else { end };
+    let outcome = outcome_of(&end);
+    let _ = attempts::close(v, &id, None, outcome, kept.as_deref(), false);
+    if acknowledged {
+        if had_result {
+            let _ = attempts::event(
+                v,
+                &id,
+                None,
+                attempts::kind::LATE_RESULT,
+                "a result came after the cancel and was kept in history",
+            );
+        }
+        let _ = attempts::event(v, &id, None, attempts::kind::CANCEL_ACKNOWLEDGED, "");
+    }
     let status = match &end {
         End::Completed(md) => {
             let md = md.trim();
@@ -341,16 +404,20 @@ pub fn recover(v: &Vault, node: &str) -> Result<u32> {
     Ok(n)
 }
 
-/// Moves `node`'s jobs that ended more than `keep_ms` before `now` to the
-/// trash. Returns how many.
-pub fn sweep(v: &Vault, node: &str, keep_ms: i64, now: i64) -> Result<u32> {
-    let mut n = 0;
-    for job in all(v)?.into_iter().filter(|j| j.node == node && j.ended()) {
-        let ended = job.finished_ms.unwrap_or(job.created_ms);
-        if now.saturating_sub(ended) >= keep_ms {
-            v.delete_page(job.id.clone())?;
-            n += 1;
-        }
-    }
-    Ok(n)
+/// `node`'s jobs that ended more than `keep_ms` before `now` and still name a
+/// session. The job row (outcome, attempts) is kept for good; only the raw
+/// session (the transcript and logs) expires. The caller deletes each session
+/// and then calls [`session_expired`].
+pub fn expired_sessions(v: &Vault, node: &str, keep_ms: i64, now: i64) -> Result<Vec<Job>> {
+    Ok(all(v)?
+        .into_iter()
+        .filter(|j| j.node == node && j.ended() && !j.session.is_empty())
+        .filter(|j| now.saturating_sub(j.finished_ms.unwrap_or(j.created_ms)) >= keep_ms)
+        .collect())
+}
+
+/// Clears the job's `session` once its session is deleted.
+pub fn session_expired(v: &Vault, id: &str) -> Result<()> {
+    v.remove_property(id.to_string(), "session".into())?;
+    Ok(())
 }

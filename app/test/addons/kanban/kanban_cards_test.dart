@@ -103,7 +103,7 @@ void main() {
     },
   );
 
-  appTest('opening a card opens its note', (tester) async {
+  appTest('opening a card shows its panel, and Open note opens the note', (tester) async {
     final f = await pumpApp(tester, mobile: false);
     final garden = f.pages['Garden plan']!;
     final board = await seedKanban(
@@ -118,7 +118,10 @@ void main() {
     await openNote(tester, board, 'Launch board');
     expect(cardIn('To do', 'Garden plan'), findsOneWidget);
 
+    // Clicking the card shows its panel; Open note goes on to the note.
     await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
+    expect(editableWith('Some text about garden plan.'), findsNothing);
+    await tapAndSettle(tester, find.byKey(const ValueKey('kanban-panel-open-note')));
     expect(editableWith('Some text about garden plan.'), findsOneWidget);
   });
 

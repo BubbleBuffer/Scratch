@@ -107,6 +107,7 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
         projectId: projectId,
       );
       await source.refresh();
+      source.onDelegated?.call();
       return _fromTask(taskId, task) ??
           RunnerAssignment(
             taskId: taskId,
@@ -163,7 +164,38 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
       reason: s.reason,
       progress: _progressOf(t),
       projectName: _projectName(t.node, t.project),
+      outdated: t.status == 'running' && !t.cancelRequested && t.stale,
     );
+  }
+
+  /// The task row about the card [cardId], or null.
+  AiTask? _taskOf(String cardId) {
+    for (final t in source.tasks) {
+      if (t.page == cardId) return t;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> cancel(String taskId) async {
+    final t = _taskOf(taskId);
+    if (t == null) return;
+    try {
+      await source.cancel(t.id);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  @override
+  Future<void> sendUpdate(String taskId) async {
+    final t = _taskOf(taskId);
+    if (t == null) return;
+    try {
+      await source.sendUpdate(t.id);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
   }
 
   /// The row's progress line, trimmed, or null while it has none. The chip
@@ -173,12 +205,15 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
     return text.isEmpty ? null : text;
   }
 
-  /// Maps a row's status to the chip. The bridge has no `cancelling` state,
-  /// so a stopping run shows as running until it ends. An interrupted run
+  /// Maps a row's status to the chip. A run with a cancel the runner has not
+  /// acknowledged shows as cancellation requested, never as stopped. An interrupted run
   /// reads as failed. A queued row pinned to an offline runner is waiting.
   ({AssignState state, String? reason}) _stateOf(AiTask t, AiRunner? runner) {
     switch (t.status) {
       case 'running':
+        if (t.cancelRequested) {
+          return (state: AssignState.cancelling, reason: null);
+        }
         return (state: AssignState.running, reason: null);
       case 'done':
         return (state: AssignState.done, reason: null);

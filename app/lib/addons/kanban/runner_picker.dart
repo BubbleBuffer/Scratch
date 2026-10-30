@@ -4,6 +4,7 @@
 // PC that has projects it also offers a Project choice, None by default.
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
@@ -36,15 +37,92 @@ Future<RunnerAssignment?> showRunnerPicker(
       ),
     );
   }
-  return showPopover<RunnerAssignment>(
-    context,
-    anchor,
-    (ctx) => MenuSurface(
-      width: 300,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-      child: _RunnerPicker(taskId: taskId, assignments: assignments),
+  return Navigator.of(context).push(
+    _PickerRoute(
+      anchor: anchor,
+      duration: Motion.of(context).fast,
+      builder: (ctx) => MenuSurface(
+        width: 300,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+        child: _RunnerPicker(taskId: taskId, assignments: assignments),
+      ),
     ),
   );
+}
+
+/// The picker's popover. It always opens below [anchor], so it never covers
+/// the column headers above the card. The kit's popover flips above the
+/// anchor when there is no room below; this one moves up only as far as the
+/// window needs.
+class _PickerRoute extends PopupRoute<RunnerAssignment> {
+  _PickerRoute({
+    required this.anchor,
+    required this.builder,
+    required this.duration,
+  });
+
+  final Rect anchor;
+  final WidgetBuilder builder;
+  final Duration duration;
+
+  @override
+  Color? get barrierColor => null;
+  @override
+  bool get barrierDismissible => true;
+  @override
+  String? get barrierLabel => 'Close';
+  @override
+  Duration get transitionDuration => duration;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) => CustomSingleChildLayout(
+    delegate: _PickerLayout(anchor),
+    child: builder(context),
+  );
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => MediaQuery.disableAnimationsOf(context)
+      ? child
+      : FadeTransition(opacity: animation, child: child);
+}
+
+class _PickerLayout extends SingleChildLayoutDelegate {
+  _PickerLayout(this.anchor);
+
+  final Rect anchor;
+
+  static const _margin = 8.0;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      constraints.loosen();
+
+  @override
+  Offset getPositionForChild(Size size, Size child) {
+    // Right-aligned with the button, like a menu from a card's corner, kept
+    // inside the window.
+    final x = math.max(
+      _margin,
+      math.min(anchor.right - child.width, size.width - child.width - _margin),
+    );
+    final y = math.max(
+      _margin,
+      math.min(anchor.bottom + 4, size.height - child.height - _margin),
+    );
+    return Offset(x, y);
+  }
+
+  @override
+  bool shouldRelayout(_PickerLayout old) => old.anchor != anchor;
 }
 
 /// The line under a runner's name: what it is, and whether it is on.

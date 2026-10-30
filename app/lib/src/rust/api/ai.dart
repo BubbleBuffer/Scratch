@@ -9,8 +9,11 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'vault.dart';
 
-// These functions are ignored because they are not marked as `pub`: `task`
+// These functions are ignored because they are not marked as `pub`: `lock`, `task_in`, `task`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+
+/// The default listen address of the app's MCP endpoint.
+String mcpDefaultAddr() => RustLib.instance.api.crateApiAiMcpDefaultAddr();
 
 /// Lists the hub first, then the vault's PCs. Pass whether the app has a
 /// usable hub link, as AgentStore.usableHosts does; online is independently
@@ -92,6 +95,20 @@ Future<AiTask> aiCreateTaskHere({
 Future<bool> aiCancelTask({required NotesVault vault, required String id}) =>
     RustLib.instance.api.crateApiAiAiCancelTask(vault: vault, id: id);
 
+/// Asks the runner to send the running worker the note's current version.
+/// Returns whether the task was running and took the request.
+Future<bool> aiSendUpdate({required NotesVault vault, required String id}) =>
+    RustLib.instance.api.crateApiAiAiSendUpdate(vault: vault, id: id);
+
+/// Adds a to-do under the running task; the runner puts it on the worker's
+/// list and sends it as a steering message.
+Future<void> aiAddStep({
+  required NotesVault vault,
+  required String id,
+  required String text,
+}) =>
+    RustLib.instance.api.crateApiAiAiAddStep(vault: vault, id: id, text: text);
+
 /// The newest tasks first.
 Future<List<AiTask>> aiListTasks({
   required NotesVault vault,
@@ -129,6 +146,28 @@ Future<void> aiFinishTask({
   ok: ok,
   text: text,
 );
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesMcp>>
+abstract class NotesMcp implements RustOpaqueInterface {
+  factory NotesMcp({required NotesVault vault}) =>
+      RustLib.instance.api.crateApiAiNotesMcpNew(vault: vault);
+
+  /// Replaces the token (and restarts the endpoint if it runs); clients
+  /// configured with the old one stop working.
+  Future<String> rotateToken();
+
+  /// Starts serving on `addr` (restarts if running) and returns the URL.
+  Future<String> start({required String addr});
+
+  /// Stops serving and removes the endpoint file.
+  Future<void> stop();
+
+  /// The bearer token (created on first use, kept in `.vault/mcp/token`).
+  Future<String> token();
+
+  /// The URL while running.
+  String? url();
+}
 
 class AiRunner {
   /// `hub` or the device id in `.vault/device`, never a node-record page id.
@@ -257,6 +296,12 @@ class AiTask {
   final String worktreeBranch;
   final String worktreePath;
 
+  /// A cancel was requested and the runner has not acknowledged it yet.
+  final bool cancelRequested;
+
+  /// The note changed after the running worker got its brief.
+  final bool stale;
+
   const AiTask({
     required this.id,
     required this.prompt,
@@ -274,6 +319,8 @@ class AiTask {
     required this.project,
     required this.worktreeBranch,
     required this.worktreePath,
+    required this.cancelRequested,
+    required this.stale,
   });
 
   @override
@@ -293,7 +340,9 @@ class AiTask {
       node.hashCode ^
       project.hashCode ^
       worktreeBranch.hashCode ^
-      worktreePath.hashCode;
+      worktreePath.hashCode ^
+      cancelRequested.hashCode ^
+      stale.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -315,5 +364,7 @@ class AiTask {
           node == other.node &&
           project == other.project &&
           worktreeBranch == other.worktreeBranch &&
-          worktreePath == other.worktreePath;
+          worktreePath == other.worktreePath &&
+          cancelRequested == other.cancelRequested &&
+          stale == other.stale;
 }

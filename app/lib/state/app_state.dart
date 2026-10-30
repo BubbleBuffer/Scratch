@@ -16,6 +16,8 @@ import 'ui_state.dart';
 import 'editor_focus.dart';
 import 'agenda_store.dart';
 import 'reminder_store.dart';
+import '../features/ai/ai_store.dart';
+import '../features/ai/run_notices.dart';
 import '../features/reminders/backends.dart';
 import '../features/settings/settings_store.dart';
 import '../addons/agent/api.dart';
@@ -58,6 +60,30 @@ class AppState {
   late final AgendaStore agenda;
   late final ReminderStore reminders;
 
+  RunNotifier? _runNotices;
+
+  /// Phone notices for delegated runs; made on first use, started at boot
+  /// once the AI store is up.
+  RunNotifier get runNotices => _runNotices ??= RunNotifier(
+    deviceId: vault.deviceId,
+    titleOf: _noteTitle,
+    settings: settings,
+    backend: reminders.backend,
+    source: AiStore.forVault(vault, feed),
+  );
+
+  /// The title of note [id], or null when it is gone or in the trash.
+  Future<String?> _noteTitle(String id) async {
+    try {
+      final p = await vault.loadPage(id);
+      if (p.inTrash) return null;
+      final title = p.title.trim();
+      return title.isEmpty ? 'Untitled' : title;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Starts the change feed and loads what the first screen shows.
   Future<void> start() async {
     await feed.start();
@@ -72,6 +98,7 @@ class AppState {
     feed.stop();
     EditorFocus.disposeFor(this);
     await AgentStore.closeFor(vault);
+    _runNotices?.dispose();
     await reminders.close();
     await pageStore.lastSave;
     pages.dispose();

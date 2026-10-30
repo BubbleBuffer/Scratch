@@ -60,6 +60,8 @@ AiTask _row(
   String error = '',
   String progress = '',
   String project = '',
+  bool cancelRequested = false,
+  bool stale = false,
 }) => AiTask(
   project: project,
   worktreeBranch: '',
@@ -76,6 +78,8 @@ AiTask _row(
   createdMs: 0,
   updatedMs: 0,
   node: node,
+  cancelRequested: cancelRequested,
+  stale: stale,
 );
 
 /// Records the calls and answers from fixed data.
@@ -123,7 +127,17 @@ class _FakeSource extends ChangeNotifier implements AiTaskSource {
   List<AiTask> tasks = [];
   @override
   bool hubUsable = true;
+  @override
+  void Function()? onDelegated;
   int refreshes = 0;
+  final cancelled = <String>[];
+  final updated = <String>[];
+
+  @override
+  Future<void> cancel(String id) async => cancelled.add(id);
+
+  @override
+  Future<void> sendUpdate(String id) async => updated.add(id);
 
   @override
   Future<void> refresh() async {

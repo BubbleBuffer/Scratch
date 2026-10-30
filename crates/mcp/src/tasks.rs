@@ -34,18 +34,25 @@ use vault_core::{
 
 use crate::{err, Result};
 
+pub mod attempts;
 mod subtasks;
 
 #[cfg(test)]
 mod source_tests;
 
-pub use subtasks::{begin_subtasks, mirror_subtasks, SubtaskItem};
+pub use subtasks::{
+    add_step, begin_subtasks, mirror_subtasks, pending_steps, record_baseline, Step, SubtaskItem,
+};
 
 /// The page property that marks the tasks database.
 pub const MARKER: &str = "ai.tasks";
 pub const TITLE: &str = "AI tasks";
 /// The callout icon of a task's placeholder.
 pub const ICON: &str = "✨";
+
+/// Not a stored status: the placeholder text of a running task whose cancel
+/// the runner has not acknowledged yet.
+pub(crate) const CANCELLING: &str = "cancelling";
 
 pub const QUEUED: &str = "queued";
 pub const RUNNING: &str = "running";
@@ -101,6 +108,14 @@ pub struct Task {
     pub worktree_branch: String,
     #[serde(default)]
     pub worktree_path: String,
+    /// The current attempt's id, empty until one starts (see [`attempts`]).
+    #[serde(default)]
+    pub attempt: String,
+    /// When a cancel command was recorded (ms), while the runner has not
+    /// acknowledged it. A task that is `running` with this set shows
+    /// "cancellation requested".
+    #[serde(default)]
+    pub cancel_requested_ms: Option<i64>,
     pub created_ms: i64,
     pub updated_ms: i64,
 }
@@ -166,6 +181,22 @@ pub fn schema() -> Vec<PropDef> {
         // run's subtask tracking (see [`subtasks`]).
         def("source_block", "Source block", PropKind::Text, vec![]),
         def("subtask_blocks", "Subtask blocks", PropKind::Text, vec![]),
+        // The attempt history (see [`attempts`]) and a cancel command the
+        // runner has not acknowledged yet.
+        def(attempts::CURRENT, "Attempt", PropKind::Text, vec![]),
+        def(attempts::HISTORY, "Attempts", PropKind::Text, vec![]),
+        def(
+            attempts::CANCEL_REQUESTED,
+            "Cancel requested",
+            PropKind::Text,
+            vec![],
+        ),
+        def(
+            attempts::UPDATE_REQUESTED,
+            "Update requested",
+            PropKind::Text,
+            vec![],
+        ),
     ]
 }
 
@@ -272,6 +303,8 @@ fn task_of(row: &PageSummary) -> Task {
         project: text(p, "project"),
         worktree_branch: text(p, "worktree_branch"),
         worktree_path: text(p, "worktree_path"),
+        attempt: text(p, attempts::CURRENT),
+        cancel_requested_ms: text(p, attempts::CANCEL_REQUESTED).parse().ok(),
         created_ms: row.created_ms,
         updated_ms: row.updated_ms,
     }
@@ -314,6 +347,7 @@ fn placeholder_text(status: &str, prompt: &str) -> String {
         RUNNING => "AI is working on this",
         FAILED => "AI task failed",
         CANCELLED => "AI task cancelled",
+        CANCELLING => "AI task cancellation requested",
         INTERRUPTED => "AI task interrupted",
         DONE => "AI task done",
         _ => "AI task",
@@ -484,11 +518,7 @@ pub(crate) fn create_on_with(
         )?;
     }
     if let Some(source) = source {
-        v.set_property(
-            row.clone(),
-            "source_block".into(),
-            PropValue::Text(source),
-        )?;
+        v.set_property(row.clone(), "source_block".into(), PropValue::Text(source))?;
     }
     v.set_property(row.clone(), "prompt".into(), PropValue::Text(prompt.into()))?;
     v.set_property(
@@ -654,6 +684,17 @@ pub fn claim_next(v: &Vault, device: &str) -> Result<Option<Task>> {
         "device".into(),
         PropValue::Text(device.into()),
     )?;
+    // A new attempt before the status flips: whoever sees `running` finds
+    // its attempt.
+    let actor = text(&row.properties, "owner");
+    attempts::begin(
+        v,
+        &Task {
+            device: device.into(),
+            ..t.clone()
+        },
+        &actor,
+    )?;
     set_status(v, &t, RUNNING)?;
     Ok(Some(get(v, &t.id)?))
 }
@@ -679,9 +720,26 @@ pub fn recover(v: &Vault, device: &str) -> Result<u32> {
 }
 
 /// Puts a failed (or finished) task back in the queue.
+///
+/// Only an ended task is retried. A queued task is already waiting. A running
+/// one, including one whose cancel the runner has not acknowledged, is an
+/// error: there is one active attempt per task, and the new attempt starts
+/// only after the old one ended.
 pub fn retry(v: &Vault, id: &str) -> Result<()> {
     let t = get(v, id)?;
+    match t.status.as_str() {
+        QUEUED => return Ok(()),
+        RUNNING if t.cancel_requested_ms.is_some() => {
+            return err("the cancel is not acknowledged yet: retry once the task stops")
+        }
+        RUNNING => return err("the task is still running: cancel it before retrying"),
+        _ => {}
+    }
     v.remove_property(t.id.clone(), "error".into())?;
+    v.remove_property(t.id.clone(), attempts::CANCEL_REQUESTED.into())?;
+    // The last attempt's progress line belongs to that attempt.
+    v.remove_property(t.id.clone(), "progress".into())?;
+    v.remove_property(t.id.clone(), "progress_at".into())?;
     if !t.project.is_empty() {
         // Review metadata belongs to an attempt, not to the reusable row.
         // Retain the checkout itself; the next run creates a fresh binding.
@@ -743,25 +801,41 @@ fn create_placeholder_at_end(v: &Vault, page: &PageId, prompt: &str) -> Result<S
     Ok(id)
 }
 
-/// Cancels a desktop task that hasn't ended (queued or running): it is
-/// never claimed, and a running one's result is dropped when it ends. Jobs
-/// (node `hub`) are cancelled through the hub's jobs API instead. Returns
-/// whether the task was still going.
+/// Cancels a desktop task that hasn't ended. A queued task is cancelled at
+/// once: no runner has it. A running task gets a cancel request and stays
+/// `running` until its runner stops the run and acknowledges (the runner
+/// then ends it through [`finish_attempt`]); until then it shows
+/// "cancellation requested", never stopped. Jobs (node `hub`) are cancelled
+/// through the hub's jobs API instead. Returns whether the task was still
+/// going.
 pub fn cancel(v: &Vault, id: &str) -> Result<bool> {
     let t = get(v, id)?;
     if t.node == crate::jobs::NODE_HUB {
         return err("this task runs on the hub: cancel it there");
     }
-    if t.status != QUEUED && t.status != RUNNING {
-        return Ok(false);
+    match t.status.as_str() {
+        QUEUED => {
+            v.set_property(
+                t.id.clone(),
+                "status".into(),
+                PropValue::Select(CANCELLED.into()),
+            )?;
+            set_placeholder(v, &t, CANCELLED)?;
+            Ok(true)
+        }
+        RUNNING => {
+            request_cancel(v, &t)?;
+            Ok(true)
+        }
+        _ => Ok(false),
     }
-    v.set_property(
-        t.id.clone(),
-        "status".into(),
-        PropValue::Select(CANCELLED.into()),
-    )?;
-    set_placeholder(v, &t, CANCELLED)?;
-    Ok(true)
+}
+
+/// Records a cancel command on a running task (see [`cancel`]) and shows it
+/// in the placeholder. Idempotent.
+pub(crate) fn request_cancel(v: &Vault, t: &Task) -> Result<()> {
+    attempts::request_cancel(v, t)?;
+    set_placeholder(v, t, CANCELLING)
 }
 
 /// Records a running task's latest progress: `message` is trimmed and kept
@@ -778,17 +852,26 @@ pub fn report_progress(v: &Vault, id: &str, message: &str) -> Result<()> {
     if t.status != RUNNING {
         return err("only a running task takes progress");
     }
+    if t.cancel_requested_ms.is_some() {
+        return err("only a running task takes progress; this one is being cancelled");
+    }
     // A database from before these properties gets them now: set_property
     // refuses a key its collection's schema lacks.
     if let Some(c) = collection(v)? {
         migrate_schema(v, &c)?;
     }
-    v.set_property(t.id.clone(), "progress".into(), PropValue::Text(message))?;
+    v.set_property(
+        t.id.clone(),
+        "progress".into(),
+        PropValue::Text(message.clone()),
+    )?;
     v.set_property(
         t.id.clone(),
         "progress_at".into(),
         PropValue::Text(crate::jobs::now_ms().to_string()),
     )?;
+    // The history is best effort: the row already has the report.
+    let _ = attempts::event(v, &t.id, None, attempts::kind::CHECKPOINT, &message);
     Ok(())
 }
 
@@ -832,15 +915,89 @@ pub(crate) fn write_result(v: &Vault, t: &Task, md: &str) -> Result<()> {
     Ok(())
 }
 
-/// Ends a task. `Ok(markdown)`: the result goes into the task's row and
-/// replaces the placeholder in the target page (an empty result removes
-/// the placeholder: the agent edited the vault itself). `Err(message)`:
-/// the task fails and the placeholder says why. A cancelled task stays
-/// cancelled and its result is dropped.
+/// Ends a task's current attempt: [`finish_attempt`] without naming the
+/// attempt, for callers that cannot have a stale one (a restart's recovery).
 pub fn finish(v: &Vault, id: &str, result: std::result::Result<String, String>) -> Result<()> {
+    finish_attempt(v, id, None, result)
+}
+
+/// A summary of an outcome for the attempt record.
+fn outcome_text(result: &std::result::Result<String, String>) -> String {
+    match result {
+        Ok(md) => md.clone(),
+        Err(msg) => msg.clone(),
+    }
+}
+
+/// Ends a task for the runner of attempt `attempt` (the current one when
+/// None). `Ok(markdown)`: the result goes into the task's row and replaces
+/// the placeholder in the target page (an empty result removes the
+/// placeholder: the agent edited the vault itself). `Err(message)`: the task
+/// fails and the placeholder says why.
+///
+/// Two cases never touch the task, and the outcome is kept in the attempt's
+/// history instead:
+/// - a late result: `attempt` is no longer the row's current attempt (it was
+///   retried), or the task already ended (cancelled);
+/// - a cancel the runner now acknowledges: the task becomes `cancelled`
+///   whatever the run returned, so a result never replaces a cancellation.
+pub fn finish_attempt(
+    v: &Vault,
+    id: &str,
+    attempt: Option<&str>,
+    result: std::result::Result<String, String>,
+) -> Result<()> {
     let t = get(v, id)?;
-    if t.status == CANCELLED {
+    let summary = outcome_text(&result);
+    let outcome = if result.is_ok() { DONE } else { FAILED };
+    let current = (!t.attempt.is_empty()).then(|| t.attempt.clone());
+    let stale = match (attempt, &current) {
+        (Some(a), Some(c)) => a != c,
+        _ => false,
+    };
+    if stale
+        || t.status == CANCELLED
+        || (t.status != RUNNING && t.status != QUEUED && attempt.is_some())
+    {
+        // Not this attempt's turn: keep what it produced and change nothing.
+        let target = attempt.map(str::to_string).or(current);
+        if target.is_some() {
+            let _ = attempts::close(v, id, target.as_deref(), outcome, Some(&summary), true);
+        }
         return Ok(());
+    }
+    if t.cancel_requested_ms.is_some() && t.status == RUNNING {
+        // The runner stopped (or the run raced the cancel): acknowledge.
+        v.set_property(
+            t.id.clone(),
+            "status".into(),
+            PropValue::Select(CANCELLED.into()),
+        )?;
+        set_placeholder(v, &t, CANCELLED)?;
+        let _ = attempts::close(
+            v,
+            id,
+            attempt,
+            CANCELLED,
+            result.as_ref().ok().map(String::as_str),
+            false,
+        );
+        if result.is_ok() {
+            let _ = attempts::event(
+                v,
+                id,
+                attempt,
+                attempts::kind::LATE_RESULT,
+                "a result came after the cancel and was kept in history",
+            );
+        }
+        let _ = attempts::event(v, id, attempt, attempts::kind::CANCEL_ACKNOWLEDGED, "");
+        return Ok(());
+    }
+    let closed = attempts::close(v, id, attempt, outcome, Some(&summary), false);
+    if let Err(e) = closed {
+        // The history never blocks the task's own end.
+        eprintln!("task {id}: could not record the attempt: {}", e.0);
     }
     match result {
         Ok(md) => {
@@ -873,11 +1030,151 @@ pub fn finish(v: &Vault, id: &str, result: std::result::Result<String, String>) 
     }
 }
 
+/// A stable fingerprint of the note a run was briefed from: the task's page
+/// without the run's own blocks (the placeholder and what nests in it, the
+/// mirrored subtasks, and the to-dos the user added as steering). Editing
+/// anything else in the page changes it. Empty when the task has no page.
+/// The same text gives the same value on every device.
+pub fn source_revision(v: &Vault, t: &Task) -> String {
+    let Some(page) = &t.page else {
+        return String::new();
+    };
+    let Ok(p) = v.load_page(page.clone()) else {
+        return String::new();
+    };
+    let mut skip: std::collections::HashSet<String> = std::collections::HashSet::new();
+    skip.extend(t.block.iter().cloned());
+    if let Ok(row) = v.load_page(t.id.clone()) {
+        skip.extend(subtasks::owned_blocks(&text(
+            &row.properties,
+            "subtask_blocks",
+        )));
+        if let Ok(all) = attempts::list(v, &t.id) {
+            for a in all {
+                skip.extend(a.steered);
+            }
+        }
+    }
+    fn without(blocks: &[Block], skip: &std::collections::HashSet<String>) -> Vec<Block> {
+        blocks
+            .iter()
+            .filter(|b| !skip.contains(&b.id))
+            .map(|b| {
+                let mut b = b.clone();
+                b.children = without(&b.children, skip);
+                b
+            })
+            .collect()
+    }
+    let md = v.blocks_markdown(without(&p.blocks, &skip));
+    // FNV-1a, 64 bit: short and the same everywhere.
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in md.bytes() {
+        h ^= u64::from(byte);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{h:016x}")
+}
+
 /// How the agent running a task reaches the vault; sets the prompt's wording.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptTools {
     /// A BubblePaw agent whose `js` tool exposes vault actions as `tools.*`.
     Js,
+}
+
+/// The task's page as the worker is shown it: its title and id, and its
+/// content without the task's placeholder. None when the task has no page.
+fn page_context(v: &Vault, t: &Task) -> Option<String> {
+    let page = t.page.as_ref()?;
+    let p = v.load_page(page.clone()).ok()?;
+    let mut md = v.blocks_markdown(
+        p.blocks
+            .iter()
+            .filter(|b| Some(&b.id) != t.block.as_ref())
+            .cloned()
+            .collect(),
+    );
+    if md.chars().count() > 20_000 {
+        md = format!(
+            "{}\n\n[\u{2026} truncated; use read_page for the rest]",
+            md.chars().take(20_000).collect::<String>()
+        );
+    }
+    Some(format!(
+        "The task was asked on the page \"{}\" (page id {}). Its current content:\n<page>\n{}\n</page>\n\n",
+        p.title, p.id, md
+    ))
+}
+
+/// Whether the note changed since the running attempt's brief was made: the
+/// worker runs on an earlier revision of it. False for a task that is not
+/// running, or whose attempt recorded no revision.
+pub fn is_stale(v: &Vault, t: &Task) -> bool {
+    if t.status != RUNNING || t.attempt.is_empty() {
+        return false;
+    }
+    let Ok(all) = attempts::list(v, &t.id) else {
+        return false;
+    };
+    let Some(a) = all.iter().find(|a| a.id == t.attempt) else {
+        return false;
+    };
+    !a.source_rev.is_empty() && a.source_rev != source_revision(v, t)
+}
+
+/// Asks the runner to send the worker the note's current version. Like a
+/// cancel, it is a command: the runner sends it and the history shows
+/// `update_sent` when it has. Only a running task that is not being cancelled
+/// takes it. Returns whether the request was recorded.
+pub fn request_update(v: &Vault, id: &str) -> Result<bool> {
+    let t = get(v, id)?;
+    if t.status != RUNNING || t.cancel_requested_ms.is_some() {
+        return Ok(false);
+    }
+    if let Some(c) = collection(v)? {
+        migrate_schema(v, &c)?;
+    }
+    let row = v.load_page(id.to_string())?;
+    if text(&row.properties, attempts::UPDATE_REQUESTED).is_empty() {
+        v.set_property(
+            t.id.clone(),
+            attempts::UPDATE_REQUESTED.into(),
+            PropValue::Text(crate::jobs::now_ms().to_string()),
+        )?;
+        let _ = attempts::event(v, id, None, attempts::kind::UPDATE_REQUESTED, "");
+    }
+    Ok(true)
+}
+
+/// The message to steer the worker with, and the revision it carries, when an
+/// update was requested for the running task. None otherwise.
+pub fn update_message(v: &Vault, id: &str) -> Result<Option<(String, String)>> {
+    let t = get(v, id)?;
+    let row = v.load_page(id.to_string())?;
+    if t.status != RUNNING
+        || t.cancel_requested_ms.is_some()
+        || text(&row.properties, attempts::UPDATE_REQUESTED).is_empty()
+    {
+        return Ok(None);
+    }
+    let Some(context) = page_context(v, &t) else {
+        return Ok(None);
+    };
+    let message = format!(
+        "The user changed the note since you started. Continue the task with this version, and keep \
+         what you already did where it still applies.\n\n{context}"
+    );
+    Ok(Some((message, source_revision(v, &t))))
+}
+
+/// Records that the update reached the worker: the attempt now works from
+/// `rev`, and the request is cleared.
+pub fn update_sent(v: &Vault, id: &str, attempt: Option<&str>, rev: &str) -> Result<()> {
+    attempts::update(v, id, attempt, |a| a.source_rev = rev.to_string())?;
+    let _ = attempts::event(v, id, attempt, attempts::kind::UPDATE_SENT, "");
+    v.remove_property(id.to_string(), attempts::UPDATE_REQUESTED.into())?;
+    Ok(())
 }
 
 /// The prompt given to an agent: the task, the target page's content and
@@ -894,26 +1191,8 @@ pub fn agent_prompt(v: &Vault, t: &Task, tools: PromptTools) -> Result<String> {
         ),
     }
     out.push_str(&format!("Task from the user:\n{}\n\n", t.prompt));
-    if let Some(page) = &t.page {
-        if let Ok(p) = v.load_page(page.clone()) {
-            let mut md = v.blocks_markdown(
-                p.blocks
-                    .iter()
-                    .filter(|b| Some(&b.id) != t.block.as_ref())
-                    .cloned()
-                    .collect(),
-            );
-            if md.chars().count() > 20_000 {
-                md = format!(
-                    "{}\n\n[… truncated; use read_page for the rest]",
-                    md.chars().take(20_000).collect::<String>()
-                );
-            }
-            out.push_str(&format!(
-                "The task was asked on the page \"{}\" (page id {}). Its current content:\n<page>\n{}\n</page>\n\n",
-                p.title, p.id, md
-            ));
-        }
+    if let Some(context) = page_context(v, t) {
+        out.push_str(&context);
     }
     out.push_str(
         "Your final reply is inserted into that page where the user asked. Reply with only the \
