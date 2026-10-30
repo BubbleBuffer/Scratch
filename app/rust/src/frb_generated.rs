@@ -12309,6 +12309,8 @@ fn wire__crate__api__sync__hub_bearer_impl(
             >>::sse_decode(&mut deserializer);
             let api_hub_url = <String>::sse_decode(&mut deserializer);
             let api_token = <String>::sse_decode(&mut deserializer);
+            let api_trusted =
+                <Vec<crate::api::types::TrustedHubCertificate>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -12326,8 +12328,12 @@ fn wire__crate__api__sync__hub_bearer_impl(
                         }
                     }
                     let api_vault_guard = api_vault_guard.unwrap();
-                    let output_ok =
-                        crate::api::sync::hub_bearer(&*api_vault_guard, api_hub_url, api_token)?;
+                    let output_ok = crate::api::sync::hub_bearer(
+                        &*api_vault_guard,
+                        api_hub_url,
+                        api_token,
+                        api_trusted,
+                    )?;
                     std::result::Result::Ok(output_ok)
                 })())
             }

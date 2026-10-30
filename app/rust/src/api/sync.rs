@@ -247,17 +247,26 @@ fn device_session(
     vault: &NotesVault,
     hub_url: &str,
     token: &str,
+    trust: Option<Arc<vault_sync::tls::Trust>>,
 ) -> Result<Arc<vault_sync::DeviceSession>, String> {
     let v = &vault.inner;
-    vault_sync::DeviceSession::shared(&v.root(), &v.device_id(), hub_url, token, None).map_err(err)
+    vault_sync::DeviceSession::shared(&v.root(), &v.device_id(), hub_url, token, trust).map_err(err)
 }
 
 /// The bearer for an HTTP call to the hub at `hub_url` with the device
 /// `token`: a short-lived session proved with this vault's device key
 /// (upgrading the token on first use), or the bare token for a hub without
 /// device keys. Shared with the sync client. Blocking: may handshake.
-pub fn hub_bearer(vault: &NotesVault, hub_url: String, token: String) -> Result<String, String> {
-    device_session(vault, &hub_url, &token)?.bearer().map_err(err)
+/// `trusted`: the device's trusted hub certificates, as for
+/// `NotesSync::with_trusted_certificates` (a self-signed hub needs its pin).
+pub fn hub_bearer(
+    vault: &NotesVault,
+    hub_url: String,
+    token: String,
+    trusted: Vec<TrustedHubCertificate>,
+) -> Result<String, String> {
+    let trust = vault_sync::tls::Trust::for_hub(&hub_url, &TrustedHubCertificate::to_sync(trusted));
+    device_session(vault, &hub_url, &token, Some(trust))?.bearer().map_err(err)
 }
 
 /// Forgets `bearer` after the hub answered 401 to it, so the next
@@ -268,7 +277,7 @@ pub fn hub_bearer_invalidate(
     token: String,
     bearer: String,
 ) -> Result<(), String> {
-    device_session(vault, &hub_url, &token)?.invalidate(&bearer);
+    device_session(vault, &hub_url, &token, None)?.invalidate(&bearer);
     Ok(())
 }
 

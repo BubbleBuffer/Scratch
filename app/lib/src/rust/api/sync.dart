@@ -25,14 +25,18 @@ Future<String> deviceKeyId({required NotesVault vault}) =>
 /// `token`: a short-lived session proved with this vault's device key
 /// (upgrading the token on first use), or the bare token for a hub without
 /// device keys. Shared with the sync client. Blocking: may handshake.
+/// `trusted`: the device's trusted hub certificates, as for
+/// `NotesSync::with_trusted_certificates` (a self-signed hub needs its pin).
 Future<String> hubBearer({
   required NotesVault vault,
   required String hubUrl,
   required String token,
+  required List<TrustedHubCertificate> trusted,
 }) => RustLib.instance.api.crateApiSyncHubBearer(
   vault: vault,
   hubUrl: hubUrl,
   token: token,
+  trusted: trusted,
 );
 
 /// Forgets `bearer` after the hub answered 401 to it, so the next

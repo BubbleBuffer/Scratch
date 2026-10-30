@@ -1302,6 +1302,7 @@ abstract class RustLibApi extends BaseApi {
     required NotesVault vault,
     required String hubUrl,
     required String token,
+    required List<TrustedHubCertificate> trusted,
   });
 
   Future<void> crateApiSyncHubBearerInvalidate({
@@ -10291,6 +10292,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required NotesVault vault,
     required String hubUrl,
     required String token,
+    required List<TrustedHubCertificate> trusted,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -10302,6 +10304,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(hubUrl, serializer);
           sse_encode_String(token, serializer);
+          sse_encode_list_trusted_hub_certificate(trusted, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -10314,7 +10317,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiSyncHubBearerConstMeta,
-        argValues: [vault, hubUrl, token],
+        argValues: [vault, hubUrl, token, trusted],
         apiImpl: this,
       ),
     );
@@ -10322,7 +10325,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiSyncHubBearerConstMeta => const TaskConstMeta(
     debugName: "hub_bearer",
-    argNames: ["vault", "hubUrl", "token"],
+    argNames: ["vault", "hubUrl", "token", "trusted"],
   );
 
   @override
