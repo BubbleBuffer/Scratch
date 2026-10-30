@@ -188,6 +188,143 @@ impl Tool for TriagePropose {
     }
 }
 
+/// Checks that every id is a page of the run's scope.
+fn check_scope(
+    vault: &Vault,
+    scope: &vault_mcp::triage::Scope,
+    ids: &[&str],
+) -> std::result::Result<(), String> {
+    let listed = vault
+        .triage_candidates(scope.root.clone(), scope.pages.clone())
+        .map_err(|e| e.to_string())?;
+    for id in ids {
+        if !listed.iter().any(|c| c.id == *id) {
+            return Err(format!("page {id} is not in this triage run's scope"));
+        }
+    }
+    Ok(())
+}
+
+/// Triage runs only: links one scoped page to another, and records the change
+/// in the run's row so it can be undone.
+struct TriageLink {
+    vault: Arc<Vault>,
+    task: String,
+    session: String,
+    scope: vault_mcp::triage::Scope,
+}
+
+#[async_trait]
+impl Tool for TriageLink {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "triage_link".into(),
+            description: "Add a link from one page to a closely related page, both listed by triage_pages. A link-to-page block is added at the end of the `from` page. Applied at once; the user can undo it. Does nothing if the link exists.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "from": {"type": "string", "description": "id of the page that gets the link"},
+                    "to": {"type": "string", "description": "id of the page it points at"}
+                },
+                "required": ["from", "to"],
+                "additionalProperties": false
+            }),
+            read_only: false,
+            approval: Approval::None,
+        }
+    }
+
+    async fn invoke(&self, context: ToolContext, input: Value) -> Result<ToolResult> {
+        if context.session_id != self.session {
+            return Ok(ToolResult::error("triage belongs to another task session"));
+        }
+        let text = |key: &str| {
+            input.get(key).and_then(Value::as_str).map(str::trim).unwrap_or("").to_owned()
+        };
+        let (from, to) = (text("from"), text("to"));
+        if from.is_empty() || to.is_empty() {
+            return Ok(ToolResult::error("triage_link needs the page ids from and to"));
+        }
+        let (vault, task, scope) = (self.vault.clone(), self.task.clone(), self.scope.clone());
+        let result = tokio::task::spawn_blocking(move || -> std::result::Result<String, String> {
+            check_scope(&vault, &scope, &[&from, &to])?;
+            match vault.triage_link(from, to).map_err(|e| e.to_string())? {
+                Some(action) => {
+                    vault_mcp::triage::record_action(&vault, &task, &action)
+                        .map_err(|e| e.0)?;
+                    Ok("Link added.".into())
+                }
+                None => Ok("The page already links there.".into()),
+            }
+        })
+        .await?;
+        Ok(match result {
+            Ok(text) => ToolResult::text(text),
+            Err(error) => ToolResult::error(error),
+        })
+    }
+}
+
+/// Triage runs only: adds a tag to one scoped page, and records the previous
+/// tags in the run's row so it can be undone.
+struct TriageTag {
+    vault: Arc<Vault>,
+    task: String,
+    session: String,
+    scope: vault_mcp::triage::Scope,
+}
+
+#[async_trait]
+impl Tool for TriageTag {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "triage_tag".into(),
+            description: "Add a short topic tag to a page listed by triage_pages. Applied at once; the user can undo it. Does nothing if the page has the tag.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "page": {"type": "string", "description": "id of the page"},
+                    "tag": {"type": "string", "description": "the tag, 1 to 64 characters, no commas"}
+                },
+                "required": ["page", "tag"],
+                "additionalProperties": false
+            }),
+            read_only: false,
+            approval: Approval::None,
+        }
+    }
+
+    async fn invoke(&self, context: ToolContext, input: Value) -> Result<ToolResult> {
+        if context.session_id != self.session {
+            return Ok(ToolResult::error("triage belongs to another task session"));
+        }
+        let text = |key: &str| {
+            input.get(key).and_then(Value::as_str).map(str::trim).unwrap_or("").to_owned()
+        };
+        let (page, tag) = (text("page"), text("tag"));
+        if page.is_empty() || tag.is_empty() {
+            return Ok(ToolResult::error("triage_tag needs a page id and a tag"));
+        }
+        let (vault, task, scope) = (self.vault.clone(), self.task.clone(), self.scope.clone());
+        let result = tokio::task::spawn_blocking(move || -> std::result::Result<String, String> {
+            check_scope(&vault, &scope, &[&page])?;
+            match vault.triage_tag(page, tag).map_err(|e| e.to_string())? {
+                Some(action) => {
+                    vault_mcp::triage::record_action(&vault, &task, &action)
+                        .map_err(|e| e.0)?;
+                    Ok("Tag added.".into())
+                }
+                None => Ok("The page has the tag already.".into()),
+            }
+        })
+        .await?;
+        Ok(match result {
+            Ok(text) => ToolResult::text(text),
+            Err(error) => ToolResult::error(error),
+        })
+    }
+}
+
 impl Agent {
     /// Prepare before admitting the provider: failures are written to the task
     /// by the same finish path as provider errors. A retry has a new session.
@@ -255,6 +392,18 @@ impl Agent {
                 vault: self.vault.clone(),
                 task: task.into(),
                 session: session.into(),
+                scope: scope.clone(),
+            }));
+            triage.push(Arc::new(TriageLink {
+                vault: self.vault.clone(),
+                task: task.into(),
+                session: session.into(),
+                scope: scope.clone(),
+            }));
+            triage.push(Arc::new(TriageTag {
+                vault: self.vault.clone(),
+                task: task.into(),
+                session: session.into(),
                 scope,
             }));
         }
@@ -265,7 +414,7 @@ impl Agent {
                 registry.register_host(tool.clone())?;
             }
             if !triage.is_empty() {
-                registry.show_always(["triage_pages", "triage_propose"]);
+                registry.show_always(["triage_pages", "triage_propose", "triage_link", "triage_tag"]);
             }
             // BubblePaw's todo tool: the same runs as before, and the state it
             // stores (the bare array under `todo`) is what the subtask mirror reads.

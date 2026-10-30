@@ -19,7 +19,7 @@ use serde_json::Value;
 use crate::error::{invalid, not_found, Result};
 use crate::ids::now_ms;
 use crate::templates::TemplateCopy;
-use crate::types::{Block, PageId, PAGE_TYPE_DOCUMENT};
+use crate::types::{Block, BlockKind, BlockOp, MarkKind, NewBlock, PageId, PropValue, PAGE_TYPE_DOCUMENT};
 use crate::vault::{lock, Vault};
 
 // The proposals' key in the Nodes page's type data.
@@ -407,5 +407,163 @@ impl Vault {
         out.sort_by(|a, b| a.created_ms.cmp(&b.created_ms).then_with(|| a.id.cmp(&b.id)));
         out.truncate(CANDIDATE_MAX);
         Ok(out)
+    }
+}
+
+/// One change a triage run made on its own (a link or a tag), with what is
+/// needed to take it back.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TriageAction {
+    /// `link` or `tag`.
+    pub kind: String,
+    /// The page that was changed.
+    pub page: PageId,
+    /// For a link, the page it points at; for a tag, the tag.
+    pub target: String,
+    /// A link's inserted block.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block: Option<String>,
+    /// A tag's previous `tags` value: `None` when the page had none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous: Option<Vec<String>>,
+}
+
+pub const TRIAGE_LINK: &str = "link";
+pub const TRIAGE_TAG: &str = "tag";
+const TAG_MAX: usize = 64;
+const TAGS_KEY: &str = "tags";
+
+fn links_to(blocks: &[Block], target: &str) -> bool {
+    blocks.iter().any(|b| {
+        (b.kind == BlockKind::LinkToPage && b.target.as_deref() == Some(target))
+            || b.marks
+                .iter()
+                .any(|m| matches!(&m.kind, MarkKind::PageLink(p) if p == target))
+            || links_to(&b.children, target)
+    })
+}
+
+impl Vault {
+    /// Adds a link from page `from` to page `to`: a link-to-page block at the
+    /// end of `from`. Both must be live pages of one project and not the
+    /// same page. `None` when `from` already links to `to`.
+    pub fn triage_link(&self, from: PageId, to: PageId) -> Result<Option<TriageAction>> {
+        if from == to {
+            return Err(invalid("a page cannot link to itself"));
+        }
+        let (a, _) = self.triage_check_link(&from, &to)?;
+        let page = self.load_page(a.id.clone())?;
+        if links_to(&page.blocks, &to) {
+            return Ok(None);
+        }
+        let block = crate::ids::new_id();
+        self.apply(
+            from.clone(),
+            vec![
+                BlockOp::Insert {
+                    parent: None,
+                    after: page.blocks.last().map(|b| b.id.clone()),
+                    block: NewBlock {
+                        id: block.clone(),
+                        kind: BlockKind::LinkToPage,
+                        text: String::new(),
+                        marks: vec![],
+                        checked: false,
+                    },
+                },
+                BlockOp::SetTarget {
+                    id: block.clone(),
+                    target: Some(to.clone()),
+                },
+            ],
+        )?;
+        Ok(Some(TriageAction {
+            kind: TRIAGE_LINK.into(),
+            page: from,
+            target: to,
+            block: Some(block),
+            previous: None,
+        }))
+    }
+
+    /// Like `triage_check_pair` without the same-type rule: links may join
+    /// pages of different types.
+    fn triage_check_link(&self, a: &str, b: &str) -> Result<(Info, Info)> {
+        let (ia, ib) = (self.triage_info(a)?, self.triage_info(b)?);
+        for i in [&ia, &ib] {
+            if i.in_trash || i.hidden || i.page_type == "database" {
+                return Err(invalid(format!("page {:?} cannot be linked", i.title)));
+            }
+        }
+        if self.triage_root(a)? != self.triage_root(b)? {
+            return Err(invalid("pages of different projects cannot be linked"));
+        }
+        Ok((ia, ib))
+    }
+
+    /// Adds `tag` to the page's `tags` property. The tag is trimmed, a leading
+    /// `#` dropped, and it must be 1 to 64 characters without commas. `None`
+    /// when the page has the tag already (compared ignoring case).
+    pub fn triage_tag(&self, page: PageId, tag: String) -> Result<Option<TriageAction>> {
+        let tag = tag.trim().trim_start_matches('#').trim().to_owned();
+        if tag.is_empty() || tag.chars().count() > TAG_MAX || tag.contains(',') {
+            return Err(invalid("a tag is 1 to 64 characters without commas"));
+        }
+        let info = self.triage_info(&page)?;
+        if info.in_trash || info.hidden || info.page_type == "database" {
+            return Err(invalid(format!("page {:?} cannot be tagged", info.title)));
+        }
+        let current = self.load_page(page.clone())?.properties;
+        let previous = current.iter().find(|p| p.key == TAGS_KEY).and_then(|p| match &p.value {
+            PropValue::MultiSelect(v) => Some(v.clone()),
+            _ => None,
+        });
+        if current.iter().any(|p| p.key == TAGS_KEY) && previous.is_none() {
+            return Err(invalid("the page's tags property is not a tag list"));
+        }
+        let mut next = previous.clone().unwrap_or_default();
+        if next.iter().any(|t| t.eq_ignore_ascii_case(&tag)) {
+            return Ok(None);
+        }
+        next.push(tag.clone());
+        self.set_property(page.clone(), TAGS_KEY.into(), PropValue::MultiSelect(next))?;
+        Ok(Some(TriageAction {
+            kind: TRIAGE_TAG.into(),
+            page,
+            target: tag,
+            block: None,
+            previous,
+        }))
+    }
+
+    /// Takes back one action: a link's block is deleted (if it is still
+    /// there), a tag's page gets its previous `tags` value back (the tags
+    /// property removed when there was none). Changes made to the page since
+    /// stay, except that a tag list is restored whole.
+    pub fn triage_undo_action(&self, action: &TriageAction) -> Result<()> {
+        match action.kind.as_str() {
+            TRIAGE_LINK => {
+                let Some(block) = &action.block else {
+                    return Err(invalid("the link action has no block"));
+                };
+                let page = self.load_page(action.page.clone())?;
+                fn has(blocks: &[Block], id: &str) -> bool {
+                    blocks.iter().any(|b| b.id == id || has(&b.children, id))
+                }
+                if has(&page.blocks, block) {
+                    self.apply(action.page.clone(), vec![BlockOp::Delete { id: block.clone() }])?;
+                }
+                Ok(())
+            }
+            TRIAGE_TAG => match &action.previous {
+                Some(tags) => self.set_property(
+                    action.page.clone(),
+                    TAGS_KEY.into(),
+                    PropValue::MultiSelect(tags.clone()),
+                ),
+                None => self.remove_property(action.page.clone(), TAGS_KEY.into()),
+            },
+            other => Err(invalid(format!("unknown triage action {other:?}"))),
+        }
     }
 }
