@@ -7,7 +7,6 @@ import '../state/app_state.dart';
 import '../state/editor_focus.dart';
 import '../features/ai/ai_settings.dart';
 import '../features/ai/ai_store.dart';
-import '../addons/agent/api.dart' show AgentStore, openAgent;
 import '../registry/addon_registry.dart';
 import '../shell/page_stack.dart';
 
@@ -58,9 +57,7 @@ class AddonServices {
 
   /// Opens the agent chat of a run's session.
   Future<void> openAgentSession(BuildContext context, String sessionId) async {
-    await AgentStore.of(context.app).openSession(sessionId);
-    if (!context.mounted) return;
-    await openAgent(context);
+    await AiStore.openSession(context, sessionId);
   }
 
   bool addonEnabled(String id) =>

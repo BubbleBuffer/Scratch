@@ -28,6 +28,7 @@ import '../../core/debounce.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show BuildContext;
 
 import '../../core/change_feed.dart';
 import '../../core/models.dart';
@@ -365,6 +366,13 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   Future<void> addStep(String id, String text) async {
     await vault.run((v) => aiAddStep(vault: v, id: id, text: text), writes: true);
     await refresh();
+  }
+
+  /// Opens the agent chat of a run's session (the Agent screen).
+  static Future<void> openSession(BuildContext context, String sessionId) async {
+    await AgentStore.of(context.app).openSession(sessionId);
+    if (!context.mounted) return;
+    await openAgent(context);
   }
 
   @override
