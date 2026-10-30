@@ -100,7 +100,7 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: IconBtn(
-                      Ico.x,
+                      Ico.close,
                       key: const ValueKey('kanban-panel-close'),
                       semanticLabel: 'Close',
                       onTap: widget.onClose,
