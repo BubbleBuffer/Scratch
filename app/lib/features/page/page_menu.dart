@@ -21,7 +21,7 @@ String shareMenuLabel(int? links) => (links == null || links == 0)
     ? 'Share'
     : 'Share · $links ${links == 1 ? 'link' : 'links'}';
 
-enum PageMenuAction { favorite, copyLink, share, duplicate, moveTo, askAi, undo, history, trash, delete, import, export, feedback }
+enum PageMenuAction { favorite, copyLink, share, duplicate, moveTo, askAi, triage, proposals, undo, history, trash, delete, import, export, feedback }
 
 Future<PageMenuAction?> showPageMenu(BuildContext context, Rect? anchor,
     {required String pageId, required bool favorite, required bool canUndo, bool canAskAi = false, bool canShare = false}) {
@@ -206,6 +206,10 @@ class _PageMenuState extends State<PageMenu> {
       row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: shortcutHint('Ctrl+D')),
       row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo)),
       if (widget.canAskAi) row('ask-ai', AiMark(size: iconSize), 'Ask AI', () => onAction(PageMenuAction.askAi)),
+      if (meta != null && !meta.missing && meta.parent == null) ...[
+        row('triage', AiMark(size: iconSize), 'Triage', () => onAction(PageMenuAction.triage)),
+        row('proposals', ico(Ico.duplicate), 'Merge proposals', () => onAction(PageMenuAction.proposals)),
+      ],
       sep(),
       row('undo', ico(Ico.undo), 'Undo', canUndo ? () => onAction(PageMenuAction.undo) : null, shortcut: shortcutHint('Ctrl+Z')),
       row('history', icx(Ix.history), 'Page history', () => onAction(PageMenuAction.history)),

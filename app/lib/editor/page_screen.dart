@@ -44,6 +44,8 @@ import '../features/sync/sync_indicator.dart';
 import '../features/share/share_popup.dart';
 import '../state/sync_store.dart';
 import '../features/trash/trash_panel.dart';
+import '../features/triage/proposals_panel.dart';
+import '../features/triage/triage_start.dart';
 import '../registry/block_registry.dart';
 import '../shell/move_to.dart';
 import '../shell/navigation.dart';
@@ -3457,6 +3459,14 @@ class PageEditorState extends State<PageScreen>
         navOpenPage(context, id, titleCtl.text, stack: true);
       case PageMenuAction.moveTo:
         await showMoveTo(context, widget.pageId, anchor: rect);
+      case PageMenuAction.triage:
+        await startTriage(
+          context,
+          projectId: widget.pageId,
+          projectTitle: displayTitle(titleCtl.text),
+        );
+      case PageMenuAction.proposals:
+        await showProposals(context);
       case PageMenuAction.askAi:
         await _askAi();
       case PageMenuAction.undo:
