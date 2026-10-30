@@ -2,7 +2,7 @@
 // children are the folder's Markdown files. Settings → Vault lists them; a
 // path field adds one, "Remove" unmounts (the pages stay in the vault, the
 // folder's files are left alone). The core reads outside changes every two
-// seconds (the bridge's poll thread); see wiki/architecture/mounts.md.
+// seconds (the bridge's poll thread); see wiki/core/mounts.md.
 
 import 'dart:io';
 

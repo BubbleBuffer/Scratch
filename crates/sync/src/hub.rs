@@ -2,7 +2,7 @@
 //! transport-free [`HubRequest`]; [`Hub::serve`] runs it over plain HTTP
 //! (tiny_http), one thread per request.
 //!
-//! Device keys (`wiki/architecture/device-keys.md`), all `POST` with JSON:
+//! Device keys (`wiki/sync/device-keys.md`), all `POST` with JSON:
 //! - `/auth/challenge` -> `{nonce}`: 32 random bytes (hex), single use, 60 s
 //! - `/auth/session` [`SessionProof`] -> `{session, expires_in}`, when the
 //!   device's entry holds that public key and the proof verifies

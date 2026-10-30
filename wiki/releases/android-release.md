@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "How Android builds are numbered, signed and published: a Scratch release is built on GitHub, then release-signed on the home Linux box and published to the owner's private F-Droid repo."
-parent: "[[architecture/index]]"
+parent: "[[releases/index]]"
 status: current
 ---
 

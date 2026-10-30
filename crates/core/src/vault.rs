@@ -1,4 +1,4 @@
-//! `Vault`: the public entry point. See `wiki/architecture/core-state.md` for
+//! `Vault`: the public entry point. See `wiki/core/core-state.md` for
 //! the storage design (update logs, background writer, index).
 //!
 //! The API is split over several files, each an `impl Vault` block:

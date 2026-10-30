@@ -1,7 +1,7 @@
 ---
 type: page
 summary: "Per-user Inno Setup installer built in the windows-build workflow: where Scratch installs, shortcuts, upgrade, uninstall, how the app updates itself and how to build it."
-parent: "[[architecture/index]]"
+parent: "[[releases/index]]"
 status: current
 ---
 
@@ -16,7 +16,7 @@ Built 2026-10-21 on `lane/win-installer`. The script is [app/windows/installer/s
 - **Apps & features.** An uninstall entry under HKCU: name Scratch, the displayed version (`VersionText`, see below), publisher BubbleBuffer, and the exe's icon.
 - **Upgrade in place.** The AppId GUID is fixed (`1B472506-0E7C-46CD-B530-F256FB709BB5`), so a newer installer replaces the same install. Never change it.
 - **Running app.** If Scratch is open, the installer closes it through the Restart Manager (`CloseApplications=yes`) before replacing files. The Restart Manager does not restart it (`RestartApplications=no`). An interactive install offers "Launch Scratch" on the finish page. A silent one (`/SILENT`, used by the updater) starts Scratch itself at the end, through the second `[Run]` entry (`skipifnotsilent`).
-- **Uninstall.** Removes the program files (the Claude Code bundle included), the shortcuts and `HKCU\Software\Classes\notes` (the `notes://` scheme). The installer writes that key at install time, pointing at the installed `notes.exe`, so links work before the first start; the app also rewrites it on every start ([app state, page links](app-state.md#page-links)). User data in `%LOCALAPPDATA%\Notes` is never touched.
+- **Uninstall.** Removes the program files (the Claude Code bundle included), the shortcuts and `HKCU\Software\Classes\notes` (the `notes://` scheme). The installer writes that key at install time, pointing at the installed `notes.exe`, so links work before the first start; the app also rewrites it on every start ([app state, page links](../app/app-state.md#page-links)). User data in `%LOCALAPPDATA%\Notes` is never touched.
 - **Updates.** The app finds new releases on GitHub and installs them with this installer on the user's click. See [Updates](#updates).
 - **Not done.** Unsigned (SmartScreen warns once on first run). No autostart or file associations.
 
@@ -68,7 +68,7 @@ lives outside the app folder, so it also looks in the installed app folder,
 
 ## Updates
 
-Added 2026-10-26. Windows only. The code is [app/rust/src/updater.rs](../../app/rust/src/updater.rs) (the work), [app/rust/src/api/update.rs](../../app/rust/src/api/update.rs) (the bridge) and [app/lib/features/updates/](../../app/lib/features/updates/) (schedule, state and UI).
+Added 2026-10-26. Windows only. The code is [app/rust/src/updater.rs](../../app/rust/src/updater.rs) (the work), [app/rust/src/api/update.rs](../../app/rust/src/api/update.rs) (the bridge) and [app/lib/features/updates/](../../app/lib/features/updates) (schedule, state and UI).
 
 **Build identity.** Release and nightly builds are built with `--dart-define=SCRATCH_RELEASE_TAG=<tag>` ([scripts/build-windows-installer.sh](../../scripts/build-windows-installer.sh)). A build without it (`windows-build` artifacts, local builds) is a development build: Settings > Updates says so and nothing is checked. For testing, the environment variable `SCRATCH_UPDATE_TAG=<tag>` makes any build behave as that tag.
 

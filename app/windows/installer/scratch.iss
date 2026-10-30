@@ -8,7 +8,7 @@
 ;
 ; Installs to %LOCALAPPDATA%\Programs\Scratch. The exe stays notes.exe; the
 ; Start menu shortcut, desktop shortcut and Apps & features entry say Scratch.
-; User data in %LOCALAPPDATA%\Notes is never touched. See wiki/architecture/windows-install.md.
+; User data in %LOCALAPPDATA%\Notes is never touched. See wiki/releases/windows-install.md.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -88,5 +88,5 @@ Root: HKCU; Subkey: "Software\Classes\notes\shell\open\command"; ValueType: stri
 Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 ; Silent install (/SILENT): the app's "Restart to update" starts the installer
 ; this way and then closes itself, so Scratch opens again once files are replaced.
-; See wiki/architecture/windows-install.md, "Updates".
+; See wiki/releases/windows-install.md, "Updates".
 Filename: "{app}\{#AppExe}"; Flags: nowait skipifnotsilent

@@ -1,7 +1,7 @@
 //! "Let the hub use this computer": the host relay. While it runs, this
 //! computer keeps one socket open to the hub's `GET /host/ws` and is the
 //! host named after this device for `/mcp/agent?host=<name>`
-//! (`notes_agent_wire::host`; `wiki/architecture/hub.md`).
+//! (`notes_agent_wire::host`; `wiki/sync/hub.md`).
 //!
 //! - The hub sends `tools`, `call` and `close_session` requests and `cancel`
 //!   notifications; this side only answers.

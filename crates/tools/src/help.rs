@@ -398,7 +398,7 @@ mod tests {
     }
 
     /// Repo files that carry the generated operator table.
-    const OPERATOR_DOCS: &[&str] = &["docs/notes/search.md", "wiki/architecture/search-queries.md"];
+    const OPERATOR_DOCS: &[&str] = &["docs/notes/search.md", "wiki/core/search-queries.md"];
     const OPEN: &str = "<!-- generated: operators -->";
     const CLOSE: &str = "<!-- /generated -->";
 

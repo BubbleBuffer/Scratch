@@ -88,4 +88,4 @@ The readable body is not rewritten for changes from another device. A card renam
 
 Cross-column moves use separate delete and insert calls. An interrupted move can leave a note off the board; it never deletes the note. Column deletion appends references before removing the column.
 
-Source: [`api.dart`](../../app/lib/addons/kanban/api.dart). Tests: [`app/test/addons/kanban/`](../../app/test/addons/kanban/).
+Source: [`api.dart`](../../app/lib/addons/kanban/api.dart). Tests: [`app/test/addons/kanban/`](../../app/test/addons/kanban).

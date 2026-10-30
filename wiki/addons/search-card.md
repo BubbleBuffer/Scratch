@@ -10,7 +10,7 @@ status: current
 
 `SearchCardAddon` in `app/lib/addons/search_card/api.dart` registers the `query` block kind and its `/` menu entry ("Search query", group Advanced). It has no dependencies. It is optional in `shell/addons.dart`, enabled by default. The card reads the Tasks add-on only through `AddonServices().addonEnabled('tasks')`, so it boots with Tasks off.
 
-Design and behaviour follow [Dynamic search card UI](../architecture/search-queries.md#dynamic-search-card-ui-approved-2026-10-13) (Form A, block card).
+Design and behaviour follow [Dynamic search card UI](../core/search-queries.md#dynamic-search-card-ui-approved-2026-10-13) (Form A, block card).
 
 - **Block text.** The block holds the query string only. Markdown writes it as a fenced `query` block; the fence is longer than any backtick run in the query. The Dart codec mirrors the core's fence because `MarkdownCodec.rust` cannot be used from Dart.
 - **Live results.** `QueryCard` subscribes through `NotesVault.watchQuery` with a limit of 50 and applies the core's snapshot and diffs in `query_hits.dart`. It releases its handle on dispose and when the query text changes.
@@ -24,7 +24,7 @@ Design and behaviour follow [Dynamic search card UI](../architecture/search-quer
 - Open work is `#work type:task -status:done`. The core indexes a task's status as the `status` property, so a ticked task leaves this list when the core's live result arrives. Queries that do not name the status still list a done task, checked.
 - The core returns a property operator's key as the property id, so the status wording reads the typed key from the token span (`_typedKey`).
 
-- **Shared watch.** `QueryWatch` (`query_watch.dart`) holds one query's core watch, hits, row facts and pending ticks. The card owns one. The chip owns one per mark: `QueryInlineMark` (`query_inline.dart`) makes it, and the editor releases it when the mark or its block goes away (see [Add-ons](../architecture/addons.md)).
+- **Shared watch.** `QueryWatch` (`query_watch.dart`) holds one query's core watch, hits, row facts and pending ticks. The card owns one. The chip owns one per mark: `QueryInlineMark` (`query_inline.dart`) makes it, and the editor releases it when the mark or its block goes away (see [Add-ons](../app/addons.md)).
 - **Results panel.** `showQueryPanel` opens a 420 px popover on desktop, closed by Escape, and a bottom sheet on phone. The phone sheet shows the Undo message above its footer. Its footer offers "Open in Search" and "Show as a block".
 - **Inline chip (Form B).** A paragraph with a `query` mark (`BMarkKind.query`, payload = query string) draws "N … #work tasks" from the chip's watch, or its plain text until the first result is in. A tap on the chip opens the results panel. "Open in Search" opens the search overlay with the query.
 - **Show as a block.** If the chip is the whole paragraph, the paragraph becomes the query block (`replaceWithBlock`). Otherwise the query block goes after the paragraph and the chip's text is cut from it (`insertBlockAfter` with `removeText`), with one adjacent space cut too (the space after the chip, else the one before), so "chip and more" leaves "and more". Each is one undo step.

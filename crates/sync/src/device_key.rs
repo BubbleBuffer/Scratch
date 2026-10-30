@@ -7,7 +7,7 @@
 //! The hub binds the key's public half (and its [`DeviceId`], the key id)
 //! to the vault's device id; a proof over a hub nonce
 //! ([`session_proof`]) then buys a short-lived session token
-//! (`wiki/architecture/device-keys.md`).
+//! (`wiki/sync/device-keys.md`).
 
 use std::fs;
 use std::io::{self, Write};

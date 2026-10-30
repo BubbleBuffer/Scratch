@@ -1,4 +1,4 @@
-//! Timings for the targets in wiki/architecture/core-state.md.
+//! Timings for the targets in wiki/core/core-state.md.
 //!
 //! cargo run -p vault_core --release --example bench -- <vault dir> [pages] [big page blocks] [--pages-only|--agenda-only]
 //!

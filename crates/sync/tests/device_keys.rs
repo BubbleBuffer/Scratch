@@ -1,5 +1,5 @@
 //! Device keys on the hub: challenges, session proofs, upgrades, pairing
-//! codes and the bearer rules (wiki/architecture/device-keys.md). These go
+//! codes and the bearer rules (wiki/sync/device-keys.md). These go
 //! through `Hub::handle` directly; `device_key_client.rs` covers a real
 //! `SyncClient` over HTTP.
 

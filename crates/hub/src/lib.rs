@@ -2,7 +2,7 @@
 //! [`vault_sync::Hub::handle`], and device tokens issued after an OIDC
 //! login (Authentik), behind a TLS proxy (Caddy).
 //!
-//! Routes, config and the login sequence: `wiki/architecture/hub.md`.
+//! Routes, config and the login sequence: `wiki/sync/hub.md`.
 
 pub mod agent;
 mod agent_token_api;

@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "Every page has a type, blocks and properties; database pages group rows; views are queries plus renderers; markdown is the file format."
-parent: "[[architecture/index]]"
+parent: "[[core/index]]"
 status: current
 ---
 
@@ -13,7 +13,7 @@ status: current
 ## Pages, blocks and properties
 
 - **A page** has an id, a title, a string **type**, a tree of blocks and a set of properties. Pages nest logically: every page has at most one parent page. `document` is the default; `database` replaces the former collection boolean. Unknown type strings survive storage, index and API reads. Rust exposes `page_type`, Dart `pageType` with an `isDatabase` helper.
-- The compiled-in add-on type registry and generic embeds are built. Agent chat bodies stay in their own store. The registry selects how each installed type is drawn, embedded and edited. Embed storage has no depth limit; drawing caps recursion at four and uses link chips for cycles. See [Note types](note-types.md).
+- The compiled-in add-on type registry and generic embeds are built. Agent chat bodies stay in their own store. The registry selects how each installed type is drawn, embedded and edited. Embed storage has no depth limit; drawing caps recursion at four and uses link chips for cycles. See [Note types](../app/note-types.md).
 - **A block** is a typed node: paragraph, heading, list item, to-do, toggle, quote, code, markdown table, image, file, embed, link to a page, or an inline view of a collection. Blocks can contain blocks. A table keeps its GFM source in `text`; a code block keeps its fence info string in the existing `target` attribute.
 - **Properties** are typed values: text, number, date or date range, checkbox, select, multi-select, status, relation to other pages, URL, file. Tasks, events, ideas and plans are all ordinary pages with the right properties.
 
@@ -55,8 +55,8 @@ View settings JSON contributes no searchable text (index version 14); ordinary d
 - `type:` is reserved page metadata and is written for every type except the default `document`. The legacy `collection:` key is still read. A property named type is written as `prop:type`.
 - Non-empty type data is written as `type-data:` followed by a single-line JSON object `{addonId: data}` in front matter. A stored `$markdown` string becomes `"$markdown": true` in that object, and is written verbatim as the body when the page has no blocks, or only empty paragraphs with no text or children. Other blocks take precedence when present. Import with the true marker stores the entire body verbatim as `$markdown` and never parses it into blocks; without the marker, normal block parsing applies. The nested add-on data still round-trips, including unknown ids. The reserved name is escaped as `prop:type-data` for a user property. The core vault writer and Export panel share the core renderer, including identical front matter for the same page.
 - A numbered list that starts at a number other than 1 keeps it: the first item stores an optional `numbered_start`, and both the app and the Markdown renderer count on from it. Typing `N. ` and pasting numbered Markdown store that number the same way, unless the item continues a numbered run directly above it. Inline code is written with a backtick delimiter one longer than the longest backtick run in the text, padded with a space when the text starts or ends with a backtick; the parser strips one space from each side, as in CommonMark.
-- Blocks without native Markdown syntax (`embed`, unknown kinds and `chat_ref`) use readable blockquote text plus `<!-- block=<hex-json> -->` metadata for their raw kind, target, fallback line count and checked state. An embed stores only its target id, with empty block text; its current target title is the readable fallback and search text, or empty while unavailable. New inline databases are embeds; old `database` blocks remain readable without migration. Existing toggle, callout, colour and column annotations remain supported. See the [generic fallback format](note-types.md#generic-markdown-fallback-built-2026-10-12). Schema/view definitions and CRDT block ids live in the page's editing state.
-- **The live editing state is a CRDT per page** (see [Sync and storage](sync-and-storage.md)). The markdown file is written from it, and outside edits to the file (in VS Code, or in a [mounted folder](mounts.md)) are diffed back into it.
+- Blocks without native Markdown syntax (`embed`, unknown kinds and `chat_ref`) use readable blockquote text plus `<!-- block=<hex-json> -->` metadata for their raw kind, target, fallback line count and checked state. An embed stores only its target id, with empty block text; its current target title is the readable fallback and search text, or empty while unavailable. New inline databases are embeds; old `database` blocks remain readable without migration. Existing toggle, callout, colour and column annotations remain supported. See the [generic fallback format](../app/note-types.md#generic-markdown-fallback-built-2026-10-12). Schema/view definitions and CRDT block ids live in the page's editing state.
+- **The live editing state is a CRDT per page** (see [Sync and storage](../sync/sync-and-storage.md)). The markdown file is written from it, and outside edits to the file (in VS Code, or in a [mounted folder](mounts.md)) are diffed back into it.
 - **A local index database** (SQLite) holds titles, page types, properties, links and full-text search; it has no embeddings. It can be rebuilt from the vault's CRDT documents. Index schema version 9 replaces `is_collection` with a string `page_type` column.
 
 ## Built (2026-10-01, Track B)

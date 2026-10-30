@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "Remote amd64 image build and the lead's deployment procedure for notes-hub behind the existing VPS Caddy and Authentik."
-parent: "[[architecture/index]]"
+parent: "[[sync/index]]"
 status: current
 ---
 

@@ -1,7 +1,7 @@
 ---
 type: page
 summary: "Each device holds an Ed25519 key (bubblebuffer-device-key v0.1.0) in .vault/device-key.json; the hub binds it to the device token, and sync, /agent/ws, /mcp and the app's hub calls run on 1-hour session tokens bought with a signed challenge. Agent tokens, MCP OAuth and the OIDC login are unchanged."
-parent: "[[architecture/index]]"
+parent: "[[sync/index]]"
 status: current
 ---
 

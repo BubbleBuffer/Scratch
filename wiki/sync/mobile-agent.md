@@ -1,7 +1,7 @@
 ---
 type: architecture
 summary: "Android's Hub-only agent, authenticated vault sync, local acceptance tests and phone setup."
-parent: "[[architecture/index]]"
+parent: "[[sync/index]]"
 status: current
 ---
 

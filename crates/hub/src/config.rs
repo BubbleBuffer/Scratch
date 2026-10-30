@@ -3,7 +3,7 @@
 //! the `[oidc]` table, `NOTES_HUB_MCP_OAUTH_<KEY>` for `[mcp_oauth]`,
 //! `NOTES_HUB_AGENT_<KEY>` for `[agent]`, and
 //! `NOTES_HUB_SCHEDULES_<KEY>` for `[schedules]`). List values in variables are separated by commas
-//! or spaces. Reference: `wiki/architecture/hub.md`.
+//! or spaces. Reference: `wiki/sync/hub.md`.
 
 use std::path::{Path, PathBuf};
 
@@ -33,7 +33,7 @@ pub struct Config {
     /// when the hub is reachable directly.
     pub trust_proxy: bool,
     /// Refuse device tokens that are not bound to a device key yet
-    /// (`wiki/architecture/device-keys.md`). Off by default: an unbound
+    /// (`wiki/sync/device-keys.md`). Off by default: an unbound
     /// token works, and its client upgrades it on the next sync.
     pub require_device_keys: bool,
     /// Maximum tar archive bytes per markdown source, before base64.

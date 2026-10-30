@@ -191,7 +191,7 @@ Future<List<String>> appendBlocks(
 
 /// The mockup's page for the screenshots: the host page "Week 42" with three
 /// query cards under headings, over the mockup's sample data. The queries are
-/// the real operator syntax (see wiki/architecture/search-queries.md):
+/// the real operator syntax (see wiki/core/search-queries.md):
 ///  - open work: `#work type:task -status:done`, four open task pages tagged #work;
 ///  - on the board: `in:[[Sprint board]] status:doing`, rows with Status;
 ///  - touched this week: `updated:week`, minus the host page itself.

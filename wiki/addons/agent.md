@@ -24,7 +24,7 @@ The host contract is [addon_services.dart](../../app/lib/services/addon_services
 
 When disabled, its type, block, slash item, commands, settings, panel and search source are absent. The agent store refuses to open. Existing `chat_ref` data uses the unknown-block placeholder and the containing page still opens. Grouped search hides unregistered indexed rows. With no registered indexed sources it uses page-only search before ranking and the limit, so cached chat rows cannot crowd out pages.
 
-`app/test/addons/agent/` checks isolated registration, actual page-to-type embed dispatch, disabled placeholders and refused agent opening. `app/test/addons/search_sources_test.dart` checks a fake source independently of Agent. Existing agent/mobile/outline/reference and grouped-search assertions and golden files remain unchanged. See [Add-ons](../architecture/addons.md) for acceptance results and limits.
+`app/test/addons/agent/` checks isolated registration, actual page-to-type embed dispatch, disabled placeholders and refused agent opening. `app/test/addons/search_sources_test.dart` checks a fake source independently of Agent. Existing agent/mobile/outline/reference and grouped-search assertions and golden files remain unchanged. See [Add-ons](../app/addons.md) for acceptance results and limits.
 
 ## Kit dev pane
 

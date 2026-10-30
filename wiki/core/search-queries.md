@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "Search operators and type filters over vault pages and external chat summaries, grouped results with anchored navigation, and live query streams."
-parent: "[[architecture/index]]"
+parent: "[[core/index]]"
 status: current
 covers: ["crates/core/src/index.rs", "crates/core/src/query.rs", "crates/core/src/vault.rs", "crates/core/src/feed.rs"]
 ---
@@ -15,7 +15,7 @@ below containing `--with ...BubblePaw-base-agent` record historical runs only;
 retain the matching dependency checkout when reproducing those old revisions.
 # Search queries and live queries
 
-Status: search syntax, filters, execution and API merged. External sources, chat search, grouped results and the `type:` filter built 2026-10-12 ([note types, refactor 6](note-types.md#preparatory-refactors)). Live query registry and bridge streams are built 2026-10-15. The dynamic search card (block and inline chip) is built 2026-10-16.
+Status: search syntax, filters, execution and API merged. External sources, chat search, grouped results and the `type:` filter built 2026-10-12 ([note types, refactor 6](../app/note-types.md#preparatory-refactors)). Live query registry and bridge streams are built 2026-10-15. The dynamic search card (block and inline chip) is built 2026-10-16.
 
 ## Syntax
 

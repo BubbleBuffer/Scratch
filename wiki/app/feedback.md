@@ -1,7 +1,7 @@
 ---
 type: page
 summary: "Quick feedback capture: shake, Ctrl+Shift+F or a Send feedback button (sidebar, page menu, Pages screen) opens a sheet with a screenshot and diagnostics; app and MCP reports are hidden child pages of the Feedback system page."
-parent: "[[architecture/index]]"
+parent: "[[app/index]]"
 status: current
 ---
 
@@ -20,7 +20,7 @@ Built 2026-10-16 on `lane/feedback`.
 - **Sheet.** A bottom sheet on phones and a dialog on desktop. It has a "What happened?" text field, a thumbnail of the screen with a remove button, and a collapsed Diagnostics section that shows the exact text that will be sent. Send with an empty text field is allowed. The screenshot is captured from a `RepaintBoundary` at the app root before the sheet opens, at the screen's pixel ratio capped at 3x.
 - **Diagnostics.** App version, build, git commit (`--dart-define=GIT_COMMIT`, empty when absent), platform, OS, device, locale, screen size and pixel ratio, theme, current route and open page id/title (never contents), sync state, the schedule-runner setting, page count, the last 200 log lines and recent uncaught errors. The log ring buffer (`app/lib/feedback/log_buffer.dart`) is fed by `AppLog`, `FlutterError.onError` and `PlatformDispatcher.onError`, chaining to any previous handler. The hub token and AI keys are replaced by `[redacted]`, as are `Bearer` values and token/key/secret query parameters.
 - **Where reports land.** Each report is a child page of the system page "Feedback" (role `feedback`, fixed id `000000000000000000000000FB`, created on first use). The title is "Feedback yyyy-MM-dd HH:mm Platform". The body is the text, the screenshot as an image block (a normal attachment, so it syncs through the hub as a blob), then the diagnostics as a `text` code block. A toast "Feedback saved â€” thanks" confirms; it works offline and syncs later.
-- **Hidden.** The Feedback page and its descendants are left out of the sidebar roots, page lists and counts, and search, including MCP `search_notes`. They are reachable by id, by link, and over MCP with `read_page` or `list_pages` with `parent` set to the Feedback id. The `role` round-trips through Markdown frontmatter ([core state](core-state.md)).
+- **Hidden.** The Feedback page and its descendants are left out of the sidebar roots, page lists and counts, and search, including MCP `search_notes`. They are reachable by id, by link, and over MCP with `read_page` or `list_pages` with `parent` set to the Feedback id. The `role` round-trips through Markdown frontmatter ([core state](../core/core-state.md)).
 
 ## Feedback over MCP
 

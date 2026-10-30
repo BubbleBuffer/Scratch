@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "notes-hub: sync and OIDC device login, the web viewer and share links, BubblePaw at /agent/ws, vault MCP at /mcp, and an opt-in OAuth agent gateway at /mcp/agent; config, routes and security."
-parent: "[[architecture/index]]"
+parent: "[[sync/index]]"
 status: current
 covers: ["crates/hub/**", "crates/agent_wire/**"]
 realizes: ["[[integrations/agent]]"]

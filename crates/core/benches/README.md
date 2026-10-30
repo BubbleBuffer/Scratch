@@ -186,5 +186,5 @@ Without git history they fail, and the selftest reports that check as FAIL.
 - Earlier record, before the control band (rule: both median p50 and median p95
   ratios at most 1.05, no control): on the Linux machine, `4f978b9` versus `333d1ea` with
   five AB/BA pairs gave **FAIL**, with fourteen warm cases over 1.05 in median
-  p50. See the [superseded diagnostic record](../../../wiki/architecture/search-queries.md#interleaved-ab-acceptance-2026-10-13).
+  p50. See the [superseded diagnostic record](../../../wiki/core/search-queries.md#interleaved-ab-acceptance-2026-10-13).
   That result does not apply to the current rule.

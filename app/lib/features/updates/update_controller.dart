@@ -2,7 +2,7 @@
 // and verifies its installer, and starts it when the user clicks "Restart
 // to update". The work is in Rust (app/rust/src/updater.rs); this decides
 // when to call it and holds the state the settings section and the
-// sidebar indicator show. How and why: wiki/architecture/windows-install.md.
+// sidebar indicator show. How and why: wiki/releases/windows-install.md.
 //
 // - Release and nightly builds are built with
 //   `--dart-define=SCRATCH_RELEASE_TAG=<tag>`. Without it the build is a

@@ -1,6 +1,6 @@
 //! The hub's agent: `vault_agent` over the hub's own vault replica, served
 //! at `GET /agent/ws` as JSON-RPC 2.0 over a WebSocket (one text frame per
-//! message). Protocol: `wiki/architecture/hub.md` (`/agent/ws`).
+//! message). Protocol: `wiki/sync/hub.md` (`/agent/ws`).
 //!
 //! - Auth: the upgrade request's `Authorization: Bearer <token>` and
 //!   `X-Device`, checked by `Hub::handle` itself, exactly as for sync.

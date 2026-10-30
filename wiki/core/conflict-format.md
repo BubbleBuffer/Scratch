@@ -52,7 +52,7 @@ Every applied resolution stores `before`, the page frontiers just before applyin
 
 The core format, detection, scope restoration and undo, display diff, settings/policy, archive/lifecycle transport hooks and archived page-history reads/restores are implemented on `feat/conflict-format`. Core, sync and Rust bridge/MCP checks listed above pass. `Vault::list_conflicts` returns pending review; `Vault::conflict_log` also exposes recent undone applications on reopened entries. The bridge supplies both `NotesVault::conflicts` and the `list_conflicts` alias. Bridge DTOs, regenerated bindings and interim Flutter adaptation are present; native bridge and fake-agent builds are complete; all 12 targeted Flutter tests pass and analysis reports no issues.
 
-**Workspace gate:** passed on the Linux machine with 775 passed, 5 ignored and 0 failed after fix `3093be8`. The focused format/bridge and retained Flutter checks above pass. Current notes are in [Sync state](sync-state.md#conflicts), [Core state](core-state.md) and [App state](app-state.md#bridge). No packaged release or deployment is claimed here.
+**Workspace gate:** passed on the Linux machine with 775 passed, 5 ignored and 0 failed after fix `3093be8`. The focused format/bridge and retained Flutter checks above pass. Current notes are in [Sync state](../sync/sync-state.md#conflicts), [Core state](core-state.md) and [App state](../app/app-state.md#bridge). No packaged release or deployment is claimed here.
 
 The undo-status decision was settled by the user on 2026-10-14 below and is implemented and checked in core and cross-replica transport. The interim Flutter compatibility surface passes its existing tests.
 

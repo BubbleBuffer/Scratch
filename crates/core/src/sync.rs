@@ -1,6 +1,6 @@
 //! Sync hooks, used by `crates/sync`: version vectors, update export and
 //! import, purge tombstones, conflicts and blobs. Design and limits:
-//! `wiki/architecture/sync-state.md`.
+//! `wiki/sync/sync-state.md`.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;

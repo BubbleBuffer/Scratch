@@ -4,7 +4,7 @@
 //! The public surface is [`Vault`], the plain data types in [`types`], the
 //! single error type [`VaultError`] and [`seed::generate`]. Every public
 //! function takes owned arguments and is synchronous; run it off the UI
-//! thread. Design notes: `wiki/architecture/core-state.md`.
+//! thread. Design notes: `wiki/core/core-state.md`.
 
 mod agenda;
 mod agent_defaults;

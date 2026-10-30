@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "Local-first sync with CRDTs, attachments by hash, page history and cold history storage."
-parent: "[[architecture/index]]"
+parent: "[[sync/index]]"
 status: current
 ---
 

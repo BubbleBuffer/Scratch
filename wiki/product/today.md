@@ -14,7 +14,7 @@ The Journal core and bridge are merged, including Tasks + Log sections and idemp
 
 ## What counts as a task or an event
 
-Tasks and events stay ordinary pages and blocks ([data model](../architecture/data-model.md)). The *agenda* is everything with a date that belongs on a day:
+Tasks and events stay ordinary pages and blocks ([data model](../core/data-model.md)). The *agenda* is everything with a date that belongs on a day:
 
 - **Task notes.** The `tasks` add-on stores status, date, optional time/duration, optional checkbox presentation, calendar and assignee in core type data. Status controls completion. Category switches control Calendar and Today independently.
 - **Database rows.** Each database has an agenda role:
@@ -80,9 +80,9 @@ The day note embeds the ordinary page editor, editable on past and future dates 
 
 ## Build
 
-1. **Core and bridge — built 2026-10-06:** status groups, the agenda index and queries, bounded overdue and overdue count, to-do progress, daily notes, space colours and roles, set done. ([Core state](../architecture/core-state.md).)
-2. **App, Today — built 2026-10-06:** home sections, week strip, capture, In motion, to-do dates in the editor, "Show in Today" in database settings, colours in the sidebar and page menu, first-run and demo seeds. ([App state](../architecture/app-state.md).)
-3. **App, reminders — built 2026-10-07:** notifications on Android and desktop, plus the settings. Android schedules absolute UTC instants with inexact delivery; Windows, Linux and macOS deliver only while the app runs. Settings hold the switch, event lead and morning time on this device. ([App state](../architecture/app-state.md#reminders).)
+1. **Core and bridge — built 2026-10-06:** status groups, the agenda index and queries, bounded overdue and overdue count, to-do progress, daily notes, space colours and roles, set done. ([Core state](../core/core-state.md).)
+2. **App, Today — built 2026-10-06:** home sections, week strip, capture, In motion, to-do dates in the editor, "Show in Today" in database settings, colours in the sidebar and page menu, first-run and demo seeds. ([App state](../app/app-state.md).)
+3. **App, reminders — built 2026-10-07:** notifications on Android and desktop, plus the settings. Android schedules absolute UTC instants with inexact delivery; Windows, Linux and macOS deliver only while the app runs. Settings hold the switch, event lead and morning time on this device. ([App state](../app/app-state.md#reminders).)
 
 Build deviations: a focused to-do shows its canonical date mention while resting to-dos show the compact chip, preserving editing offsets and IME behaviour. New top-level pages and Colour > None store explicit `none`, which the boot backfill leaves uncoloured across restarts. The demo leaves Lisbon's editable Dates/Status/Budget/Tags out: ordinary pages need a parent database schema for these, and making Trips a database would change the settled hierarchy. No such hierarchy change was made. The assignment's capture → week → day order and dots after sidebar titles take precedence over the earlier ordering above. Reminders keep the agreed behaviour: because agenda items carry source ids only, the app loads source titles before pure planning; no core changes were needed. The seven-day upper edge is inclusive. Validation is headless; notification delivery on a real Android device and on Windows remains unverified.
 ## Decisions

@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "Where Scratch's code, CI, releases and private operations live since 2026-10-22: the public repo, the private scratch-ops repo, the private-strings check and how to cut a release."
-parent: "[[architecture/index]]"
+parent: "[[releases/index]]"
 status: current
 ---
 
@@ -93,7 +93,7 @@ Run the scratch-ops `hub-deploy` workflow by hand:
 gh workflow run hub-deploy.yml -R BubbleBuffer/scratch-ops -f ref=<tag> -f dry_run=false
 ```
 
-It builds `ghcr.io/bubblebuffer/scratch-hub:<sha>` from Scratch at `ref`, and deploys it to the VPS through a forced-command key. Details are in [Hub deployment](hub-deploy.md).
+It builds `ghcr.io/bubblebuffer/scratch-hub:<sha>` from Scratch at `ref`, and deploys it to the VPS through a forced-command key. Details are in [Hub deployment](../sync/hub-deploy.md).
 
 ## Scratch repo settings
 

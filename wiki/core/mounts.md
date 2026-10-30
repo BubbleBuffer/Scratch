@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "Any PC folder can be mounted at a vault path; devices see one logical vault, with no symlinks."
-parent: "[[architecture/index]]"
+parent: "[[core/index]]"
 status: current
 ---
 

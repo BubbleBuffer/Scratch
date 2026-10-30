@@ -1,7 +1,7 @@
 //! The search operator table: the single source for the query language's
 //! built-in operators. The parser's key recognition, the completion list,
 //! the `search_notes` tool description, the `notes_help` topic `query` and
-//! the generated section of `wiki/architecture/search-queries.md` all read
+//! the generated section of `wiki/core/search-queries.md` all read
 //! it. Drift tests check that every row is documented and handled.
 
 use serde::Serialize;

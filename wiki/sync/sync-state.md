@@ -2,10 +2,10 @@
 type: topic
 layer: state
 summary: "The built sync (vault_sync + core hooks): hub server, binary protocol, token pairing, delta sync by version vectors, conflicts, purges, lazy blobs, numbers."
-parent: "[[architecture/index]]"
+parent: "[[sync/index]]"
 status: current
 covers: ["crates/sync/**", "crates/core/src/sync.rs"]
-realizes: ["[[architecture/sync-and-storage]]"]
+realizes: ["[[sync/sync-and-storage]]"]
 ---
 
 # Sync (state)
@@ -61,7 +61,7 @@ Vault writers in one process queue on a shared mutex keyed by the canonical `.va
 
 - Each vault's Loro peer id is derived from its device id (`.vault/device`): the first 63 bits of its SHA-256. Every session of a device writes as the same peer, so version vectors do not grow per session. Restored pages derive a fresh per-device peer from their persisted recovery generation, stable across restarts, so removing purge-side history cannot make later edits reuse old operation counters.
 - Peer reuse is safe only if no op counter is ever issued twice. The first `Vault` on a folder takes `.vault/lock` (`File::try_lock`) and uses the device peer. A second instance in the same or another process gets a random peer, as before.
-- Update logs are not fsynced (see [Core (state)](core-state.md#edits-and-durability)). An op that was exported to another device but lost here in a crash would make this device reuse its counter. To prevent that, `export_updates` fsyncs the page's snapshot and logs if one was written in the last 120 s, and the next flush of an exported page writes its snapshot with fsync before the rename.
+- Update logs are not fsynced (see [Core (state)](../core/core-state.md#edits-and-durability)). An op that was exported to another device but lost here in a crash would make this device reuse its counter. To prevent that, `export_updates` fsyncs the page's snapshot and logs if one was written in the last 120 s, and the next flush of an exported page writes its snapshot with fsync before the rename.
 
 ## Protocol
 
@@ -124,11 +124,11 @@ Plain HTTP on the tiny_http hub (Tailscale provides transport security); HTTPS t
 
 ## Conflicts
 
-**Core and sync backend built and checked, 2026-10-14.** The contract is [Conflict format v2](conflict-format.md), approved 2026-10-13 with missing-parent and undo-status decisions on 2026-10-14. Types, scoped detection, resolution/undo, diff, synced policy and archive/history hooks are implemented. Core checks pass: 199 unit tests (2 ignored), 5 detection tests, 5 public resolution/history tests and 13 unchanged import-recovery tests. All 54 sync tests pass: 18 unit, 3 new real-HTTP, 5 hub, 9 purge and 19 zstd tests. These cover fresh/warm replica purge/undo, tombstone replays, restarts and background startup. FRB 2.13.0 bindings are regenerated; 21 Rust bridge and 12 MCP tests pass. Native bridge and fake-agent builds are complete; all 12 targeted Flutter tests pass and analysis reports no issues. No packaged app or deployment is claimed.
+**Core and sync backend built and checked, 2026-10-14.** The contract is [Conflict format v2](../core/conflict-format.md), approved 2026-10-13 with missing-parent and undo-status decisions on 2026-10-14. Types, scoped detection, resolution/undo, diff, synced policy and archive/history hooks are implemented. Core checks pass: 199 unit tests (2 ignored), 5 detection tests, 5 public resolution/history tests and 13 unchanged import-recovery tests. All 54 sync tests pass: 18 unit, 3 new real-HTTP, 5 hub, 9 purge and 19 zstd tests. These cover fresh/warm replica purge/undo, tombstone replays, restarts and background startup. FRB 2.13.0 bindings are regenerated; 21 Rust bridge and 12 MCP tests pass. Native bridge and fake-agent builds are complete; all 12 targeted Flutter tests pass and analysis reports no issues. No packaged app or deployment is claimed.
 
 - Detection compares common, local and incoming historical versions. `Block` covers a block's own text/properties; `Subtree` covers a root and every descendant; `Page` covers a whole trashed or purged note opposed by new edits. Broader events cover their children rather than creating a separate conflict for each descendant.
 - Each stable record ID keys JSON in the same page's Loro `conflicts` map. A side carries its device, timestamp, encoded frontiers, full scoped tree for display, lifecycle state (`Present`, `Deleted`, `Trashed { at }`, `Purged { tombstone_version }`) and, for block/subtree scope, its parent and previous-sibling anchor. Frontiers remain authoritative. The index mirrors record ID, anchor block, scope and JSON; it is not the source of truth.
-- Delete versus edit applies the editing side's **entire** version at detection, including descendants or unchanged content the deleting device removed. With auto-resolve off, that already-applied entry stays pending until OK. With it on, the entry goes straight to the resolved log. Text edited on both sides takes one side's own content at detection (later `time_ms`, then the greater device id; `auto(later-text-wins)`, undoable) and always waits for a user's pick; see [Conflict format v2](conflict-format.md).
+- Delete versus edit applies the editing side's **entire** version at detection, including descendants or unchanged content the deleting device removed. With auto-resolve off, that already-applied entry stays pending until OK. With it on, the entry goes straight to the resolved log. Text edited on both sides takes one side's own content at detection (later `time_ms`, then the greater device id; `auto(later-text-wins)`, undoable) and always waits for a user's pick; see [Conflict format v2](../core/conflict-format.md).
 - `Keep` confirms the current scope; `UseSide(i)` makes it match the recorded side at index `i`. There is no `Replace` or AI resolution in the v2 backend. Side order stays stable for `UseSide`; display diffs identify Local by this vault's device ID and retain both foreign flags as false when neither side is Local. Diffs are overlays and never drive application of a choice.
 - Every application records `resolution: Keep | UseSide(i)` (the applied side for automatic rules; unknown for old records), the historical `before` frontiers, a non-live before-state when needed, `by = user` or `auto(rule)`, restored ancestor IDs and any root fallback. Undo restores only the conflict scope to that before-state and preserves unrelated edits. The user settled status on 2026-10-14: ordinary undo returns the record to pending review and marks the consumed application with `undone_at` in history and the log; journal undo remains log-only. Restoration rebuilds only the missing ancestor chain required by the saved anchor, in its original order and position; undo removes ancestors introduced by that application. If no version can rebuild an ancestor, scoped content appends at the page root and the log records the fallback. A missing previous sibling otherwise appends within the saved parent.
 - Actual Journal day-section repairs create one `auto(journal)` entry for the restoration, using its historical deletion/edit frames. It is log-only regardless of the switch, and the same repair footprint suppresses duplicate delete/edit conflict entries.
@@ -169,7 +169,7 @@ Release build, Windows desktop under load from other jobs, hub and client in one
 - **TLS (2026-10-08):** `ureq` has its `rustls` feature (rustls with ring and the bundled webpki roots), so `SyncClient` talks to `https://` hubs on Windows, Linux and Android alike. The scheme comes from the stored hub URL; nothing in the Rust code assumes `http://`. Since 2026-10-19 the client builds its own TLS connector to support [trusted certificates](#trusted-certificates-2026-10-19).
 - Original dependencies (all pure Rust, no async runtime): `tiny_http` 0.12 without default features (server), `ureq` 3 without default features (client, plain HTTP), `getrandom` 0.3 (tokens, epoch). They add `ascii`, `base64`, `chunked_transfer`, `http`, `httparse`, `httpdate`, `percent-encoding`, `ureq-proto` and `utf8-zero` to the lock file.
 - `cargo test -p vault_core -p vault_sync` runs 41 core tests (12 unit, 10 `api`, 19 `mvp`), 8 core sync tests, 3 sync unit tests and 5 hub tests. Clippy is clean.
-- `cargo check -p vault_core -p vault_sync --all-targets` passes for `x86_64-linux-android` and `aarch64-linux-android` with NDK 27.3 (environment in [Core (state)](core-state.md#build)).
+- `cargo check -p vault_core -p vault_sync --all-targets` passes for `x86_64-linux-android` and `aarch64-linux-android` with NDK 27.3 (environment in [Core (state)](../core/core-state.md#build)).
 
 ## Known limits
 

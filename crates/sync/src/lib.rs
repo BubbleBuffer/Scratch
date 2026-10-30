@@ -11,7 +11,7 @@
 //!   [`SyncClient::start`] for a background loop.
 //! - [`wire`] is the protocol's message encoding.
 //!
-//! Design, protocol and limits: `wiki/architecture/sync-state.md`.
+//! Design, protocol and limits: `wiki/sync/sync-state.md`.
 
 // Instrumentation for the `storage-metrics` feature. Without it, each macro
 // is its plain expression or nothing, so default builds are unchanged.
