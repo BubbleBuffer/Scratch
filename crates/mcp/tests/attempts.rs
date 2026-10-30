@@ -480,5 +480,14 @@ fn a_question_is_open_until_the_reply_and_a_run_that_ends_waiting_is_not_failed(
     assert_eq!(row.question, "Still there?");
     let a = attempts::list(&v, &id).unwrap();
     assert_eq!(a.last().unwrap().outcome.as_deref(), Some(tasks::WAITING_FOR_INPUT));
-    assert!(!tasks::reply(&v, &id, "late").unwrap(), "nobody is waiting");
+    // A reply to it is not a dead end: a new attempt starts on the same row.
+    let before = row.attempt.clone();
+    assert!(tasks::reply(&v, &id, "Yes, go on").unwrap());
+    let again = tasks::get(&v, &id).unwrap();
+    assert_eq!(again.status, tasks::QUEUED);
+    assert!(again.question.is_empty());
+    assert!(again.prompt.contains("Still there?") && again.prompt.contains("Yes, go on"));
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    assert_ne!(tasks::get(&v, &id).unwrap().attempt, before);
+    assert!(!tasks::reply(&v, &id, "nothing open").unwrap());
 }

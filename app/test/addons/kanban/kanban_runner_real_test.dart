@@ -272,7 +272,9 @@ void main() {
           error: 'waiting for input: no reply within the run limit',
         ),
       ];
-      expect(backend.current('card-s')!.state, AssignState.waiting);
+      final closed = backend.current('card-s')!;
+      expect(closed.state, AssignState.needsInput);
+      expect(closed.question, 'Blue or green?');
     });
 
     test('a card reads its newest row, and a card with no row has no assignment', () async {

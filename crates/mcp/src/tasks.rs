@@ -759,11 +759,31 @@ pub fn ask(v: &Vault, id: &str, question: &str) -> Result<()> {
 
 /// The user answers the worker's question. The reply is stored for the
 /// waiting tool and the question is cleared, which puts the task back to
-/// plain `running`. False when there is no open question on a running task.
+/// plain `running`. A task whose run ended while it waited (`interrupted`,
+/// "waiting for input") starts a new attempt instead, with the question and
+/// the reply added to its prompt. False when there is no open question.
 pub fn reply(v: &Vault, id: &str, text_in: &str) -> Result<bool> {
     let t = get(v, id)?;
     let r: String = text_in.trim().chars().take(QUESTION_MAX).collect();
-    if t.status != RUNNING || t.question.is_empty() || r.is_empty() {
+    if t.question.is_empty() || r.is_empty() {
+        return Ok(false);
+    }
+    if t.status == INTERRUPTED && t.error.starts_with(WAITING_FOR_INPUT) {
+        // The run ended while it waited: a reply starts a new attempt on the
+        // same runner, with the question and the reply added to the brief.
+        let prompt = format!(
+            "{}
+
+Earlier in this task you asked the user: {}
+The user replied: {r}",
+            t.prompt, t.question
+        );
+        v.set_property(t.id.clone(), "prompt".into(), PropValue::Text(prompt))?;
+        let _ = attempts::event(v, id, None, attempts::kind::REPLY, &r);
+        retry(v, id)?;
+        return Ok(true);
+    }
+    if t.status != RUNNING {
         return Ok(false);
     }
     v.set_property(t.id.clone(), REPLY.into(), PropValue::Text(r.clone()))?;

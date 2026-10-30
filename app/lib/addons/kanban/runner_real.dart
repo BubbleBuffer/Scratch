@@ -286,11 +286,8 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
         );
       case 'interrupted':
         if (t.error.startsWith('waiting for input')) {
-          return (
-            state: AssignState.waiting,
-            reason: 'The run ended while it waited for your reply: ${t.question}',
-            note: null,
-          );
+          // The run ended while it waited; a reply starts a new attempt.
+          return (state: AssignState.needsInput, reason: null, note: null);
         }
         return (
           state: AssignState.failed,

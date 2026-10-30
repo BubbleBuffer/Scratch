@@ -375,6 +375,7 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
     );
     await refresh();
     if (!taken) throw 'The worker is no longer waiting for a reply.';
+    unawaited(pump());
   }
 
   Future<void> retry(String id) async {
