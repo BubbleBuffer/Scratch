@@ -57,6 +57,9 @@ pub(crate) const CANCELLING: &str = "cancelling";
 pub const QUEUED: &str = "queued";
 pub const RUNNING: &str = "running";
 pub const DONE: &str = "done";
+/// A finished run of a task with a review policy (see [`set_review`]): the
+/// result waits for the user's acceptance, which makes it `done`.
+pub const REVIEW: &str = "review";
 pub const FAILED: &str = "failed";
 /// Jobs only (see [`crate::jobs`]): cancelled by their owner.
 pub const CANCELLED: &str = "cancelled";
@@ -116,6 +119,13 @@ pub struct Task {
     /// "cancellation requested".
     #[serde(default)]
     pub cancel_requested_ms: Option<i64>,
+    /// The runner's last sign of life while it runs (ms), written about
+    /// every minute. None for a row whose runner does not write one.
+    #[serde(default)]
+    pub heartbeat_ms: Option<i64>,
+    /// The agent session of the run, empty until it starts or after it expired.
+    #[serde(default)]
+    pub session: String,
     pub created_ms: i64,
     pub updated_ms: i64,
 }
@@ -149,6 +159,7 @@ pub fn schema() -> Vec<PropDef> {
                 opt(QUEUED, "Queued", "gray"),
                 opt(RUNNING, "Running", "blue"),
                 opt(DONE, "Done", "green"),
+                opt(REVIEW, "Review", "purple"),
                 opt(FAILED, "Failed", "red"),
                 opt(CANCELLED, "Cancelled", "default"),
                 opt(INTERRUPTED, "Interrupted", "yellow"),
@@ -197,6 +208,9 @@ pub fn schema() -> Vec<PropDef> {
             PropKind::Text,
             vec![],
         ),
+        // The runner's last sign of life, and the review policy.
+        def(HEARTBEAT, "Heartbeat", PropKind::Text, vec![]),
+        def(REVIEW_POLICY, "Review", PropKind::Text, vec![]),
     ]
 }
 
@@ -305,6 +319,8 @@ fn task_of(row: &PageSummary) -> Task {
         worktree_path: text(p, "worktree_path"),
         attempt: text(p, attempts::CURRENT),
         cancel_requested_ms: text(p, attempts::CANCEL_REQUESTED).parse().ok(),
+        heartbeat_ms: text(p, HEARTBEAT).parse().ok(),
+        session: text(p, "session"),
         created_ms: row.created_ms,
         updated_ms: row.updated_ms,
     }
@@ -350,6 +366,7 @@ fn placeholder_text(status: &str, prompt: &str) -> String {
         CANCELLING => "AI task cancellation requested",
         INTERRUPTED => "AI task interrupted",
         DONE => "AI task done",
+        REVIEW => "AI task ready for review",
         _ => "AI task",
     };
     format!("{what}: {}", first_line(prompt, 100))
@@ -695,8 +712,101 @@ pub fn claim_next(v: &Vault, device: &str) -> Result<Option<Task>> {
         },
         &actor,
     )?;
+    let _ = heartbeat(v, &t.id);
     set_status(v, &t, RUNNING)?;
     Ok(Some(get(v, &t.id)?))
+}
+
+/// The row property holding the runner's last sign of life (ms).
+pub(crate) const HEARTBEAT: &str = "heartbeat";
+/// The row property that makes a successful run end in `review`.
+pub(crate) const REVIEW_POLICY: &str = "review";
+
+/// A run with no sign of life for this long is shown as stalled.
+pub const STALL_MS: i64 = 10 * 60 * 1000;
+
+/// Makes the task's successful runs end in `review` instead of `done`.
+pub fn set_review(v: &Vault, id: &str) -> Result<()> {
+    if let Some(c) = collection(v)? {
+        migrate_schema(v, &c)?;
+    }
+    v.set_property(id.to_string(), REVIEW_POLICY.into(), PropValue::Text("1".into()))?;
+    Ok(())
+}
+
+/// The user accepts a reviewed result: `review` becomes `done`. Returns
+/// whether the task was in review.
+pub fn accept(v: &Vault, id: &str) -> Result<bool> {
+    let t = get(v, id)?;
+    if t.status != REVIEW {
+        return Ok(false);
+    }
+    set_status(v, &t, DONE)?;
+    Ok(true)
+}
+
+/// Records the runner's sign of life on a running task. Called about every
+/// minute by the runner while it works.
+pub fn heartbeat(v: &Vault, id: &str) -> Result<()> {
+    if let Some(c) = collection(v)? {
+        migrate_schema(v, &c)?;
+    }
+    v.set_property(
+        id.to_string(),
+        HEARTBEAT.into(),
+        PropValue::Text(crate::jobs::now_ms().to_string()),
+    )?;
+    Ok(())
+}
+
+/// When the runner was last heard from, if the task is `running`, writes a
+/// heartbeat and the last one is more than [`STALL_MS`] before `now`.
+pub fn stalled_since(t: &Task, now: i64) -> Option<i64> {
+    let beat = t.heartbeat_ms?;
+    (t.status == RUNNING && now.saturating_sub(beat) > STALL_MS).then_some(beat)
+}
+
+/// Fails a task whose runner stalled, from another device. Refused (false)
+/// when the task is not stalled; nothing ends a stalled task by itself.
+pub fn mark_failed(v: &Vault, id: &str) -> Result<bool> {
+    let t = get(v, id)?;
+    if stalled_since(&t, crate::jobs::now_ms()).is_none() {
+        return Ok(false);
+    }
+    finish(v, id, Err("the runner stopped responding".into()))?;
+    Ok(true)
+}
+
+/// This device's ended tasks whose session (transcript and logs) is older
+/// than `keep_ms`: the caller deletes each session and then calls
+/// [`session_expired`]. The row, outcome and attempt history stay for good.
+pub fn expired_sessions(
+    v: &Vault,
+    device: &str,
+    keep_ms: i64,
+    now: i64,
+) -> Result<Vec<(Task, String)>> {
+    let Some(c) = collection(v)? else {
+        return Ok(vec![]);
+    };
+    let rows = v.query(Some(c), None, vec![], 0, 5000)?.rows;
+    Ok(rows
+        .iter()
+        .map(|r| (task_of(r), text(&r.properties, "session")))
+        .filter(|(t, session)| {
+            !session.is_empty()
+                && t.device == device
+                && t.node != "hub"
+                && ![QUEUED, RUNNING].contains(&t.status.as_str())
+                && now.saturating_sub(t.updated_ms) >= keep_ms
+        })
+        .collect())
+}
+
+/// Clears a task's `session` once its session is deleted.
+pub fn session_expired(v: &Vault, id: &str) -> Result<()> {
+    v.remove_property(id.to_string(), "session".into())?;
+    Ok(())
 }
 
 /// Marks tasks this device was running as failed (after a restart).
@@ -737,6 +847,7 @@ pub fn retry(v: &Vault, id: &str) -> Result<()> {
     }
     v.remove_property(t.id.clone(), "error".into())?;
     v.remove_property(t.id.clone(), attempts::CANCEL_REQUESTED.into())?;
+    v.remove_property(t.id.clone(), HEARTBEAT.into())?;
     // The last attempt's progress line belongs to that attempt.
     v.remove_property(t.id.clone(), "progress".into())?;
     v.remove_property(t.id.clone(), "progress_at".into())?;
@@ -1010,7 +1121,12 @@ pub fn finish_attempt(
             v.replace_markdown(t.id.clone(), vec![], body)?;
             write_result(v, &t, &md)?;
             v.remove_property(t.id.clone(), "error".into())?;
-            set_status(v, &t, DONE)
+            let row = v.load_page(t.id.clone())?;
+            if text(&row.properties, REVIEW_POLICY).is_empty() {
+                set_status(v, &t, DONE)
+            } else {
+                set_status(v, &t, REVIEW)
+            }
         }
         Err(msg) => {
             let msg = if msg.trim().is_empty() {

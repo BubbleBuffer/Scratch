@@ -132,9 +132,15 @@ pub struct AiTask {
     pub cancel_requested: bool,
     /// The note changed after the running worker got its brief.
     pub stale: bool,
+    /// When the runner of a running task was last heard from (ms), set only
+    /// when it has been silent for over ten minutes.
+    pub stalled_since_ms: Option<i64>,
+    /// The agent session of the run, empty when it has none or it expired.
+    pub session: String,
 }
 
 fn task(t: tasks::Task) -> AiTask {
+    let stalled_since_ms = tasks::stalled_since(&t, vault_mcp::jobs::now_ms());
     AiTask {
         id: t.id,
         prompt: t.prompt,
@@ -154,6 +160,8 @@ fn task(t: tasks::Task) -> AiTask {
         worktree_path: t.worktree_path,
         cancel_requested: t.cancel_requested_ms.is_some(),
         stale: false,
+        stalled_since_ms,
+        session: t.session,
     }
 }
 
@@ -313,6 +321,18 @@ pub fn ai_create_task_here(
 /// Hub jobs are cancelled on the hub.
 pub fn ai_cancel_task(vault: &NotesVault, id: String) -> Result<bool, String> {
     tasks::cancel(&vault.inner, &id).map_err(err)
+}
+
+/// The user accepts a reviewed result: the task goes from review to done.
+/// Returns whether it was in review.
+pub fn ai_accept_task(vault: &NotesVault, id: String) -> Result<bool, String> {
+    tasks::accept(&vault.inner, &id).map_err(err)
+}
+
+/// Fails a task whose runner has been silent for over ten minutes. Returns
+/// false, and changes nothing, when the task is not stalled.
+pub fn ai_mark_task_failed(vault: &NotesVault, id: String) -> Result<bool, String> {
+    tasks::mark_failed(&vault.inner, &id).map_err(err)
 }
 
 /// Asks the runner to send the running worker the note's current version.

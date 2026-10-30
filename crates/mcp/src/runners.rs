@@ -173,5 +173,8 @@ pub fn assign(
             return err(format!("block {block:?} does not belong to page {page:?}"));
         }
     }
-    tasks::create_for_project(v, prompt, &page_id, block, "agent", runner_id, project)
+    // A card handed to a runner ends in review: the user accepts the result.
+    let task = tasks::create_for_project(v, prompt, &page_id, block, "agent", runner_id, project)?;
+    tasks::set_review(v, &task.id)?;
+    tasks::get(v, &task.id)
 }

@@ -302,3 +302,91 @@ fn an_old_ended_job_loses_its_session_but_keeps_its_row_and_attempts() {
     assert!(kept.session.is_empty());
     assert!(!attempts::list(&v, &job.id).unwrap().is_empty());
 }
+
+#[test]
+fn a_reviewed_task_ends_in_review_and_accept_makes_it_done() {
+    let t = Temp::new();
+    let v = t.open();
+    let page = v.create_page(None, "Notes".into()).unwrap();
+    let me = v.device_id();
+    let task = vault_mcp::runners::assign(&v, "Plan it", &page, None, &me, None);
+    // This device is not a published PC runner here: use a plain row.
+    let id = match task {
+        Ok(t) => t.id,
+        Err(_) => {
+            let t = tasks::create(&v, "Plan it", &page, None, "agent").unwrap();
+            tasks::set_review(&v, &t.id).unwrap();
+            t.id
+        }
+    };
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    assert!(!tasks::accept(&v, &id).unwrap());
+    tasks::finish(&v, &id, Ok("The plan".into())).unwrap();
+    assert_eq!(tasks::get(&v, &id).unwrap().status, tasks::REVIEW);
+    assert!(tasks::accept(&v, &id).unwrap());
+    assert_eq!(tasks::get(&v, &id).unwrap().status, tasks::DONE);
+    assert!(!tasks::accept(&v, &id).unwrap());
+
+    // A task without the policy still ends in done.
+    let plain = tasks::create(&v, "Plain", &page, None, "agent").unwrap();
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    tasks::finish(&v, &plain.id, Ok("Done".into())).unwrap();
+    assert_eq!(tasks::get(&v, &plain.id).unwrap().status, tasks::DONE);
+}
+
+#[test]
+fn a_silent_runner_is_stalled_after_ten_minutes_and_only_then_can_be_failed() {
+    let t = Temp::new();
+    let v = t.open();
+    let (_, id) = running_task(&v, "Long");
+    let task = tasks::get(&v, &id).unwrap();
+    // claim_next wrote a heartbeat.
+    let beat = task.heartbeat_ms.expect("a heartbeat at claim");
+    assert_eq!(tasks::stalled_since(&task, beat + 1000), None);
+    assert_eq!(
+        tasks::stalled_since(&task, beat + tasks::STALL_MS + 1),
+        Some(beat)
+    );
+    // Not stalled now: refused, nothing changes.
+    assert!(!tasks::mark_failed(&v, &id).unwrap());
+    assert_eq!(tasks::get(&v, &id).unwrap().status, "running");
+
+    // An old heartbeat: stalled, and the user may mark it failed.
+    v.set_property(
+        id.clone(),
+        "heartbeat".into(),
+        PropValue::Text((jobs_now() - tasks::STALL_MS - 1000).to_string()),
+    )
+    .unwrap();
+    assert!(tasks::mark_failed(&v, &id).unwrap());
+    let failed = tasks::get(&v, &id).unwrap();
+    assert_eq!(failed.status, "failed");
+    assert!(failed.error.contains("stopped responding"));
+}
+
+fn jobs_now() -> i64 {
+    vault_mcp::jobs::now_ms()
+}
+
+#[test]
+fn an_old_ended_task_loses_its_session_but_keeps_its_row() {
+    let t = Temp::new();
+    let v = t.open();
+    let (_, id) = running_task(&v, "Old");
+    v.set_property(id.clone(), "session".into(), PropValue::Text("s-1".into()))
+        .unwrap();
+    tasks::finish(&v, &id, Ok("Result".into())).unwrap();
+    let me = v.device_id();
+    let day = 86_400_000;
+    let now = jobs_now();
+    assert!(tasks::expired_sessions(&v, &me, 30 * day, now).unwrap().is_empty());
+    let due = tasks::expired_sessions(&v, &me, 30 * day, now + 31 * day).unwrap();
+    assert_eq!(due.len(), 1);
+    assert_eq!(due[0].1, "s-1");
+    tasks::session_expired(&v, &id).unwrap();
+    assert!(tasks::expired_sessions(&v, &me, 30 * day, now + 31 * day)
+        .unwrap()
+        .is_empty());
+    assert_eq!(tasks::get(&v, &id).unwrap().status, "done");
+    assert!(!attempts::list(&v, &id).unwrap().is_empty());
+}

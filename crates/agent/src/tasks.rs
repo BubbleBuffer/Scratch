@@ -3,6 +3,7 @@
 mod subtasks;
 
 use std::pin::pin;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -35,6 +36,10 @@ const WATCH_EVERY: Duration = Duration::from_millis(500);
 /// A run looks for the user's steering (new to-dos under the task, a requested
 /// update of the note) on every this-many-th watch.
 const STEER_EVERY: u32 = 4;
+
+/// A running task's heartbeat is written on every this-many-th watch tick
+/// (500 ms each): about once a minute.
+const BEAT_EVERY: u32 = 120;
 
 const DELEGATED_PROMPT: &str = " Use report_progress to keep the user informed while working. Plan multi-step work with todo, passing the whole list each time as {\"items\": [...]}, and keep the list current; it appears as subtasks in the note, mirrored by Scratch, so do not write those subtasks yourself.";
 
@@ -300,6 +305,14 @@ impl Agent {
     /// with `tasks::finish`: the final text, or the run's error. A run still
     /// going after [`RUN_LIMIT`] is cancelled and the task fails.
     pub fn run_task(&self, vault: &Vault, task_id: &str) -> Result<TaskRun> {
+        // Transcripts and logs of old runs expire after 30 days; the task
+        // rows, outcomes and attempt summaries stay.
+        if !self.sessions_expired.swap(true, Ordering::SeqCst) {
+            let keep = 30 * 24 * 60 * 60 * 1000;
+            if let Err(e) = self.expire_task_sessions(keep) {
+                eprintln!("could not expire old task sessions: {e}");
+            }
+        }
         self.run_task_with_limit(vault, task_id, RUN_LIMIT)
     }
 
@@ -466,6 +479,9 @@ impl Agent {
                         if ticks % STEER_EVERY == 0 {
                             self.deliver_steering(vault, task_id, session, &mirror.run_id, &harness);
                         }
+                        if ticks % BEAT_EVERY == 0 {
+                            let _ = tasks::heartbeat(vault, task_id);
+                        }
                     }
                     event = events.recv(), if events_open => {
                         note_steering_accepted(vault, task_id, session, &event);
@@ -535,11 +551,16 @@ impl Agent {
             let mut events_open = true;
             let mut watch = tokio::time::interval(WATCH_EVERY * STEER_EVERY);
             watch.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            let mut beats = 0u32;
             let outcome = loop {
                 tokio::select! {
                     outcome = wait.as_mut() => break outcome,
                     _ = watch.tick() => {
                         self.deliver_steering(&self.vault, task_id, session, &mirror.run_id, &harness);
+                        beats = beats.wrapping_add(1);
+                        if beats % (BEAT_EVERY / STEER_EVERY) == 0 {
+                            let _ = tasks::heartbeat(&self.vault, task_id);
+                        }
                     }
                     event = events.recv(), if events_open => {
                         note_steering_accepted(&self.vault, task_id, session, &event);
