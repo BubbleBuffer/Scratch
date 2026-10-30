@@ -35,6 +35,7 @@ use vault_core::{
 use crate::{err, Result};
 
 pub mod attempts;
+pub mod board;
 mod subtasks;
 
 #[cfg(test)]
@@ -742,6 +743,9 @@ pub fn accept(v: &Vault, id: &str) -> Result<bool> {
         return Ok(false);
     }
     set_status(v, &t, DONE)?;
+    if let Some(card) = &t.page {
+        let _ = board::move_card(v, card, board::Target::Last);
+    }
     Ok(true)
 }
 
@@ -1125,7 +1129,11 @@ pub fn finish_attempt(
             if text(&row.properties, REVIEW_POLICY).is_empty() {
                 set_status(v, &t, DONE)
             } else {
-                set_status(v, &t, REVIEW)
+                set_status(v, &t, REVIEW)?;
+                if let Some(card) = &t.page {
+                    let _ = board::move_card(v, card, board::Target::Review);
+                }
+                Ok(())
             }
         }
         Err(msg) => {

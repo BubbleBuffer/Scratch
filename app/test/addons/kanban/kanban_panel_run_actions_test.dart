@@ -1,7 +1,6 @@
-// The panel's actions on a run: Accept on a result waiting for review moves
-// the card to the board's last column, Mark failed on a stalled run, Add step
-// on a running one, and a run that reaches review moves its card to a column
-// named Review.
+// The panel's actions on a run: Accept on a result waiting for review, Mark
+// failed on a stalled run, Add step on a running one. The card moves between
+// columns in the task layer (crates/mcp), not here.
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -68,7 +67,7 @@ Future<_Backend> _open(
 void main() {
   setUpAll(initCore);
 
-  appTest('Accept in the panel accepts the run and moves the card to the last column', (
+  appTest('Accept in the panel accepts the run', (
     tester,
   ) async {
     final backend = await _open(
@@ -79,8 +78,6 @@ void main() {
     await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
     await tapAndSettle(tester, find.byKey(const ValueKey('kanban-panel-accept')));
     expect(backend.calls, ['accept']);
-    expect(cardIn('Done', 'Garden plan'), findsOneWidget);
-    expect(cardIn('To do', 'Garden plan'), findsNothing);
   });
 
   appTest('Mark failed shows on a stalled run, Add step on a running one', (
@@ -106,20 +103,5 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await settle(tester);
     expect(backend.calls, ['failed', 'step:Check the logs']);
-  });
-
-  appTest('a run that reaches review moves its card to the Review column', (
-    tester,
-  ) async {
-    final backend = await _open(
-      tester,
-      AssignState.running,
-      (g) => {'To do': [g], 'Review': [], 'Done': []},
-    );
-    backend.set(AssignState.running);
-    await settle(tester);
-    backend.set(AssignState.review);
-    await settle(tester);
-    expect(cardIn('Review', 'Garden plan'), findsOneWidget);
   });
 }

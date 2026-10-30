@@ -390,3 +390,61 @@ fn an_old_ended_task_loses_its_session_but_keeps_its_row() {
     assert_eq!(tasks::get(&v, &id).unwrap().status, "done");
     assert!(!attempts::list(&v, &id).unwrap().is_empty());
 }
+
+fn board(v: &Vault, title: &str, columns: &[(&str, &str)], card: &str, in_col: &str) -> PageId {
+    let b = v.create_page(None, title.into()).unwrap();
+    v.set_page_type(b.clone(), "kanban".into()).unwrap();
+    let cols: Vec<_> = columns
+        .iter()
+        .map(|(id, t)| serde_json::json!({"id": id, "title": t}))
+        .collect();
+    v.type_data_set(b.clone(), "kanban".into(), vec!["columns".into()], serde_json::Value::Array(cols).to_string())
+        .unwrap();
+    for (id, _) in columns {
+        let list = if *id == in_col { serde_json::json!([card]) } else { serde_json::json!([]) };
+        v.type_data_set(b.clone(), "kanban".into(), vec!["cards".into(), (*id).into()], list.to_string())
+            .unwrap();
+    }
+    b
+}
+
+fn column_of(v: &Vault, b: &str, card: &str) -> String {
+    let d: serde_json::Value =
+        serde_json::from_str(&v.type_data(b.to_string(), "kanban".into()).unwrap()).unwrap();
+    d["cards"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .find(|(_, l)| l.as_array().unwrap().iter().any(|x| x == card))
+        .map(|(k, _)| k.clone())
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_reviewed_run_moves_its_card_to_review_and_accept_to_the_last_column() {
+    let t = Temp::new();
+    let v = t.open();
+    let card = v.create_page(None, "Card".into()).unwrap();
+    let with = board(
+        &v,
+        "With review",
+        &[("a", "To do"), ("b", "review "), ("c", "Done")],
+        &card,
+        "a",
+    );
+    let without = board(&v, "No review", &[("x", "Todo"), ("y", "Done")], &card, "x");
+    let t1 = tasks::create(&v, "Plan it", &card, None, "agent").unwrap();
+    tasks::set_review(&v, &t1.id).unwrap();
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    tasks::finish(&v, &t1.id, Ok("The plan".into())).unwrap();
+    assert_eq!(column_of(&v, &with, &card), "b");
+    assert_eq!(column_of(&v, &without, &card), "x", "no Review column: left alone");
+
+    // Moving again changes nothing.
+    assert_eq!(tasks::board::move_card(&v, &card, tasks::board::Target::Review).unwrap(), 0);
+
+    assert!(tasks::accept(&v, &t1.id).unwrap());
+    assert_eq!(column_of(&v, &with, &card), "c");
+    assert_eq!(column_of(&v, &without, &card), "y");
+    assert_eq!(tasks::board::move_card(&v, &card, tasks::board::Target::Last).unwrap(), 0);
+}
