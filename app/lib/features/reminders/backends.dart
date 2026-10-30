@@ -15,6 +15,16 @@ abstract class ReminderBackend {
   Future<void> apply(List<PlannedReminder> plan);
   Future<void> cancelAll();
   Stream<String> get taps;
+
+  /// Shows a notification now (agent run notices). Phones only: the desktop
+  /// backend shows none.
+  Future<void> showNow({
+    required int id,
+    required String title,
+    required String body,
+    required String payload,
+  }) async {}
+
   Future<void> dispose() async {}
 }
 
@@ -75,6 +85,13 @@ class AndroidReminderBackend extends ReminderBackend {
         'reminders',
         'Reminders',
         importance: Importance.high,
+      ),
+    );
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'agent-runs',
+        'Agent runs',
+        importance: Importance.defaultImportance,
       ),
     );
     await android?.createNotificationChannel(
@@ -142,6 +159,27 @@ class AndroidReminderBackend extends ReminderBackend {
     _scheduled.clear();
     _pendingIds.clear();
   }
+
+  @override
+  Future<void> showNow({
+    required int id,
+    required String title,
+    required String body,
+    required String payload,
+  }) => _plugin.show(
+    id: id,
+    title: title,
+    body: body,
+    notificationDetails: const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'agent-runs',
+        'Agent runs',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      ),
+    ),
+    payload: payload,
+  );
 
   @override
   Future<void> dispose() => _taps.close();

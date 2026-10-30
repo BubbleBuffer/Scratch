@@ -65,6 +65,10 @@ abstract interface class AiTaskSource implements Listenable {
   bool get hubUsable;
   AiRunnerBridge get runnerBridge;
   Future<void> refresh();
+
+  /// Called when the user delegates a task to a runner from this device (the
+  /// run notices ask for the notification permission then).
+  void Function()? onDelegated;
 }
 
 /// Starts and stops the agent's runs for add-ons (a task assigned to the
@@ -134,6 +138,9 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   String? mcpError;
   bool _started = false, _disposed = false, _pumping = false;
   Timer? _debounce;
+
+  @override
+  void Function()? onDelegated;
 
   /// The newest tasks first (loaded by [refresh]).
   @override

@@ -127,7 +127,13 @@ class _NotesAppState extends State<NotesApp> {
         return;
       }
       setState(() => _app = app);
-      unawaited(startSyncAtBoot(app.sync, _settings));
+      unawaited(
+        startSyncAtBoot(app.sync, _settings).whenComplete(
+          () => app.runNotices.start().catchError((Object e) {
+            AppLog.info('run notices failed to start: $e');
+          }),
+        ),
+      );
       if (syncing && !seedDemo && !seedBench) {
         unawaited(seedStarterPagesAfterPull(vault, app.sync.firstSyncOk(), createTasks: seedTaskRows == 0).catchError((Object e) {
           AppLog.info('starter pages after pull failed: $e');

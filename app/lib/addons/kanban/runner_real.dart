@@ -107,6 +107,7 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
         projectId: projectId,
       );
       await source.refresh();
+      source.onDelegated?.call();
       return _fromTask(taskId, task) ??
           RunnerAssignment(
             taskId: taskId,

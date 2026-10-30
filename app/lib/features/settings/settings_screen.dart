@@ -6,6 +6,7 @@
 // Devices (desktop: devices paired with the hub), Conflicts, AI, Vault
 // (location; desktop: mounted folders), Updates (Windows) and About.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -413,6 +414,22 @@ class PreferencesBody extends StatelessWidget {
             onChanged: (on) => s.update((s) => s.shakeToSend = on),
           ),
         ),
+      if (defaultTargetPlatform == TargetPlatform.android) ...[
+        const SettingsHeading('Agent runs', top: 24),
+        SettingsRow(
+          label: 'Notify when a run finishes or fails',
+          description:
+              'A notice when a task you delegated finishes or fails. It appears when the app syncs the change.',
+          trailing: Toggle(
+            key: const ValueKey('run-notices'),
+            value: s.runNotices,
+            onChanged: (on) {
+              s.update((s) => s.runNotices = on);
+              if (on) unawaited(context.app.runNotices.enable());
+            },
+          ),
+        ),
+      ],
     ]);
   }
 }
