@@ -30,9 +30,9 @@ chrono = "0.4"
 # Bundle tzdb on every target, including Android (platform defaults use its system db).
 jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
-similar = "2"
+similar = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
-toml = "0.8"
+toml = "1.1"
 
 [dev-dependencies]
 tempfile = "3"

@@ -20,6 +20,6 @@ vault_tools = { path = "../tools" }
 # server binds 127.0.0.1; remote access goes through a tunnel that adds TLS).
 tiny_http = { version = "0.12", default-features = false }
 ureq = { version = "3", default-features = false }
-getrandom = "0.3"
+getrandom = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

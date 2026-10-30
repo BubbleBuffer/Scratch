@@ -26,12 +26,12 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 anyhow = "1"
-toml = "0.8"
+toml = "1.1"
 serde_yaml = "0.9"
 # Pinned: attach_file uses ureq's unversioned resolver API (no semver guarantee).
-ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
+ureq = { version = "=3.5.0", default-features = false, features = ["rustls"] }
 url = "2"
-base64 = "0.22"
+base64 = "0.23"
 tar = "0.4"
 tempfile = "3"
 # BubblePaw's core crate at tag v0.3.1 (the same tag as crates/agent); the

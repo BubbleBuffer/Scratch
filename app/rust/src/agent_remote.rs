@@ -1122,11 +1122,15 @@ mod tests {
     // ---- TLS trust of the hub sockets (agent and host relay) ----
 
     /// A leaf for `host` issued by `ca` (with its key), served with `ca`.
-    fn served(host: &str, ca: &rcgen::Certificate, ca_key: &rcgen::KeyPair) -> (Vec<Vec<u8>>, Vec<u8>) {
+    fn served(
+        host: &str,
+        ca: &rcgen::Certificate,
+        issuer: &rcgen::Issuer<'_, rcgen::KeyPair>,
+    ) -> (Vec<Vec<u8>>, Vec<u8>) {
         let key = rcgen::KeyPair::generate().unwrap();
         let leaf = rcgen::CertificateParams::new(vec![host.to_string()])
             .unwrap()
-            .signed_by(&key, ca, ca_key)
+            .signed_by(&key, issuer)
             .unwrap();
         (vec![leaf.der().to_vec(), ca.der().to_vec()], key.serialize_der())
     }
@@ -1190,10 +1194,12 @@ mod tests {
         let ca_key = rcgen::KeyPair::generate().unwrap();
         let mut ca = rcgen::CertificateParams::new(Vec::<String>::new()).unwrap();
         ca.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
-        let ca = ca.self_signed(&ca_key).unwrap();
-        let first = served("notes.example.test", &ca, &ca_key);
-        let reminted = served("notes.example.test", &ca, &ca_key);
-        let other = served("other.example.test", &ca, &ca_key);
+        let ca_cert = ca.self_signed(&ca_key).unwrap();
+        let issuer = rcgen::Issuer::new(ca, ca_key);
+        let ca = ca_cert;
+        let first = served("notes.example.test", &ca, &issuer);
+        let reminted = served("notes.example.test", &ca, &issuer);
+        let other = served("other.example.test", &ca, &issuer);
 
         // Untrusted: the public roots only, as before.
         let none = Trust::for_hub("https://notes.example.test", &[]);
