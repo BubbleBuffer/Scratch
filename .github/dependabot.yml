@@ -1,0 +1,52 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      github_actions:
+        patterns:
+          - "*"
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      cargo:
+        patterns:
+          - "*"
+  - package-ecosystem: pub
+    directory: "/app"
+    schedule:
+      interval: monthly
+    groups:
+      pub:
+        patterns:
+          - "*"
+  - package-ecosystem: gradle
+    directories:
+      - "/app/android"
+      - "/prototypes/tauri/src-tauri/gen/android"
+    schedule:
+      interval: monthly
+    groups:
+      gradle:
+        patterns:
+          - "*"
+  - package-ecosystem: npm
+    directory: "/prototypes/tauri"
+    schedule:
+      interval: monthly
+    groups:
+      npm:
+        patterns:
+          - "*"
+  - package-ecosystem: docker
+    directory: "/deploy/hub"
+    schedule:
+      interval: monthly
+    groups:
+      docker:
+        patterns:
+          - "*"

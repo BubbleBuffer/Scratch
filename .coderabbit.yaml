@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+reviews:
+  profile: assertive
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!**/Cargo.lock"
+    - "!**/pubspec.lock"
+    - "!**/package-lock.json"
+    - "!app/lib/src/rust/**"
+    - "!app/rust/src/frb_generated.rs"
+    - "!app/linux/flutter/generated_plugin*"
+    - "!app/windows/flutter/generated_plugin*"
+    - "!prototypes/tauri/src-tauri/gen/**"
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "wiki/**/*.md"
+      - "docs/**/*.md"
