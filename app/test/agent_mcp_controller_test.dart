@@ -217,33 +217,14 @@ void main() {
       expect(computerModelValue(['a', 'b'], null), 'a');
     });
 
-    test('tool set help per runner', () {
-      const hubNote =
-          ' Jobs use it at once; hub chats after the hub restarts '
-          '(an update or reboot).';
-      expect(
-        toolSetHelp('read', AgentHost.local),
-        'Reads the vault and changes nothing.',
-      );
-      expect(
-        toolSetHelp('write', AgentHost.hub),
-        'Reads and edits the vault.$hubNote',
-      );
-      expect(
-        toolSetHelp('everything', AgentHost.local),
-        'The vault, plus files, commands and MCP servers here.',
-      );
-      expect(
-        toolSetHelp('everything', AgentHost.hub),
-        'Every tool the hub has.$hubNote',
-      );
+    test('runner help', () {
       expect(
         runnerHelp(AgentHost.hub),
-        'Your hub runs the AI; works from every device.',
+        'Works the same from every device, including your phone. Uses the models signed in on the hub.',
       );
       expect(
         runnerHelp(AgentHost.local),
-        'This computer runs the AI with its own models and tools.',
+        'Uses this computer’s models, and can work in its folders and programs.',
       );
     });
   });

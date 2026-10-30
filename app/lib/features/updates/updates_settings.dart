@@ -8,7 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
-import '../settings/controls.dart';
+import '../settings/settings_kit.dart';
 import 'update_controller.dart';
 
 /// Whether the Updates section and indicator exist on this device.
@@ -55,7 +55,11 @@ Future<void> _openNotes(String url) async {
 }
 
 class UpdatesBody extends StatelessWidget {
-  const UpdatesBody({super.key});
+  const UpdatesBody({super.key, this.embedded = false});
+
+  /// Shown on the About page under the version: a section heading, and the
+  /// version row names the installed build.
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -69,70 +73,74 @@ class UpdatesBody extends StatelessWidget {
 
   Widget _body(BuildContext context, UpdateController u) {
     final s = u.settings;
-    final c = context.colors;
-    final caption = tsRaw(13, 18, 400, c.textSecondary);
     final r = u.release;
     Widget? action;
     if (u.phase == UpdatePhase.available) {
-      action = TextBtn('Download', key: const ValueKey('updates-download'), onTap: u.download);
+      action = SButton('Download', key: const ValueKey('updates-download'), kind: SButtonKind.primary, onTap: u.download);
     } else if (u.phase == UpdatePhase.ready) {
-      action = TextBtn('Restart to update', key: const ValueKey('updates-install'), onTap: u.install);
+      action = SButton('Restart to update', key: const ValueKey('updates-install'), kind: SButtonKind.primary, onTap: u.install);
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Updates', primary: true),
-      SettingsRow(
-        label: 'Version',
-        description: u.enabled ? '$appName ${_version(u.currentTag)} · ${_channel(u.currentTag)}' : '$appName · Development build',
-      ),
-      SettingsRow(
-        label: 'Include nightly builds',
-        description: 'Daily builds of the latest changes. Less tested than releases.',
-        trailing: Toggle(
-          key: const ValueKey('updates-nightly'),
-          value: s.updatesIncludeNightly,
-          onChanged: u.enabled
-              ? (on) {
-                  s.update((s) => s.updatesIncludeNightly = on);
-                  u.check();
-                }
-              : null,
+    return SSection(
+      title: 'Updates',
+      children: [
+        SRow(
+          label: embedded ? 'Installed build' : 'Version',
+          desc: u.enabled ? '$appName ${_version(u.currentTag)} · ${_channel(u.currentTag)}' : '$appName · Development build',
         ),
-      ),
-      SettingsRow(
-        label: 'Download updates automatically',
-        description: 'Updates download in the background. They install only when you choose.',
-        trailing: Toggle(
-          key: const ValueKey('updates-auto-download'),
-          value: s.updatesAutoDownload,
-          onChanged: u.enabled ? (on) => s.update((s) => s.updatesAutoDownload = on) : null,
+        SRow(
+          label: 'Include nightly builds',
+          desc: 'Daily builds of the latest changes. Less tested than releases.',
+          scope: 'Windows',
+          control: SSwitch(
+            key: const ValueKey('updates-nightly'),
+            label: 'Include nightly builds',
+            value: s.updatesIncludeNightly,
+            onChanged: u.enabled
+                ? (on) {
+                    s.update((s) => s.updatesIncludeNightly = on);
+                    u.check();
+                  }
+                : null,
+          ),
         ),
-      ),
-      SettingsRow(
-        label: 'Status',
-        description: updateStatusText(u),
-        trailing: TextBtn(
-          'Check now',
-          key: const ValueKey('updates-check-now'),
-          onTap: u.enabled && !u.busy ? u.check : null,
+        SRow(
+          label: 'Download updates automatically',
+          desc: 'Updates download in the background. They install only when you choose.',
+          control: SSwitch(
+            key: const ValueKey('updates-auto-download'),
+            label: 'Download updates automatically',
+            value: s.updatesAutoDownload,
+            onChanged: u.enabled ? (on) => s.update((s) => s.updatesAutoDownload = on) : null,
+          ),
         ),
-      ),
-      if (r != null && action != null)
-        SettingsRow(
-          label: '${r.nightly ? 'Nightly' : 'Version'} ${_version(r.tag)}',
-          description: 'Published ${r.publishedAt.length >= 10 ? r.publishedAt.substring(0, 10) : r.publishedAt}.',
-          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (r.notesUrl.isNotEmpty)
-              TextBtn('Release notes', key: const ValueKey('updates-notes'), color: c.textSecondary, onTap: () => _openNotes(r.notesUrl)),
-            const SizedBox(width: 8),
-            action,
-          ]),
+        SRow(
+          label: 'Status',
+          desc: updateStatusText(u),
+          control: SButton(
+            'Check now',
+            key: const ValueKey('updates-check-now'),
+            onTap: u.enabled && !u.busy ? u.check : null,
+          ),
         ),
-      if (u.problem != null && u.phase != UpdatePhase.development)
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(u.problem!, key: const ValueKey('updates-problem'), style: caption),
-        ),
-    ]);
+        if (r != null && action != null)
+          SRow(
+            label: '${r.nightly ? 'Nightly' : 'Version'} ${_version(r.tag)}',
+            desc: 'Published ${r.publishedAt.length >= 10 ? r.publishedAt.substring(0, 10) : r.publishedAt}.',
+            control: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (r.notesUrl.isNotEmpty) ...[
+                SButton('Release notes', key: const ValueKey('updates-notes'), kind: SButtonKind.quiet, onTap: () => _openNotes(r.notesUrl)),
+                const SizedBox(width: 8),
+              ],
+              action,
+            ]),
+          ),
+        if (u.problem != null && u.phase != UpdatePhase.development)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(u.problem!, key: const ValueKey('updates-problem'), style: sHint(context)),
+          ),
+      ],
+    );
   }
 }
 

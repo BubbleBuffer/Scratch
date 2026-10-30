@@ -60,7 +60,7 @@ flag anywhere), so `claude-code\` and `bun\` go with the rest.
 The app finds the bundle without a setting: `crates/agent/src/claude.rs` looks
 for the extension as `claude-code` and Bun as `bun\bun.exe` in the running
 executable's folder, after every explicit choice (an override, then
-`NOTES_CLAUDE_CODE_DIR`, then the app's saved paths in Settings > AI > Agent)
+`NOTES_CLAUDE_CODE_DIR`, then the app's saved paths in Settings > Agent > Advanced)
 and before the extension location compiled into the binary. `scratch-cli`
 lives outside the app folder, so it also looks in the installed app folder,
 `%LOCALAPPDATA%\Programs\Scratch`. The lookup order is in
@@ -70,7 +70,7 @@ lives outside the app folder, so it also looks in the installed app folder,
 
 Added 2026-10-26. Windows only. The code is [app/rust/src/updater.rs](../../app/rust/src/updater.rs) (the work), [app/rust/src/api/update.rs](../../app/rust/src/api/update.rs) (the bridge) and [app/lib/features/updates/](../../app/lib/features/updates) (schedule, state and UI).
 
-**Build identity.** Release and nightly builds are built with `--dart-define=SCRATCH_RELEASE_TAG=<tag>` ([scripts/build-windows-installer.sh](../../scripts/build-windows-installer.sh)). A build without it (`windows-build` artifacts, local builds) is a development build: Settings > Updates says so and nothing is checked. For testing, the environment variable `SCRATCH_UPDATE_TAG=<tag>` makes any build behave as that tag.
+**Build identity.** Release and nightly builds are built with `--dart-define=SCRATCH_RELEASE_TAG=<tag>` ([scripts/build-windows-installer.sh](../../scripts/build-windows-installer.sh)). A build without it (`windows-build` artifacts, local builds) is a development build: Settings > About (Updates section) says so and nothing is checked. For testing, the environment variable `SCRATCH_UPDATE_TAG=<tag>` makes any build behave as that tag.
 
 **Checking.**
 
@@ -95,7 +95,7 @@ Added 2026-10-26. Windows only. The code is [app/rust/src/updater.rs](../../app/
 - "Download updates automatically" (on by default) downloads in the background. Off, Settings shows a Download button. Nothing installs by itself.
 - Assets are fetched only from `https://github.com/BubbleBuffer/Scratch/releases/download/`, and file names must be plain `Scratch-Setup-*.exe` names.
 
-**Installing.** Only on a click on "Restart to update", in Settings > Updates or in the panel behind the sidebar's "Update ready" row:
+**Installing.** Only on a click on "Restart to update", in Settings > About, Updates section, or in the panel behind the sidebar's "Update ready" row:
 
 1. Rust checks the file's SHA-256 again, then calls `verify_publisher`.
 2. It starts the installer with `ShellExecuteW` ("open", `/SILENT`, normal window). Inno Setup shows its progress window without wizard pages.

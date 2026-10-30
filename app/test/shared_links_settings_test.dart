@@ -224,7 +224,7 @@ void main() {
     expect(visible, contains(SettingsSection.sharedLinks));
     expect(
       visible.indexOf(SettingsSection.sharedLinks),
-      visible.indexOf(SettingsSection.sync) + 1,
+      visible.indexOf(SettingsSection.storage) + 1,
     );
 
     SharePopup.debugClientFor = (_) => null;

@@ -24,7 +24,7 @@ Built 2026-10-16 on `lane/feedback`.
 
 ## Feedback over MCP
 
-Agents can submit reports through the hub's HTTP `/mcp`, desktop HTTP endpoint and `notes-mcp` stdio. The in-app agent files them with the same `feedback_submit` tool (transport `in-app agent`). `feedback_list` is MCP only. Use these tools when a vault tool fails unexpectedly, the user complains about Scratch, sync or the vault, or the user asks to report something. File each issue only once per session; use the list to check recent reports.
+Agents can submit reports through the hub's HTTP `/mcp` and `notes-mcp` stdio (the desktop HTTP endpoint was removed on 2026-10-23). The in-app agent files them with the same `feedback_submit` tool (transport `in-app agent`). `feedback_list` is MCP only. Use these tools when a vault tool fails unexpectedly, the user complains about Scratch, sync or the vault, or the user asks to report something. File each issue only once per session; use the list to check recent reports.
 
 | Tool | Inputs | Result |
 |---|---|---|

@@ -54,7 +54,8 @@ impl Fixture {
                 // Sends to a loaded replay are routed to the replay model; this
                 // default would fail rather than reach a real model.
                 default_model: "replay/replay".into(),
-                bun_path: Some(self.data_dir().join("missing-test-bun")),
+                // A missing extension folder disables Claude Code deterministically.
+                claude_code_dir: Some(self.data_dir().join("missing-test-claude-code")),
                 ..AgentConfig::default()
             },
         )

@@ -6,6 +6,9 @@ use std::path::{Path, PathBuf};
 pub struct ClaudeDetection {
     pub bun_path: Option<PathBuf>,
     pub claude_code_dir: Option<PathBuf>,
+    /// The `bun` override that is not a file. It is ignored, and `bun_path` is
+    /// found without it.
+    pub ignored_bun_override: Option<PathBuf>,
 }
 
 pub fn detect(bun: Option<&Path>, extension: Option<&Path>) -> ClaudeDetection {
@@ -112,19 +115,24 @@ fn detect_with(
     bundles: &[PathBuf],
 ) -> ClaudeDetection {
     let bun_name = if cfg!(windows) { "bun.exe" } else { "bun" };
-    let bun_path = match bun {
-        // An explicit override is authoritative, including when invalid.
-        Some(path) => path.is_file().then(|| path.to_owned()),
-        None => search_path
-            .into_iter()
-            .flat_map(std::env::split_paths)
-            .map(|dir| dir.join(bun_name))
-            .find(|path| path.is_file())
-            .or_else(|| {
-                home.map(|h| h.join(".bun/bin").join(bun_name))
-                    .filter(|path| path.is_file())
-            })
-            .or_else(|| bundled(bundles, &["bun", bun_name], Path::is_file)),
+    // A valid override wins. An invalid one is ignored and reported, so detection
+    // falls back to PATH, ~/.bun/bin and the bundle rather than hiding Claude
+    // Code.
+    let (bun_path, ignored_bun_override) = match bun {
+        Some(path) if path.is_file() => (Some(path.to_owned()), None),
+        ignored => (
+            search_path
+                .into_iter()
+                .flat_map(std::env::split_paths)
+                .map(|dir| dir.join(bun_name))
+                .find(|path| path.is_file())
+                .or_else(|| {
+                    home.map(|h| h.join(".bun/bin").join(bun_name))
+                        .filter(|path| path.is_file())
+                })
+                .or_else(|| bundled(bundles, &["bun", bun_name], Path::is_file)),
+            ignored.map(Path::to_owned),
+        ),
     };
     let dir = extension
         .or(env_extension)
@@ -134,6 +142,7 @@ fn detect_with(
     ClaudeDetection {
         bun_path,
         claude_code_dir: dir.is_dir().then(|| dir.to_owned()),
+        ignored_bun_override,
     }
 }
 
@@ -228,20 +237,52 @@ mod tests {
         let detected = run(Some(&override_bun), Some(&explicit), Some(&env_dir));
         assert_eq!(detected.bun_path, Some(override_bun.clone()));
         assert_eq!(detected.claude_code_dir, Some(explicit.clone()));
+        let missing = root.join("missing");
         let detected = run(None, None, Some(&env_dir));
         assert_eq!(detected.bun_path, Some(path_bun.clone()));
         assert_eq!(detected.claude_code_dir, Some(env_dir.clone()));
+        // The invalid override is ignored and reported. PATH wins over ~/.bun/bin
+        // even though both exist.
+        let detected = run(Some(&missing), None, None);
+        assert_eq!(detected.bun_path, Some(path_bun.clone()));
+        assert_eq!(detected.ignored_bun_override, Some(missing.clone()));
         std::fs::remove_file(path_bun).unwrap();
         let detected = run(None, None, None);
-        assert_eq!(detected.bun_path, Some(home_bun));
+        assert_eq!(detected.bun_path, Some(home_bun.clone()));
         assert_eq!(detected.claude_code_dir, Some(default.clone()));
+        // With PATH empty of bun, the invalid override falls back to ~/.bun/bin.
+        let detected = run(Some(&missing), None, None);
+        assert_eq!(detected.bun_path, Some(home_bun));
+        assert_eq!(detected.ignored_bun_override, Some(missing.clone()));
+        assert!(run(None, Some(&missing), None).claude_code_dir.is_none());
+    }
+
+    #[test]
+    fn invalid_bun_override_is_reported_even_when_nothing_is_found() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let empty = root.join("empty");
+        std::fs::create_dir(&empty).unwrap();
         let missing = root.join("missing");
-        assert!(run(Some(&missing), None, None)
-            .bun_path
-            .is_none());
-        assert!(run(None, Some(&missing), None)
-            .claude_code_dir
-            .is_none());
+        let valid = root.join("valid-bun");
+        std::fs::write(&valid, "fake").unwrap();
+
+        let detected = detect_with(Some(&missing), None, None, Some(&empty), None, &empty, &[]);
+        assert_eq!(detected.bun_path, None);
+        assert_eq!(detected.ignored_bun_override, Some(missing));
+
+        // A folder is not an executable, so it is ignored like a missing file.
+        let detected = detect_with(Some(&empty), None, None, Some(&empty), None, &empty, &[]);
+        assert_eq!(detected.bun_path, None);
+        assert_eq!(detected.ignored_bun_override, Some(empty.clone()));
+
+        let detected = detect_with(Some(&valid), None, None, Some(&empty), None, &empty, &[]);
+        assert_eq!(detected.bun_path, Some(valid));
+        assert_eq!(detected.ignored_bun_override, None);
+
+        let detected = detect_with(None, None, None, Some(&empty), None, &empty, &[]);
+        assert_eq!(detected.bun_path, None);
+        assert_eq!(detected.ignored_bun_override, None);
     }
 
     /// A folder laid out as the Windows app folder is, with the bundled

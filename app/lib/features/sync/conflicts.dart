@@ -33,7 +33,7 @@ import '../../state/pages_store.dart' show firstLineOfTexts;
 import '../../state/sync_store.dart';
 import '../../ui/toast.dart';
 import '../../ui/ui.dart';
-import '../settings/controls.dart';
+import '../settings/settings_kit.dart';
 import 'conflict_copy.dart';
 import 'conflict_toast.dart';
 
@@ -483,12 +483,15 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
     final pages = sync.conflictPages;
     if (pages.isEmpty) {
       if (widget.look != ConflictRowsLook.list) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(conflictsNone, key: const ValueKey('no-conflicts'), style: tsRaw(14, 20, 400, c.textTertiary)),
+      return const SEmpty(
+        key: ValueKey('no-conflicts'),
+        icon: Sx.circleCheck,
+        title: conflictsNoneTitle,
+        text: conflictsNone,
       );
     }
     final rows = [for (final p in pages) _row(context, sync, p, sync.conflictsOf(p).first)];
+    if (widget.look == ConflictRowsLook.list) return SList(children: rows);
     if (widget.look != ConflictRowsLook.card) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
     }
@@ -510,7 +513,6 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
 
   Widget _row(BuildContext context, SyncStore sync, String p, Conflict first) {
     final c = context.colors;
-    final m = context.mobile;
     final title = titleOf(p);
     final summary = _summary(sync, first);
     final when = relativeTime(first.timeMs.toInt());
@@ -520,23 +522,18 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
         return Hover(
           key: ValueKey('conflict-page-$p'),
           onTap: open,
-          radius: Radii.md,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(children: [
-            PageIcon(size: m ? 22 : 20, color: c.iconSecondary),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(title,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(m ? 16 : 14, 20, 500, c.textPrimary)),
-                Text(summary, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(13, 18, 400, c.textTertiary)),
-              ]),
-            ),
-            const SizedBox(width: 8),
-            Text(when, style: tsRaw(13, 18, 400, c.textTertiary)),
-            const SizedBox(width: 6),
-            Icon20(Ico.chevronRight, size: 16, color: c.iconTertiary),
-          ]),
+          radius: 0,
+          lift: 0,
+          child: SItem(
+            icon: Sx.fileText,
+            name: title,
+            sub: summary,
+            trailing: [
+              Text(when, style: sHint(context)),
+              const SizedBox(width: 8),
+              SButton('Review', onTap: open),
+            ],
+          ),
         );
       case ConflictRowsLook.card:
         return Hover(
@@ -705,34 +702,41 @@ class ConflictLog extends StatefulWidget {
 class _ConflictLogState extends State<ConflictLog> with _PageTitles {
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     final sync = context.watch<SyncStore>();
     final log = [...sync.conflictLog]..sort((a, b) => _logTime(b).compareTo(_logTime(a)));
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SettingsHeading(conflictsRecentTitle, key: const ValueKey('conflict-log')),
-      if (log.isEmpty)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(conflictsRecentNone, key: const ValueKey('no-conflict-log'), style: tsRaw(14, 20, 400, c.textTertiary)),
-        ),
-      for (final k in log)
-        Hover(
-          key: ValueKey('conflict-log-${k.page}-${k.id}'),
-          onTap: () => showConflicts(context, k.page, title: titleOf(k.page)),
-          radius: Radii.md,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: SettingsRow(
-            label: titleOf(k.page),
-            description: conflictLogDetail(conflictLogWhat(k), relativeTime(_logTime(k))),
-            trailing: k.undoable && k.status == ConflictStatus.resolved
-                ? TextBtn(conflictUndo,
+    if (log.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Text(conflictsRecentNone, key: const ValueKey('no-conflict-log'), style: sDesc(context)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: SList(children: [
+        for (final k in log)
+          Hover(
+            key: ValueKey('conflict-log-${k.page}-${k.id}'),
+            onTap: () => showConflicts(context, k.page, title: titleOf(k.page)),
+            radius: 0,
+            lift: 0,
+            child: SItem(
+              icon: Sx.history,
+              name: titleOf(k.page),
+              sub: conflictLogDetail(conflictLogWhat(k), relativeTime(_logTime(k))),
+              trailing: [
+                if (k.undoable && k.status == ConflictStatus.resolved)
+                  SButton(
+                    conflictUndo,
                     key: ValueKey('conflict-log-undo-${k.id}'),
+                    kind: SButtonKind.quiet,
+                    icon: Sx.undo,
                     onTap: () => sync.undoConflict(k),
-                    color: c.accentText)
-                : null,
+                  ),
+              ],
+            ),
           ),
-        ),
-    ]);
+      ]),
+    );
   }
 }
 
@@ -835,27 +839,34 @@ class _ConflictsBodyState extends State<ConflictsBody> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SettingsHeading(conflictsSectionTitle, primary: true),
-      const SizedBox(height: 4),
-      const ConflictRows(),
-      const SizedBox(height: 12),
-      Container(height: 1, color: c.border),
-      const SizedBox(height: 8),
-      SettingsRow(
-        label: conflictAutoResolveName,
-        description: conflictAutoResolveDesc,
-        trailing: Toggle(
-          key: const ValueKey('conflict-auto-resolve'),
-          value: _auto ?? false,
-          onChanged: _auto == null ? null : _set,
+    return SPage(
+      title: conflictsSettingsTitle,
+      intro: conflictsIntro,
+      children: [
+        const SSection(title: 'Needs a look', first: true, children: [ConflictRows()]),
+        SSection(
+          title: 'Handling',
+          children: [
+            SRow(
+              label: conflictAutoResolveName,
+              desc: conflictAutoResolveDesc,
+              help: conflictAutoResolveHelp,
+              scope: 'All devices',
+              control: SSwitch(
+                key: const ValueKey('conflict-auto-resolve'),
+                label: conflictAutoResolveName,
+                value: _auto ?? false,
+                onChanged: _auto == null ? null : _set,
+              ),
+            ),
+          ],
         ),
-      ),
-      const SizedBox(height: 12),
-      Container(height: 1, color: c.border),
-      const SizedBox(height: 8),
-      const ConflictLog(),
-    ]);
+        const SSection(
+          key: ValueKey('conflict-log'),
+          title: conflictsRecentTitle,
+          children: [ConflictLog()],
+        ),
+      ],
+    );
   }
 }

@@ -24,6 +24,7 @@ One section per component, each with its own index. Every page is reachable from
 
 <!-- wiki:children -->
 - [Product](product/index.md): What the app does now, how it looks and feels, and the speed measurements behind it.
+  - [Settings](product/settings.md): The Settings pages, where each option lives, and how options explain and guard themselves.
 - [Core](core/index.md): The Rust core (vault_core): the data model, state, search queries, the conflict format and folder mounts.
 - [App](app/index.md): The Flutter app: app state, note types, the add-on architecture, the UI and agent kit, and feedback capture.
 - [Add-on reference](addons/index.md): The compiled-in add-ons, registrations and public APIs.

@@ -76,7 +76,7 @@ class _FakeBridge implements AiRunnerBridge {
 
 Future<void> _openAiSettings(WidgetTester t) async {
   await tapAndSettle(t, key('sidebar-settings'));
-  await tapAndSettle(t, key('settings-nav-ai'));
+  await tapAndSettle(t, key('settings-nav-agent'));
   await real(t, () => Future<void>.delayed(const Duration(milliseconds: 50)));
   await settle(t);
 }

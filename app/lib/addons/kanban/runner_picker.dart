@@ -245,7 +245,7 @@ class _RunnerPickerState extends State<_RunnerPicker> {
                     'Change default in Settings',
                     color: c.accentText,
                     onTap: () => unawaited(
-                      showSettings(context, section: SettingsSection.ai),
+                      showSettings(context, section: SettingsSection.agent),
                     ),
                   ),
                   const Spacer(),
