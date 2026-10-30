@@ -12,6 +12,7 @@ import '../../ui/board/board_source.dart';
 import '../../services/addon_services.dart' show AddonServices;
 import '../../ui/database/widgets.dart' show showPanel;
 import '../../ui/ui.dart';
+import 'card_panel.dart';
 import 'keyboard_menu.dart';
 import 'runner_backend.dart';
 import 'runner_chip.dart';
@@ -44,6 +45,11 @@ class KanbanBoard extends StatefulWidget {
 class _KanbanBoardState extends State<KanbanBoard> {
   late KanbanBoardSource _source;
 
+  /// The card whose panel is open beside the board (desktop), and the node
+  /// that had focus before, which gets it back when the panel closes.
+  BoardCard? _open;
+  FocusNode? _restoreFocus;
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +74,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
   @override
   Widget build(BuildContext context) {
     _source.colors = context.colors;
+    _source.cardOpener = widget.inline ? null : _showCard;
     final board = ListenableBuilder(
       listenable: widget.noteTypes ?? noteTypeRegistry,
       builder: (context, _) => BoardRenderer(
@@ -80,13 +87,118 @@ class _KanbanBoardState extends State<KanbanBoard> {
             _cardMenu(context, column, card, anchor, focus),
       ),
     );
+    final content = ListenableBuilder(
+      listenable: _source,
+      builder: (context, _) {
+        final open = _open;
+        if (open == null || widget.inline || context.mobile) return board;
+        final column = _columnOf(open.id);
+        if (column == null) return board;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: board),
+            _sidePanel(context, open, column),
+          ],
+        );
+      },
+    );
     // Without a scope above, the board uses the agent's runners. The
     // SEED_DEMO build uses the fake runners instead.
-    if (RunnerScope.maybeOf(context) != null) return board;
+    if (RunnerScope.maybeOf(context) != null) return content;
     final assignments = runnerSeedDemo
         ? demoRunnerAssignments
         : aiRunnerAssignments(AddonServices().aiTasks(context));
-    return RunnerScope(assignments: assignments, child: board);
+    return RunnerScope(assignments: assignments, child: content);
+  }
+
+  /// The column that holds [cardId], or null when no loaded column does.
+  BoardColumn? _columnOf(String cardId) {
+    for (final column in _source.columns) {
+      if (_source.loadedCards(column.id).any((card) => card.id == cardId)) {
+        return column;
+      }
+    }
+    return null;
+  }
+
+  /// Opening a card shows its panel: beside the board on desktop, a bottom
+  /// sheet on a phone. An embedded board has none and opens the note.
+  void _showCard(BuildContext context, BoardCard card) {
+    if (context.mobile) {
+      showSheet<void>(
+        context,
+        (sheet) => SheetSurface(
+          children: [_panel(sheet, card, sheet: true)],
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _open = card;
+      _restoreFocus = FocusManager.instance.primaryFocus;
+    });
+  }
+
+  void _closePanel() {
+    final restore = _restoreFocus;
+    setState(() {
+      _open = null;
+      _restoreFocus = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (restore != null && restore.context != null) restore.requestFocus();
+    });
+  }
+
+  Widget _sidePanel(BuildContext context, BoardCard card, BoardColumn column) {
+    final c = context.colors;
+    return Container(
+      key: const ValueKey('kanban-card-panel'),
+      width: 360,
+      decoration: BoxDecoration(
+        color: c.bgPrimary,
+        border: Border(left: BorderSide(color: c.border)),
+      ),
+      child: SingleChildScrollView(child: _panel(context, card)),
+    );
+  }
+
+  /// The panel for [card]. Closing it, or going on to the note, ends it; a
+  /// sheet pops itself.
+  Widget _panel(BuildContext context, BoardCard card, {bool sheet = false}) {
+    final meta = context.watch<PagesStore>().meta(card.id);
+    final title = displayTitle(
+      meta?.title ?? card.title,
+      firstLine: _source.firstLineOf(card.id),
+    );
+    void close() {
+      if (sheet) {
+        Navigator.of(context).pop();
+      } else {
+        _closePanel();
+      }
+    }
+
+    final runners = RunnerScope.maybeOf(context);
+    return KanbanCardPanel(
+      cardId: card.id,
+      title: title,
+      status: _columnOf(card.id)?.title ?? '',
+      firstLine: meta?.title.trim().isNotEmpty ?? false
+          ? _source.firstLineOf(card.id)
+          : '',
+      runners: runners,
+      sheet: sheet,
+      onClose: close,
+      onOpenNote: () {
+        close();
+        _source.openNote(this.context, card);
+      },
+      onAssign: (anchor) {
+        if (runners != null) _assignCard(context, anchor, card, runners);
+      },
+    );
   }
 
   /// A card draws its note through the board builder, or its card builder.

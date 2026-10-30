@@ -84,7 +84,7 @@ Columns are the kanban's own list; property-driven columns and agent automation 
 
 The card menu on desktop is reachable by keyboard: each card is one focus stop (the board's, which Enter opens), the menu button shows while the card has focus, and the context-menu key or Shift+F10 on the card opens the menu under it (the button itself is for the pointer and touch). Focus starts on the first item, Up and Down move between items, Enter runs one, and Esc closes the menu and returns focus to the card (`keyboard_menu.dart`). The Run on picker is not keyboard-driven yet. Mobile long-press remains the kit's drag gesture; the phone menu is reached by the always-visible button.
 
-Pending: an Assign to Agent button in the opened card. The design is being settled; today Assign is only in the card menu.
+**Card panel.** Clicking a card, or Enter on a focused card, opens its panel (`card_panel.dart`) instead of the note: beside the board (360 px) on desktop, a bottom sheet on a phone. An embedded board still opens the note. The panel shows the title, the Status (the column the card is in), the Runner (the chip, or "Not assigned"), an **Assign to Agent** button that opens the Run on picker (hidden once assigned), and **Open note**. Esc closes it and returns focus to the card; Open in the card menu still goes straight to the note.
 
 The readable body is not rewritten for changes from another device. A card renamed elsewhere keeps its old title in the copy until the next local board change. If the copy's write fails, the board change still stands, the copy keeps its previous text, and the error reaches the caller.
 
