@@ -38,6 +38,10 @@ use vault_tools::ToolSet;
 use crate::agent::Shared;
 use crate::AppState;
 
+/// How long a cancel waits for the runner's acknowledgement before it
+/// answers with the job still running (cancel requested).
+const CANCEL_ACK_WAIT: Duration = Duration::from_secs(3);
+
 /// The jobs API's limits. Tests shorten them.
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -264,14 +268,33 @@ impl Jobs {
                 r.cancelled = true;
                 (r.engine.clone(), r.session.clone())
             });
-            jobs::finish(&self.vault, &job.id, End::Cancelled).map_err(|e| e.0)?;
+            let queued = jobs::get(&self.vault, &job.id)
+                .map_err(|e| e.0)?
+                .is_some_and(|j| j.status == QUEUED);
+            if queued {
+                // No run to stop: nothing to wait for.
+                jobs::finish(&self.vault, &job.id, End::Cancelled).map_err(|e| e.0)?;
+            } else {
+                // A running job stays running until its run stops; `end`
+                // acknowledges. Never report stopped work that still runs.
+                jobs::request_cancel(&self.vault, &job.id).map_err(|e| e.0)?;
+            }
             target
         };
         if let Some((Some(engine), Some(session))) = target {
             engine.cancel_as(&session, job_client());
         }
         self.wake.notify_one();
-        job_json(&self.owned(actor, a)?)
+        // A run usually stops within moments: give the acknowledgement a
+        // short time before answering with the job's state.
+        let start = Instant::now();
+        loop {
+            let now = self.owned(actor, a)?;
+            if now.ended() || start.elapsed() >= CANCEL_ACK_WAIT {
+                return job_json(&now);
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
     }
 
     fn list(&self, actor: &str, a: &Value) -> Result<String, String> {
@@ -326,14 +349,16 @@ impl Jobs {
         Ok(taken)
     }
 
-    /// Ends `id` unless it was cancelled through the API or the hub is
-    /// stopping, and forgets it.
+    /// Ends `id` unless the hub is stopping, and forgets it. A job whose
+    /// cancel was asked for ends as cancelled: this is the runner's
+    /// acknowledgement.
     fn end(&self, id: &str, end: End) {
         let mut running = self.running.lock().unwrap();
         let cancelled = running.remove(id).is_some_and(|r| r.cancelled);
-        if cancelled || self.stopping.load(Ordering::SeqCst) {
+        if self.stopping.load(Ordering::SeqCst) {
             return;
         }
+        let end = if cancelled { End::Cancelled } else { end };
         if let Err(e) = jobs::finish(&self.vault, id, end) {
             tracing::warn!("job {id}: could not save its end: {}", e.0);
         }
@@ -361,6 +386,11 @@ impl Jobs {
             };
             if r.cancelled {
                 running.remove(&job.id);
+                drop(running);
+                // Cancelled before its run started: acknowledge now.
+                if let Err(e) = jobs::finish(&self.vault, &job.id, End::Cancelled) {
+                    tracing::warn!("job {}: could not save its cancel: {}", job.id, e.0);
+                }
                 return;
             }
             r.engine = Some(engine.clone());

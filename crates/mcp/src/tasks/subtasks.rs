@@ -64,6 +64,14 @@ fn parse(s: &str) -> Result<State> {
     }
 }
 
+/// The blocks the attempt owns now (its mirrored todos), from the row's
+/// tracking text. A damaged or empty tracking owns none.
+pub(super) fn owned_blocks(tracking: &str) -> Vec<String> {
+    parse(tracking)
+        .map(|s| s.items.into_iter().filter_map(|i| i.block).collect())
+        .unwrap_or_default()
+}
+
 /// The task, which must be running, its tracking, and the session its row
 /// names (empty when none).
 fn running(v: &Vault, task_id: &str) -> Result<(Task, State, String)> {
