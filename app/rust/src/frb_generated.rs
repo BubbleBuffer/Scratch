@@ -14161,6 +14161,8 @@ impl SseDecode for crate::api::ai::AiTask {
         let mut var_worktreePath = <String>::sse_decode(deserializer);
         let mut var_cancelRequested = <bool>::sse_decode(deserializer);
         let mut var_stale = <bool>::sse_decode(deserializer);
+        let mut var_stalledSinceMs = <Option<i64>>::sse_decode(deserializer);
+        let mut var_session = <String>::sse_decode(deserializer);
         return crate::api::ai::AiTask {
             id: var_id,
             prompt: var_prompt,
@@ -14180,6 +14182,8 @@ impl SseDecode for crate::api::ai::AiTask {
             worktree_path: var_worktreePath,
             cancel_requested: var_cancelRequested,
             stale: var_stale,
+            stalled_since_ms: var_stalledSinceMs,
+            session: var_session,
         };
     }
 }
@@ -19327,6 +19331,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::ai::AiTask {
             self.worktree_path.into_into_dart().into_dart(),
             self.cancel_requested.into_into_dart().into_dart(),
             self.stale.into_into_dart().into_dart(),
+            self.stalled_since_ms.into_into_dart().into_dart(),
+            self.session.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -22389,6 +22395,8 @@ impl SseEncode for crate::api::ai::AiTask {
         <String>::sse_encode(self.worktree_path, serializer);
         <bool>::sse_encode(self.cancel_requested, serializer);
         <bool>::sse_encode(self.stale, serializer);
+        <Option<i64>>::sse_encode(self.stalled_since_ms, serializer);
+        <String>::sse_encode(self.session, serializer);
     }
 }
 
