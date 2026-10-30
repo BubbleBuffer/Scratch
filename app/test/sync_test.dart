@@ -276,6 +276,7 @@ void main() {
       await tester.tap(key('disconnect-button'));
       await settleUntil(tester, () => !sync.connected && current.app.settings.clientUrl == null);
       expect(current.app.settings.clientUrl, isNull);
+      await tapAndSettle(tester, key('connect-advanced'));
       expect(key('connect-button'), findsOneWidget);
     } finally {
       await real(tester, () => tv.app.sync.disconnect());
