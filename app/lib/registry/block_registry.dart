@@ -15,9 +15,6 @@ import '../ui/ui.dart';
 import '../ui/unsupported_card.dart';
 import 'block_codecs.dart';
 
-/// Blocks reach add-ons through this registry, so its node type does too.
-export '../editor/model.dart' show Node;
-
 /// What a block's widgets can ask of the editor that shows them.
 abstract interface class BlockHost {
   void toggleChecked(Node n);

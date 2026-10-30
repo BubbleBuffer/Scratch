@@ -15,6 +15,7 @@ import 'package:flutter/widgets.dart';
 import '../../../core/models.dart';
 import '../../../core/vault.dart';
 import '../../../registry/block_codecs.dart';
+import '../../../registry/block_node.dart';
 import '../../../registry/block_registry.dart';
 import '../../../state/app_state.dart';
 import '../../../state/collection_store.dart';
