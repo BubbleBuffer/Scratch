@@ -36,8 +36,9 @@ TriageProposalDto _p(
 );
 
 class FakeTriage implements TriageBridge {
-  FakeTriage(this.items);
+  FakeTriage(this.items, {List<TriageRunDto>? runs}) : runs = runs ?? [];
   List<TriageProposalDto> items;
+  List<TriageRunDto> runs;
   final calls = <String>[];
 
   void _set(String id, String status) => items = [
@@ -83,6 +84,19 @@ class FakeTriage implements TriageBridge {
     calls.add('undo:$id');
     _set(id, 'dismissed');
     return _get(id);
+  }
+
+  @override
+  Future<List<TriageRunDto>> applied() async => runs;
+  @override
+  Future<int> undoApplied(String task) async {
+    calls.add('undo-applied:$task');
+    final n = runs.firstWhere((r) => r.task == task).actions.length;
+    runs = [
+      for (final r in runs)
+        if (r.task != task) r,
+    ];
+    return n;
   }
 
   @override
@@ -238,6 +252,50 @@ void main() {
     expect(fake.calls, ['accept:a', 'undo:a']);
     expect(_k('proposal-a'), findsNothing);
     expect(find.text('No proposals. Run Triage on a project to look for duplicates.'), findsOneWidget);
+  });
+
+  testWidgets('lists a run's links and tags and Undo takes them back', (
+    tester,
+  ) async {
+    final fake = FakeTriage(
+      [],
+      runs: [
+        TriageRunDto(
+          task: 't1',
+          actions: [
+            TriageActionDto(
+              kind: 'link',
+              pageId: 'p1',
+              pageTitle: 'Garden plan',
+              target: 'p2',
+              targetTitle: 'Seed list',
+            ),
+            TriageActionDto(
+              kind: 'tag',
+              pageId: 'p2',
+              pageTitle: 'Seed list',
+              target: 'garden',
+              targetTitle: '',
+            ),
+          ],
+        ),
+      ],
+    );
+    await _panel(tester, fake);
+
+    expect(find.text("Linked 'Garden plan' to 'Seed list'"), findsOneWidget);
+    expect(find.text("Tagged 'Seed list' with garden"), findsOneWidget);
+    expect(find.text('Links and tags added by Triage'), findsOneWidget);
+
+    await tester.tap(_k('applied-undo-t1'));
+    await tester.pumpAndSettle();
+
+    expect(fake.calls, ['undo-applied:t1']);
+    expect(_k('applied-t1'), findsNothing);
+    expect(
+      find.text('No proposals. Run Triage on a project to look for duplicates.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Dismiss calls dismiss and removes the entry', (tester) async {

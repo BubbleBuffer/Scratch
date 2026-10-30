@@ -55,4 +55,6 @@ Built 2026-10-30. A triage run also gets `triage_link({from, to})` and `triage_t
 - Each change is appended to the task row's text property `triage_actions` (the run's outcome), a JSON list of `{kind, page, target, block?, previous?}`: a link records its inserted block, a tag the page's previous `tags` value (absent when it had none).
 - `vault_mcp::triage::undo_actions(task)` takes back all of a run's changes newest first and empties the record (`Vault::triage_undo_action` does one). A link's block is deleted if it is still there; tags are restored to the previous list, so tag edits made since are lost. Edits to other properties and blocks stay.
 
-The bridge does not expose the record yet: a UI that lists or undoes a run's links and tags needs a new bridge function over `triage::actions` and `triage::undo_actions` (and regenerated bindings).
+The bridge exposes the record: `triage_applied()` lists the runs (newest first, among the latest 200 tasks) that still hold applied links or tags, with page titles, and `triage_undo_applied(task)` takes a run's changes back. The Merge proposals screen shows them (see [Triage UI](../app/triage-ui.md)).
+
+Link repointing is not built: links to a merged-away page keep pointing at its trashed copy. It means rewriting every linking page and recording each rewrite for undo, which is its own change.

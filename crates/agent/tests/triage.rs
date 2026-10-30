@@ -210,8 +210,15 @@ fn a_triage_run_applies_a_link_and_a_tag_and_records_them() {
     assert_eq!((done[0].kind.as_str(), done[0].page.as_str()), ("link", f.a.as_str()));
     assert_eq!((done[1].kind.as_str(), done[1].target.as_str()), ("tag", "meetings"));
 
+    // The run is listed with both actions until they are undone.
+    let runs = triage::applied_runs(&f.v).unwrap();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].task, task);
+    assert_eq!(runs[0].actions, done);
+
     // The recorded state undoes both.
     assert_eq!(triage::undo_actions(&f.v, &task).unwrap(), 2);
+    assert!(triage::applied_runs(&f.v).unwrap().is_empty());
     assert_eq!(f.v.load_page(f.a.clone()).unwrap().blocks, before.blocks);
     assert!(tags(&f.b).is_none());
     assert!(triage::actions(&f.v, &task).unwrap().is_empty());

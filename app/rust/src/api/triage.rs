@@ -115,3 +115,65 @@ pub fn triage_undo(vault: &NotesVault, id: String) -> Result<TriageProposalDto, 
 pub fn triage_page_id(vault: &NotesVault) -> Result<String, String> {
     vault.inner.triage_page_id().map_err(err)
 }
+
+/// One link or tag a triage run applied, with the page titles for display.
+#[derive(Debug, Clone)]
+pub struct TriageActionDto {
+    /// "link" or "tag".
+    pub kind: String,
+    pub page_id: String,
+    pub page_title: String,
+    /// A link's target page id; a tag's tag.
+    pub target: String,
+    /// A link's target title; "" for a tag.
+    pub target_title: String,
+}
+
+/// The links and tags one triage run applied and has not undone.
+#[derive(Debug, Clone)]
+pub struct TriageRunDto {
+    /// The AI task row of the run.
+    pub task: String,
+    pub actions: Vec<TriageActionDto>,
+}
+
+/// The triage runs that applied links or tags and still have them, newest
+/// first.
+pub fn triage_applied(vault: &NotesVault) -> Result<Vec<TriageRunDto>, String> {
+    let title = |id: &str| {
+        vault
+            .inner
+            .load_page(id.to_owned())
+            .map(|p| p.title)
+            .unwrap_or_default()
+    };
+    let runs = triage::applied_runs(&vault.inner).map_err(err)?;
+    Ok(runs
+        .into_iter()
+        .map(|r| TriageRunDto {
+            task: r.task,
+            actions: r
+                .actions
+                .into_iter()
+                .map(|a| {
+                    let is_link = a.kind == vault_core::TRIAGE_LINK;
+                    TriageActionDto {
+                        page_title: title(&a.page),
+                        target_title: if is_link { title(&a.target) } else { String::new() },
+                        kind: a.kind,
+                        page_id: a.page,
+                        target: a.target,
+                    }
+                })
+                .collect(),
+        })
+        .collect())
+}
+
+/// Takes back every link and tag one run applied, newest first, and returns
+/// how many were undone.
+pub fn triage_undo_applied(vault: &NotesVault, task: String) -> Result<u32, String> {
+    triage::undo_actions(&vault.inner, &task)
+        .map(|n| n as u32)
+        .map_err(err)
+}

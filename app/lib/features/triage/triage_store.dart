@@ -16,7 +16,8 @@ import '../../src/rust/api/triage.dart';
 import '../../src/rust/api/types.dart' show ChangeBatch;
 import '../../state/app_state.dart';
 
-export '../../src/rust/api/triage.dart' show TriageProposalDto;
+export '../../src/rust/api/triage.dart'
+    show TriageActionDto, TriageProposalDto, TriageRunDto;
 
 /// Proposal statuses (`TriageProposalDto.status`).
 abstract final class TriageStatus {
@@ -38,6 +39,12 @@ abstract interface class TriageBridge {
   Future<TriageProposalDto> accept(String id);
   Future<TriageProposalDto> dismiss(String id);
   Future<TriageProposalDto> undo(String id);
+
+  /// The links and tags triage runs applied and have not undone.
+  Future<List<TriageRunDto>> applied();
+
+  /// Takes back all links and tags of the run [task].
+  Future<int> undoApplied(String task);
 
   /// The page whose change means the proposals changed.
   Future<String> pageId();
@@ -79,6 +86,14 @@ class VaultTriageBridge implements TriageBridge {
       vault.run((v) => triageUndo(vault: v, id: id), writes: true);
 
   @override
+  Future<List<TriageRunDto>> applied() =>
+      vault.run((v) => triageApplied(vault: v));
+
+  @override
+  Future<int> undoApplied(String task) =>
+      vault.run((v) => triageUndoApplied(vault: v, task: task), writes: true);
+
+  @override
   Future<String> pageId() => vault.run((v) => triagePageId(vault: v));
 }
 
@@ -100,6 +115,7 @@ class TriageStore extends ChangeNotifier {
   );
 
   List<TriageProposalDto> _items = const [];
+  List<TriageRunDto> _applied = const [];
   bool _loaded = false, _disposed = false;
   String? _pageId;
   int _gen = 0;
@@ -108,6 +124,9 @@ class TriageStore extends ChangeNotifier {
   /// undone, newest first. Dismissed proposals are left out.
   List<TriageProposalDto> get items => _items;
   bool get loaded => _loaded;
+
+  /// Triage runs that applied links or tags and still have them, newest first.
+  List<TriageRunDto> get applied => _applied;
 
   /// The badge count: proposals waiting for a decision.
   int get pending =>
@@ -128,6 +147,8 @@ class TriageStore extends ChangeNotifier {
         for (final p in all)
           if (p.status != TriageStatus.dismissed) p,
       ];
+      _applied = await bridge.applied();
+      if (_disposed || gen != _gen) return;
       _loaded = true;
       if (_pageId == null && all.isNotEmpty) {
         _pageId = await bridge.pageId();
@@ -143,6 +164,16 @@ class TriageStore extends ChangeNotifier {
   Future<void> merge(String id) => _decide(bridge.accept(id));
   Future<void> dismiss(String id) => _decide(bridge.dismiss(id));
   Future<void> undoMerge(String id) => _decide(bridge.undo(id));
+
+  Future<void> undoRun(String task) => _decideApplied(bridge.undoApplied(task));
+
+  Future<void> _decideApplied(Future<int> call) async {
+    try {
+      await call;
+    } finally {
+      await load();
+    }
+  }
 
   Future<void> _decide(Future<TriageProposalDto> call) async {
     try {
