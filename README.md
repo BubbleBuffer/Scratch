@@ -67,9 +67,9 @@ flowchart LR
 | `scratch_cli` | [crates/cli](crates/cli) | Runs a desktop vault's AI tasks without the app's UI |
 | `notes_bridge` | [app/rust](app/rust) | The flutter_rust_bridge layer between the app and the crates |
 
-The app is in [app/](app), and its add-ons (calendar, agent, schedule, board and others) are in [app/lib/addons](app/lib/addons). How each part works now is in the [project wiki](wiki/index.md).
+The app is in [app/](app), and its add-ons (calendar, agent, schedule, board and others) are in [app/lib/addons](app/lib/addons).
 
-**Documentation.** Start at the [project wiki](wiki/index.md). Good first pages are the [data model](wiki/core/data-model.md), the [Flutter app](wiki/app/app-state.md) and [sync and storage](wiki/sync/sync-and-storage.md).
+**Documentation.** How each part works now is in the [project wiki](wiki/index.md). Good first pages are the [data model](wiki/core/data-model.md), the [Flutter app](wiki/app/app-state.md) and [sync and storage](wiki/sync/sync-and-storage.md).
 
 ## Build
 
