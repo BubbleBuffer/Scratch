@@ -33,6 +33,8 @@ AiTask task(
   worktreePath: '',
   cancelRequested: false,
   stale: false,
+  stalledSinceMs: null,
+  session: '',
 );
 
 class _Source extends ChangeNotifier implements AiTaskSource {
@@ -50,6 +52,12 @@ class _Source extends ChangeNotifier implements AiTaskSource {
   Future<void> cancel(String id) async {}
   @override
   Future<void> sendUpdate(String id) async {}
+  @override
+  Future<void> accept(String id) async {}
+  @override
+  Future<void> markFailed(String id) async {}
+  @override
+  Future<void> addStep(String id, String text) async {}
 
   void set(List<AiTask> next) {
     tasks = next;
@@ -93,6 +101,7 @@ void main() {
   group('runNoticeOf', () {
     test('finished and failed runs call for a notice, other states none', () {
       expect(runNoticeOf(task('a', 'done')), RunNoticeKind.finished);
+      expect(runNoticeOf(task('a', 'review')), RunNoticeKind.review);
       expect(runNoticeOf(task('a', 'failed')), RunNoticeKind.failed);
       expect(runNoticeOf(task('a', 'interrupted')), RunNoticeKind.failed);
       expect(runNoticeOf(task('a', 'queued')), isNull);

@@ -391,6 +391,7 @@ class _StatusChip extends StatelessWidget {
     final c = context.colors;
     final bg = switch (status) {
       AiStatus.done => c.okBg,
+      AiStatus.review => c.attnBg,
       AiStatus.failed => c.dangerBg,
       AiStatus.running => c.infoBg,
       _ => c.bgSecondary,

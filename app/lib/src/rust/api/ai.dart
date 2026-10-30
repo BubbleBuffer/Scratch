@@ -95,6 +95,18 @@ Future<AiTask> aiCreateTaskHere({
 Future<bool> aiCancelTask({required NotesVault vault, required String id}) =>
     RustLib.instance.api.crateApiAiAiCancelTask(vault: vault, id: id);
 
+/// The user accepts a reviewed result: the task goes from review to done.
+/// Returns whether it was in review.
+Future<bool> aiAcceptTask({required NotesVault vault, required String id}) =>
+    RustLib.instance.api.crateApiAiAiAcceptTask(vault: vault, id: id);
+
+/// Fails a task whose runner has been silent for over ten minutes. Returns
+/// false, and changes nothing, when the task is not stalled.
+Future<bool> aiMarkTaskFailed({
+  required NotesVault vault,
+  required String id,
+}) => RustLib.instance.api.crateApiAiAiMarkTaskFailed(vault: vault, id: id);
+
 /// Asks the runner to send the running worker the note's current version.
 /// Returns whether the task was running and took the request.
 Future<bool> aiSendUpdate({required NotesVault vault, required String id}) =>
@@ -302,6 +314,13 @@ class AiTask {
   /// The note changed after the running worker got its brief.
   final bool stale;
 
+  /// When the runner of a running task was last heard from (ms), set only
+  /// when it has been silent for over ten minutes.
+  final PlatformInt64? stalledSinceMs;
+
+  /// The agent session of the run, empty when it has none or it expired.
+  final String session;
+
   const AiTask({
     required this.id,
     required this.prompt,
@@ -321,6 +340,8 @@ class AiTask {
     required this.worktreePath,
     required this.cancelRequested,
     required this.stale,
+    this.stalledSinceMs,
+    required this.session,
   });
 
   @override
@@ -342,7 +363,9 @@ class AiTask {
       worktreeBranch.hashCode ^
       worktreePath.hashCode ^
       cancelRequested.hashCode ^
-      stale.hashCode;
+      stale.hashCode ^
+      stalledSinceMs.hashCode ^
+      session.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -366,5 +389,7 @@ class AiTask {
           worktreeBranch == other.worktreeBranch &&
           worktreePath == other.worktreePath &&
           cancelRequested == other.cancelRequested &&
-          stale == other.stale;
+          stale == other.stale &&
+          stalledSinceMs == other.stalledSinceMs &&
+          session == other.session;
 }

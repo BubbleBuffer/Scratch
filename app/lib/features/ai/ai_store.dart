@@ -49,6 +49,7 @@ abstract final class AiStatus {
   static const queued = 'queued';
   static const running = 'running';
   static const done = 'done';
+  static const review = 'review';
   static const failed = 'failed';
   static const cancelled = 'cancelled';
   static const interrupted = 'interrupted';
@@ -76,6 +77,15 @@ abstract interface class AiTaskSource implements Listenable {
 
   /// Asks the runner to send task [id]'s worker the note's current version.
   Future<void> sendUpdate(String id);
+
+  /// The user accepts a reviewed result: the task goes from review to done.
+  Future<void> accept(String id);
+
+  /// Fails a task whose runner stalled (no contact for over ten minutes).
+  Future<void> markFailed(String id);
+
+  /// Adds a to-do under the running task; the runner gives it to the worker.
+  Future<void> addStep(String id, String text);
 }
 
 /// Starts and stops the agent's runs for add-ons (a task assigned to the
@@ -333,6 +343,24 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   @override
   Future<void> sendUpdate(String id) async {
     await vault.run((v) => aiSendUpdate(vault: v, id: id), writes: true);
+    await refresh();
+  }
+
+  @override
+  Future<void> accept(String id) async {
+    await vault.run((v) => aiAcceptTask(vault: v, id: id), writes: true);
+    await refresh();
+  }
+
+  @override
+  Future<void> markFailed(String id) async {
+    await vault.run((v) => aiMarkTaskFailed(vault: v, id: id), writes: true);
+    await refresh();
+  }
+
+  @override
+  Future<void> addStep(String id, String text) async {
+    await vault.run((v) => aiAddStep(vault: v, id: id, text: text), writes: true);
     await refresh();
   }
 

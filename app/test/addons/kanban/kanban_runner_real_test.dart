@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' as w;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/kanban/api.dart';
+import 'package:notes_app/addons/kanban/runner_chip.dart' show runnerChipText;
 import 'package:notes_app/ui/tokens.dart';
 import 'package:notes_app/services/addon_services.dart'
     show AiRunnerBridge, AiTask, AiTaskSource;
@@ -62,6 +63,8 @@ AiTask _row(
   String project = '',
   bool cancelRequested = false,
   bool stale = false,
+  int? stalledSinceMs,
+  String session = '',
 }) => AiTask(
   project: project,
   worktreeBranch: '',
@@ -80,6 +83,8 @@ AiTask _row(
   node: node,
   cancelRequested: cancelRequested,
   stale: stale,
+  stalledSinceMs: stalledSinceMs,
+  session: session,
 );
 
 /// Records the calls and answers from fixed data.
@@ -138,6 +143,18 @@ class _FakeSource extends ChangeNotifier implements AiTaskSource {
 
   @override
   Future<void> sendUpdate(String id) async => updated.add(id);
+  final accepted = <String>[];
+  final failedMarked = <String>[];
+  final steps = <String>[];
+
+  @override
+  Future<void> accept(String id) async => accepted.add(id);
+
+  @override
+  Future<void> markFailed(String id) async => failedMarked.add(id);
+
+  @override
+  Future<void> addStep(String id, String text) async => steps.add('$id:$text');
 
   @override
   Future<void> refresh() async {
@@ -204,6 +221,36 @@ void main() {
       final interrupted = backend.current('card-int')!;
       expect(interrupted.state, AssignState.failed);
       expect(interrupted.reason, 'The run was interrupted before it finished.');
+    });
+
+    test('a review row, a stalled run and the run commands', () async {
+      final source = _FakeSource(_FakeBridge(_fleet()));
+      final backend = RealRunnerBackend(source, clock: () => _now);
+      await backend.listRunners();
+
+      source.tasks = [_row('t1', 'card-r', 'review')];
+      expect(backend.current('card-r')!.state, AssignState.review);
+
+      final beat = DateTime(2026, 10, 30, 14, 5).millisecondsSinceEpoch;
+      source.tasks = [_row('t2', 'card-s', 'running', stalledSinceMs: beat)];
+      final stalled = backend.current('card-s')!;
+      expect(stalled.state, AssignState.stalled);
+      expect(stalled.note, 'no contact since 14:05');
+      expect(runnerChipText(stalled), endsWith('stalled (no contact since 14:05)'));
+
+      source.tasks = [
+        _row('t1', 'card-r', 'review', session: 'sess-1'),
+        _row('t2', 'card-s', 'running'),
+      ];
+      expect(backend.sessionOf('card-r'), 'sess-1');
+      expect(backend.sessionOf('card-s'), isNull);
+      await backend.accept('card-r');
+      await backend.addStep('card-s', 'Check the dates');
+      expect(source.accepted, ['t1']);
+      expect(source.steps, ['t2:Check the dates']);
+      source.tasks = [_row('t2', 'card-s', 'running', stalledSinceMs: beat)];
+      await backend.markFailed('card-s');
+      expect(source.failedMarked, ['t2']);
     });
 
     test('a card reads its newest row, and a card with no row has no assignment', () async {

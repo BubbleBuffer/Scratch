@@ -54,6 +54,8 @@ enum AssignState {
   waiting('waiting'),
   running('running'),
   cancelling('cancellation requested'),
+  review('ready for review'),
+  stalled('stalled'),
   done('done'),
   failed('failed'),
   cancelled('cancelled');
@@ -80,6 +82,7 @@ class RunnerAssignment {
     this.progress,
     this.projectName,
     this.outdated = false,
+    this.note,
   });
 
   final String taskId;
@@ -93,6 +96,10 @@ class RunnerAssignment {
 
   /// The project's name, or null when the task runs in no project.
   final String? projectName;
+
+  /// A short remark after the state, in brackets on the chip, for example
+  /// "no contact since 14:05" on a stalled run.
+  final String? note;
 
   /// True while the worker runs on an earlier version of the note. The user
   /// sends it the update; editing the note alone sends nothing.
@@ -131,6 +138,21 @@ abstract class RunnerBackend {
   Future<void> sendUpdate(String taskId) =>
       throw const RunnerUnavailable('This runner cannot take an update.');
 
+  /// Accepts the reviewed result of the card's run.
+  Future<void> accept(String taskId) =>
+      throw const RunnerUnavailable('This runner has nothing to accept.');
+
+  /// Fails the card's run when its runner stalled.
+  Future<void> markFailed(String taskId) =>
+      throw const RunnerUnavailable('This runner cannot fail a run.');
+
+  /// Adds [text] as a step under the card's running task.
+  Future<void> addStep(String taskId, String text) =>
+      throw const RunnerUnavailable('This runner cannot take a step.');
+
+  /// The agent session of the card's run, or null when it has none.
+  String? sessionOf(String taskId) => null;
+
   /// The assignment this backend already knows for [taskId], or null. Chips
   /// read it on every redraw, so it must not call the backend.
   RunnerAssignment? current(String taskId) => null;
@@ -162,6 +184,15 @@ class RunnerAssignments extends ChangeNotifier {
 
   /// Sends the running worker of [taskId] the note's current version.
   Future<void> sendUpdate(String taskId) => backend.sendUpdate(taskId);
+
+  Future<void> accept(String taskId) => backend.accept(taskId);
+
+  Future<void> markFailed(String taskId) => backend.markFailed(taskId);
+
+  Future<void> addStep(String taskId, String text) =>
+      backend.addStep(taskId, text);
+
+  String? sessionOf(String taskId) => backend.sessionOf(taskId);
 
   /// Assigns [taskId] to [runnerId], in [projectId] or in none, and keeps the
   /// answer.

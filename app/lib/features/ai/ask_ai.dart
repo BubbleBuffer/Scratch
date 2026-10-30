@@ -203,6 +203,7 @@ String aiStatusLabel(String status) => switch (status) {
       AiStatus.queued => 'Queued',
       AiStatus.running => 'Running',
       AiStatus.done => 'Done',
+      AiStatus.review => 'Ready for review',
       AiStatus.failed => 'Failed',
       AiStatus.cancelled => 'Cancelled',
       AiStatus.interrupted => 'Interrupted',

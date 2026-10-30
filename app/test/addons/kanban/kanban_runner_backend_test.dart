@@ -128,6 +128,8 @@ void main() {
         AssignState.waiting: 'waiting',
         AssignState.running: 'running',
         AssignState.cancelling: 'cancellation requested',
+        AssignState.review: 'ready for review',
+        AssignState.stalled: 'stalled',
         AssignState.done: 'done',
         AssignState.failed: 'failed',
         AssignState.cancelled: 'cancelled',

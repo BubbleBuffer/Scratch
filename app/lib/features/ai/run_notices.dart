@@ -22,6 +22,7 @@ import 'ai_store.dart';
 /// What a run's change says to the user.
 enum RunNoticeKind {
   finished('Task finished'),
+  review('Task ready for review'),
   failed('Task failed');
 
   const RunNoticeKind(this.title);
@@ -36,6 +37,7 @@ enum RunNoticeKind {
 /// moved to Review) are added here.
 RunNoticeKind? runNoticeOf(AiTask t) => switch (t.status) {
   AiStatus.done => RunNoticeKind.finished,
+  AiStatus.review => RunNoticeKind.review,
   AiStatus.failed || AiStatus.interrupted => RunNoticeKind.failed,
   _ => null,
 };

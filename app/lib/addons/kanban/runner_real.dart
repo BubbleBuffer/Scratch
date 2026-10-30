@@ -165,7 +165,41 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
       progress: _progressOf(t),
       projectName: _projectName(t.node, t.project),
       outdated: t.status == 'running' && !t.cancelRequested && t.stale,
+      note: s.note,
     );
+  }
+
+  @override
+  Future<void> accept(String taskId) => _command(taskId, source.accept);
+
+  @override
+  Future<void> markFailed(String taskId) => _command(taskId, source.markFailed);
+
+  @override
+  Future<void> addStep(String taskId, String text) async {
+    final t = _taskOf(taskId);
+    if (t == null) return;
+    try {
+      await source.addStep(t.id, text);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  @override
+  String? sessionOf(String taskId) {
+    final s = _taskOf(taskId)?.session;
+    return s == null || s.isEmpty ? null : s;
+  }
+
+  Future<void> _command(String cardId, Future<void> Function(String) run) async {
+    final t = _taskOf(cardId);
+    if (t == null) return;
+    try {
+      await run(t.id);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
   }
 
   /// The task row about the card [cardId], or null.
@@ -208,32 +242,50 @@ class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
   /// Maps a row's status to the chip. A run with a cancel the runner has not
   /// acknowledged shows as cancellation requested, never as stopped. An interrupted run
   /// reads as failed. A queued row pinned to an offline runner is waiting.
-  ({AssignState state, String? reason}) _stateOf(AiTask t, AiRunner? runner) {
+  ({AssignState state, String? reason, String? note}) _stateOf(AiTask t, AiRunner? runner) {
     switch (t.status) {
       case 'running':
         if (t.cancelRequested) {
-          return (state: AssignState.cancelling, reason: null);
+          return (state: AssignState.cancelling, reason: null, note: null);
         }
-        return (state: AssignState.running, reason: null);
+        final since = _time(t.stalledSinceMs?.toInt());
+        if (since != null) {
+          final hh = since.hour.toString().padLeft(2, '0');
+          final mm = since.minute.toString().padLeft(2, '0');
+          return (
+            state: AssignState.stalled,
+            reason: null,
+            note: 'no contact since $hh:$mm',
+          );
+        }
+        return (state: AssignState.running, reason: null, note: null);
+      case 'review':
+        return (state: AssignState.review, reason: null, note: null);
       case 'done':
-        return (state: AssignState.done, reason: null);
+        return (state: AssignState.done, reason: null, note: null);
       case 'failed':
         return (
           state: AssignState.failed,
           reason: t.error.isEmpty ? null : t.error,
+          note: null,
         );
       case 'interrupted':
         return (
           state: AssignState.failed,
           reason: 'The run was interrupted before it finished.',
+          note: null,
         );
       case 'cancelled':
-        return (state: AssignState.cancelled, reason: null);
+        return (state: AssignState.cancelled, reason: null, note: null);
       default:
         if (runner != null && !runner.online) {
-          return (state: AssignState.waiting, reason: _offlineReason(runner));
+          return (
+            state: AssignState.waiting,
+            reason: _offlineReason(runner),
+            note: null,
+          );
         }
-        return (state: AssignState.queued, reason: null);
+        return (state: AssignState.queued, reason: null, note: null);
     }
   }
 
