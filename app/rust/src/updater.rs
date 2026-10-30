@@ -214,6 +214,16 @@ pub fn sha256_file(path: &Path) -> io::Result<String> {
     Ok(hex(&hasher.finalize()))
 }
 
+/// [verify_file] before launch: an installer that changed since its download
+/// is deleted, so the next check downloads it again.
+pub fn verify_or_discard(path: &Path, expected: &str) -> Result<(), UpdateError> {
+    let result = verify_file(path, expected);
+    if matches!(result, Err(UpdateError::Mismatch { .. })) {
+        let _ = fs::remove_file(path);
+    }
+    result
+}
+
 /// Ok when [path] hashes to [expected] (hex, any case).
 pub fn verify_file(path: &Path, expected: &str) -> Result<(), UpdateError> {
     let actual = sha256_file(path)?;
@@ -307,7 +317,7 @@ pub fn launch_installer(installer: &Path, sha256: &str) -> Result<(), UpdateErro
     {
         return Err(UpdateError::Install("not a Scratch installer".into()));
     }
-    verify_file(installer, sha256)?;
+    verify_or_discard(installer, sha256)?;
     verify_publisher(installer)?;
     shell_execute(installer, INSTALLER_ARGS)
 }
@@ -680,6 +690,23 @@ mod tests {
             verify_file(&file, &"0".repeat(64)),
             Err(UpdateError::Mismatch { .. })
         ));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn update_launch_check_deletes_a_changed_installer() {
+        let dir = temp_dir("launch-check");
+        let file = dir.join("Scratch-Setup-1.exe");
+        fs::write(&file, b"abc").unwrap();
+        let abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        assert!(verify_or_discard(&file, abc).is_ok());
+        assert!(file.exists());
+        fs::write(&file, b"abd").unwrap();
+        assert!(matches!(
+            verify_or_discard(&file, abc),
+            Err(UpdateError::Mismatch { .. })
+        ));
+        assert!(!file.exists());
         let _ = fs::remove_dir_all(&dir);
     }
 
