@@ -157,6 +157,7 @@ void main() {
       dialogs.folder = dir.path;
       await tapAndSettle(tester, key('sidebar-settings'));
       await tapAndSettle(tester, key('settings-nav-storage'));
+      await tapAndSettle(tester, key('vault-open-another'));
       await tapAndSettle(tester, key('vault-choose'));
       expect(dialogs.calls, ['folder']);
       expect(find.textContaining('Scratch opens ${dir.path} the next time it starts.'), findsOneWidget);

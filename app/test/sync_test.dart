@@ -43,7 +43,7 @@ void main() {
       await tapAndSettle(tester, key('sidebar-settings'));
       // Devices are part of the "Sync and devices" page, below the sync part.
       await tapAndSettle(tester, key('settings-nav-sync'));
-      expect(find.text('No devices yet.'), findsOneWidget);
+      expect(find.text('No devices paired yet'), findsOneWidget);
       await tester.ensureVisible(key('devices-add'));
       await tapAndSettle(tester, key('devices-add'));
       await enterField(tester, 'device-name-field', 'Pixel');
@@ -225,6 +225,7 @@ void main() {
       await openMobileSettings(tester);
       await tapAndSettle(tester, key('settings-nav-sync'));
       expect(key('hub-toggle'), findsNothing, reason: 'phones do not host');
+      await tapAndSettle(tester, key('connect-advanced'));
       await enterField(tester, 'connect-hub-field', code);
       expect(tester.widget<EditableText>(find.descendant(of: key('connect-token-field'), matching: find.byType(EditableText))).controller.text,
           isEmpty, reason: 'a code link fills only the hub; connecting redeems the code');
@@ -301,8 +302,7 @@ void main() {
   appTest('the theme setting switches to dark', (tester) async {
     await pumpApp(tester, mobile: false);
     await tapAndSettle(tester, key('sidebar-settings'));
-    await tapAndSettle(tester, key('theme-select'));
-    await tapAndSettle(tester, key('option-Dark'));
+    await tapAndSettle(tester, key('theme-dark'));
     expect(current.app.settings.theme, ThemePref.dark);
     expect(current.app.settings.theme.forceDark, isTrue);
   });

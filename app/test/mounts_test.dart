@@ -30,6 +30,7 @@ void main() {
 
     showSettings(tester.element(find.byType(HomeScreen)), section: SettingsSection.storage);
     await settle(tester);
+    await tapKey(tester, 'mount-open');
     await typeInto(tester, 'mount-path-field', 'not/absolute');
     await tapKey(tester, 'mount-add');
     expect(byKey('mount-error'), findsOneWidget);
