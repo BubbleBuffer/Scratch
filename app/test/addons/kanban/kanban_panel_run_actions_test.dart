@@ -2,7 +2,6 @@
 // failed on a stalled run, Add step on a running one. The card moves between
 // columns in the task layer (crates/mcp), not here.
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/kanban/api.dart';
 import 'package:flutter/widgets.dart';
@@ -17,7 +16,7 @@ class _Backend extends FakeRunnerBackend {
   _Backend(this.state) : super(runners: const []);
 
   AssignState state;
-  final calls = <String>[];
+  final log = <String>[];
   final _changes = _Ping();
 
   @override
@@ -38,18 +37,18 @@ class _Backend extends FakeRunnerBackend {
   );
 
   @override
-  Future<void> accept(String taskId) async => calls.add('accept');
+  Future<void> accept(String taskId) async => log.add('accept');
 
   @override
-  Future<void> markFailed(String taskId) async => calls.add('failed');
+  Future<void> markFailed(String taskId) async => log.add('failed');
 
   @override
   Future<void> reply(String taskId, String text) async =>
-      calls.add('reply:$text');
+      log.add('reply:$text');
 
   @override
   Future<void> addStep(String taskId, String text) async =>
-      calls.add('step:$text');
+      log.add('step:$text');
 }
 
 Future<_Backend> _open(
@@ -82,7 +81,7 @@ void main() {
     );
     await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
     await tapAndSettle(tester, find.byKey(const ValueKey('kanban-panel-accept')));
-    expect(backend.calls, ['accept']);
+    expect(backend.log, ['accept']);
   });
 
   appTest('Mark failed shows on a stalled run, Add step on a running one', (
@@ -96,7 +95,7 @@ void main() {
     await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
     expect(find.byKey(const ValueKey('kanban-panel-add-step')), findsNothing);
     await tapAndSettle(tester, find.byKey(const ValueKey('kanban-panel-mark-failed')));
-    expect(backend.calls, ['failed']);
+    expect(backend.log, ['failed']);
 
     backend.set(AssignState.running);
     await settle(tester);
@@ -107,7 +106,7 @@ void main() {
     );
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await settle(tester);
-    expect(backend.calls, ['failed', 'step:Check the logs']);
+    expect(backend.log, ['failed', 'step:Check the logs']);
   });
 
   appTest('a worker question shows on the card with a Reply field', (tester) async {
@@ -125,6 +124,6 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('kanban-panel-reply')), 'Green');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await settle(tester);
-    expect(backend.calls, ['reply:Green']);
+    expect(backend.log, ['reply:Green']);
   });
 }
