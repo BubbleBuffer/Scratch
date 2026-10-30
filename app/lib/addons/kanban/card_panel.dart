@@ -234,10 +234,12 @@ class _RunActions extends StatefulWidget {
 
 class _RunActionsState extends State<_RunActions> {
   final _step = TextEditingController();
+  final _stepFocus = FocusNode();
 
   @override
   void dispose() {
     _step.dispose();
+    _stepFocus.dispose();
     super.dispose();
   }
 
@@ -278,6 +280,7 @@ class _RunActionsState extends State<_RunActions> {
           child: PlainField(
             key: const ValueKey('kanban-panel-add-step'),
             controller: _step,
+            focusNode: _stepFocus,
             style: ts(context.type.ui, c.textPrimary),
             placeholder: 'Add step',
             textInputAction: TextInputAction.done,

@@ -54,7 +54,7 @@ Future<_Backend> _open(
   Map<String, List<String>> Function(String garden) columns,
 ) async {
   final backend = _Backend(state);
-  final f = await pumpApp(tester, runners: RunnerAssignments(backend));
+  final f = await pumpApp(tester, mobile: false, runners: RunnerAssignments(backend));
   final garden = f.pages['Garden plan']!;
   final board = await seedKanban(
     tester,
