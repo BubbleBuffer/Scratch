@@ -53,7 +53,7 @@ enum AssignState {
   queued('queued'),
   waiting('waiting'),
   running('running'),
-  cancelling('cancelling'),
+  cancelling('cancellation requested'),
   done('done'),
   failed('failed'),
   cancelled('cancelled');
@@ -79,6 +79,7 @@ class RunnerAssignment {
     this.reason,
     this.progress,
     this.projectName,
+    this.outdated = false,
   });
 
   final String taskId;
@@ -92,6 +93,10 @@ class RunnerAssignment {
 
   /// The project's name, or null when the task runs in no project.
   final String? projectName;
+
+  /// True while the worker runs on an earlier version of the note. The user
+  /// sends it the update; editing the note alone sends nothing.
+  final bool outdated;
 }
 
 /// The backend could not answer. [reason] is shown as is.
@@ -116,6 +121,15 @@ abstract class RunnerBackend {
     String runnerId, {
     String? projectId,
   });
+
+  /// Asks the runner to stop the run of the card [taskId]. The chip then reads
+  /// "cancellation requested" until the runner has stopped.
+  Future<void> cancel(String taskId) =>
+      throw const RunnerUnavailable('This runner cannot stop a run.');
+
+  /// Sends the running worker the card's current note.
+  Future<void> sendUpdate(String taskId) =>
+      throw const RunnerUnavailable('This runner cannot take an update.');
 
   /// The assignment this backend already knows for [taskId], or null. Chips
   /// read it on every redraw, so it must not call the backend.
@@ -142,6 +156,12 @@ class RunnerAssignments extends ChangeNotifier {
       backend.current(taskId) ?? _byTask[taskId];
 
   Future<List<Runner>> runners() => backend.listRunners();
+
+  /// Asks the runner to stop the run of [taskId].
+  Future<void> cancel(String taskId) => backend.cancel(taskId);
+
+  /// Sends the running worker of [taskId] the note's current version.
+  Future<void> sendUpdate(String taskId) => backend.sendUpdate(taskId);
 
   /// Assigns [taskId] to [runnerId], in [projectId] or in none, and keeps the
   /// answer.

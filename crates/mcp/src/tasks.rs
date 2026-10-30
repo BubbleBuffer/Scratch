@@ -40,7 +40,9 @@ mod subtasks;
 #[cfg(test)]
 mod source_tests;
 
-pub use subtasks::{begin_subtasks, mirror_subtasks, SubtaskItem};
+pub use subtasks::{
+    add_step, begin_subtasks, mirror_subtasks, pending_steps, record_baseline, Step, SubtaskItem,
+};
 
 /// The page property that marks the tasks database.
 pub const MARKER: &str = "ai.tasks";
@@ -188,6 +190,12 @@ pub fn schema() -> Vec<PropDef> {
         def(
             attempts::CANCEL_REQUESTED,
             "Cancel requested",
+            PropKind::Text,
+            vec![],
+        ),
+        def(
+            attempts::UPDATE_REQUESTED,
+            "Update requested",
             PropKind::Text,
             vec![],
         ),
@@ -1077,6 +1085,100 @@ pub enum PromptTools {
     Js,
 }
 
+/// The task's page as the worker is shown it: its title and id, and its
+/// content without the task's placeholder. None when the task has no page.
+fn page_context(v: &Vault, t: &Task) -> Option<String> {
+    let page = t.page.as_ref()?;
+    let p = v.load_page(page.clone()).ok()?;
+    let mut md = v.blocks_markdown(
+        p.blocks
+            .iter()
+            .filter(|b| Some(&b.id) != t.block.as_ref())
+            .cloned()
+            .collect(),
+    );
+    if md.chars().count() > 20_000 {
+        md = format!(
+            "{}\n\n[\u{2026} truncated; use read_page for the rest]",
+            md.chars().take(20_000).collect::<String>()
+        );
+    }
+    Some(format!(
+        "The task was asked on the page \"{}\" (page id {}). Its current content:\n<page>\n{}\n</page>\n\n",
+        p.title, p.id, md
+    ))
+}
+
+/// Whether the note changed since the running attempt's brief was made: the
+/// worker runs on an earlier revision of it. False for a task that is not
+/// running, or whose attempt recorded no revision.
+pub fn is_stale(v: &Vault, t: &Task) -> bool {
+    if t.status != RUNNING || t.attempt.is_empty() {
+        return false;
+    }
+    let Ok(all) = attempts::list(v, &t.id) else {
+        return false;
+    };
+    let Some(a) = all.iter().find(|a| a.id == t.attempt) else {
+        return false;
+    };
+    !a.source_rev.is_empty() && a.source_rev != source_revision(v, t)
+}
+
+/// Asks the runner to send the worker the note's current version. Like a
+/// cancel, it is a command: the runner sends it and the history shows
+/// `update_sent` when it has. Only a running task that is not being cancelled
+/// takes it. Returns whether the request was recorded.
+pub fn request_update(v: &Vault, id: &str) -> Result<bool> {
+    let t = get(v, id)?;
+    if t.status != RUNNING || t.cancel_requested_ms.is_some() {
+        return Ok(false);
+    }
+    if let Some(c) = collection(v)? {
+        migrate_schema(v, &c)?;
+    }
+    let row = v.load_page(id.to_string())?;
+    if text(&row.properties, attempts::UPDATE_REQUESTED).is_empty() {
+        v.set_property(
+            t.id.clone(),
+            attempts::UPDATE_REQUESTED.into(),
+            PropValue::Text(crate::jobs::now_ms().to_string()),
+        )?;
+        let _ = attempts::event(v, id, None, attempts::kind::UPDATE_REQUESTED, "");
+    }
+    Ok(true)
+}
+
+/// The message to steer the worker with, and the revision it carries, when an
+/// update was requested for the running task. None otherwise.
+pub fn update_message(v: &Vault, id: &str) -> Result<Option<(String, String)>> {
+    let t = get(v, id)?;
+    let row = v.load_page(id.to_string())?;
+    if t.status != RUNNING
+        || t.cancel_requested_ms.is_some()
+        || text(&row.properties, attempts::UPDATE_REQUESTED).is_empty()
+    {
+        return Ok(None);
+    }
+    let Some(context) = page_context(v, &t) else {
+        return Ok(None);
+    };
+    let message = format!(
+        "The user changed the note since you started. Continue the task with this version, and keep \
+         what you already did where it still applies.\n\n{context}"
+    );
+    Ok(Some((message, source_revision(v, &t))))
+}
+
+/// Records that the update reached the worker: the attempt now works from
+/// `rev`, and the request is cleared.
+pub fn update_sent(v: &Vault, id: &str, attempt: Option<&str>, rev: &str) -> Result<()> {
+    attempts::update(v, id, attempt, |a| a.source_rev = rev.to_string())?;
+    let _ = attempts::event(v, id, attempt, attempts::kind::UPDATE_SENT, "");
+    v.remove_property(id.to_string(), attempts::UPDATE_REQUESTED.into())?;
+    Ok(())
+}
+
 /// The prompt given to an agent: the task, the target page's content and
 /// how the result is used. A BubblePaw agent (`PromptTools::Js`) reaches
 /// the vault through its `js` tool.
@@ -1091,26 +1193,8 @@ pub fn agent_prompt(v: &Vault, t: &Task, tools: PromptTools) -> Result<String> {
         ),
     }
     out.push_str(&format!("Task from the user:\n{}\n\n", t.prompt));
-    if let Some(page) = &t.page {
-        if let Ok(p) = v.load_page(page.clone()) {
-            let mut md = v.blocks_markdown(
-                p.blocks
-                    .iter()
-                    .filter(|b| Some(&b.id) != t.block.as_ref())
-                    .cloned()
-                    .collect(),
-            );
-            if md.chars().count() > 20_000 {
-                md = format!(
-                    "{}\n\n[… truncated; use read_page for the rest]",
-                    md.chars().take(20_000).collect::<String>()
-                );
-            }
-            out.push_str(&format!(
-                "The task was asked on the page \"{}\" (page id {}). Its current content:\n<page>\n{}\n</page>\n\n",
-                p.title, p.id, md
-            ));
-        }
+    if let Some(context) = page_context(v, t) {
+        out.push_str(&context);
     }
     out.push_str(
         "Your final reply is inserted into that page where the user asked. Reply with only the \
