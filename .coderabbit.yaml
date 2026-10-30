@@ -14,6 +14,38 @@ reviews:
     - "!app/linux/flutter/generated_plugin*"
     - "!app/windows/flutter/generated_plugin*"
     - "!prototypes/tauri/src-tauri/gen/**"
+  path_instructions:
+    - path: ".github/workflows/release.yml"
+      instructions: >-
+        Signing material must stay in the android job (environment `release`), written with umask 077 under $RUNNER_TEMP and removed by the `if: always()` step.
+        Flag any new use of the PREALPHA_* secrets elsewhere, secrets echoed or passed on a command line, or a signing key that reaches an uploaded artifact.
+        The release key is never on GitHub; the APK is signed with the separate pre-alpha key or ships as `-unsigned.apk`.
+    - path: ".github/workflows/{release,nightly}.yml"
+      instructions: >-
+        Only the publish jobs may have `contents: write`. Tags come from `inputs.tag` or `github.ref_name`, so they must be validated and passed through `env:`, never interpolated into `run:`.
+        release.yml must keep refusing `-nightly.` tags and nightly.yml must keep its pruning limited to tags containing `-nightly.`.
+    - path: "app/android/app/build.gradle.kts"
+      instructions: >-
+        The release keystore stays outside the repo (keystore.properties under LOCALAPPDATA) with a debug-key fallback.
+        Flag a committed keystore or password, a changed `applicationId` (`de.bubblebuffer.notes`; the phone treats a new id as a new app), or a signing config that fails the build when the key is absent.
+    - path: "crates/sync/src/**/*.rs"
+      instructions: >-
+        Protocol messages are versioned binary (`PROTOCOL`, `PURGE_PROTOCOL` in wire.rs). Bump the version byte for any incompatible field change and keep decoders rejecting unknown versions.
+        Secret comparisons (tokens, hashes, nonces) must use `ct_eq`. Sync apply paths must not discard independent local edits or resurrect purged content.
+    - path: "crates/hub/src/**/*.rs"
+      instructions: >-
+        Device tokens, agent tokens and OAuth JWTs are separate credentials: a route that accepts one must not silently accept another (for example `/agent-tokens` and `/shares` refuse agent tokens, `/mcp` refuses device tokens except for `jobs`).
+        Tokens are stored only as SHA-256 and compared with `ct_eq`, and token or secret material must not be logged or returned after creation.
+        New routes need an auth check and an `Origin` decision, and the route table in wiki/sync/hub.md must be updated.
+    - path: "crates/{core,tools,agent_wire}/src/**/*.rs"
+      instructions: >-
+        vault_core is the only owner of vault storage and the index. Tools and the agent go through its API, not around it.
+        The `path` source of attach_file only works where `allow_local_paths` was enabled (never on the hub); keep archive paths relative and links refused.
+        Wire DTOs in notes_agent_wire must stay in step with the bridge's `Agent*` types and wiki/sync/hub.md.
+    - path: "app/rust/src/**/*.rs"
+      instructions: >-
+        This is the hand-written flutter_rust_bridge layer (frb_generated.rs is excluded and generated). A changed `pub` function or type in `api/` needs the regenerated bindings from scripts/regen-bindings.sh, with codegen pinned to flutter_rust_bridge 2.13.0.
+        Keep logic in vault_* crates and the bridge a thin conversion layer. Rust errors must reach Dart as errors, not panics.
 knowledge_base:
   code_guidelines:
     enabled: true
