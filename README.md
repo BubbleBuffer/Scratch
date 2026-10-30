@@ -21,7 +21,7 @@
 - **Pages and blocks.** Everything is a page made of blocks: text, headings, tasks, tables, code, embeds. You edit blocks, not markup.
 - **Properties and views.** Any page can carry properties, and pages nest. A view block shows a page's children as a list, table, board, calendar or gallery, with each page drawn as a card. There are no separate databases to set up.
 - **Local-first.** A vault is a folder on your device. Pages are Loro CRDT documents, indexed in SQLite for search, and the app works offline.
-- **Your own hub.** Devices sync through a small server you run yourself: the hub built into the desktop app, or `notes-hub` on a server behind your own TLS and OIDC login. See [Running your own hub](wiki/architecture/hub.md).
+- **Your own hub.** Devices sync through a small server you run yourself: the hub built into the desktop app, or `notes-hub` on a server behind your own TLS and OIDC login. See [Running your own hub](wiki/sync/hub.md).
 - **Agent tab.** A built-in agent, on [BubblePaw](https://github.com/BubbleBuffer/BubblePaw-Core), that reads and edits the vault with you and asks before running tools.
 - **MCP access.** Claude, ChatGPT and other MCP clients use the vault through the hub, with scoped agent tokens or OAuth.
 - **Windows, Android and a CLI.** A Windows app with an installer, an Android app, and the `notes` command line tool.
@@ -67,7 +67,9 @@ flowchart LR
 | `scratch_cli` | [crates/cli](crates/cli) | Runs a desktop vault's AI tasks without the app's UI |
 | `notes_bridge` | [app/rust](app/rust) | The flutter_rust_bridge layer between the app and the crates |
 
-The app is in [app/](app), and its add-ons (calendar, agent, schedule, board and others) are in [app/lib/addons](app/lib/addons). How each part works now: the [project wiki](wiki/index.md).
+The app is in [app/](app), and its add-ons (calendar, agent, schedule, board and others) are in [app/lib/addons](app/lib/addons). How each part works now is in the [project wiki](wiki/index.md).
+
+**Documentation.** Start at the [project wiki](wiki/index.md). Good first pages are the [data model](wiki/core/data-model.md), the [Flutter app](wiki/app/app-state.md) and [sync and storage](wiki/sync/sync-and-storage.md).
 
 ## Build
 
@@ -85,7 +87,7 @@ cargo build --release --locked -p vault_tools --bin notes   # notes CLI
 cargo build --release --locked -p notes_hub                 # hub server (notes-hub)
 ```
 
-The Windows installer is described in [Windows installer](wiki/architecture/windows-install.md). The screenshots come from `app/test/golden_test.dart`; the wordmark is Bricolage Grotesque, outlined by `design/readme/wordmark.py`.
+The Windows installer is described in [Windows installer](wiki/releases/windows-install.md). The screenshots come from `app/test/golden_test.dart`; the wordmark is Bricolage Grotesque, outlined by `design/readme/wordmark.py`.
 
 ## Licence
 

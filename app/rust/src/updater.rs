@@ -1,7 +1,7 @@
 //! Windows updates: which GitHub release to offer, fetching its installer
 //! and SHA256SUMS.txt, verifying the download, and starting the installer
 //! the way a person would (ShellExecute, visible window). The flow and the
-//! reasons behind it are in wiki/architecture/windows-install.md.
+//! reasons behind it are in wiki/releases/windows-install.md.
 //!
 //! The pure parts (release choice, checksum parsing, file verification,
 //! pruning) build and are tested on every target. The network client and

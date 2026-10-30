@@ -5,7 +5,7 @@
 //! - the method names and their params,
 //! - JSON-RPC 2.0 envelopes (one text frame per message).
 //!
-//! Protocol reference: `wiki/architecture/hub.md` (`/agent/ws`).
+//! Protocol reference: `wiki/sync/hub.md` (`/agent/ws`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

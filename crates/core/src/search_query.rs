@@ -1,7 +1,7 @@
 //! Search query parser: text with `key:value` operators becomes a
 //! [`SearchSpec`] (what the search runs) and byte-spanned [`Token`]s (what the
 //! UI marks). Syntax, date grammar and bad-input rules are settled in
-//! `wiki/architecture/search-queries.md`.
+//! `wiki/core/search-queries.md`.
 //!
 //! Parsing never fails. A known key with an unreadable value becomes an
 //! `Error` token, is left out of the spec and adds a warning. An unknown

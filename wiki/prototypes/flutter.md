@@ -9,7 +9,7 @@ covers: []
 
 # Flutter prototype
 
-**Status:** outdated, 2026-09-30. The prototype became the real app in [app/](../../app); its current state is [The Flutter app (state)](../architecture/app-state.md). This page describes the prototype as it was at the end of the bake-off. Spec: Bake-off (internal wiki).
+**Status:** outdated, 2026-09-30. The prototype became the real app in [app/](../../app); its current state is [The Flutter app (state)](../app/app-state.md). This page describes the prototype as it was at the end of the bake-off. Spec: Bake-off (internal wiki).
 
 ## What it does
 

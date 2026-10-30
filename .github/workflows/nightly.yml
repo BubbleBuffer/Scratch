@@ -11,7 +11,7 @@
 # their tags; only tags containing "-nightly." are ever touched.
 #
 # The tag is created by GITHUB_TOKEN, so it does not trigger release.yml.
-# See wiki/architecture/repository-and-releases.md, "Nightly builds".
+# See wiki/releases/repository-and-releases.md, "Nightly builds".
 name: nightly
 
 on:

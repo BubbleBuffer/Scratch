@@ -20,7 +20,7 @@ The Windows app folder, and so the installer, also ships the BubblePaw
 `claude-code` extension with its production dependencies (`claude-code\`)
 and Bun (`bun\bun.exe`), beside `notes.exe`. Both are installed copies on
 disk, not linked into the app's own code; see the "Claude Code bundle"
-section of [wiki/architecture/windows-install.md](wiki/architecture/windows-install.md#claude-code-bundle)
+section of [wiki/releases/windows-install.md](wiki/releases/windows-install.md#claude-code-bundle)
 for the layout and size.
 
 - **Bun**, Windows x64 binary `bun\bun.exe`, MIT licence,

@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "Scratch consumes UI tokens and primitives from bb-ui and the optional chat pane from agent-kit; repository pins, compatibility and release updates."
-parent: "[[architecture/index]]"
+parent: "[[app/index]]"
 status: current
 ---
 

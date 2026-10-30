@@ -41,7 +41,7 @@ The previous open-time insert caused `PagesStore` to reload and scan `listPages`
 
 ### Edit cost on the 10k-row vault
 
-A content edit patches `PagesStore` in place instead of reloading and re-scanning the vault; structural changes still reload (see [app state](../architecture/app-state.md)). `app/test/edit_perf_test.dart` types one character into an ordinary page with the 10k-row Tasks collection present, 20 times, and waits until idle. Command: `flutter test --concurrency=1 test/edit_perf_test.dart`, debug build with the release bridge, on the Linux machine (2026-10-13). Each cell is the median of three runs; each run's p50 and p95 are over the 20 edits.
+A content edit patches `PagesStore` in place instead of reloading and re-scanning the vault; structural changes still reload (see [app state](../app/app-state.md)). `app/test/edit_perf_test.dart` types one character into an ordinary page with the 10k-row Tasks collection present, 20 times, and waits until idle. Command: `flutter test --concurrency=1 test/edit_perf_test.dart`, debug build with the release bridge, on the Linux machine (2026-10-13). Each cell is the median of three runs; each run's p50 and p95 are over the 20 edits.
 
 | Metric | Before (7cb34fb) p50 / p95 | After (b0e309b) p50 / p95 |
 |---|---|---|

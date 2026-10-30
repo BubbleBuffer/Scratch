@@ -10,7 +10,7 @@ status: "current (phase 1 built)"
 
 ## Format
 
-**A schedule is a note of type `schedule`.** Its definition is the note's frontmatter, stored as `type_data.schedule` ([data model](../architecture/data-model.md)). Reason: only pages carry properties and frontmatter; blocks do not. It sits in normal notes as a child page or an embed. Frontmatter is the stored format; users edit it in the schedule view.
+**A schedule is a note of type `schedule`.** Its definition is the note's frontmatter, stored as `type_data.schedule` ([data model](../core/data-model.md)). Reason: only pages carry properties and frontmatter; blocks do not. It sits in normal notes as a child page or an embed. Frontmatter is the stored format; users edit it in the schedule view.
 
 ```yaml
 type: schedule

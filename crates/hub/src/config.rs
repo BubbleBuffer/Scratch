@@ -3,7 +3,7 @@
 //! the `[oidc]` table, `NOTES_HUB_MCP_OAUTH_<KEY>` for `[mcp_oauth]`,
 //! `NOTES_HUB_AGENT_<KEY>` for `[agent]`, and
 //! `NOTES_HUB_SCHEDULES_<KEY>` for `[schedules]`). List values in variables are separated by commas
-//! or spaces. Reference: `wiki/architecture/hub.md`.
+//! or spaces. Reference: `wiki/sync/hub.md`.
 
 use std::path::{Path, PathBuf};
 

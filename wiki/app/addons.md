@@ -2,7 +2,7 @@
 type: topic
 layer: state
 summary: "The app as a thin shell plus a shared kit, with every feature an isolated add-on that registers types, blocks, views, commands, codecs, search sources and agent tools; enforced in CI."
-parent: "[[architecture/index]]"
+parent: "[[app/index]]"
 status: current
 ---
 
