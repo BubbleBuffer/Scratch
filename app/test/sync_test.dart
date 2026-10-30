@@ -41,8 +41,10 @@ void main() {
       await settle(tester);
 
       await tapAndSettle(tester, key('sidebar-settings'));
-      await tapAndSettle(tester, key('settings-nav-devices'));
+      // Devices are part of the "Sync and devices" page, below the sync part.
+      await tapAndSettle(tester, key('settings-nav-sync'));
       expect(find.text('No devices yet.'), findsOneWidget);
+      await tester.ensureVisible(key('devices-add'));
       await tapAndSettle(tester, key('devices-add'));
       await enterField(tester, 'device-name-field', 'Pixel');
       await tester.tap(key('create-pairing'));
@@ -79,7 +81,7 @@ void main() {
       // Close settings (Escape), then an edit there shows up here.
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await settle(tester);
-      expect(key('settings-nav-devices'), findsNothing);
+      expect(key('settings-nav-sync'), findsNothing);
       await real(tester, () => other.vault.renamePage(tv.pages['Budget']!, 'Budget 2027'));
       await real(tester, () => other.client!.syncOnce());
       await settleUntil(tester, () => find.text('Budget 2027').evaluate().isNotEmpty);
@@ -116,9 +118,10 @@ void main() {
 
       // Unpair: the device is listed as connected, then its token stops working.
       await tapAndSettle(tester, key('sidebar-settings'));
-      await tapAndSettle(tester, key('settings-nav-devices'));
+      await tapAndSettle(tester, key('settings-nav-sync'));
       await settleUntil(tester, () => sync.devices.any((d) => d.device != null));
       expect(sync.devices.single.device, other.vault.deviceId);
+      await tester.ensureVisible(key('unpair-Pixel'));
       await tester.tap(key('unpair-Pixel'));
       await settleUntil(tester, () => sync.devices.isEmpty);
       expect(key('device-Pixel'), findsNothing);

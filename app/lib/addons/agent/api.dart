@@ -31,7 +31,6 @@ export 'mobile_agent_settings.dart';
 export 'navigation.dart';
 export 'outline_names.dart';
 
-import 'package:flutter/widgets.dart';
 
 import '../../registry/addon_registry.dart';
 import '../../registry/block_codecs.dart';
@@ -102,15 +101,9 @@ class AgentAddon extends Addon {
         location: 'ai',
         placement: 'top',
         isVisible: (_) => AgentStore.canRun && !hubAgentPlatform,
-        build: (context) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SettingsHeading('Agent'),
-            AgentSettingsSection(
-              store: AgentStore.of(context.app),
-              onChanged: () => ctx.services.pumpAi(context),
-            ),
-          ],
+        build: (context) => AgentSettingsSection(
+          store: AgentStore.of(context.app),
+          onChanged: () => ctx.services.pumpAi(context),
         ),
       ),
     );
@@ -121,13 +114,8 @@ class AgentAddon extends Addon {
         location: 'ai',
         placement: 'beforeTasks',
         isVisible: (_) => hubAgentPlatform,
-        build: (context) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SettingsHeading('Agent', top: 24),
+        build: (context) =>
             MobileAgentSettings(store: AgentStore.of(context.app)),
-          ],
-        ),
       ),
     );
   }

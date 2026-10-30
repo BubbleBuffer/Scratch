@@ -11,13 +11,11 @@
 
 import 'package:flutter/widgets.dart';
 
-import '../../addons/agent/api.dart' show AgentStore, HostRelayDetails;
 import '../../state/app_state.dart';
 import '../../src/rust/api/sync.dart' show redeemPairingCode;
 import '../../state/sync_store.dart';
 import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
-import '../ai/ai_settings.dart' show localAgentPlatform;
 import '../settings/controls.dart';
 import '../settings/settings_screen.dart';
 import '../settings/settings_store.dart';
@@ -25,7 +23,6 @@ import 'cert_trust.dart';
 import 'certificate_view.dart';
 import 'pairing_codec.dart';
 import 'hub_auth.dart';
-import 'hub_device_client.dart';
 import 'qr.dart';
 import 'sync_control.dart';
 import 'sync_icons.dart';
@@ -188,43 +185,6 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
             ],
           ),
         ],
-        // Desktop only: the hub may run this computer's agent tools.
-        if (signedIn && localAgentPlatform)
-          SettingsRow(
-            label: 'Let the hub use this computer',
-            description:
-                'AI apps connected to the hub can read and edit files and run '
-                'commands on this computer while the app is open. Off by default.',
-            trailing: Toggle(
-              key: const ValueKey('host-relay-toggle'),
-              value: s.hubUsesThisComputer,
-              onChanged: (on) => AppSettings.read(
-                context,
-              ).update((s) => s.hubUsesThisComputer = on),
-            ),
-          ),
-        // While on: this computer's name on the hub, the connection state
-        // and the connector address.
-        if (signedIn && localAgentPlatform && s.hubUsesThisComputer)
-          HostRelayDetails(
-            link: AgentStore.of(context.app).relay,
-            store: AgentStore.of(context.app),
-            hubUrl: s.clientUrl!,
-            name: s.clientDeviceLabel!.trim(),
-            onRename: (name) async {
-              final settings = AppSettings.read(context);
-              final deviceId = context.read<SyncStore>().vault.deviceId;
-              final used = await renameHubDevice(
-                hubUrl: s.clientUrl!,
-                token: s.clientToken ?? '',
-                deviceId: deviceId,
-                name: name,
-                vault: context.read<SyncStore>().vault.raw,
-                trusted: trustedFor(settings, s.clientUrl!),
-              );
-              settings.update((s) => s.clientDeviceLabel = used);
-            },
-          ),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),

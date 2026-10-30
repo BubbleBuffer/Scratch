@@ -55,7 +55,11 @@ Future<void> _openNotes(String url) async {
 }
 
 class UpdatesBody extends StatelessWidget {
-  const UpdatesBody({super.key});
+  const UpdatesBody({super.key, this.embedded = false});
+
+  /// Shown on the About page under the version: a section heading, and the
+  /// version row names the installed build.
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -79,9 +83,9 @@ class UpdatesBody extends StatelessWidget {
       action = TextBtn('Restart to update', key: const ValueKey('updates-install'), onTap: u.install);
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Updates', primary: true),
+      SettingsHeading('Updates', primary: !embedded),
       SettingsRow(
-        label: 'Version',
+        label: embedded ? 'Installed build' : 'Version',
         description: u.enabled ? '$appName ${_version(u.currentTag)} · ${_channel(u.currentTag)}' : '$appName · Development build',
       ),
       SettingsRow(

@@ -1,23 +1,22 @@
 import '../../services/addon_services.dart';
-// Settings > AI > Agent (desktop): whether the in-app agent runs, and
-// "Run AI on" (the vault's synced runner, [RunAiOnSetting]). Below it only
-// what applies to that runner: for the hub, its model (listed by the hub)
-// and tool set; for this computer, its model, tool set, computer access and
-// projects, the MCP servers ([McpServersSettings]) and the Claude Code
-// extension. The MCP servers also show while "Let the hub use this
-// computer" (Settings > Sync) shares them. The runner, models and tool sets
-// are vault settings (synced); the rest is this computer's
-// (ai_settings.json). If the chosen runner isn't reachable here, chats fall
-// back to the other one by themselves.
+// Settings > Agent (desktop): "Use the agent", then "Where it runs" (the
+// vault's synced runner, [RunAiOnSetting]) with that runner's model, "What
+// it may do" (its tool set), and, when it runs on this computer, "On this
+// computer" (computer access and projects, which need Everything) and
+// Advanced > Claude Code provider. MCP servers are on Settings >
+// Connectors; one line links there. The runner, models and tool sets are
+// vault settings (synced); the rest is this computer's (ai_settings.json).
+// If the chosen runner isn't reachable here, chats fall back to the other
+// one by themselves.
 
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../ui/ui.dart';
 import '../../core/file_dialogs.dart';
-import 'agent_mcp_settings.dart';
 import 'agent_runner_settings.dart';
 import 'agent_store.dart';
+import 'host_relay_status.dart' show showMcpServers;
 
 class AgentSettingsSection extends StatefulWidget {
   const AgentSettingsSection({
@@ -105,133 +104,183 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
   Widget build(BuildContext context) {
     final store = widget.store;
     final s = store.settings;
-    final c = context.colors;
-    Widget field(
-      String label,
-      String? description,
-      TextEditingController ctl,
-      String key,
-      String placeholder,
-      void Function(AiSettings, String) save,
-    ) => SettingsRow(
-      label: label,
-      description: description,
-      stack: true,
-      trailing: SettingsField(
-        fieldKey: ValueKey(key),
-        controller: ctl,
-        mono: true,
-        placeholder: placeholder,
-        onChanged: (v) => _set((s) => save(s, v.trim())),
-      ),
-    );
-    Widget note(String text, Key key, {bool problem = false}) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        key: key,
-        style: tsRaw(
-          12,
-          16,
-          400,
-          problem ? c.inlineCodeText : c.textSecondary,
-        ),
-      ),
-    );
     final chosen = chosenRunner(store);
     final onHub = chosen == AgentHost.hub;
     final resolved = store.resolvedHost;
-    // The MCP servers also serve the hub while it may use this computer.
-    final mcp = KeyedSubtree(
-      key: mcpServersAnchor,
-      child: McpServersSettings(store: store),
-    );
+    final everything =
+        store.vaultDefaults.toolSetFor(AgentHost.local) == 'everything';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SettingsRow(
-          label: 'Use the agent',
-          description: 'Chat with the agent in the Agent section.',
-          trailing: Toggle(
-            key: const ValueKey('agent-enabled-toggle'),
-            value: s.agentEnabled,
-            onChanged: (v) => _set((s) => s.agentEnabled = v),
-          ),
+        SSection(
+          first: true,
+          children: [
+            SRow(
+              label: 'Use the agent',
+              desc: 'Show the Agent chat and Ask AI.',
+              control: SSwitch(
+                key: const ValueKey('agent-enabled-toggle'),
+                label: 'Use the agent',
+                value: s.agentEnabled,
+                onChanged: (v) => _set((s) => s.agentEnabled = v),
+              ),
+            ),
+          ],
         ),
         if (s.agentEnabled) ...[
-          RunAiOnSetting(store: store, onChanged: widget.onChanged),
-          if (resolved.fellBack && resolved.wanted == AgentHost.hub)
-            note(
-              store.hubLink == null
-                  ? "Chats run on this computer until this vault syncs with an https:// hub."
-                  : "Chats run on this computer for now.",
-              const ValueKey('agent-host-fallback'),
-            ),
-          if (onHub) ...[
-            HubModelSetting(store: store, onChanged: widget.onChanged),
-            RunnerToolSetSetting(
-              store: store,
-              runner: AgentHost.hub,
-              onChanged: widget.onChanged,
-            ),
-            if (store.sharesThisComputer) mcp,
-          ] else ...[
-            ComputerModelSetting(store: store, onChanged: widget.onChanged),
-            RunnerToolSetSetting(
-              store: store,
-              runner: AgentHost.local,
-              onChanged: widget.onChanged,
-            ),
-            SettingsRow(
-              label: 'Computer access',
-              description: 'Lets the agent work in projects and run commands. Commands are not sandboxed.',
-              trailing: Toggle(
-                key: const ValueKey('agent-desktop-tools'),
-                value: s.desktopTools,
-                onChanged: (v) => _set((s) => s.desktopTools = v),
+          SSection(
+            title: 'Where it runs',
+            intro: 'One choice for all your devices.',
+            children: [
+              RunAiOnSetting(store: store, onChanged: widget.onChanged),
+              if (resolved.fellBack && resolved.wanted == AgentHost.hub)
+                SNotice(
+                  store.hubLink == null
+                      ? 'Chats run on this computer until this vault syncs with an https:// hub.'
+                      : 'Chats run on this computer for now.',
+                  kind: SNoticeKind.warn,
+                  textKey: const ValueKey('agent-host-fallback'),
+                ),
+              if (onHub)
+                HubModelSetting(store: store, onChanged: widget.onChanged)
+              else
+                ComputerModelSetting(store: store, onChanged: widget.onChanged),
+            ],
+          ),
+          SSection(
+            title: 'What it may do',
+            intro: onHub
+                ? 'Applies to the agent on your hub.'
+                : 'Applies to the agent on this computer.',
+            children: [
+              RunnerToolSetSetting(
+                store: store,
+                runner: onHub ? AgentHost.hub : AgentHost.local,
+                onChanged: widget.onChanged,
               ),
-            ),
-            if (s.desktopTools &&
-                store.host == AgentHost.local &&
-                (store.hostInfo?.projects ?? false))
-              _projects(context),
-            mcp,
-            field(
-              'Claude Code: bun program',
-              'Optional. Empty uses the bun program found on this computer.',
-              _bun,
-              'agent-bun-path',
-              store.claudeDetection?.bunPath ?? 'bun',
-              (s, v) => s.agentBunPath = v,
-            ),
-            field(
-              'Claude Code: extension folder',
-              'Optional. Empty uses the Claude Code extension found on this computer.',
-              _dir,
-              'agent-claude-code-dir',
-              store.claudeDetection?.claudeCodeDir ??
-                  'BubblePaw/extensions/claude-code',
-              (s, v) => s.agentClaudeCodeDir = v,
+            ],
+          ),
+          if (!onHub) ...[
+            SSection(
+              title: 'On this computer',
+              intro: 'Extra reach for the agent when it runs here.',
+              children: [
+                SRow(
+                  label: 'Computer access',
+                  desc:
+                      'Lets the agent open project folders and run commands. **Commands are not sandboxed:** they can do anything you can.',
+                  help: 'Turn off to keep the agent inside your notes.',
+                  disabled: !everything,
+                  reason: everything
+                      ? null
+                      : 'Needs “Everything” above. With Read or Write this switch does nothing.',
+                  control: SSwitch(
+                    key: const ValueKey('agent-desktop-tools'),
+                    label: 'Computer access',
+                    value: s.desktopTools,
+                    onChanged: everything
+                        ? (v) => _set((s) => s.desktopTools = v)
+                        : null,
+                  ),
+                ),
+                if (store.host == AgentHost.local &&
+                    (store.hostInfo?.projects ?? false))
+                  _projects(context, everything && s.desktopTools, everything),
+                SLinkLine(
+                  key: const ValueKey('agent-mcp-link'),
+                  before: 'MCP servers are on ',
+                  link: 'Connectors',
+                  after: '.',
+                  onTap: () => showMcpServers(context, open: false),
+                ),
+              ],
             ),
             if (store.error != null)
-              note(
+              SNotice(
                 store.error!,
-                const ValueKey('agent-project-error'),
-                problem: true,
+                kind: SNoticeKind.bad,
+                textKey: const ValueKey('agent-project-error'),
               ),
             if (store.host == AgentHost.local && store.openError != null)
-              note(
+              SNotice(
                 store.openError!,
-                const ValueKey('agent-settings-error'),
-                problem: true,
+                kind: SNoticeKind.bad,
+                textKey: const ValueKey('agent-settings-error'),
               ),
+            SAdvanced(
+              title: 'Advanced',
+              summary: 'Claude Code provider',
+              headerKey: const ValueKey('agent-advanced'),
+              initiallyOpen:
+                  s.agentBunPath.isNotEmpty || s.agentClaudeCodeDir.isNotEmpty,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text.rich(
+                    sRich(
+                      'The agent can use **Claude Code** as a model provider, with your Claude Code sign-in. It needs the bun program and BubblePaw’s Claude Code extension. Scratch finds both on its own; leave these empty unless Claude Code is missing from Model.',
+                      sDesc(context),
+                    ),
+                  ),
+                ),
+                _pathRow(
+                  label: 'bun program',
+                  desc: 'Path to bun.exe.',
+                  help: 'Only if bun is installed somewhere Scratch doesn’t look.',
+                  extra:
+                      'A wrong path hides Claude Code entirely. Clear the field to go back to automatic.',
+                  ctl: _bun,
+                  key: 'agent-bun-path',
+                  found: store.claudeDetection?.bunPath,
+                  fallback: 'bun',
+                  save: (s, v) => s.agentBunPath = v,
+                ),
+                _pathRow(
+                  label: 'Claude Code extension folder',
+                  desc: 'The folder that holds the extension’s src/main.ts.',
+                  help:
+                      'Only if you keep BubblePaw’s extension in your own checkout.',
+                  ctl: _dir,
+                  key: 'agent-claude-code-dir',
+                  found: store.claudeDetection?.claudeCodeDir,
+                  fallback: 'BubblePaw/extensions/claude-code',
+                  save: (s, v) => s.agentClaudeCodeDir = v,
+                ),
+              ],
+            ),
           ],
         ],
-        // Off, or with the hub chosen: the hub may still use this computer.
-        if (!s.agentEnabled && store.sharesThisComputer) mcp,
       ],
     );
   }
+
+  Widget _pathRow({
+    required String label,
+    required String desc,
+    required String help,
+    String? extra,
+    required TextEditingController ctl,
+    required String key,
+    required String? found,
+    required String fallback,
+    required void Function(AiSettings, String) save,
+  }) => SRow(
+    label: label,
+    desc: desc,
+    help: help,
+    extra: extra,
+    stack: true,
+    control: SizedBox(
+      width: double.infinity,
+      child: STextField(
+        fieldKey: ValueKey(key),
+        controller: ctl,
+        mono: true,
+        placeholder: found == null ? fallback : 'Found: $found',
+        onChanged: (v) => _set((s) => save(s, v.trim())),
+      ),
+    ),
+  );
 
   Future<void> _pickFolder() async {
     final path = await FileDialogs.instance.pickFolder(
@@ -277,131 +326,177 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
     });
   }
 
-  Widget _projects(BuildContext context) {
-    final c = context.colors;
+  Future<void> _removeProject(AgentProject project) async {
+    final ok = await showConfirm(
+      context,
+      title: 'Remove “${project.name}”?',
+      message:
+          'The agent can no longer work in ${project.path}. The folder and its files stay as they are.',
+      confirmLabel: 'Remove project',
+      danger: true,
+    );
+    if (ok && mounted) await widget.store.removeProject(project.id);
+  }
+
+  Widget _projects(BuildContext context, bool on, bool everything) {
     final store = widget.store;
-    return SettingsRow(
-      label: 'Projects',
-      description: 'Each project is a folder the agent can use as its working directory.',
-      stack: true,
-      trailing: Column(
-        key: const ValueKey('agent-projects'),
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final project in store.projects)
-            Padding(
-              key: ValueKey('agent-project-${project.id}'),
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _renaming == project.id
-                        ? SettingsField(
-                            fieldKey: const ValueKey(
-                              'agent-project-rename-field',
-                            ),
-                            controller: _rename,
-                            onSubmitted: (_) => _renameProject(project.id),
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                project.name,
-                                style: tsRaw(14, 20, 400, c.textPrimary),
-                              ),
-                              Text(
-                                project.path,
-                                style: tsRaw(12, 16, 400, c.textSecondary),
-                                softWrap: true,
-                              ),
-                            ],
-                          ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (_renaming == project.id) ...[
-                    TextBtn(
-                      'Save',
-                      key: const ValueKey('agent-project-rename-save'),
-                      onTap: _saving ? null : () => _renameProject(project.id),
+    final only = store.projects.length <= 1;
+    final list = Column(
+      key: const ValueKey('agent-projects'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SList(
+          foot: _adding
+              ? null
+              : SListFoot(
+                  children: [
+                    SButton(
+                      'Add project',
+                      key: const ValueKey('agent-project-add'),
+                      icon: Sx.plus,
+                      onTap: () => setState(() => _adding = true),
                     ),
-                    TextBtn(
-                      'Cancel',
-                      onTap: () => setState(() => _renaming = null),
-                    ),
-                  ] else ...[
-                    TextBtn(
-                      'Rename',
-                      key: ValueKey('agent-project-rename-${project.id}'),
-                      onTap: () => setState(() {
-                        _renaming = project.id;
-                        _rename.text = project.name;
-                      }),
-                    ),
-                    TextBtn(
-                      'Remove',
-                      key: ValueKey('agent-project-remove-${project.id}'),
-                      color: c.inlineCodeText,
-                      onTap: store.projects.length <= 1
-                          ? null
-                          : () => store.removeProject(project.id),
-                    ),
+                    if (only)
+                      Text(
+                        'Only ${store.projects.firstOrNull?.name ?? 'one folder'} so far. Add a folder to let the agent work there.',
+                        style: sHint(context),
+                      ),
                   ],
-                ],
+                ),
+          children: [
+            for (final project in store.projects)
+              KeyedSubtree(
+                key: ValueKey('agent-project-${project.id}'),
+                child: _renaming == project.id
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: STextField(
+                                fieldKey: const ValueKey(
+                                  'agent-project-rename-field',
+                                ),
+                                controller: _rename,
+                                autofocus: true,
+                                onSubmitted: (_) => _renameProject(project.id),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SButton(
+                              'Cancel',
+                              kind: SButtonKind.quiet,
+                              onTap: () => setState(() => _renaming = null),
+                            ),
+                            SButton(
+                              'Save',
+                              key: const ValueKey('agent-project-rename-save'),
+                              kind: SButtonKind.primary,
+                              onTap: _saving
+                                  ? null
+                                  : () => _renameProject(project.id),
+                            ),
+                          ],
+                        ),
+                      )
+                    : SItem(
+                        icon: Sx.folder,
+                        name: project.name,
+                        sub: project.path,
+                        subMono: true,
+                        trailing: [
+                          SIconButton(
+                            Sx.pencil,
+                            key: ValueKey('agent-project-rename-${project.id}'),
+                            label: 'Rename ${project.name}',
+                            onTap: () => setState(() {
+                              _renaming = project.id;
+                              _rename.text = project.name;
+                            }),
+                          ),
+                          if (!only)
+                            SIconButton(
+                              Sx.trash,
+                              key: ValueKey(
+                                'agent-project-remove-${project.id}',
+                              ),
+                              label: 'Remove ${project.name}',
+                              danger: true,
+                              onTap: () => _removeProject(project),
+                            ),
+                        ],
+                      ),
               ),
-            ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextBtn(
-              'Add project',
-              key: const ValueKey('agent-project-add'),
-              onTap: () => setState(() => _adding = true),
-            ),
-          ),
-          if (_adding) ...[
-            const SizedBox(height: 8),
-            SettingsField(
-              fieldKey: const ValueKey('agent-project-name'),
-              controller: _projectName,
-              placeholder: 'Project name',
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: SettingsField(
-                    fieldKey: const ValueKey('agent-project-path'),
-                    controller: _projectPath,
-                    placeholder: 'Folder path',
-                    mono: true,
-                  ),
-                ),
-                if (FileDialogs.instance.folders) ...[
-                  const SizedBox(width: 8),
-                  TextBtn(
-                    'Browse',
-                    key: const ValueKey('agent-project-browse'),
-                    onTap: _pickFolder,
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                SecondaryButton(
-                  label: 'Add',
-                  key: const ValueKey('agent-project-add-save'),
-                  height: 32,
-                  onTap: _saving ? null : _addProject,
-                ),
-                const SizedBox(width: 8),
-                TextBtn('Cancel', onTap: () => setState(() => _adding = false)),
-              ],
-            ),
           ],
-        ],
-      ),
+        ),
+        if (_adding)
+          SEditor(
+            title: 'Add a project',
+            actions: [
+              SButton(
+                'Cancel',
+                kind: SButtonKind.quiet,
+                onTap: () => setState(() => _adding = false),
+              ),
+              SButton(
+                'Add project',
+                key: const ValueKey('agent-project-add-save'),
+                kind: SButtonKind.primary,
+                onTap: _saving ? null : _addProject,
+              ),
+            ],
+            children: [
+              SField(
+                label: 'Folder',
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: STextField(
+                        fieldKey: const ValueKey('agent-project-path'),
+                        controller: _projectPath,
+                        placeholder: 'Folder path',
+                        mono: true,
+                      ),
+                    ),
+                    if (FileDialogs.instance.folders) ...[
+                      const SizedBox(width: 8),
+                      SButton(
+                        'Browse…',
+                        key: const ValueKey('agent-project-browse'),
+                        icon: Sx.folder,
+                        onTap: _pickFolder,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              SField(
+                label: 'Name',
+                hint: 'Filled in from the folder name when you browse.',
+                child: STextField(
+                  fieldKey: const ValueKey('agent-project-name'),
+                  controller: _projectName,
+                  placeholder: 'Project name',
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+    return SRow(
+      label: 'Projects',
+      desc:
+          'Folders the agent can work in. In a chat, the agent starts in one of them and runs its commands there.',
+      help:
+          'Add a folder when you want the agent to work on its files, such as a code repository or a writing project.',
+      stack: true,
+      disabled: !on,
+      reason: !everything
+          ? 'Needs “Everything” above.'
+          : !on
+          ? 'Turn on Computer access to use projects.'
+          : null,
+      below: on ? list : null,
     );
   }
 }

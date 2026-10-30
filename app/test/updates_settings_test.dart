@@ -72,7 +72,7 @@ void main() {
     UpdateController.current = u;
     final tv = await pumpApp(tester, mobile: false);
     await tapAndSettle(tester, key('sidebar-settings'));
-    await tapAndSettle(tester, key('settings-nav-updates'));
+    await tapAndSettle(tester, key('settings-nav-about'));
     return (fake, u, tv);
   }
 
@@ -153,7 +153,7 @@ void main() {
     UpdateController.current = UpdateController(currentTag: 'v0.1.0', updatesDir: 'u', settings: AppSettings(), backend: FakeBackend());
     await pumpApp(tester, mobile: true);
     await openMobileSettings(tester);
-    expect(key('settings-nav-updates'), findsNothing);
+    expect(find.byKey(const ValueKey('updates-check-now')), findsNothing);
     expect(find.text('Updates'), findsNothing);
   });
 }

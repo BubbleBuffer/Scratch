@@ -1,26 +1,38 @@
-// Settings > AI > Agent (desktop), next to the tool sets: the MCP servers the
+// Settings > Connectors > Tools for the agent (desktop): the MCP servers the
 // agent on this computer starts, for in-app chats and the host relay. Each
 // server is a command (with arguments and environment) or a URL (with
 // headers whose values come from environment variables), and can be turned
-// off. The list is this device's (AI settings `agentMcpServers`); changes
-// apply to both engines at once ([AgentStore]), and each server's state is
-// read from the chat engine every [McpServersSettings.statusInterval] while
-// the section is shown. What the section does is [McpServersController]; the
-// editor's data and the JSON format are in agent_mcp_draft.dart. This file
-// is the layout.
+// off. They start only while this computer's tool set is Everything; with
+// Read or Write the row shows a lock line linking to Settings > Agent. The
+// list is this device's (AI settings `agentMcpServers`); changes apply to
+// both engines at once ([AgentStore]), and each server's state is read from
+// the chat engine every [McpServersSettings.statusInterval] while shown.
+// What the section does is [McpServersController]; the editor's data and the
+// JSON format are in agent_mcp_draft.dart. This file is the layout.
 
 import 'package:flutter/widgets.dart';
 
-import '../../core/tool_sets.dart';
+import '../../features/settings/settings_kit.dart';
+import '../../features/settings/settings_screen.dart'
+    show SettingsSection, openSettingsSection;
 import '../../services/addon_services.dart';
 import '../../ui/ui.dart';
 import 'agent_mcp_controller.dart';
 import 'agent_mcp_draft.dart';
 import 'agent_store.dart';
 
-/// Marks the MCP servers in Settings > AI, so Settings > Sync can scroll to
-/// them ([showMcpServers]).
+/// Marks the MCP servers on Settings > Connectors, so other places can
+/// scroll to them ([showMcpServers]).
 final mcpServersAnchor = GlobalKey(debugLabel: 'mcp-servers');
+
+/// The tools panel's status: "3 servers · 1 off", or "No servers".
+String mcpServersSummary(AgentStore store) {
+  final all = store.settings.agentMcpServers.values;
+  if (all.isEmpty) return 'No servers';
+  final off = all.where((v) => v['enabled'] == false).length;
+  final n = '${all.length} ${all.length == 1 ? 'server' : 'servers'}';
+  return off == 0 ? n : '$n · $off off';
+}
 
 class McpServersSettings extends StatefulWidget {
   const McpServersSettings({super.key, required this.store});
@@ -58,10 +70,22 @@ class _McpServersSettingsState extends State<McpServersSettings> {
 
   void _changed() => setState(() {});
 
+  Future<void> _confirmRemove(String name) async {
+    final ok = await showConfirm(
+      context,
+      title: 'Remove “$name”?',
+      message:
+          'The agent loses the tools from this MCP server at once. You can add it again later.',
+      confirmLabel: 'Remove server',
+      danger: true,
+    );
+    if (ok && mounted) _mcp.remove(name);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     final store = widget.store;
+    final servers = _mcp.servers;
     final everything =
         store.vaultDefaults.toolSetFor(AgentHost.local) == 'everything';
     final errors = [
@@ -70,120 +94,120 @@ class _McpServersSettingsState extends State<McpServersSettings> {
       if (store.relay.mcpError != null)
         "Couldn't apply the servers to the hub relay: ${store.relay.mcpError}",
     ];
-    final note = !everything
-        ? 'Servers run only while Tools on this computer is '
-              '${toolSetLabel('everything')}.'
-        : _mcp.serverStates == null
+    final note = _mcp.serverStates == null && servers.isNotEmpty
         ? 'Their state shows while the agent runs on this computer.'
         : null;
-    return SettingsRow(
+    Widget add() => SButton(
+      'Add server',
+      key: const ValueKey('agent-mcp-add'),
+      icon: Sx.plus,
+      onTap: () => _mcp.edit(null),
+    );
+    final body = !everything
+        ? null
+        : Column(
+            key: const ValueKey('agent-mcp-servers'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (servers.isNotEmpty)
+                SList(
+                  foot: _mcp.editing ? null : SListFoot(children: [add()]),
+                  children: [
+                    for (final e in servers.entries)
+                      _row(context, e.key, e.value),
+                  ],
+                )
+              else if (!_mcp.editing)
+                SEmpty(
+                  icon: Sx.wrench,
+                  title: 'No MCP servers',
+                  text:
+                      'MCP servers are small programs or web services that give the agent extra tools, such as reading a database or searching documentation. Their setup instructions give you a command or a URL to add here.',
+                  action: add(),
+                ),
+              if (note != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    note,
+                    key: const ValueKey('agent-mcp-note'),
+                    style: sHint(context),
+                  ),
+                ),
+              if (errors.isNotEmpty)
+                SNotice(
+                  errors.join('\n'),
+                  kind: SNoticeKind.bad,
+                  textKey: const ValueKey('agent-mcp-error'),
+                ),
+              if (_mcp.editing) _editor(context),
+            ],
+          );
+    return SRow(
       label: 'MCP servers',
-      description:
-          'Programs and URLs that give the agent on this computer more tools, '
-          'in chats and for the hub. Saved on this device; changes apply at once.',
+      desc:
+          'Extra tools for the agent, from programs on this computer or from web addresses. Changes apply at once.',
+      help:
+          'Add one when a tool or service offers an MCP server and you want the agent to use it.',
       stack: true,
-      trailing: Column(
-        key: const ValueKey('agent-mcp-servers'),
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final e in _mcp.servers.entries)
-            _row(context, e.key, e.value, showState: everything),
-          if (note != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                note,
-                key: const ValueKey('agent-mcp-note'),
-                style: tsRaw(12, 16, 400, c.textSecondary),
-              ),
-            ),
-          if (errors.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                errors.join('\n'),
-                key: const ValueKey('agent-mcp-error'),
-                style: tsRaw(12, 16, 400, c.inlineCodeText),
-              ),
-            ),
-          if (_mcp.editing)
-            _editor(context)
-          else
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextBtn(
-                'Add server',
-                key: const ValueKey('agent-mcp-add'),
-                onTap: () => _mcp.edit(null),
-              ),
-            ),
-        ],
-      ),
+      disabled: !everything,
+      reason: everything
+          ? null
+          : 'Needs “Everything” on the Agent page. Servers don’t start with Read or Write.',
+      reasonActionLabel: everything ? null : 'Change on the Agent page',
+      reasonAction: everything
+          ? null
+          : () => openSettingsSection(context, SettingsSection.agent),
+      below: body,
     );
   }
 
-  Widget _row(
-    BuildContext context,
-    String name,
-    Map<String, dynamic> json, {
-    required bool showState,
-  }) {
-    final c = context.colors;
+  Widget _row(BuildContext context, String name, Map<String, dynamic> json) {
     final enabled = json['enabled'] != false;
-    final what = McpServerDraft.of(name, json).summary;
-    final state = showState ? _mcp.stateOf(name, enabled) : null;
-    return Padding(
+    final d = McpServerDraft.of(name, json);
+    final state = _mcp.stateOf(name, enabled);
+    final failed = state?.$2 ?? false;
+    final pill = state == null
+        ? null
+        : SStatus(
+            failed ? 'Failed' : state.$1,
+            key: ValueKey('agent-mcp-status-$name'),
+            kind: failed
+                ? SStatusKind.bad
+                : state.$1.startsWith('Running')
+                ? SStatusKind.ok
+                : SStatusKind.off,
+          );
+    return KeyedSubtree(
       key: ValueKey('agent-mcp-server-$name'),
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: tsRaw(14, 20, 400, c.textPrimary)),
-                if (what.isNotEmpty)
-                  Text(
-                    what,
-                    style: ts(
-                      const TypeSpec(12, 16, 400),
-                      c.textSecondary,
-                      mono: true,
-                    ),
-                    softWrap: true,
-                  ),
-                if (state != null)
-                  Text(
-                    state.$1,
-                    key: ValueKey('agent-mcp-status-$name'),
-                    style: tsRaw(
-                      12,
-                      16,
-                      400,
-                      state.$2 ? c.inlineCodeText : c.textSecondary,
-                    ),
-                    softWrap: true,
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextBtn(
-            'Edit',
-            key: ValueKey('agent-mcp-edit-$name'),
-            onTap: () => _mcp.edit(name),
-          ),
-          TextBtn(
-            'Remove',
-            key: ValueKey('agent-mcp-remove-$name'),
-            color: c.inlineCodeText,
-            onTap: () => _mcp.remove(name),
-          ),
-          const SizedBox(width: 8),
-          Toggle(
+      child: SItem(
+        icon: d.isUrl ? Sx.globe : Sx.terminal,
+        name: name,
+        tags: [d.isUrl ? 'URL' : 'Program'],
+        status: pill,
+        sub: d.summary,
+        subMono: true,
+        error: failed ? state!.$1 : null,
+        trailing: [
+          SSwitch(
             key: ValueKey('agent-mcp-enabled-$name'),
+            label: '$name on',
             value: enabled,
             onChanged: (on) => _mcp.setEnabled(name, on),
+          ),
+          const SizedBox(width: 4),
+          SIconButton(
+            Sx.pencil,
+            key: ValueKey('agent-mcp-edit-$name'),
+            label: 'Edit $name',
+            onTap: () => _mcp.edit(name),
+          ),
+          SIconButton(
+            Sx.trash,
+            key: ValueKey('agent-mcp-remove-$name'),
+            label: 'Remove $name',
+            danger: true,
+            onTap: () => _confirmRemove(name),
           ),
         ],
       ),
@@ -191,102 +215,105 @@ class _McpServersSettingsState extends State<McpServersSettings> {
   }
 
   Widget _editor(BuildContext context) {
-    final c = context.colors;
-    Widget label(String text) => Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 4),
-      child: Text(text, style: tsRaw(12, 16, 400, c.textSecondary)),
-    );
-    return Column(
+    return SEditor(
       key: const ValueKey('agent-mcp-editor'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      title: _mcp.original == null ? 'Add an MCP server' : 'Edit $_mcp.original',
+      actions: [
+        SButton(
+          'Cancel',
+          key: const ValueKey('agent-mcp-cancel'),
+          kind: SButtonKind.quiet,
+          onTap: _mcp.close,
+        ),
+        SButton(
+          _mcp.original == null ? 'Add server' : 'Save',
+          key: const ValueKey('agent-mcp-save'),
+          kind: SButtonKind.primary,
+          onTap: _mcp.save,
+        ),
+      ],
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: SettingsField(
-                fieldKey: const ValueKey('agent-mcp-name'),
-                controller: _mcp.name,
-                placeholder: 'Name',
-                autofocus: true,
-              ),
-            ),
-            const SizedBox(width: 8),
-            SelectButton<bool>(
+        SField(
+          label: 'How it runs',
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SSegmented<bool>(
               key: const ValueKey('agent-mcp-type'),
-              title: 'Server type',
               value: _mcp.isUrl,
               options: const [false, true],
-              labelOf: (url) => url ? 'URL' : 'Command',
+              keyOf: (url) => ValueKey(
+                url ? 'agent-mcp-type-url' : 'agent-mcp-type-command',
+              ),
+              labelOf: (url) =>
+                  url ? 'A web address' : 'A program on this computer',
               onChanged: (url) => _mcp.isUrl = url,
             ),
-          ],
+          ),
+        ),
+        SField(
+          label: 'Name',
+          child: STextField(
+            fieldKey: const ValueKey('agent-mcp-name'),
+            controller: _mcp.name,
+            placeholder: 'filesystem',
+            autofocus: true,
+          ),
         ),
         if (_mcp.isUrl) ...[
-          label('URL'),
-          SettingsField(
-            fieldKey: const ValueKey('agent-mcp-url'),
-            controller: _mcp.url,
-            placeholder: 'https://example.com/mcp',
-            mono: true,
+          SField(
+            label: 'URL',
+            child: STextField(
+              fieldKey: const ValueKey('agent-mcp-url'),
+              controller: _mcp.url,
+              placeholder: 'https://example.com/mcp',
+              mono: true,
+            ),
           ),
-          label(
-            'Headers, one per line as Header=ENV_VAR. Each value is read from '
-            'that environment variable on this computer; its name ends in '
-            '_API_KEY, _KEY or _TOKEN.',
-          ),
-          _LinesField(
-            key: const ValueKey('agent-mcp-headers'),
-            controller: _mcp.headers,
-            placeholder: 'Authorization=EXAMPLE_TOKEN',
+          SField(
+            label: 'Headers, Header=ENV_VAR per line (optional)',
+            hint:
+                'Each value is read from that environment variable on this computer. Its name ends in _API_KEY, _KEY or _TOKEN.',
+            child: _LinesField(
+              key: const ValueKey('agent-mcp-headers'),
+              controller: _mcp.headers,
+              placeholder: 'Authorization=EXAMPLE_TOKEN',
+            ),
           ),
         ] else ...[
-          label('Command'),
-          SettingsField(
-            fieldKey: const ValueKey('agent-mcp-command'),
-            controller: _mcp.command,
-            placeholder: 'npx',
-            mono: true,
+          SField(
+            label: 'Command',
+            child: STextField(
+              fieldKey: const ValueKey('agent-mcp-command'),
+              controller: _mcp.command,
+              placeholder: 'npx',
+              mono: true,
+            ),
           ),
-          label('Arguments, one per line'),
-          _LinesField(
-            key: const ValueKey('agent-mcp-args'),
-            controller: _mcp.args,
-            placeholder: '-y\n@example/mcp-server',
+          SField(
+            label: 'Arguments, one per line',
+            child: _LinesField(
+              key: const ValueKey('agent-mcp-args'),
+              controller: _mcp.args,
+              placeholder: '-y\n@example/mcp-server',
+            ),
           ),
-          label('Environment, one per line as KEY=value'),
-          _LinesField(
-            key: const ValueKey('agent-mcp-env'),
-            controller: _mcp.env,
-            placeholder: 'EXAMPLE_ROOT=/path',
+          SField(
+            label: 'Environment variables, KEY=value per line (optional)',
+            hint:
+                'Copy these from the server’s setup instructions. They usually give a command such as npx -y @org/server.',
+            child: _LinesField(
+              key: const ValueKey('agent-mcp-env'),
+              controller: _mcp.env,
+              placeholder: 'EXAMPLE_ROOT=/path',
+            ),
           ),
         ],
         if (_mcp.editorError != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              _mcp.editorError!,
-              key: const ValueKey('agent-mcp-editor-error'),
-              style: tsRaw(12, 16, 400, c.inlineCodeText),
-            ),
+          SNotice(
+            _mcp.editorError!,
+            kind: SNoticeKind.bad,
+            textKey: const ValueKey('agent-mcp-editor-error'),
           ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            SecondaryButton(
-              label: _mcp.original == null ? 'Add' : 'Save',
-              key: const ValueKey('agent-mcp-save'),
-              height: 32,
-              onTap: _mcp.save,
-            ),
-            const SizedBox(width: 8),
-            TextBtn(
-              'Cancel',
-              key: const ValueKey('agent-mcp-cancel'),
-              onTap: _mcp.close,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
       ],
     );
   }
