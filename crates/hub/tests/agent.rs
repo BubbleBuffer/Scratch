@@ -231,6 +231,18 @@ async fn sync(c: &Arc<SyncClient>) {
         .unwrap();
 }
 
+/// The bearer a device client sends for `token` now: a session, once the
+/// token is bound to its key (a bare bound token is refused).
+async fn session_bearer(root: String, device: String, url: String, token: String) -> String {
+    tokio::task::spawn_blocking(move || {
+        vault_sync::DeviceSession::shared(&root, &device, &url, &token, None)
+            .and_then(|s| s.bearer())
+    })
+    .await
+    .unwrap()
+    .unwrap()
+}
+
 fn titles(v: &Vault) -> Vec<String> {
     v.list_children(None, 0, 200)
         .unwrap()
@@ -290,7 +302,7 @@ async fn weekly_schedule_is_accepted_over_rpc_and_runs_without_a_provider() {
             )
             .unwrap();
     }
-    let token = e.server().hub().pair("scheduler client").unwrap();
+    let token = e.server().hub().pair_legacy_token("scheduler client").unwrap();
     let mut client = connect(&e.url, &token, "scheduler-client").await.unwrap();
     let state = client
         .call("schedule_state", json!({"page_id":page}))
@@ -385,7 +397,7 @@ async fn missing_or_bad_tokens_get_401_before_the_upgrade() {
         Ok(_) => panic!("connected with a bad token"),
     }
     // A good token for another device is refused as on /sync.
-    let token = e.server().hub().pair("phone").unwrap();
+    let token = e.server().hub().pair_legacy_token("phone").unwrap();
     let mine = connect(&e.url, &token, "dev-1").await.unwrap();
     match connect(&e.url, &token, "dev-2").await {
         Err(tokio_tungstenite::tungstenite::Error::Http(r)) => assert_eq!(r.status(), 403),
@@ -404,7 +416,7 @@ async fn unreadable_schedule_state_keeps_sync_up_and_reports_the_runner_error() 
     .await;
     let response = reqwest::get(format!("{}/health", e.url)).await.unwrap();
     assert_eq!(response.status(), 200);
-    let token = e.server().hub().pair("scheduler failure client").unwrap();
+    let token = e.server().hub().pair_legacy_token("scheduler failure client").unwrap();
     let mut client = connect(&e.url, &token, "scheduler-failure-client")
         .await
         .unwrap();
@@ -441,7 +453,7 @@ async fn sessions_scripts_events_and_a_syncing_peer() {
     let dir = TempDir::new("peer");
     let peer = dir.open();
     let device = peer.device_id();
-    let token = e.server().hub().pair("laptop").unwrap();
+    let token = e.server().hub().pair_legacy_token("laptop").unwrap();
     let mut c = connect(&e.url, &token, &device).await.unwrap();
 
     let s: w::AgentSession = get(c
@@ -517,8 +529,10 @@ async fn sessions_scripts_events_and_a_syncing_peer() {
     let err = c.call("rename_session", json!({})).await.unwrap_err();
     assert_eq!(err.code, w::code::INVALID_PARAMS);
 
-    // Several sockets per device.
-    let mut c2 = connect(&e.url, &token, &device).await.unwrap();
+    // Several sockets per device. The first connect bound the token to the
+    // device's key, so the second one sends its session.
+    let bearer = session_bearer(peer.root(), device.clone(), e.url.clone(), token.clone()).await;
+    let mut c2 = connect(&e.url, &bearer, &device).await.unwrap();
     let list: Vec<w::AgentSession> = get(c2.call("sessions", Value::Null).await.unwrap());
     assert!(list.iter().any(|x| x.id == s.id));
     assert_eq!(e.server().agent_sockets(), 2);
@@ -527,7 +541,7 @@ async fn sessions_scripts_events_and_a_syncing_peer() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn approvals_round_trip_over_the_socket() {
     let e = js_env().await;
-    let token = e.server().hub().pair("laptop").unwrap();
+    let token = e.server().hub().pair_legacy_token("laptop").unwrap();
     let mut c = connect(&e.url, &token, "dev-approve").await.unwrap();
     // Lower-level policy/approval RPCs remain functional for explicit callers.
     c.call(w::method::PERMISSION_MODE_SET, json!({"mode":"manual"}))
@@ -567,7 +581,7 @@ async fn approvals_round_trip_over_the_socket() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn sign_out_closes_the_devices_sockets() {
     let e = env().await;
-    let token = e.server().hub().pair("laptop").unwrap();
+    let token = e.server().hub().pair_legacy_token("laptop").unwrap();
     let mut c = connect(&e.url, &token, "dev-out").await.unwrap();
     c.call("sessions", Value::Null).await.unwrap();
     let r = reqwest::Client::new()
@@ -594,7 +608,7 @@ async fn an_agent_that_cannot_open_gives_503_while_sync_works() {
     let e = env_with(|data| fs::write(data.join("agent"), b"not a folder").unwrap()).await;
     let dir = TempDir::new("peer");
     let peer = dir.open();
-    let token = e.server().hub().pair("laptop").unwrap();
+    let token = e.server().hub().pair_legacy_token("laptop").unwrap();
     let r = reqwest::Client::new()
         .get(format!("{}/agent/ws", e.url))
         .header("Authorization", format!("Bearer {token}"))
@@ -616,8 +630,10 @@ async fn an_agent_that_cannot_open_gives_503_while_sync_works() {
     assert!(titles(&peer).contains(&"On the hub".to_string()));
 
     // The next connection retries the open: with the folder fixed it works.
+    // The sync above bound the token to the peer's key: send its session.
     fs::remove_file(e.data.0.join("agent")).unwrap();
-    let mut c = connect(&e.url, &token, &peer.device_id()).await.unwrap();
+    let bearer = session_bearer(peer.root(), peer.device_id(), e.url.clone(), token.clone()).await;
+    let mut c = connect(&e.url, &bearer, &peer.device_id()).await.unwrap();
     c.call("sessions", Value::Null).await.unwrap();
 }
 
@@ -631,7 +647,7 @@ async fn host_info_reports_the_hubs_base_pack() {
         fs::write(agent.join("permission-mode.json"), r#""ask""#).unwrap();
     })
     .await;
-    let token = e.server().hub().pair("laptop").unwrap();
+    let token = e.server().hub().pair_legacy_token("laptop").unwrap();
     let mut client = connect(&e.url, &token, "dev-host-info").await.unwrap();
     let info: w::HostInfo = get(client
         .call(w::method::HOST_INFO, Value::Null)
@@ -731,7 +747,7 @@ async fn runs_without_a_model_use_the_vault_default_for_hub() {
     let dir = TempDir::new("defaults_peer");
     let peer = dir.open();
     let device = peer.device_id();
-    let token = e.server().hub().pair("laptop").unwrap();
+    let token = e.server().hub().pair_legacy_token("laptop").unwrap();
     let mut c = connect(&e.url, &token, &device).await.unwrap();
     c.call("subscribe", Value::Null).await.unwrap();
 

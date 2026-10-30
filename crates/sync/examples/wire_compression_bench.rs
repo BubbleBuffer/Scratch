@@ -82,7 +82,7 @@ fn main() {
     for (label, url) in [("uncompressed", legacy_url), ("zstd", current_url)] {
         let root = work.0.join(label).to_string_lossy().into_owned();
         let vault = Arc::new(Vault::open(root).unwrap());
-        let client = SyncClient::new(vault.clone(), &url, &hub.pair(label).unwrap());
+        let client = SyncClient::new(vault.clone(), &url, &hub.pair_legacy_token(label).unwrap());
         let report = client.sync_once().unwrap();
         assert_eq!(report.created as usize, versions.len());
         for page in vault.page_versions().unwrap() {

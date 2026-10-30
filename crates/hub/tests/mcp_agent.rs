@@ -1076,7 +1076,7 @@ async fn oauth_metadata_challenge_audience_allowlist_and_origins_are_shared_with
         format!("Bearer resource_metadata=\"{}\"", env.metadata())
     );
     // Static agent and sync device tokens remain valid only for their original transports.
-    let device = env.server.hub().pair("gateway-test-device").unwrap();
+    let device = env.server.hub().pair_legacy_token("gateway-test-device").unwrap();
     for token in [&env.static_token, &device] {
         let response = env
             .send_at(&env.url, Some(token), None, request.clone())

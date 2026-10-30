@@ -34,6 +34,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 rustls-pki-types = "1"
 webpki-roots = "1"
 sha2 = "0.10"
+# Stateless challenge nonces (src/keys.rs): an HMAC tag under a per-process key.
+hmac = "0.12"
 # Details of a hub certificate the user is asked to trust.
 x509-parser = "0.18"
 getrandom = "0.3"
@@ -42,6 +44,8 @@ serde_json = "1"
 # Compressed /sync and /push bodies (the zstd-v1 capability): libzstd, level 3.
 zstd = "0.13"
 tracing = "0.1"
+# Device keys: Ed25519 identities, key files and possession proofs.
+bubblebuffer-device-key = { git = "https://github.com/BubbleBuffer/bubblebuffer-identity", tag = "v0.1.0" }
 
 [dev-dependencies]
 # Test certificates (unit tests in src/tls.rs and tests/tls.rs).

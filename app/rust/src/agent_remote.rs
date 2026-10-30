@@ -31,6 +31,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 use crate::api::agent::*;
 use vault_sync::tls::{Trust, TrustedCertificate};
+use vault_sync::DeviceSession;
 
 const PING_EVERY: Duration = Duration::from_secs(30);
 const SILENCE: Duration = Duration::from_secs(90);
@@ -62,6 +63,41 @@ struct Target {
     token: String,
     /// The device's trusted hub certificates (`vault_sync::tls`).
     trust: Arc<Trust>,
+    /// Session bearers for the device token (device keys); None sends the
+    /// bare token (no vault path given).
+    session: Option<Arc<DeviceSession>>,
+}
+
+/// The session provider shared with the sync client for the vault at
+/// `vault_root`, the hub at `base` (its http(s) URL) and `token`. None
+/// without a vault path.
+pub(crate) fn device_session(
+    vault_root: &str,
+    base: &str,
+    device: &str,
+    token: &str,
+    trust: &Arc<Trust>,
+) -> Option<Arc<DeviceSession>> {
+    if vault_root.trim().is_empty() {
+        return None;
+    }
+    DeviceSession::shared(vault_root, device, base, token, Some(trust.clone())).ok()
+}
+
+/// The bearer for a socket: a session from `session` (handshaking off the
+/// async runtime), or the bare token.
+async fn socket_bearer(session: &Option<Arc<DeviceSession>>, token: &str) -> Result<String, String> {
+    let Some(s) = session.clone() else {
+        return Ok(token.to_string());
+    };
+    match tokio::task::spawn_blocking(move || s.bearer()).await {
+        Ok(Ok(b)) => Ok(b),
+        Ok(Err(vault_sync::SyncError::Status(code @ (401 | 403), m))) => {
+            Err(format!("the hub refused this device ({code}): {}", m.trim()))
+        }
+        Ok(Err(e)) => Err(format!("hub unreachable: {e}")),
+        Err(e) => Err(format!("hub unreachable: {e}")),
+    }
 }
 
 enum Link {
@@ -126,12 +162,14 @@ pub(crate) async fn open_device_socket(
     device: &str,
     token: &str,
     trust: Arc<Trust>,
+    session: Option<Arc<DeviceSession>>,
 ) -> Result<Socket, String> {
     open_socket(&Target {
         url: url.to_owned(),
         device: device.to_owned(),
         token: token.to_owned(),
         trust,
+        session,
     })
     .await
 }
@@ -143,24 +181,40 @@ pub(crate) fn tls(trust: &Arc<Trust>) -> tokio_tungstenite::Connector {
     tokio_tungstenite::Connector::Rustls(vault_sync::tls::client_config(trust))
 }
 
+/// Opens `t`'s socket; a session the hub refuses (401: expired, or the
+/// hub restarted) is renewed once.
 async fn open_socket(t: &Target) -> Result<Socket, String> {
+    let bearer = socket_bearer(&t.session, &t.token).await?;
+    match open_socket_with(t, &bearer).await {
+        Err((401, _)) if t.session.is_some() && bearer != t.token => {
+            if let Some(s) = &t.session {
+                s.invalidate(&bearer);
+            }
+            let bearer = socket_bearer(&t.session, &t.token).await?;
+            open_socket_with(t, &bearer).await.map_err(|(_, e)| e)
+        }
+        r => r.map_err(|(_, e)| e),
+    }
+}
+
+async fn open_socket_with(t: &Target, bearer: &str) -> Result<Socket, (u16, String)> {
     use tokio_tungstenite::tungstenite::Error as E;
     let mut req = t
         .url
         .as_str()
         .into_client_request()
-        .map_err(|e| format!("hub unreachable: {e}"))?;
+        .map_err(|e| (0, format!("hub unreachable: {e}")))?;
     let h = req.headers_mut();
-    let auth = HeaderValue::from_str(&format!("Bearer {}", t.token))
-        .map_err(|_| "the device token is not valid text".to_string())?;
+    let auth = HeaderValue::from_str(&format!("Bearer {bearer}"))
+        .map_err(|_| (0, "the device token is not valid text".to_string()))?;
     h.insert("Authorization", auth);
     let device = HeaderValue::from_str(&t.device)
-        .map_err(|_| "the device id is not valid text".to_string())?;
+        .map_err(|_| (0, "the device id is not valid text".to_string()))?;
     h.insert("X-Device", device);
     let connecting =
         tokio_tungstenite::connect_async_tls_with_config(req, None, false, Some(tls(&t.trust)));
     match tokio::time::timeout(Duration::from_secs(20), connecting).await {
-        Err(_) => Err("hub unreachable: connecting timed out".into()),
+        Err(_) => Err((0, "hub unreachable: connecting timed out".into())),
         Ok(Ok((socket, _))) => Ok(socket),
         Ok(Err(E::Http(r))) => {
             let status = r.status();
@@ -169,13 +223,16 @@ async fn open_socket(t: &Target) -> Result<Socket, String> {
                 .as_ref()
                 .map(|b| String::from_utf8_lossy(b).trim().to_string())
                 .unwrap_or_default();
-            Err(match status.as_u16() {
-                401 | 403 => format!("the hub refused this device ({status}): {body}"),
-                503 => format!("the hub's agent is not available: {body}"),
-                _ => format!("the hub answered {status}: {body}"),
-            })
+            Err((
+                status.as_u16(),
+                match status.as_u16() {
+                    401 | 403 => format!("the hub refused this device ({status}): {body}"),
+                    503 => format!("the hub's agent is not available: {body}"),
+                    _ => format!("the hub answered {status}: {body}"),
+                },
+            ))
         }
-        Ok(Err(e)) => Err(format!("hub unreachable: {e}")),
+        Ok(Err(e)) => Err((0, format!("hub unreachable: {e}"))),
     }
 }
 
@@ -283,17 +340,23 @@ impl Shared {
 }
 
 impl Remote {
+    /// `vault_root`: the vault whose device key proves this device (empty:
+    /// the bare token, for a hub without device keys).
     pub(crate) fn connect(
         url: String,
         device: String,
         token: String,
         trusted: Vec<TrustedCertificate>,
+        vault_root: String,
     ) -> Result<Remote, String> {
+        let trust = Trust::for_hub(&url, &trusted);
+        let session = device_session(&vault_root, &url, &device, &token, &trust);
         let target = Target {
             url: ws_url(&url)?,
             device,
             token,
-            trust: Trust::for_hub(&url, &trusted),
+            trust,
+            session,
         };
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
@@ -965,14 +1028,14 @@ mod tests {
     #[test]
     fn a_remote_agent_lists_runs_streams_and_reconnects_with_a_gap() {
         let h = hub();
-        let token = h.server.as_ref().unwrap().hub().pair("laptop").unwrap();
+        let token = h.server.as_ref().unwrap().hub().pair_legacy_token("laptop").unwrap();
 
-        match Remote::connect(h.url.clone(), "dev-remote".into(), "bad".into(), Vec::new()) {
+        match Remote::connect(h.url.clone(), "dev-remote".into(), "bad".into(), Vec::new(), String::new()) {
             Err(e) => assert!(e.contains("refused"), "{e}"),
             Ok(_) => panic!("connected with a bad token"),
         }
 
-        let remote = Remote::connect(h.url.clone(), "dev-remote".into(), token, Vec::new()).unwrap();
+        let remote = Remote::connect(h.url.clone(), "dev-remote".into(), token, Vec::new(), String::new()).unwrap();
         let info = remote.host_info().unwrap();
         assert_eq!(info.kind, "hub");
         assert!(info.packs.is_empty());

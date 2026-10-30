@@ -8,6 +8,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../src/rust/api/types.dart' show TrustedHubCertificate;
+import '../../src/rust/api/vault.dart' show NotesVault;
+import '../sync/hub_bearer.dart';
 import 'agent_token_client.dart' show AgentTokenClient;
 
 /// A job as the hub reports it.
@@ -50,11 +53,20 @@ class HubJobsClient implements HubJobs {
     required this.hubUrl,
     required this.token,
     required this.deviceId,
+    required this.vault,
+    required this.trusted,
     HttpClient Function()? httpClient,
     this.timeout = const Duration(seconds: 20),
   }) : _httpClient = httpClient ?? HttpClient.new;
 
   final String hubUrl, token, deviceId;
+
+  /// The vault whose device key proves this device (the bearer is a session).
+  final NotesVault vault;
+
+  /// What this device trusts for the hub beyond the public roots (as sync).
+  final List<TrustedHubCertificate> trusted;
+
   final Duration timeout;
   final HttpClient Function() _httpClient;
 
@@ -76,13 +88,12 @@ class HubJobsClient implements HubJobs {
     }
   }
 
-  Future<Map<String, dynamic>> _call(Map<String, Object?> arguments) async {
-    final base = AgentTokenClient.hubUri(hubUrl);
-    if (base == null) throw const HubJobException('This hub address is not https.');
+  /// One `tools/call` on the hub's /mcp with [bearer]: the status and body.
+  Future<(int, String)> _post(Uri base, Map<String, Object?> arguments, String bearer) async {
     final client = _httpClient()..connectionTimeout = timeout;
     try {
       final req = await client.postUrl(base.resolve('/mcp')).timeout(timeout);
-      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $bearer');
       req.headers.set('X-Device', deviceId);
       req.headers.contentType = ContentType.json;
       req.write(jsonEncode({
@@ -93,11 +104,29 @@ class HubJobsClient implements HubJobs {
       }));
       final res = await req.close().timeout(timeout);
       final text = await res.transform(utf8.decoder).join().timeout(timeout);
-      if (res.statusCode == 401 || res.statusCode == 403) {
+      return (res.statusCode, text);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _call(Map<String, Object?> arguments) async {
+    final base = AgentTokenClient.hubUri(hubUrl);
+    if (base == null) throw const HubJobException('This hub address is not https.');
+    try {
+      final (status, text) = await sendToHub(
+        vault: vault,
+        hubUrl: hubUrl,
+        token: token,
+        trusted: trusted,
+        send: (bearer) => _post(base, arguments, bearer),
+        statusOf: (r) => r.$1,
+      );
+      if (status == 401 || status == 403) {
         throw const HubJobException("The hub didn't accept this device. Sign in to the hub again, or update the hub.");
       }
-      if (res.statusCode != 200) {
-        throw HubJobException("The hub couldn't start the agent (error ${res.statusCode}).");
+      if (status != 200) {
+        throw HubJobException("The hub couldn't start the agent (error $status).");
       }
       final Object? reply;
       try {
@@ -129,8 +158,9 @@ class HubJobsClient implements HubJobs {
       throw const HubJobException("The hub didn't answer in time.");
     } on IOException {
       throw const HubJobException("Couldn't reach the hub.");
-    } finally {
-      client.close(force: true);
+    } catch (_) {
+      // The bridge's handshake failed (hub unreachable, or the key refused).
+      throw const HubJobException("Couldn't reach the hub.");
     }
   }
 }

@@ -38,6 +38,8 @@ struct Signin {
     url: String,
     token: String,
     device: String,
+    /// The vault, whose device key proves this device to the hub.
+    vault: PathBuf,
 }
 
 pub fn setup(agent: Agent) -> Result<String> {
@@ -254,9 +256,42 @@ fn create_token(signin: &Signin, agent: Agent, host: &str) -> Result<(String, St
     )
 }
 
-/// `POST <hub>/agent-tokens`, with the device token and `X-Device`. The
-/// response body is returned as parsed JSON; errors never echo it.
+/// The bearer for the hub: a session proved with the vault's device key
+/// (the desktop app's sync shares the key), or the bare token for a hub
+/// without device keys.
+fn bearer(signin: &Signin) -> Result<(String, Option<std::sync::Arc<vault_sync::DeviceSession>>)> {
+    let session = vault_sync::DeviceSession::shared(
+        &signin.vault.to_string_lossy(),
+        &signin.device,
+        &signin.url,
+        &signin.token,
+        None,
+    )
+    .map_err(|_| anyhow!("the hub address in the Notes app settings is not an http(s) URL. Nothing was changed."))?;
+    match session.bearer() {
+        Ok(b) => Ok((b, Some(session))),
+        Err(vault_sync::SyncError::Status(401 | 403, _)) => bail!("the notes hub refused this computer's sign-in. Sign in to the hub in the Notes desktop app on this computer again, then run this again. Nothing was changed."),
+        Err(_) => bail!("cannot reach the notes hub. Check that the Notes app is running and signed in. Nothing was changed."),
+    }
+}
+
+/// `POST <hub>/agent-tokens`, with a session bearer and `X-Device`; a
+/// refused session is renewed once. The response body is returned as
+/// parsed JSON; errors never echo it.
 fn post_token(signin: &Signin, name: &str) -> Result<(u16, Value)> {
+    let (b, session) = bearer(signin)?;
+    let (status, value) = post_token_with(signin, &b, name)?;
+    match session {
+        Some(s) if status == 401 && b != signin.token => {
+            s.invalidate(&b);
+            let (b, _) = bearer(signin)?;
+            post_token_with(signin, &b, name)
+        }
+        _ => Ok((status, value)),
+    }
+}
+
+fn post_token_with(signin: &Signin, bearer: &str, name: &str) -> Result<(u16, Value)> {
     let agent = ureq::config::Config::builder()
         .http_status_as_error(false)
         // Never replay the device credential to a redirect destination.
@@ -269,7 +304,7 @@ fn post_token(signin: &Signin, name: &str) -> Result<(u16, Value)> {
     let body = json!({"name": name, "scope": "write"}).to_string();
     let mut response = agent
         .post(&format!("{}/agent-tokens", signin.url))
-        .header("Authorization", &format!("Bearer {}", signin.token))
+        .header("Authorization", &format!("Bearer {bearer}"))
         .header("X-Device", &signin.device)
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
@@ -379,7 +414,7 @@ fn read_signin() -> Result<Signin> {
         .unwrap_or_else(|| data.join("vault"));
     let url = hub_base(&raw_url)?;
     let device = read_device(&vault)?;
-    Ok(Signin { url, token, device })
+    Ok(Signin { url, token, device, vault })
 }
 
 fn hub_base(raw: &str) -> Result<String> {

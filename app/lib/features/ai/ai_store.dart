@@ -267,7 +267,14 @@ class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   }
 
   HubJobs _jobs(HubLink hub) =>
-      (hubJobsOverride ?? (h, d) => HubJobsClient(hubUrl: h.url, token: h.token, deviceId: d))(hub, vault.deviceId);
+      (hubJobsOverride ??
+          (h, d) => HubJobsClient(
+                hubUrl: h.url,
+                token: h.token,
+                deviceId: d,
+                vault: vault.raw,
+                trusted: _agents.hubTrust(h.url),
+              ))(hub, vault.deviceId);
 
   Future<HubJob> _hubJob(String prompt, String page, String? after) async {
     final hub = hubLink;

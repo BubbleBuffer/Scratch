@@ -48,7 +48,7 @@ impl Env {
         let store = AgentTokens::open(config.vault_dir()).unwrap();
         let server = notes_hub::start_on(listener, config).await.unwrap();
         let hub = server.hub().clone();
-        let device_token = tokio::task::spawn_blocking(move || hub.pair("phone"))
+        let device_token = tokio::task::spawn_blocking(move || hub.pair_legacy_token("phone"))
             .await
             .unwrap()
             .unwrap();

@@ -93,12 +93,12 @@ fn setup() -> Setup {
     let a = Arc::new(SyncClient::new(
         ta.open(),
         &url,
-        &hub.pair("phone").unwrap(),
+        &hub.pair_legacy_token("phone").unwrap(),
     ));
     let b = Arc::new(SyncClient::new(
         tb.open(),
         &url,
-        &hub.pair("laptop").unwrap(),
+        &hub.pair_legacy_token("laptop").unwrap(),
     ));
     Setup {
         _dirs: vec![th, ta, tb],
@@ -276,7 +276,7 @@ fn small_budgets_take_several_rounds() {
     let mut small = SyncClient::new(
         s.a.vault().clone(),
         &format!("http://{}", s.server.addr()),
-        &s.hub.pair("small").unwrap(),
+        &s.hub.pair_legacy_token("small").unwrap(),
     );
     small.set_budget(1000);
     let r = small.sync_once().unwrap();
@@ -298,7 +298,7 @@ fn tokens_bind_to_one_device() {
     let bad = SyncClient::new(s.a.vault().clone(), &url, "not-a-token");
     assert!(matches!(bad.sync_once(), Err(SyncError::Status(401, _))));
     // The phone's token, once used by the phone, fails for the laptop.
-    let token = s.hub.pair("shared").unwrap();
+    let token = s.hub.pair_legacy_token("shared").unwrap();
     SyncClient::new(s.a.vault().clone(), &url, &token)
         .sync_once()
         .unwrap();
@@ -308,7 +308,7 @@ fn tokens_bind_to_one_device() {
     let copy = TempDir::new("copy");
     fs::create_dir_all(copy.0.join(".vault")).unwrap();
     fs::write(copy.0.join(".vault/device"), s.hub_vault.device_id()).unwrap();
-    let c = SyncClient::new(copy.open(), &url, &s.hub.pair("copy").unwrap());
+    let c = SyncClient::new(copy.open(), &url, &s.hub.pair_legacy_token("copy").unwrap());
     assert!(matches!(c.sync_once(), Err(SyncError::Status(409, _))));
     let devices = s.hub.devices();
     assert_eq!(devices.len(), 4);
@@ -414,7 +414,7 @@ fn background_sync_follows_changes_on_both_sides() {
 #[test]
 fn index_only_churn_keeps_hub_change_cursor_and_transport_history_unchanged() {
     let s = setup();
-    let token = s.hub.pair("index-observer").unwrap();
+    let token = s.hub.pair_legacy_token("index-observer").unwrap();
     let observer_device = new_id();
     let changes = |query: String| {
         let response = s.hub.handle(HubRequest {

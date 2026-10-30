@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use vault_core::{version_includes, PageId, PageUpdate, Vault, VaultError};
 
 use crate::encoding;
+use crate::session::DeviceSession;
 use crate::tls::{self, Trust};
 use crate::wire::{
     ChangesResponse, PageBytes, PushRequest, PushRequestV2, PushResponse, SyncRequest,
@@ -141,6 +142,9 @@ pub struct SyncClient {
 struct Http {
     url: String,
     token: String,
+    /// Session bearers for this vault and hub (device keys); None for a
+    /// URL that is not http(s), which then sends the bare token.
+    session: Option<Arc<DeviceSession>>,
     device: String,
     agent: ureq::Agent,
     /// Pinned hub certificates and the last untrusted chain, shared with
@@ -156,7 +160,7 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 /// over from a hub that has stopped (its server threads would hold it
 /// without answering), and a sync makes only a few requests.
 /// TLS verifies with `trust`'s pins (see `tls`).
-fn agent(timeout: Duration, trust: &Arc<Trust>) -> ureq::Agent {
+pub(crate) fn agent(timeout: Duration, trust: &Arc<Trust>) -> ureq::Agent {
     let config = ureq::config::Config::builder()
         .http_status_as_error(false)
         .max_idle_connections(0)
@@ -188,6 +192,8 @@ struct Reply {
     down: u64,
     /// The hub confirmed the zstd capability.
     confirmed: bool,
+    /// The hub advertised device keys (`X-Device-Keys: 1`, on `/health`).
+    device_keys: bool,
 }
 
 impl Http {
@@ -203,7 +209,15 @@ impl Http {
         purge_device: bool,
     ) -> Result<Reply> {
         let url = format!("{}{}", self.url, path);
-        let auth = format!("Bearer {}", self.token);
+        // `/health` is public; everything else carries a session bearer
+        // (or the bare token for a hub without device keys), and a 401 on
+        // a session renews it once (a hub restart drops sessions).
+        let public = path == "/health";
+        let mut bearer = match (&self.session, public) {
+            (_, true) => None,
+            (Some(s), false) => Some(s.bearer()?),
+            (None, false) => Some(self.token.clone()),
+        };
         let compressed = match body {
             Some(b) if zstd.compress => measure!("client.request.zstd_compress", encoding::compress(b)?),
             _ => None,
@@ -212,22 +226,28 @@ impl Http {
         let up = wire.len() as u64;
         count_bytes!("client.request.raw_bytes", body.map_or(0, |b| b.len()));
         count_bytes!("client.request.wire_bytes", up);
+        let mut retried = false;
+        let mut resp = loop {
         let generation = self.trust.generation();
+        let auth = bearer.as_ref().map(|b| format!("Bearer {b}"));
         let resp = measure!("client.http.send", match method {
-            "GET" => self
-                .agent
-                .get(&url)
-                .header("Authorization", &auth)
-                .header(DEVICE_HEADER, &self.device)
-                .call(),
+            "GET" => {
+                let mut rb = self.agent.get(&url).header(DEVICE_HEADER, &self.device);
+                if let Some(a) = &auth {
+                    rb = rb.header("Authorization", a);
+                }
+                rb.call()
+            }
             m => {
                 let mut rb = if m == "PUT" {
                     self.agent.put(&url)
                 } else {
                     self.agent.post(&url)
                 };
+                if let Some(a) = &auth {
+                    rb = rb.header("Authorization", a);
+                }
                 rb = rb
-                    .header("Authorization", &auth)
                     .header(DEVICE_HEADER, &self.device)
                     .header("Content-Type", "application/octet-stream");
                 if zstd.advertise {
@@ -245,7 +265,7 @@ impl Http {
                 rb.send(wire)
             }
         });
-        let mut resp = match resp {
+        let resp = match resp {
             Ok(r) => r,
             // The handshake met an unpinned certificate with an unknown issuer.
             Err(e) => {
@@ -254,6 +274,15 @@ impl Http {
                     None => SyncError::Http(e.to_string()),
                 })
             }
+        };
+        match (&self.session, &bearer) {
+            (Some(s), Some(b)) if resp.status().as_u16() == 401 && !retried && *b != self.token => {
+                s.invalidate(b);
+                bearer = Some(s.bearer()?);
+                retried = true;
+            }
+            _ => break resp,
+        }
         };
         self.trust.clear();
         let status = resp.status().as_u16();
@@ -297,6 +326,10 @@ impl Http {
             purge_device: headers.iter().any(|(k, v)| {
                 k.eq_ignore_ascii_case(PURGE_DEVICE_CAPABILITY_HEADER)
                     && v == PURGE_DEVICE_CAPABILITY
+            }),
+            device_keys: headers.iter().any(|(k, v)| {
+                k.eq_ignore_ascii_case(crate::DEVICE_KEYS_CAPABILITY_HEADER)
+                    && v.trim() == crate::DEVICE_KEYS_CAPABILITY
             }),
             body,
             name,
@@ -363,6 +396,14 @@ impl SyncClient {
             http: Http {
                 url: url.trim_end_matches('/').to_string(),
                 token: token.to_string(),
+                session: DeviceSession::shared(
+                    &vault.root(),
+                    &vault.device_id(),
+                    url,
+                    token,
+                    Some(trust.clone()),
+                )
+                .ok(),
                 device: vault.device_id(),
                 agent: agent(Duration::from_secs(120), &trust),
                 trust,
@@ -415,6 +456,10 @@ impl SyncClient {
             .call("GET", "/health", None, None, Zstd::default(), false)?;
         report.bytes_up += health.up;
         report.bytes_down += health.down;
+        // The session provider learns the hub's device keys from this probe.
+        if let Some(s) = &self.http.session {
+            s.note_health(health.device_keys);
+        }
         if !health.purge_v2 && !st.warned_legacy_hub {
             tracing::warn!(
                 "Purge recovery is off against this hub (protocol v1); edits to permanently deleted pages may be dropped"

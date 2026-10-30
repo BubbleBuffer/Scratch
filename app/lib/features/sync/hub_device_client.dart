@@ -8,7 +8,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../src/rust/api/types.dart' show TrustedHubCertificate;
+import '../../src/rust/api/vault.dart' show NotesVault;
 import '../ai/agent_token_client.dart' show AgentTokenClient;
+import 'hub_bearer.dart';
 
 class HubRenameException implements Exception {
   const HubRenameException(this.message);
@@ -29,18 +32,22 @@ typedef HubDeviceRename =
 HubDeviceRename? debugRenameHubDevice;
 
 /// Renames the device; returns the name the hub saved. Throws
-/// [HubRenameException] with a message to show.
+/// [HubRenameException] with a message to show. [vault] proves this device
+/// with its key (the bearer is a session; null sends the bare token);
+/// [trusted]: what it trusts for the hub, as for sync.
 Future<String> renameHubDevice({
   required String hubUrl,
   required String token,
   required String deviceId,
   required String name,
+  NotesVault? vault,
+  List<TrustedHubCertificate> trusted = const [],
 }) {
   final debug = debugRenameHubDevice;
   if (debug != null) {
     return debug(hubUrl: hubUrl, token: token, deviceId: deviceId, name: name);
   }
-  return _rename(hubUrl, token, deviceId, name);
+  return _rename(hubUrl, token, deviceId, name, vault, trusted);
 }
 
 Future<String> _rename(
@@ -48,6 +55,8 @@ Future<String> _rename(
   String token,
   String deviceId,
   String name,
+  NotesVault? vault,
+  List<TrustedHubCertificate> trusted,
 ) async {
   const timeout = Duration(seconds: 20);
   final base = AgentTokenClient.hubUri(hubUrl);
@@ -56,15 +65,26 @@ Future<String> _rename(
   }
   final client = HttpClient()..connectionTimeout = timeout;
   try {
-    final req = await client
-        .postUrl(base.resolve('/device/name'))
-        .timeout(timeout);
-    req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-    req.headers.set('X-Device', deviceId);
-    req.headers.contentType = ContentType.json;
-    req.write(jsonEncode({'name': name}));
-    final res = await req.close().timeout(timeout);
-    final text = await res.transform(utf8.decoder).join().timeout(timeout);
+    Future<(HttpClientResponse, String)> post(String bearer) async {
+      final req = await client
+          .postUrl(base.resolve('/device/name'))
+          .timeout(timeout);
+      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $bearer');
+      req.headers.set('X-Device', deviceId);
+      req.headers.contentType = ContentType.json;
+      req.write(jsonEncode({'name': name}));
+      final res = await req.close().timeout(timeout);
+      return (res, await res.transform(utf8.decoder).join().timeout(timeout));
+    }
+
+    final (res, text) = await sendToHub(
+      vault: vault,
+      hubUrl: hubUrl,
+      token: token,
+      trusted: trusted,
+      send: post,
+      statusOf: (r) => r.$1.statusCode,
+    );
     Object? reply;
     try {
       reply = jsonDecode(text);
@@ -94,6 +114,9 @@ Future<String> _rename(
   } on TimeoutException {
     throw const HubRenameException("The hub didn't answer in time.");
   } on IOException {
+    throw const HubRenameException("Couldn't reach the hub.");
+  } catch (_) {
+    // The bridge's handshake failed (hub unreachable, or the key refused).
     throw const HubRenameException("Couldn't reach the hub.");
   } finally {
     client.close(force: true);

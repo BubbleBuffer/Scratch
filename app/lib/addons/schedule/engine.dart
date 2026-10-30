@@ -68,6 +68,7 @@ class EngineScheduleBackend extends ScheduleBackend {
         device: _vault.deviceId,
         token: link.token,
         trusted: _settings.trustedCertificates.trustFor(link.url),
+        vaultRoot: _vault.root,
       );
     } catch (e) {
       throw ScheduleUnavailable('Hub not reachable: ${_detail(e)}');

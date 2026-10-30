@@ -91,10 +91,11 @@ Plain HTTP on the tiny_http hub (Tailscale provides transport security); HTTPS t
 
 ## Pairing and auth
 
-- `vault-hub <dir> --pair <label>` (or `Hub::pair`) prints a random 256-bit token. The hub stores only its SHA-256, with the label, in `.vault/hub/tokens.json`. `--unpair <label>` revokes it; `--devices` lists them.
+- `vault-hub <dir> --pair <label>` (or `Hub::pair`) prints a one-time pairing code (below); `Hub::pair_legacy_token` still makes a random 256-bit token. The hub stores only its SHA-256, with the label, in `.vault/hub/tokens.json`. `--unpair <label>` revokes it; `--devices` lists them.
 - A token binds to the first device id that uses it. Other devices get 403. A device already bound under another label gets 409, and so does a request with the hub's own device id.
 - **Login tokens** (`notes-hub`, 2026-10-08): `Hub::login_device(device, name)` creates an entry of the same kind, already bound to the device. It first drops that device's earlier entries (a re-login replaces its token) and suffixes the label ` (2)`, ` (3)`, ... if another entry has it. `Hub::sign_out(token)` drops the entry of a token.
 - Token hashes are compared in constant time over every entry (`vault_sync::ct_eq`).
+- **Device keys** (2026-10-30): each vault holds an Ed25519 key in `.vault/device-key.json`; `Hub::pair` now issues a one-time code redeemed with that key at `/auth/pair`, a legacy token is bound to the key on its first sync (`/auth/upgrade`), and from then on the client sends 1-hour sessions (`DeviceSession`) and the bare token is refused. See [Device keys](device-keys.md).
 - The hub runs one thread per request (tiny_http). `vault-hub <dir> --listen <addr>` serves until killed; `Hub::serve(addr)` embeds it and returns a `HubServer` that stops when dropped.
 
 ## Trusted certificates (2026-10-19)

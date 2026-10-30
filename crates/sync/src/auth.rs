@@ -56,6 +56,55 @@ struct Entry {
     /// the name.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     named: bool,
+    /// The device's Ed25519 public key (hex), once the entry is key-bound:
+    /// its bare token then authenticates nothing but a sign-out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pubkey: Option<String>,
+    /// The key's id (`bubblebuffer_device_key::DeviceId`, as text).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    key_id: Option<String>,
+    /// A pending pairing code: `hash` is the code's hash, redeemable once
+    /// at `/auth/pair` until this time (ms since the epoch). Never a
+    /// bearer token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    code_expires_ms: Option<i64>,
+}
+
+impl Entry {
+    fn new(hash: String, label: String, device: Option<String>) -> Entry {
+        Entry {
+            hash,
+            label,
+            device,
+            created_ms: now_ms(),
+            host: false,
+            named: false,
+            pubkey: None,
+            key_id: None,
+            code_expires_ms: None,
+        }
+    }
+
+    fn pending(&self) -> bool {
+        self.code_expires_ms.is_some()
+    }
+}
+
+/// A device's public key and key id, as bound to its entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BoundKey {
+    /// 32 bytes, hex.
+    pub pubkey: String,
+    pub key_id: String,
+}
+
+/// How long a pairing code stays redeemable.
+const PAIR_CODE_TTL_MS: i64 = 10 * 60 * 1000;
+
+/// Drops pairing codes that expired.
+fn prune(entries: &mut Vec<Entry>) {
+    let now = now_ms();
+    entries.retain(|x| x.code_expires_ms.is_none_or(|t| t > now));
 }
 
 /// The longest device name, in characters (as `/auth/start` allows).
@@ -64,10 +113,15 @@ pub const MAX_NAME_CHARS: usize = 64;
 /// The entry holding `token`, comparing hashes in constant time and
 /// looking at every entry.
 fn find(entries: &[Entry], token: &str) -> Option<usize> {
-    let hash = sha256_hex(token.as_bytes());
+    find_hash(entries, token, false)
+}
+
+/// Like [`find`] over the pending pairing codes (`codes`) or the tokens.
+fn find_hash(entries: &[Entry], secret: &str, codes: bool) -> Option<usize> {
+    let hash = sha256_hex(secret.as_bytes());
     let mut found = None;
     for (i, x) in entries.iter().enumerate() {
-        if ct_eq(x.hash.as_bytes(), hash.as_bytes()) {
+        if ct_eq(x.hash.as_bytes(), hash.as_bytes()) && x.pending() == codes {
             found = Some(i);
         }
     }
@@ -83,10 +137,27 @@ enum Verdict {
 }
 
 /// The check rules, applied to a file's entries.
-fn judge(entries: &[Entry], token: &str, device: &str) -> Result<Verdict> {
+fn judge(entries: &[Entry], token: &str, device: &str, require_keys: bool) -> Result<Verdict> {
     let Some(i) = find(entries, token) else {
         return Err(SyncError::Status(401, "unknown token".into()));
     };
+    if entries[i].pubkey.is_some() {
+        return Err(SyncError::Status(
+            401,
+            "this device signs in with its device key; use a session".into(),
+        ));
+    }
+    if require_keys {
+        return Err(SyncError::Status(
+            401,
+            "this hub requires device keys; sign in or pair this device again".into(),
+        ));
+    }
+    bind_verdict(entries, i, device)
+}
+
+/// Whether entry `i` is `device`'s, or free for it to bind.
+fn bind_verdict(entries: &[Entry], i: usize, device: &str) -> Result<Verdict> {
     match &entries[i].device {
         Some(d) if d == device => Ok(Verdict::Allowed),
         Some(_) => Err(SyncError::Status(
@@ -234,37 +305,143 @@ impl Tokens {
 
     /// A new token for a device named `label` (shown once; only its hash
     /// is kept).
-    pub fn pair(&self, label: &str) -> Result<String> {
+    /// The old pairing: a long-lived token. Tests and benchmarks only.
+    pub fn pair_legacy(&self, label: &str) -> Result<String> {
         let token = random_hex()?;
         let _file_lock = self.lock_file()?;
         let mut cache = self.lock();
         self.reload(&mut cache)?;
         let mut entries = cache.entries.clone();
-        entries.push(Entry {
-            hash: sha256_hex(token.as_bytes()),
-            label: label.to_string(),
-            device: None,
-            created_ms: now_ms(),
-            host: false,
-            named: false,
-        });
+        prune(&mut entries);
+        entries.push(Entry::new(sha256_hex(token.as_bytes()), label.to_string(), None));
         self.save(&mut cache, entries)?;
         Ok(token)
     }
 
-    /// Removes the tokens labelled `label`. Returns how many.
-    pub fn unpair(&self, label: &str) -> Result<usize> {
+    /// A one-time pairing code for a device named `label`, redeemable at
+    /// `/auth/pair` ([`Tokens::redeem_code`]) for `ttl_ms` (10 minutes when
+    /// None). Only its hash is kept.
+    pub fn pair(&self, label: &str, ttl_ms: Option<i64>) -> Result<String> {
+        let code = random_hex()?;
         let _file_lock = self.lock_file()?;
         let mut cache = self.lock();
         self.reload(&mut cache)?;
         let mut entries = cache.entries.clone();
+        prune(&mut entries);
+        let mut e = Entry::new(sha256_hex(code.as_bytes()), label.to_string(), None);
+        e.code_expires_ms = Some(now_ms() + ttl_ms.unwrap_or(PAIR_CODE_TTL_MS));
+        entries.push(e);
+        self.save(&mut cache, entries)?;
+        Ok(code)
+    }
+
+    /// Redeems a pairing code (once, whatever the outcome) for `device`
+    /// with `key`: the entry gets a new token, already key-bound. Returns
+    /// the token and the label.
+    pub fn redeem_code(
+        &self,
+        code: &str,
+        device: &str,
+        hub_device: &str,
+        key: &BoundKey,
+    ) -> Result<(String, String)> {
+        check_device_id(device, hub_device)?;
+        let token = random_hex()?;
+        let _file_lock = self.lock_file()?;
+        let mut cache = self.lock();
+        self.reload(&mut cache)?;
+        let mut entries = cache.entries.clone();
+        let before = entries.len();
+        prune(&mut entries);
+        let Some(i) = find_hash(&entries, code, true) else {
+            if entries.len() != before {
+                self.save(&mut cache, entries)?;
+            }
+            return Err(SyncError::Status(400, "invalid or expired pairing code".into()));
+        };
+        let mut e = entries.remove(i);
+        if let Some(other) = entries.iter().find(|x| x.device.as_deref() == Some(device)) {
+            let msg = format!(
+                "device {device} is already paired as {:?}; unpair it first, or \
+                 delete .vault/device if this vault is a copy",
+                other.label
+            );
+            self.save(&mut cache, entries)?;
+            return Err(SyncError::Status(409, msg));
+        }
+        e.hash = sha256_hex(token.as_bytes());
+        e.device = Some(device.to_string());
+        e.code_expires_ms = None;
+        e.created_ms = now_ms();
+        e.pubkey = Some(key.pubkey.clone());
+        e.key_id = Some(key.key_id.clone());
+        let label = e.label.clone();
+        entries.push(e);
+        self.save(&mut cache, entries)?;
+        Ok((token, label))
+    }
+
+    /// Binds `key` to the entry of `token`, used by `device` (binding the
+    /// device too on first use, as [`Tokens::check`] does). Refused (409)
+    /// when the entry is key-bound already, and (401) for an unknown token.
+    pub fn bind_key(&self, token: &str, device: &str, hub_device: &str, key: &BoundKey) -> Result<()> {
+        check_device_id(device, hub_device)?;
+        let _file_lock = self.lock_file()?;
+        let mut cache = self.lock();
+        self.reload(&mut cache)?;
+        let mut entries = cache.entries.clone();
+        let Some(i) = find(&entries, token) else {
+            return Err(SyncError::Status(401, "unknown token".into()));
+        };
+        // Another device's token stays a 403, bound or not.
+        bind_verdict(&entries, i, device)?;
+        if entries[i].pubkey.is_some() {
+            return Err(SyncError::Status(
+                409,
+                format!("this device is {}", crate::session::BOUND_ALREADY),
+            ));
+        }
+        entries[i].device = Some(device.to_string());
+        entries[i].pubkey = Some(key.pubkey.clone());
+        entries[i].key_id = Some(key.key_id.clone());
+        self.save(&mut cache, entries)
+    }
+
+    /// The key bound to `device`'s entry, if it has one.
+    pub fn key_of(&self, device: &str) -> Result<Option<BoundKey>> {
+        let mut cache = self.lock();
+        self.refresh(&mut cache)?;
+        Ok(cache
+            .entries
+            .iter()
+            .filter(|x| !x.pending() && x.device.as_deref() == Some(device))
+            .find_map(|x| {
+                Some(BoundKey {
+                    pubkey: x.pubkey.clone()?,
+                    key_id: x.key_id.clone()?,
+                })
+            }))
+    }
+
+    /// Removes the tokens labelled `label`. Returns how many.
+    /// Also returns the device ids of the removed entries.
+    pub fn unpair(&self, label: &str) -> Result<(usize, Vec<String>)> {
+        let _file_lock = self.lock_file()?;
+        let mut cache = self.lock();
+        self.reload(&mut cache)?;
+        let mut entries = cache.entries.clone();
+        let devices: Vec<String> = entries
+            .iter()
+            .filter(|x| x.label == label)
+            .filter_map(|x| x.device.clone())
+            .collect();
         let before = entries.len();
         entries.retain(|x| x.label != label);
         let n = before - entries.len();
         if n > 0 {
             self.save(&mut cache, entries)?;
         }
-        Ok(n)
+        Ok((n, devices))
     }
 
     /// The paired devices. If the file cannot be read, there are none: the
@@ -275,9 +452,11 @@ impl Tokens {
         if self.refresh(&mut cache).is_err() {
             return Vec::new();
         }
+        let now = now_ms();
         cache
             .entries
             .iter()
+            .filter(|x| x.code_expires_ms.is_none_or(|t| t > now))
             .map(|x| PairedDevice {
                 label: x.label.clone(),
                 device: x.device.clone(),
@@ -366,6 +545,17 @@ impl Tokens {
     /// the user renamed keeps its name, and a host stays a host. Returns
     /// the token (shown once) and the label used.
     pub fn login(&self, name: &str, device: &str, hub_device: &str) -> Result<(String, String)> {
+        self.login_with_key(name, device, hub_device, None)
+    }
+
+    /// [`Tokens::login`], key-bound from the start when `key` is given.
+    pub fn login_with_key(
+        &self,
+        name: &str,
+        device: &str,
+        hub_device: &str,
+        key: Option<&BoundKey>,
+    ) -> Result<(String, String)> {
         if device.is_empty() {
             return Err(SyncError::Status(400, "missing device id".into()));
         }
@@ -385,6 +575,7 @@ impl Tokens {
         let mut cache = self.lock();
         self.reload(&mut cache)?;
         let mut entries = cache.entries.clone();
+        prune(&mut entries);
         let earlier: Vec<Entry> = entries
             .iter()
             .filter(|x| x.device.as_deref() == Some(device))
@@ -405,53 +596,46 @@ impl Tokens {
                 label
             }
         };
-        entries.push(Entry {
-            hash: sha256_hex(token.as_bytes()),
-            label: label.clone(),
-            device: Some(device.to_string()),
-            created_ms: now_ms(),
-            host,
-            named: named.is_some(),
-        });
+        let mut e = Entry::new(sha256_hex(token.as_bytes()), label.clone(), Some(device.to_string()));
+        e.host = host;
+        e.named = named.is_some();
+        e.pubkey = key.map(|k| k.pubkey.clone());
+        e.key_id = key.map(|k| k.key_id.clone());
+        entries.push(e);
         self.save(&mut cache, entries)?;
         Ok((token, label))
     }
 
     /// Drops the entry of `token` (a device signing out). Returns whether
     /// there was one.
-    pub fn revoke(&self, token: &str) -> Result<bool> {
+    /// Works for a key-bound entry's token too: it is the entry's handle.
+    /// Returns None for an unknown token, else the entry's device id.
+    pub fn revoke(&self, token: &str) -> Result<Option<Option<String>>> {
         let _file_lock = self.lock_file()?;
         let mut cache = self.lock();
         self.reload(&mut cache)?;
         let mut entries = cache.entries.clone();
         let Some(i) = find(&entries, token) else {
-            return Ok(false);
+            return Ok(None);
         };
-        entries.remove(i);
+        let removed = entries.remove(i);
         self.save(&mut cache, entries)?;
-        Ok(true)
+        Ok(Some(removed.device))
     }
 
     /// Checks a request's token and device id; binds the token to the
     /// device on first use. Only the first use takes the file lock and
     /// writes; every other check reads the file (or the cache, if the file
     /// has not changed) and returns.
-    pub fn check(&self, token: &str, device: &str, hub_device: &str) -> Result<()> {
-        if device.is_empty() {
-            return Err(SyncError::Status(400, "missing device id".into()));
-        }
-        if device == hub_device {
-            return Err(SyncError::Status(
-                409,
-                "this vault is a copy of the hub's vault (same device id); \
-                 delete .vault/device in the copy"
-                    .into(),
-            ));
-        }
+    ///
+    /// A key-bound entry's token is refused (401), and so is an unbound
+    /// one when `require_keys`.
+    pub fn check(&self, token: &str, device: &str, hub_device: &str, require_keys: bool) -> Result<()> {
+        check_device_id(device, hub_device)?;
         {
             let mut cache = self.lock();
             self.refresh(&mut cache)?;
-            if let Verdict::Allowed = judge(&cache.entries, token, device)? {
+            if let Verdict::Allowed = judge(&cache.entries, token, device, require_keys)? {
                 return Ok(());
             }
         }
@@ -461,7 +645,7 @@ impl Tokens {
         let mut cache = self.lock();
         self.reload(&mut cache)?;
         let mut entries = cache.entries.clone();
-        match judge(&entries, token, device)? {
+        match judge(&entries, token, device, require_keys)? {
             Verdict::Allowed => Ok(()),
             Verdict::Bind(i) => {
                 entries[i].device = Some(device.to_string());
@@ -469,6 +653,22 @@ impl Tokens {
             }
         }
     }
+}
+
+/// Refuses an empty device id, and the hub's own.
+fn check_device_id(device: &str, hub_device: &str) -> Result<()> {
+    if device.is_empty() {
+        return Err(SyncError::Status(400, "missing device id".into()));
+    }
+    if device == hub_device {
+        return Err(SyncError::Status(
+            409,
+            "this vault is a copy of the hub's vault (same device id); \
+             delete .vault/device in the copy"
+                .into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Writes `bytes` to a new temp file beside `path`, then renames it over
@@ -604,36 +804,36 @@ mod tests {
     fn pair_check_and_refusals() {
         let root = TempRoot::new();
         let store = Tokens::open(&root.path()).unwrap();
-        let laptop = store.pair("laptop").unwrap();
+        let laptop = store.pair_legacy("laptop").unwrap();
         assert!(!fs::read_to_string(root.file()).unwrap().contains(&laptop));
 
-        store.check(&laptop, "dev-a", "hub").unwrap();
-        store.check(&laptop, "dev-a", "hub").unwrap();
+        store.check(&laptop, "dev-a", "hub", false).unwrap();
+        store.check(&laptop, "dev-a", "hub", false).unwrap();
         assert!(matches!(
-            store.check(&laptop, "dev-b", "hub"),
+            store.check(&laptop, "dev-b", "hub", false),
             Err(SyncError::Status(403, _))
         ));
         assert!(matches!(
-            store.check("nope", "dev-a", "hub"),
+            store.check("nope", "dev-a", "hub", false),
             Err(SyncError::Status(401, _))
         ));
         assert!(matches!(
-            store.check(&laptop, "", "hub"),
+            store.check(&laptop, "", "hub", false),
             Err(SyncError::Status(400, _))
         ));
         assert!(matches!(
-            store.check(&laptop, "hub", "hub"),
+            store.check(&laptop, "hub", "hub", false),
             Err(SyncError::Status(409, _))
         ));
 
         // A second token cannot bind a device that already has one.
-        let phone = store.pair("phone").unwrap();
+        let phone = store.pair_legacy("phone").unwrap();
         assert!(matches!(
-            store.check(&phone, "dev-a", "hub"),
+            store.check(&phone, "dev-a", "hub", false),
             Err(SyncError::Status(409, _))
         ));
-        assert!(!store.revoke("missing").unwrap());
-        assert!(store.revoke(&phone).unwrap());
+        assert!(store.revoke("missing").unwrap().is_none());
+        assert!(store.revoke(&phone).unwrap().is_some());
 
         let devices = Tokens::open(&root.path()).unwrap().devices();
         assert_eq!(devices.len(), 1);
@@ -686,15 +886,15 @@ mod tests {
         let store = Tokens::open(&root.path()).unwrap();
         let (old, label) = store.login("phone", "dev-p", "hub").unwrap();
         assert_eq!(label, "phone");
-        store.check(&old, "dev-p", "hub").unwrap();
+        store.check(&old, "dev-p", "hub", false).unwrap();
 
         let (new, label) = store.login("phone", "dev-p", "hub").unwrap();
         assert_eq!(label, "phone");
         assert!(matches!(
-            store.check(&old, "dev-p", "hub"),
+            store.check(&old, "dev-p", "hub", false),
             Err(SyncError::Status(401, _))
         ));
-        store.check(&new, "dev-p", "hub").unwrap();
+        store.check(&new, "dev-p", "hub", false).unwrap();
 
         let (_, label) = store.login("phone", "dev-q", "hub").unwrap();
         assert_eq!(label, "phone (2)");
@@ -716,18 +916,18 @@ mod tests {
         let root = TempRoot::new();
         let a = Tokens::open(&root.path()).unwrap();
         let b = Tokens::open(&root.path()).unwrap();
-        let old = a.pair("old").unwrap();
-        a.check(&old, "dev-old", "hub").unwrap();
+        let old = a.pair_legacy("old").unwrap();
+        a.check(&old, "dev-old", "hub", false).unwrap();
 
-        assert_eq!(b.unpair("old").unwrap(), 1);
+        assert_eq!(b.unpair("old").unwrap().0, 1);
         assert!(matches!(
-            a.check(&old, "dev-old", "hub"),
+            a.check(&old, "dev-old", "hub", false),
             Err(SyncError::Status(401, _))
         ));
 
-        let fresh = b.pair("fresh").unwrap();
-        a.pair("from-a").unwrap();
-        a.check(&fresh, "dev-fresh", "hub").unwrap();
+        let fresh = b.pair_legacy("fresh").unwrap();
+        a.pair_legacy("from-a").unwrap();
+        a.check(&fresh, "dev-fresh", "hub", false).unwrap();
 
         let text = fs::read_to_string(root.file()).unwrap();
         assert!(!text.contains("\"old\""));
@@ -751,7 +951,7 @@ mod tests {
         // Nothing has been written yet, so there is no lock file either.
         assert!(!root.lock_file().exists());
         assert!(matches!(
-            store.check("x", "dev", "hub"),
+            store.check("x", "dev", "hub", false),
             Err(SyncError::Status(401, _))
         ));
         assert!(!root.lock_file().exists(), "a refused check takes no lock");
@@ -769,7 +969,7 @@ mod tests {
         let first_mtime = fs::metadata(root.file()).unwrap().modified().unwrap();
 
         let store = Tokens::open(&root.path()).unwrap();
-        store.check("token-one", "dev-1", "hub").unwrap();
+        store.check("token-one", "dev-1", "hub", false).unwrap();
 
         let second = format!("[{}]", entry_json("bbbb", "token-two", Some("dev-1")));
         assert_eq!(second.len(), first.len());
@@ -781,9 +981,9 @@ mod tests {
             .set_times(fs::FileTimes::new().set_modified(first_mtime + Duration::from_secs(2)))
             .unwrap();
 
-        store.check("token-two", "dev-1", "hub").unwrap();
+        store.check("token-two", "dev-1", "hub", false).unwrap();
         assert!(matches!(
-            store.check("token-one", "dev-1", "hub"),
+            store.check("token-one", "dev-1", "hub", false),
             Err(SyncError::Status(401, _))
         ));
         assert_eq!(store.devices()[0].label, "bbbb");
@@ -800,7 +1000,7 @@ mod tests {
                 s.spawn(move || {
                     let store = Tokens::open(&path).unwrap();
                     for i in 0..PER_THREAD {
-                        store.pair(&format!("t{t}-{i}")).unwrap();
+                        store.pair_legacy(&format!("t{t}-{i}")).unwrap();
                     }
                 });
             }
@@ -820,7 +1020,7 @@ mod tests {
         // lock makes exactly one of them win; the other is refused.
         for _ in 0..10 {
             let root = TempRoot::new();
-            let token = Tokens::open(&root.path()).unwrap().pair("shared").unwrap();
+            let token = Tokens::open(&root.path()).unwrap().pair_legacy("shared").unwrap();
             let barrier = std::sync::Barrier::new(2);
             let results: Vec<Result<()>> = std::thread::scope(|s| {
                 let handles: Vec<_> = ["dev-x", "dev-y"]
@@ -830,7 +1030,7 @@ mod tests {
                         s.spawn(move || {
                             let store = Tokens::open(&path).unwrap();
                             barrier.wait();
-                            store.check(&token, dev, "hub")
+                            store.check(&token, dev, "hub", false)
                         })
                     })
                     .collect();
@@ -850,23 +1050,23 @@ mod tests {
     fn malformed_file_fails_closed() {
         let root = TempRoot::new();
         let store = Tokens::open(&root.path()).unwrap();
-        let token = store.pair("ci").unwrap();
+        let token = store.pair_legacy("ci").unwrap();
         let good = fs::read(root.file()).unwrap();
 
         let broken = b"[{\"hash\": \"x\"";
         fs::write(root.file(), broken).unwrap();
         assert!(matches!(
-            store.check(&token, "dev-a", "hub"),
+            store.check(&token, "dev-a", "hub", false),
             Err(SyncError::Io(_))
         ));
-        assert!(store.pair("next").is_err());
+        assert!(store.pair_legacy("next").is_err());
         assert!(store.revoke(&token).is_err());
         assert!(store.devices().is_empty());
         assert!(Tokens::open(&root.path()).is_err());
         assert_eq!(fs::read(root.file()).unwrap(), broken);
 
         fs::write(root.file(), &good).unwrap();
-        store.check(&token, "dev-a", "hub").unwrap();
+        store.check(&token, "dev-a", "hub", false).unwrap();
     }
 
     #[cfg(unix)]
@@ -876,8 +1076,8 @@ mod tests {
         let root = TempRoot::new();
         let store = Tokens::open(&root.path()).unwrap();
         for i in 0..3 {
-            let token = store.pair(&format!("d{i}")).unwrap();
-            store.check(&token, &format!("dev-{i}"), "hub").unwrap();
+            let token = store.pair_legacy(&format!("d{i}")).unwrap();
+            store.check(&token, &format!("dev-{i}"), "hub", false).unwrap();
             let v: Vec<serde_json::Value> =
                 serde_json::from_slice(&fs::read(root.file()).unwrap()).unwrap();
             assert_eq!(v.len(), i + 1);
@@ -913,8 +1113,8 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let root = TempRoot::new();
         let store = Tokens::open(&root.path()).unwrap();
-        let keep = store.pair("keep").unwrap();
-        store.check(&keep, "dev-k", "hub").unwrap();
+        let keep = store.pair_legacy("keep").unwrap();
+        store.check(&keep, "dev-k", "hub", false).unwrap();
 
         // The lock file already exists, so only the temp file's creation
         // fails: the save is what fails.
@@ -928,16 +1128,16 @@ mod tests {
             return;
         }
 
-        assert!(store.pair("late").is_err());
+        assert!(store.pair_legacy("late").is_err());
         assert!(store.revoke(&keep).is_err());
         // The unsaved revoke did not happen: the cache still holds the token.
-        store.check(&keep, "dev-k", "hub").unwrap();
+        store.check(&keep, "dev-k", "hub", false).unwrap();
         assert_eq!(store.devices().len(), 1);
         assert_eq!(names(&dir), vec![FILE.to_string(), LOCK_FILE.to_string()]);
         assert_eq!(Tokens::open(&root.path()).unwrap().devices().len(), 1);
 
         fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
-        store.pair("after").unwrap();
+        store.pair_legacy("after").unwrap();
         assert_eq!(store.devices().len(), 2);
     }
 
@@ -963,11 +1163,11 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let root = TempRoot::new();
         let store = Tokens::open(&root.path()).unwrap();
-        let token = store.pair("ci").unwrap();
+        let token = store.pair_legacy("ci").unwrap();
         // The first check binds the token and saves. The second reads the file
         // and caches its entries, which then authenticate on their own.
-        store.check(&token, "dev-a", "hub").unwrap();
-        store.check(&token, "dev-a", "hub").unwrap();
+        store.check(&token, "dev-a", "hub", false).unwrap();
+        store.check(&token, "dev-a", "hub", false).unwrap();
 
         let before = fs::metadata(root.file()).unwrap();
         let mode = before.permissions().mode() & 0o777;
@@ -988,14 +1188,14 @@ mod tests {
 
         // The cached entries must not authenticate while the file is unreadable.
         assert!(matches!(
-            store.check(&token, "dev-a", "hub"),
+            store.check(&token, "dev-a", "hub", false),
             Err(SyncError::Io(_))
         ));
         assert!(store.devices().is_empty());
 
         // Permission restored: the file is read again and the token works.
         fs::set_permissions(root.file(), fs::Permissions::from_mode(mode)).unwrap();
-        store.check(&token, "dev-a", "hub").unwrap();
+        store.check(&token, "dev-a", "hub", false).unwrap();
         assert_eq!(store.devices().len(), 1);
     }
 }

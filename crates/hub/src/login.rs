@@ -521,6 +521,12 @@ async fn web_callback(
 pub(crate) struct RedeemBody {
     code: String,
     device: String,
+    /// The device key (32 bytes, hex) and its key id: the new entry is
+    /// key-bound from the start, so the token alone buys only a session.
+    #[serde(default)]
+    pubkey: Option<String>,
+    #[serde(default)]
+    key_id: Option<String>,
 }
 
 pub(crate) async fn redeem(
@@ -531,13 +537,38 @@ pub(crate) async fn redeem(
         return not_configured();
     };
     // Taken on any attempt: a code is single use.
-    match login.take_code(&b.code) {
-        Some(i) if vault_sync::ct_eq(i.device.as_bytes(), b.device.as_bytes()) => no_store(
-            Json(json!({ "token": i.token, "label": i.label, "account": i.account }))
-                .into_response(),
-        ),
-        _ => json_error(StatusCode::BAD_REQUEST, "invalid_code"),
+    let i = match login.take_code(&b.code) {
+        Some(i) if vault_sync::ct_eq(i.device.as_bytes(), b.device.as_bytes()) => i,
+        _ => return json_error(StatusCode::BAD_REQUEST, "invalid_code"),
+    };
+    match (b.pubkey, b.key_id) {
+        (None, None) => {}
+        (Some(pubkey), Some(key_id)) => {
+            let (hub, token, device) = (state.hub.clone(), i.token.clone(), i.device.clone());
+            let bound = tokio::task::spawn_blocking(move || {
+                hub.bind_device_key(&token, &device, &pubkey, &key_id)
+            })
+            .await;
+            match bound {
+                Ok(Ok(())) => {}
+                Ok(Err(SyncError::Status(400, _))) => {
+                    return json_error(StatusCode::BAD_REQUEST, "invalid_key")
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!("redeem: binding the device key failed: {e}");
+                    return json_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error");
+                }
+                Err(e) => {
+                    tracing::error!("redeem: {e}");
+                    return json_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error");
+                }
+            }
+        }
+        _ => return json_error(StatusCode::BAD_REQUEST, "invalid_key"),
     }
+    no_store(
+        Json(json!({ "token": i.token, "label": i.label, "account": i.account })).into_response(),
+    )
 }
 
 pub(crate) async fn signout(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -551,14 +582,18 @@ pub(crate) async fn signout(State(state): State<Arc<AppState>>, headers: HeaderM
     };
     let hub = state.hub.clone();
     let t = token.clone();
-    match tokio::task::spawn_blocking(move || hub.sign_out(&t)).await {
-        Ok(Ok(true)) => {
-            // The device's agent sockets end with its token.
+    match tokio::task::spawn_blocking(move || hub.sign_out_device(&t)).await {
+        Ok(Ok(Some(device))) => {
+            // The device's agent sockets end with its token and sessions.
             state.agent.close_token(&token);
             state.hosts.close_token(&token);
+            if let Some(d) = device {
+                state.agent.close_device(&d);
+                state.hosts.close_device(&d);
+            }
             StatusCode::NO_CONTENT.into_response()
         }
-        Ok(Ok(false)) => json_error(StatusCode::UNAUTHORIZED, "unknown token"),
+        Ok(Ok(None)) => json_error(StatusCode::UNAUTHORIZED, "unknown token"),
         Ok(Err(e)) => {
             tracing::error!("signout: {e}");
             json_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error")

@@ -18,7 +18,7 @@ For the local amd64 image and the lead's VPS procedure, see [Hub deployment](hub
 
 - `notes-hub [--config <file>]` serves. The vault replica is `<data_dir>/vault`, created on first start.
 - `--devices`, `--unpair <label>`: as `vault-hub`.
-- `--pair <label>`: an emergency token that skips the login. It prints a warning to stderr.
+- `--pair <label>`: an emergency one-time pairing code that skips the login (single use, 10 minutes, redeemed at `POST /auth/pair`; see [Device keys](device-keys.md)). It prints a warning to stderr.
 - `--agent-token add <name> --scope read|write|everything [--expires 30d|90d|365d|never]` (default 90d), `--agent-token list` (name, tool set, created, expires, last used), `--agent-token revoke <name>` manage agent access. The app manages the same tokens over `/agent-tokens` (below). Each accepts the same `--config <file>` as the server and works while it runs; these commands open the token store without opening the vault.
 - Logs go to stdout through `tracing` (`RUST_LOG`, default `info`). One line per request: client address, method, path, status, time. Query strings are never logged, nor are tokens or codes.
 - SIGTERM or Ctrl+C stops it gracefully; open `/changes` long-polls end at once.
@@ -98,8 +98,9 @@ Operator steps for signing in are in [Provider sign-in](hub-deploy.md#provider-s
 | `/sync`, `/push`, `/changes`, `/blobs/<id>` | The sync protocol, unchanged ([Sync (state)](sync-state.md#protocol)). Paths outside the explicit hub routes fall through to `Hub::handle` on a blocking thread, with the body streamed through a sync reader only after the token check. |
 | `GET /auth/start?device=<id>&name=<label>&redirect=<uri>[&state=<s>]` | Starts a login (below). |
 | `GET /auth/callback?code&state` | The issuer's redirect back. |
-| `POST /auth/redeem` `{code, device}` | Trades a one-time code for `{token, label, account}`. `account` is the signed-in user's email from the verified ID token, or its `sub` when there is none (added 2026-10-11; the deployed hub does not send it yet, so the app shows its fallback). A bad, used, expired or other-device code gets 400 `{"error": "invalid_code"}`. |
-| `POST /auth/signout` | With `Authorization: Bearer <token>`: drops that token (204), or 401 if unknown. It also closes that token's agent sockets. |
+| `POST /auth/redeem` `{code, device[, pubkey, key_id]}` | Trades a one-time code for `{token, label, account}`. `account` is the signed-in user's email from the verified ID token, or its `sub` when there is none (added 2026-10-11; the deployed hub does not send it yet, so the app shows its fallback). A bad, used, expired or other-device code gets 400 `{"error": "invalid_code"}`. With `pubkey` and `key_id` the token is key-bound from the start ([Device keys](device-keys.md)); a malformed or half-given key gets 400 `invalid_key`. |
+| `POST /auth/signout` | With `Authorization: Bearer <token>` (the bare device token, also when key-bound): drops that token (204), or 401 if unknown. It also ends the device's sessions and closes its agent and host sockets. |
+| `POST /auth/challenge`, `/auth/session`, `/auth/upgrade`, `/auth/pair` | Device keys: a nonce, a session for a signed proof, binding a legacy token's key, and redeeming a pairing code. Served by `Hub::handle`; [Device keys](device-keys.md). With `require_device_keys` (`NOTES_HUB_REQUIRE_DEVICE_KEYS`, default off) unbound tokens are refused. |
 | `GET /agent/ws` | The agent over a WebSocket (below). |
 | `GET /agent-tokens`, `POST /agent-tokens`, `DELETE /agent-tokens/{name}` | List, create and revoke agent tokens from the app. Device token and `X-Device` required, checked like `/sync`; agent tokens and OAuth JWTs get 401. Below. |
 | `POST /mcp` | The vault MCP tools over Streamable HTTP (17 listed; 4 are read-only; `attach_file`'s base64 `data` may take the body past the 8 MiB request limit, up to about 14 MiB more), authenticated by agent tokens, or by Authentik OAuth tokens when the Claude connector is on (below). `GET` and other methods return 405. |

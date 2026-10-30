@@ -13,6 +13,7 @@ import 'package:notes_app/features/settings/settings_store.dart';
 import 'package:notes_app/features/sync/conflict_copy.dart';
 import 'package:notes_app/features/sync/conflicts.dart';
 import 'package:notes_app/features/sync/pairing_codec.dart';
+import 'package:notes_app/src/rust/api/sync.dart' show redeemPairingCode;
 import 'package:notes_app/state/sync_store.dart';
 
 import 'harness.dart';
@@ -43,18 +44,24 @@ void main() {
       await tester.tap(key('create-pairing'));
       await settleUntil(tester, () => key('pair-token').evaluate().isNotEmpty);
 
-      final token = textOf(tester, 'pair-token');
+      // A one-time pairing code (the field keeps its old key).
+      final pairCode = textOf(tester, 'pair-token');
       final url = textOf(tester, 'pair-url');
       final code = Pairing.parse(textOf(tester, 'pair-code'))!;
       expect(key('pairing-qr'), findsOneWidget);
       expect(url, 'http://${sync.hubAddress}');
       expect(code.url, url);
-      expect(code.token, token);
+      expect(code.code, pairCode);
+      expect(code.token, isEmpty);
 
       await tapAndSettle(tester, key('pair-done'));
       expect(key('device-Pixel'), findsOneWidget);
 
       // The other device's first sync brings every page.
+      final token = await real(
+        tester,
+        () => redeemPairingCode(vault: other.vault.raw, hubUrl: url, code: pairCode, trusted: const []),
+      );
       other.client = NotesSync(vault: other.vault.raw, url: url, token: token);
       final first = await real(tester, () => other.client!.syncOnce());
       expect(first.full, isTrue);
@@ -201,8 +208,8 @@ void main() {
       final hubPage = await real(tester, () => other.vault.createPage(title: 'Made on the desktop'));
       other.hub = await real(tester, () => NotesHub.newInstance(vault: other.vault.raw));
       final bound = await real(tester, () => other.hub!.start(addr: '127.0.0.1:0'));
-      final token = await real(tester, () => other.hub!.pair(label: 'Phone'));
-      final code = Pairing('http://$bound', token).encode();
+      final pairCode = await real(tester, () => other.hub!.pair(label: 'Phone'));
+      final code = Pairing.code('http://$bound', pairCode).encode();
 
       expect(key('sync-indicator'), findsNothing, reason: 'hidden while sync is off');
       await openMobileSettings(tester);
@@ -210,7 +217,7 @@ void main() {
       expect(key('hub-toggle'), findsNothing, reason: 'phones do not host');
       await enterField(tester, 'connect-hub-field', code);
       expect(tester.widget<EditableText>(find.descendant(of: key('connect-token-field'), matching: find.byType(EditableText))).controller.text,
-          token);
+          isEmpty, reason: 'a code link fills only the hub; connecting redeems the code');
       await tester.tap(key('connect-button'));
       final sync = tv.app.sync;
       await settleUntil(tester, () => sync.status.lastOkMs != null, timeout: const Duration(seconds: 20));

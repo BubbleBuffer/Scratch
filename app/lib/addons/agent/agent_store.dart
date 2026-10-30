@@ -337,6 +337,10 @@ class AgentStore extends ChangeNotifier {
   List<TrustedHubCertificate> _hubTrust(String url) =>
       _appSettings().trustedCertificates.trustFor(url);
 
+  /// The same trust for the hub at [url], for other hub clients (the AI
+  /// store's hub jobs).
+  List<TrustedHubCertificate> hubTrust(String url) => _hubTrust(url);
+
   /// The vault's hub when the agent can run there (null: it cannot).
   HubLink? get hubLink =>
       HubLink.of(_appSettings(), allowLoopback: hubAgentPlatform && kDebugMode);
@@ -1026,6 +1030,7 @@ class AgentStore extends ChangeNotifier {
         device: vault.deviceId,
         token: hub.token,
         trusted: _hubTrust(hub.url),
+        vaultRoot: vault.root,
       );
       if (_disposed || !identical(agent, _agent) || visibleSessionId != id) {
         await connection.closeEvents();
@@ -1165,6 +1170,7 @@ class AgentStore extends ChangeNotifier {
       device: vault.deviceId,
       token: hub.token,
       trusted: _hubTrust(hub.url),
+      vaultRoot: vault.root,
       trustKey: app.trustedCertificates.trustKeyFor(hub.url),
       open: () => NotesAgent.open(
         vault: vault.raw,
@@ -1377,6 +1383,7 @@ class AgentStore extends ChangeNotifier {
             device: vault.deviceId,
             token: hub.token,
             trusted: _hubTrust(hub.url),
+            vaultRoot: vault.root,
           )
         : NotesAgent.open(
             vault: vault.raw,
