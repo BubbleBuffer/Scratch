@@ -7,6 +7,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../ai/agent_token_client.dart' show AgentTokenClient;
+import '../../src/rust/api/types.dart' show TrustedHubCertificate;
+import '../../src/rust/api/vault.dart' show NotesVault;
+import '../sync/hub_bearer.dart';
 
 /// A share link as the hub lists it. Unix milliseconds for [created].
 class Share {
@@ -73,6 +76,8 @@ class ShareClient {
     required this.hubUrl,
     required this.token,
     required this.deviceId,
+    this.vault,
+    this.trusted = const [],
     HttpClient Function()? httpClient,
     this.timeout = const Duration(seconds: 15),
   }) : _httpClient = httpClient ?? HttpClient.new;
@@ -80,6 +85,14 @@ class ShareClient {
   final String hubUrl;
   final String token;
   final String deviceId;
+
+  /// The vault whose device key proves this device (the bearer is a
+  /// session); null sends the bare token.
+  final NotesVault? vault;
+
+  /// What this device trusts for the hub beyond the public roots (as sync).
+  final List<TrustedHubCertificate> trusted;
+
   final Duration timeout;
   final HttpClient Function() _httpClient;
 
@@ -157,12 +170,38 @@ class ShareClient {
     if (base == null) {
       throw const ShareException('This hub address is not https.');
     }
+    try {
+      return await sendToHub(
+        vault: vault,
+        hubUrl: hubUrl,
+        token: token,
+        trusted: trusted,
+        send: (bearer) => _sendWith(base, bearer, method, path, json),
+        statusOf: (r) => r.$1,
+      );
+    } on ShareException {
+      rethrow;
+    } on IOException {
+      throw const ShareException("Couldn't reach the hub.");
+    } catch (_) {
+      // The bridge's handshake failed (hub unreachable, or the key refused).
+      throw const ShareException("Couldn't reach the hub.");
+    }
+  }
+
+  Future<(int, Object?)> _sendWith(
+    Uri base,
+    String bearer,
+    String method,
+    String path,
+    Map<String, Object?>? json,
+  ) async {
     final client = _httpClient()..connectionTimeout = timeout;
     try {
       final req = await client
           .openUrl(method, base.resolve(path))
           .timeout(timeout);
-      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $bearer');
       req.headers.set('X-Device', deviceId);
       if (json != null) {
         req.headers.contentType = ContentType.json;
