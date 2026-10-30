@@ -14,11 +14,11 @@ Settings opens as a centred panel on desktop, with the pages in a left list grou
 
 | Page | Group | What it holds |
 | --- | --- | --- |
-| General | none | Appearance and feedback. |
+| General | none | Theme as a System, Light or Dark control, and Write feedback (plus Shake to send feedback on a phone). |
 | Reminders | none | Reminders on or off, the lead time and the morning time. |
-| Sync and devices | Your vault | Hub sign-in, "Share this vault with your devices" (addresses, pairing, paired devices), Download all attachments, and "Run schedules on this device" (desktop). |
-| Conflicts | Your vault | Pending conflicts and "Resolve changes on their own". |
-| Storage | Your vault | The vault folder and Mounted folders (desktop). |
+| Sync and devices | Your vault | A status card (Not syncing, or the sync state), then Your hub (sign-in, Sync now, Disconnect, and the collapsed "Connect with a pairing code"), Attachments, and on desktop "This computer as a hub" (share switch, addresses, paired devices, listen address, "Run schedules on this device"). Trusted certificates is a collapsed panel that appears once a certificate is trusted. |
+| Conflicts | Your vault | Needs a look (pending conflicts or an empty state), Handling ("Resolve changes on their own") and Resolved in the last 30 days, each entry with Undo. |
+| Storage | Your vault | The vault folder location, a collapsed "Open another folder" (desktop), and Mounted folders (desktop) with an empty-state card. |
 | Shared links | Your vault | The share links this device's hub holds. Listed only while signed in to a hub, after Storage. |
 | Agent | AI | Use the agent, Run AI on (Hub or This computer), Model, What it may do, On this computer (desktop), Advanced (Claude Code's bun program and extension folder), Computer names, and Recent tasks. |
 | Connectors | AI | Three collapsed panels: Tools for the agent (MCP servers, desktop), Apps that use your vault (the `notes setup` commands and agent tokens), and This computer for hub apps (letting the hub use this computer, its addresses and its name). |
