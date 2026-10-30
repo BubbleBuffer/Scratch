@@ -161,7 +161,6 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                               key: const ValueKey('kanban-panel-assign'),
                               label: 'Assign to Agent',
                               icon: Ico.sendHorizontal,
-                              expand: true,
                               onTap: _assign,
                             ),
                           ),
