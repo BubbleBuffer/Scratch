@@ -82,7 +82,7 @@ The shared page host currently inserts an empty paragraph when it opens a block-
 
 Columns are the kanban's own list; property-driven columns and agent automation are future work. Type data is preserved by the core's existing `type-data:` front matter. Disabling the optional add-on preserves its pages and data; the kit handles an unavailable type.
 
-The card menu on desktop is reachable by keyboard: a card is a focus stop, the menu button shows while the card or the button has focus, and the context-menu key or Shift+F10 on the card opens the menu (so does Enter on the focused button). Focus starts on the first item, Up and Down move between items, Enter runs one, and Esc closes the menu and returns focus to the card (`keyboard_menu.dart`). The Run on picker is not keyboard-driven yet. Mobile long-press remains the kit's drag gesture; the phone menu is reached by the always-visible button.
+The card menu on desktop is reachable by keyboard: each card is one focus stop (the board's, which Enter opens), the menu button shows while the card has focus, and the context-menu key or Shift+F10 on the card opens the menu under it (the button itself is for the pointer and touch). Focus starts on the first item, Up and Down move between items, Enter runs one, and Esc closes the menu and returns focus to the card (`keyboard_menu.dart`). The Run on picker is not keyboard-driven yet. Mobile long-press remains the kit's drag gesture; the phone menu is reached by the always-visible button.
 
 Pending: an Assign to Agent button in the opened card. The design is being settled; today Assign is only in the card menu.
 

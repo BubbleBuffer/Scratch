@@ -11,12 +11,17 @@ import 'package:notes_app/addons/kanban/api.dart';
 
 import 'kanban_fixture.dart';
 
-/// The card's own focus node (the card is a keyboard focus stop).
+/// The board's keyboard stop for the first card (the card is one focus stop).
 FocusNode _cardFocus(WidgetTester tester) => tester
-    .widgetList<Focus>(find.byType(Focus))
-    .map((f) => f.focusNode)
-    .whereType<FocusNode>()
-    .firstWhere((n) => n.debugLabel == 'kanban card');
+    .widget<FocusableActionDetector>(
+      find
+          .descendant(
+            of: allCardSurfaces().first,
+            matching: find.byType(FocusableActionDetector),
+          )
+          .first,
+    )
+    .focusNode!;
 
 /// True when the keyboard focus is on, or inside, a widget found by [finder].
 bool _focusIsIn(Finder finder) {
@@ -334,21 +339,5 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await settle(tester);
     expect(editableWith('Some text about garden plan.'), findsOneWidget);
-  });
-
-  appTest('desktop keyboard: Enter on the focused menu button opens the card menu', (
-    tester,
-  ) async {
-    final garden = await _boardWithGarden(tester);
-
-    _cardFocus(tester).requestFocus();
-    await settle(tester);
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await settle(tester);
-    expect(_focusIsIn(cardMenuTrigger(garden)), isTrue, reason: 'Tab reaches the button');
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await settle(tester);
-    expect(menuItem('Open'), findsOneWidget);
   });
 }

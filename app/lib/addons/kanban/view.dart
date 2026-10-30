@@ -1,7 +1,6 @@
 // The kanban's widgets: the full page (title, then the board) and the compact
 // board an embed draws. Both use the kit's BoardRenderer.
 
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/models.dart';
@@ -77,6 +76,8 @@ class _KanbanBoardState extends State<KanbanBoard> {
         gutter: widget.inline ? 0 : widget.gutter,
         addCardLabel: 'New card',
         cardBuilder: _card,
+        onCardMenu: (context, column, card, anchor, focus) =>
+            _cardMenu(context, column, card, anchor, focus),
       ),
     );
     // Without a scope above, the board uses the agent's runners. The
@@ -189,7 +190,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     BoardColumn column,
     BoardCard card,
     Rect anchor,
-    FocusNode restoreFocus,
+    FocusNode? restoreFocus,
   ) {
     final source = _source;
     final phone = context.mobile;
@@ -302,12 +303,13 @@ class _KanbanBoardState extends State<KanbanBoard> {
 
 /// A card's box: its note body, with the card menu button in its own column
 /// at the top right, so the button never covers the note's text. On desktop
-/// the button shows while the pointer is over the card or focus is on the
-/// card or its button; on a phone it is always shown. The space is kept
-/// either way, so the body does not shift.
+/// the button shows while the pointer is over the card or the card has
+/// keyboard focus; on a phone it is always shown. The space is kept either
+/// way, so the body does not shift.
 ///
-/// The card takes keyboard focus. The context-menu key and Shift+F10 open the
-/// card menu from the card or its button; right-click opens it too.
+/// The board gives each card one keyboard stop. The context-menu key and
+/// Shift+F10 on it open the card menu (see `KanbanBoard.onCardMenu`); the
+/// button itself is for the pointer and for touch.
 class _CardShell extends StatefulWidget {
   const _CardShell({
     super.key,
@@ -321,7 +323,7 @@ class _CardShell extends StatefulWidget {
 
   /// Opens the menu under [anchor] (the menu button); the second argument is
   /// the node that gets focus back when the menu is closed with Esc.
-  final void Function(Rect anchor, FocusNode restoreFocus) onMenu;
+  final void Function(Rect anchor, FocusNode? restoreFocus) onMenu;
   final Widget body;
 
   @override
@@ -330,38 +332,23 @@ class _CardShell extends StatefulWidget {
 
 class _CardShellState extends State<_CardShell> {
   bool _hovered = false;
-  bool _focused = false;
-  final _focusNode = FocusNode(debugLabel: 'kanban card');
   final _buttonKey = GlobalKey();
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
 
   void _openMenu() {
     final box = _buttonKey.currentContext?.findRenderObject();
     if (box is! RenderBox || !box.hasSize) return;
-    widget.onMenu(box.localToGlobal(Offset.zero) & box.size, _focusNode);
-  }
-
-  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    final key = event.logicalKey;
-    final menuKey =
-        key == LogicalKeyboardKey.contextMenu ||
-        (key == LogicalKeyboardKey.f10 && HardwareKeyboard.instance.isShiftPressed);
-    if (!menuKey) return KeyEventResult.ignored;
-    _openMenu();
-    return KeyEventResult.handled;
+    widget.onMenu(
+      box.localToGlobal(Offset.zero) & box.size,
+      BoardCardFocus.maybeOf(context)?.node,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final phone = context.mobile;
-    final shown = phone || _hovered || _focused;
+    final focused = BoardCardFocus.maybeOf(context)?.focused ?? false;
+    final shown = phone || _hovered || focused;
     final content = widget.lifted
         ? widget.body
         : Row(
@@ -406,17 +393,10 @@ class _CardShellState extends State<_CardShell> {
       ),
     );
     if (widget.lifted) return box;
-    return Focus(
-      focusNode: _focusNode,
-      onFocusChange: (focused) {
-        if (mounted) setState(() => _focused = focused);
-      },
-      onKeyEvent: _onKey,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onSecondaryTapUp: (_) => _openMenu(),
-        child: box,
-      ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapUp: (_) => _openMenu(),
+      child: box,
     );
   }
 }
