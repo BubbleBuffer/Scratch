@@ -142,7 +142,7 @@ class _RunnerChoice extends StatelessWidget {
               key: ValueKey('triage-runner-${r.id}'),
               onTap: () => onPick(r),
               child: SizedBox(
-                height: 44,
+                height: 56,
                 child: Row(
                   children: [
                     Expanded(
