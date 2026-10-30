@@ -254,7 +254,7 @@ void main() {
     expect(find.text('No proposals. Run Triage on a project to look for duplicates.'), findsOneWidget);
   });
 
-  testWidgets('lists a run's links and tags and Undo takes them back', (
+  testWidgets('lists the links and tags of a run and Undo takes them back', (
     tester,
   ) async {
     final fake = FakeTriage(
