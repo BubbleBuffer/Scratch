@@ -224,7 +224,8 @@ class _Boot extends StatelessWidget {
         ),
       );
     }
-    if (!seeding) return const SizedBox.shrink();
+    // Loading: the theme's desk colour, the same one Home sits on.
+    if (!seeding) return ColoredBox(color: c.desk, child: const SizedBox.expand());
     const total = benchPages + 1;
     final frac = (seeded / total).clamp(0.0, 1.0);
     return Center(
