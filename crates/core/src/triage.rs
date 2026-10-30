@@ -57,8 +57,19 @@ pub struct TriageProposal {
     /// set when the proposal is accepted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merged_version: Option<String>,
+    /// The other pages the merge rewrote to point at `keep`, each with its
+    /// version from before the rewrite. `triage_undo` restores them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub repointed: Vec<Repointed>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decided_ms: Option<i64>,
+}
+
+/// A page a merge rewrote, and its version from before.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Repointed {
+    pub page: PageId,
+    pub version: String,
 }
 
 /// A page a triage run may look at.
@@ -250,6 +261,7 @@ impl Vault {
             created_ms: now_ms(),
             task,
             merged_version: None,
+            repointed: Vec::new(),
             decided_ms: None,
         };
         self.triage_write(&nodes, &proposal)?;
@@ -306,9 +318,11 @@ impl Vault {
         if p.status != TRIAGE_PENDING {
             return Err(invalid(format!("the proposal is already {}", p.status)));
         }
-        let version = self.merge_pages(p.keep.clone(), p.dropped.clone())?;
+        let (version, repointed) =
+            self.merge_pages_repointing(p.keep.clone(), p.dropped.clone())?;
         p.status = TRIAGE_ACCEPTED.into();
         p.merged_version = Some(version);
+        p.repointed = repointed;
         p.decided_ms = Some(now_ms());
         self.triage_write(&nodes, &p)?;
         Ok(p)
@@ -326,7 +340,12 @@ impl Vault {
             return Err(invalid("only an accepted merge can be undone"));
         };
         self.restore_version(p.keep.clone(), version)?;
+        // Newest first. A page deleted since has nothing to restore.
+        for r in p.repointed.iter().rev() {
+            let _ = self.restore_version(r.page.clone(), r.version.clone());
+        }
         self.restore_page(p.dropped.clone())?;
+        p.repointed.clear();
         p.status = TRIAGE_DISMISSED.into();
         p.decided_ms = Some(now_ms());
         self.triage_write(&nodes, &p)?;
@@ -341,9 +360,35 @@ impl Vault {
     /// `restore_page(dropped)` undo it. Both pages must form a valid pair, and
     /// `dropped` must have no sub-pages (they would go to the trash with it).
     ///
-    /// Links to `dropped` are not repointed; they keep pointing at the page in
-    /// the trash.
+    /// Links to `dropped` are not repointed here; see
+    /// `merge_pages_repointing`.
     pub fn merge_pages(&self, keep: PageId, dropped: PageId) -> Result<String> {
+        self.merge_pages_inner(keep, dropped, false).map(|(v, _)| v)
+    }
+
+    /// `merge_pages`, and every other page that links to `dropped` is
+    /// rewritten to link to `keep`, in the forms the index sees: inline page
+    /// links, link-to-page, embed and database blocks, and relation
+    /// properties (a database row's relation included). Each rewritten page
+    /// is one history commit (message `triage:repoint`). Returns `keep`'s
+    /// version from before the merge, and the other pages with their
+    /// versions from before the rewrite; `triage_undo` restores them all. A
+    /// page in the trash is left alone. Contents views (`view` blocks) are
+    /// not searched for and stay as they are.
+    pub fn merge_pages_repointing(
+        &self,
+        keep: PageId,
+        dropped: PageId,
+    ) -> Result<(String, Vec<Repointed>)> {
+        self.merge_pages_inner(keep, dropped, true)
+    }
+
+    fn merge_pages_inner(
+        &self,
+        keep: PageId,
+        dropped: PageId,
+        repoint: bool,
+    ) -> Result<(String, Vec<Repointed>)> {
         let (_, gone) = self.triage_check_pair(&keep, &dropped)?;
         if !self.list_children(Some(dropped.clone()), 0, 1)?.is_empty() {
             return Err(invalid(format!(
@@ -363,8 +408,81 @@ impl Vault {
             let db = lock(&self.inner.db);
             self.inner.sync_meta(&db, &keep)?;
         }
+        let mut repointed = Vec::new();
+        if repoint {
+            let sources: Vec<String> = {
+                let db = lock(&self.inner.db);
+                let mut v = db.link_sources(&dropped)?;
+                v.extend(db.id_set_sources(&dropped)?);
+                v.sort();
+                v.dedup();
+                v
+            };
+            for src in sources {
+                if src == dropped {
+                    continue;
+                }
+                let live = self.triage_info(&src).map(|i| !i.in_trash).unwrap_or(false);
+                if !live {
+                    continue;
+                }
+                if let Some(before) = self.repoint_links(&src, &dropped, &keep)? {
+                    // `keep` is restored to its own version on undo.
+                    if src != keep {
+                        repointed.push(Repointed {
+                            page: src,
+                            version: before,
+                        });
+                    }
+                }
+            }
+        }
         self.trash_page(dropped)?;
-        Ok(version)
+        Ok((version, repointed))
+    }
+
+    /// Rewrites the links in page `src` that point at `from` to point at
+    /// `to`, as one commit. Returns the page's version from before, `None`
+    /// when nothing pointed at `from`.
+    fn repoint_links(&self, src: &str, from: &str, to: &str) -> Result<Option<String>> {
+        let page = self.load_page(src.to_owned())?;
+        let mut ops = Vec::new();
+        repoint_blocks(&page.blocks, from, to, &mut ops);
+        let props: Vec<(String, PropValue)> = page
+            .properties
+            .iter()
+            .filter_map(|p| match &p.value {
+                PropValue::Relation(ids) if ids.iter().any(|i| i == from) => {
+                    let mut out: Vec<PageId> = Vec::new();
+                    for i in ids {
+                        let i = if i == from { to } else { i.as_str() };
+                        if !out.iter().any(|o| o == i) {
+                            out.push(i.to_owned());
+                        }
+                    }
+                    Some((p.key.clone(), PropValue::Relation(out)))
+                }
+                _ => None,
+            })
+            .collect();
+        if ops.is_empty() && props.is_empty() {
+            return Ok(None);
+        }
+        let before = self.inner.edit_tagged(src, Some("triage:repoint"), |doc| {
+            let before = crate::history::encode_frontiers(&doc.doc.oplog_frontiers());
+            if !ops.is_empty() {
+                doc.apply(&ops)?;
+            }
+            for (key, value) in &props {
+                doc.set_prop(key, value)?;
+            }
+            Ok(before)
+        })?;
+        {
+            let db = lock(&self.inner.db);
+            self.inner.sync_meta(&db, src)?;
+        }
+        Ok(Some(before))
     }
 
     /// The pages a triage run may look at, oldest first: the live pages of the
@@ -432,6 +550,47 @@ pub const TRIAGE_LINK: &str = "link";
 pub const TRIAGE_TAG: &str = "tag";
 const TAG_MAX: usize = 64;
 const TAGS_KEY: &str = "tags";
+
+/// The ops that point every link to `from` in `blocks` at `to`: inline page
+/// link marks (the block's text is set again with the changed marks), and the
+/// target of link-to-page, embed and database blocks.
+fn repoint_blocks(blocks: &[Block], from: &str, to: &str, ops: &mut Vec<BlockOp>) {
+    for b in blocks {
+        if b.marks
+            .iter()
+            .any(|m| matches!(&m.kind, MarkKind::PageLink(p) if p == from))
+        {
+            let marks = b
+                .marks
+                .iter()
+                .map(|m| match &m.kind {
+                    MarkKind::PageLink(p) if p == from => crate::types::Mark {
+                        start: m.start,
+                        end: m.end,
+                        kind: MarkKind::PageLink(to.to_owned()),
+                    },
+                    _ => m.clone(),
+                })
+                .collect();
+            ops.push(BlockOp::SetText {
+                id: b.id.clone(),
+                text: b.text.clone(),
+                marks,
+            });
+        }
+        if matches!(
+            b.kind,
+            BlockKind::LinkToPage | BlockKind::Embed | BlockKind::Database
+        ) && b.target.as_deref() == Some(from)
+        {
+            ops.push(BlockOp::SetTarget {
+                id: b.id.clone(),
+                target: Some(to.to_owned()),
+            });
+        }
+        repoint_blocks(&b.children, from, to, ops);
+    }
+}
 
 fn links_to(blocks: &[Block], target: &str) -> bool {
     blocks.iter().any(|b| {

@@ -19,7 +19,7 @@ There is no project page type, so a *project* is a **top-level page and its subt
 
 - Stored in the type data (add-on `triage`) of the hidden Nodes page (fixed id `000000000000000000000000ND`), one map entry per page pair. The Nodes page is already left out of lists, search and counts, so no new hidden role exists. Entries sync like any page data.
 - The entry key (the proposal id) is the **sorted page id pair** `<lower>-<higher>`, so a pair has exactly one record on every device, whatever order it was proposed in.
-- A record has `keep` (the older page by creation time, tie broken by id; never the model's choice), `dropped`, `reason` (at most 500 characters), `status`, `created_ms`, `task` (the AI task row), `merged_version` and `decided_ms`.
+- A record has `keep` (the older page by creation time, tie broken by id; never the model's choice), `dropped`, `reason` (at most 500 characters), `status`, `created_ms`, `task` (the AI task row), `merged_version`, `repointed` (page and version pairs) and `decided_ms`.
 - Status is `pending`, `accepted` or `dismissed`. `triage_propose` on a pair that already has a record (any status, either order) returns that record unchanged, so a dismissed pair is never proposed again.
 - A pair is rejected with an error when it is the same page, a trashed or purged page, a system page, template or database, pages of different page types, pages of different projects, or a page with its own sub-page.
 
@@ -29,7 +29,7 @@ There is no project page type, so a *project* is a **top-level page and its subt
 
 `triage_undo` is `restore_version(keep, merged_version)` plus `restore_page(dropped)`; the kept page returns to its exact blocks and properties as a new change, so history keeps the merge. The proposal then becomes `dismissed`, so the pair stays unproposed. A test covers the exact restore.
 
-**Not done:** links to `dropped` are not repointed to `keep`; they keep pointing at the page in the trash (restorable). Repointing needs link rewriting in every linking page's marks and link blocks, and is a follow-up.
+**Links are repointed.** `triage_accept` runs `Vault::merge_pages_repointing(keep, dropped)`: before `dropped` is trashed, every live page that links to it is rewritten to link to `keep`, each as its own history commit (message `triage:repoint`). Forms covered, the ones the index sees: inline page-link marks, `linktopage`, `embed` and `database` block targets, and relation properties (a database row's relation included; a relation holding both pages ends up holding `keep` once). The merge records each rewritten page with its version from before, as `repointed` on the proposal. `triage_undo` restores those pages (newest first) as well as `keep` and `dropped`, so all of them return to their exact pre-merge blocks and properties; edits made to those pages since the merge are lost, as they are for `keep`. `keep` itself is restored from `merged_version`, so it is not listed. Pages in the trash are left alone. Not covered: contents views (`view` blocks, not in the link index) and links from outside the vault. `Vault::merge_pages` alone does not repoint.
 
 ## The run
 

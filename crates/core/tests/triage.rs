@@ -259,3 +259,173 @@ fn candidates_list_the_scope_without_trashed_pages() {
         .unwrap();
     assert_eq!(listed.len(), 2);
 }
+
+fn def(key: &str, name: &str, kind: PropKind, config: &str) -> PropDef {
+    PropDef {
+        key: key.into(),
+        name: name.into(),
+        kind,
+        options: vec![],
+        config: config.into(),
+    }
+}
+
+fn block(v: &Vault, page: &str, kind: BlockKind, text: &str, marks: Vec<Mark>, target: Option<&str>) {
+    let id = new_id();
+    let last = v.load_page(page.into()).unwrap().blocks.last().map(|b| b.id.clone());
+    let mut ops = vec![BlockOp::Insert {
+        parent: None,
+        after: last,
+        block: NewBlock {
+            id: id.clone(),
+            kind,
+            text: text.into(),
+            marks,
+            checked: false,
+        },
+    }];
+    if let Some(t) = target {
+        ops.push(BlockOp::SetTarget {
+            id,
+            target: Some(t.into()),
+        });
+    }
+    v.apply(page.into(), ops).unwrap();
+}
+
+fn links_in(v: &Vault, id: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    fn walk(blocks: &[Block], out: &mut Vec<String>) {
+        for b in blocks {
+            for m in &b.marks {
+                if let MarkKind::PageLink(p) = &m.kind {
+                    out.push(format!("mark:{p}"));
+                }
+            }
+            if matches!(b.kind, BlockKind::LinkToPage | BlockKind::Embed) {
+                out.push(format!("block:{}", b.target.clone().unwrap_or_default()));
+            }
+            walk(&b.children, out);
+        }
+    }
+    walk(&v.load_page(id.into()).unwrap().blocks, &mut out);
+    out
+}
+
+#[test]
+fn accepting_repoints_every_link_and_undo_restores_the_linking_pages() {
+    let t = TempVault::new();
+    let v = t.open();
+    let root = page(&v, None, "Project", "");
+
+    // Two rows of the Tasks database: the older is kept, the newer dropped.
+    let tasks = v.create_page(Some(root.clone()), "Tasks".into()).unwrap();
+    v.set_schema(tasks.clone(), vec![]).unwrap();
+    let a = v.create_page(Some(tasks.clone()), "Fix login".into()).unwrap();
+    add_paragraph(&v, &a, "alpha");
+    sleep(Duration::from_millis(5));
+    let b = v.create_page(Some(tasks.clone()), "Login fix".into()).unwrap();
+    add_paragraph(&v, &b, "beta");
+
+    // A row of another database relates to the dropped row (and to the kept
+    // one: the result must hold the kept row once).
+    let plans = v.create_page(Some(root.clone()), "Plans".into()).unwrap();
+    let rel = serde_json::json!({ "relation": tasks }).to_string();
+    v.set_schema(plans.clone(), vec![def("tasks", "Tasks", PropKind::Relation, &rel)])
+        .unwrap();
+    let plan_row = v.create_page(Some(plans.clone()), "Release".into()).unwrap();
+    v.set_property(
+        plan_row.clone(),
+        "tasks".into(),
+        PropValue::Relation(vec![a.clone(), b.clone()]),
+    )
+    .unwrap();
+    let plan_only_b = v.create_page(Some(plans.clone()), "Hotfix".into()).unwrap();
+    v.set_property(
+        plan_only_b.clone(),
+        "tasks".into(),
+        PropValue::Relation(vec![b.clone()]),
+    )
+    .unwrap();
+
+    // Pages linking to the dropped row: an inline link, a link-to-page block,
+    // an embed, a link nested in a toggle, and the kept page itself.
+    let inline = page(&v, Some(&root), "Notes", "see the login fix");
+    let marks = vec![Mark {
+        start: 8,
+        end: 17,
+        kind: MarkKind::PageLink(b.clone()),
+    }];
+    let first = v.load_page(inline.clone()).unwrap().blocks[0].id.clone();
+    v.apply(
+        inline.clone(),
+        vec![BlockOp::SetText {
+            id: first,
+            text: "see the login fix".into(),
+            marks,
+        }],
+    )
+    .unwrap();
+    let blocklink = page(&v, Some(&root), "Index", "");
+    block(&v, &blocklink, BlockKind::LinkToPage, "", vec![], Some(&b));
+    let embedder = page(&v, Some(&root), "Board", "");
+    block(&v, &embedder, BlockKind::Embed, "", vec![], Some(&b));
+    let keeps_link = page(&v, Some(&root), "Unrelated", "x");
+    block(&v, &keeps_link, BlockKind::LinkToPage, "", vec![], Some(&a)); // not touched
+    block(&v, &a, BlockKind::LinkToPage, "", vec![], Some(&b));
+
+    let snap = |id: &str| {
+        let p = v.load_page(id.into()).unwrap();
+        (p.blocks, format!("{:?}", p.properties))
+    };
+    let pages = [&a, &plan_row, &plan_only_b, &inline, &blocklink, &embedder, &keeps_link];
+    let before: Vec<_> = pages.iter().map(|p| snap(p)).collect();
+
+    let p = v
+        .triage_propose(a.clone(), b.clone(), "dup".into(), String::new())
+        .unwrap();
+    let done = v.triage_accept(p.id.clone()).unwrap();
+    assert_eq!(done.status, TRIAGE_ACCEPTED);
+
+    // Nothing points at the dropped row any more.
+    assert_eq!(links_in(&v, &inline), vec![format!("mark:{a}")]);
+    assert_eq!(links_in(&v, &blocklink), vec![format!("block:{a}")]);
+    assert_eq!(links_in(&v, &embedder), vec![format!("block:{a}")]);
+    assert!(links_in(&v, &a).iter().all(|l| !l.contains(&b)), "{:?}", links_in(&v, &a));
+    let rel_of = |id: &str| {
+        v.load_page(id.into())
+            .unwrap()
+            .properties
+            .into_iter()
+            .find(|p| p.key == "tasks")
+            .map(|p| p.value)
+    };
+    assert_eq!(rel_of(&plan_row), Some(PropValue::Relation(vec![a.clone()])));
+    assert_eq!(rel_of(&plan_only_b), Some(PropValue::Relation(vec![a.clone()])));
+    assert!(v.backlinks(b.clone()).unwrap().is_empty(), "no live page links to it");
+    assert_eq!(links_in(&v, &keeps_link), vec![format!("block:{a}")], "other links stay");
+    let mut recorded: Vec<_> = done.repointed.iter().map(|r| r.page.clone()).collect();
+    recorded.sort();
+    let mut want = vec![plan_row.clone(), plan_only_b.clone(), inline.clone(), blocklink.clone(), embedder.clone()];
+    want.sort();
+    assert_eq!(recorded, want, "the kept page restores from its own version");
+
+    v.triage_undo(p.id.clone()).unwrap();
+    for (id, was) in pages.iter().zip(before) {
+        assert_eq!(snap(id), was, "page {id} is exactly as before the merge");
+    }
+    assert!(!v.load_page(b.clone()).unwrap().in_trash);
+}
+
+#[test]
+fn a_merge_without_links_records_no_repointed_pages() {
+    let t = TempVault::new();
+    let v = t.open();
+    let root = page(&v, None, "Project", "");
+    let a = page(&v, Some(&root), "Notes A", "alpha");
+    let b = page(&v, Some(&root), "Notes B", "beta");
+    let p = v
+        .triage_propose(a, b, "dup".into(), String::new())
+        .unwrap();
+    assert!(v.triage_accept(p.id).unwrap().repointed.is_empty());
+}

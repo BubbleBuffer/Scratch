@@ -706,6 +706,21 @@ impl Index {
         Ok(v)
     }
 
+    /// Every page whose properties hold `id` in an id-set value (a relation
+    /// or a multi-select). Callers check the value kind.
+    pub fn id_set_sources(&self, id: &str) -> Result<Vec<String>> {
+        let mut st = self.conn.prepare_cached(
+            "SELECT DISTINCT p.id FROM props r JOIN pages p ON p.rowid = r.page
+             WHERE r.t LIKE ?1 AND p.id != ?2",
+        )?;
+        // Page ids are plain alphanumerics, so they need no LIKE escaping.
+        let pat = format!("%{SEP}{id}{SEP}%");
+        let v = st
+            .query_map([pat, id.to_owned()], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(v)
+    }
+
     /// Apply filters before title selection, adaptive breadth, FTS ranking,
     /// and typo correction. A correction can never enlarge the candidate set.
     pub fn search_spec(
