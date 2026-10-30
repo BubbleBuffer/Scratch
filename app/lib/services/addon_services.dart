@@ -55,6 +55,12 @@ class AddonServices {
 
   /// The agent's task rows and runner calls (the kanban runner picker).
   AiTaskSource aiTasks(BuildContext context) => AiStore.of(context.app);
+
+  /// Opens the agent chat of a run's session.
+  Future<void> openAgentSession(BuildContext context, String sessionId) async {
+    await AiStore.openSession(context, sessionId);
+  }
+
   bool addonEnabled(String id) =>
       activeAddonContext?.installedIds.contains(id) ?? true;
   void closeRoute(BuildContext context, String name) {

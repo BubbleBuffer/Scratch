@@ -3,6 +3,7 @@
 mod subtasks;
 
 use std::pin::pin;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -36,7 +37,11 @@ const WATCH_EVERY: Duration = Duration::from_millis(500);
 /// update of the note) on every this-many-th watch.
 const STEER_EVERY: u32 = 4;
 
-const DELEGATED_PROMPT: &str = " Use report_progress to keep the user informed while working. Plan multi-step work with todo, passing the whole list each time as {\"items\": [...]}, and keep the list current; it appears as subtasks in the note, mirrored by Scratch, so do not write those subtasks yourself.";
+/// A running task's heartbeat is written on every this-many-th watch tick
+/// (500 ms each): about once a minute.
+const BEAT_EVERY: u32 = 120;
+
+const DELEGATED_PROMPT: &str = " Use report_progress to keep the user informed while working. Plan multi-step work with todo, passing the whole list each time as {\"items\": [...]}, and keep the list current; it appears as subtasks in the note, mirrored by Scratch, so do not write those subtasks yourself. If you need a decision or information only the user has, use ask_user; it waits for the answer.";
 
 /// Only delegated runs register this capability. The row and session come
 /// from the runner, never from model arguments.
@@ -325,6 +330,63 @@ impl Tool for TriageTag {
     }
 }
 
+/// How often the waiting `ask_user` tool looks for the user's reply.
+const REPLY_EVERY: Duration = Duration::from_millis(500);
+
+/// Only delegated runs register this. It asks the user a question through the
+/// task's card and waits for the reply, which is the tool's result. The run's
+/// time limit bounds the wait: a run that ends while it waits is recorded as
+/// "waiting for input", not as a failure.
+struct AskUser {
+    vault: Arc<Vault>,
+    task: String,
+    session: String,
+}
+
+#[async_trait]
+impl Tool for AskUser {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "ask_user".into(),
+            description: "Ask the user a question you cannot settle yourself, and wait for the answer, which is returned as the result. Use it rarely, for a real decision or missing information; the question appears on the task's card.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {"question": {"type": "string"}},
+                "required": ["question"],
+                "additionalProperties": false
+            }),
+            read_only: false,
+            approval: Approval::None,
+        }
+    }
+
+    async fn invoke(&self, context: ToolContext, input: Value) -> Result<ToolResult> {
+        if context.session_id != self.session {
+            return Ok(ToolResult::error("the question belongs to another task session"));
+        }
+        let Some(question) = input.get("question").and_then(Value::as_str) else {
+            return Ok(ToolResult::error("ask_user needs a question string"));
+        };
+        let (vault, task, question) = (self.vault.clone(), self.task.clone(), question.to_string());
+        let asked = {
+            let (vault, task) = (vault.clone(), task.clone());
+            tokio::task::spawn_blocking(move || tasks::ask(&vault, &task, &question)).await?
+        };
+        if let Err(error) = asked {
+            return Ok(ToolResult::error(error.0));
+        }
+        loop {
+            tokio::time::sleep(REPLY_EVERY).await;
+            let (v, t) = (vault.clone(), task.clone());
+            match tokio::task::spawn_blocking(move || tasks::take_reply(&v, &t)).await? {
+                Ok(Some(reply)) => return Ok(ToolResult::text(format!("The user replied: {reply}"))),
+                Ok(None) => {}
+                Err(error) => return Ok(ToolResult::error(error.0)),
+            }
+        }
+    }
+}
+
 impl Agent {
     /// Prepare before admitting the provider: failures are written to the task
     /// by the same finish path as provider errors. A retry has a new session.
@@ -380,6 +442,11 @@ impl Agent {
             task: task.into(),
             session: session.into(),
         });
+        let ask: Arc<dyn Tool> = Arc::new(AskUser {
+            vault: self.vault.clone(),
+            task: task.into(),
+            session: session.into(),
+        });
         // A triage run (its row has a scope) also gets the triage tools.
         let mut triage: Vec<Arc<dyn Tool>> = Vec::new();
         if let Some(scope) = vault_mcp::triage::scope(&self.vault, task).ok().flatten() {
@@ -410,6 +477,7 @@ impl Agent {
         let store = self.store.clone();
         let register = move |mut registry: ToolRegistry| -> Result<ToolRegistry> {
             registry.register_host(progress.clone())?;
+            registry.register_host(ask.clone())?;
             for tool in &triage {
                 registry.register_host(tool.clone())?;
             }
@@ -419,7 +487,7 @@ impl Agent {
             // BubblePaw's todo tool: the same runs as before, and the state it
             // stores (the bare array under `todo`) is what the subtask mirror reads.
             bubblepaw_sdk::todo::register(&mut registry, store.clone())?;
-            registry.show_always(["report_progress", "todo"]);
+            registry.show_always(["report_progress", "ask_user", "todo"]);
             Ok(registry)
         };
         let mut config = self.task_harness_config.clone();
@@ -575,6 +643,14 @@ impl Agent {
     /// with `tasks::finish`: the final text, or the run's error. A run still
     /// going after [`RUN_LIMIT`] is cancelled and the task fails.
     pub fn run_task(&self, vault: &Vault, task_id: &str) -> Result<TaskRun> {
+        // Transcripts and logs of old runs expire after 30 days; the task
+        // rows, outcomes and attempt summaries stay.
+        if !self.sessions_expired.swap(true, Ordering::SeqCst) {
+            let keep = 30 * 24 * 60 * 60 * 1000;
+            if let Err(e) = self.expire_task_sessions(keep) {
+                eprintln!("could not expire old task sessions: {e}");
+            }
+        }
         self.run_task_with_limit(vault, task_id, RUN_LIMIT)
     }
 
@@ -624,7 +700,16 @@ impl Agent {
                     .filter(|e| !e.trim().is_empty())
                     .unwrap_or_else(|| format!("the agent run ended: {}", run.status))),
                 Ok(Ended::Cancelled) => Err(CANCELLED_TEXT.into()),
-                Ok(Ended::Limit) => Err(limit_error(limit)),
+                Ok(Ended::Limit) => Err(
+                    if tasks::get(vault, task_id).is_ok_and(|t| !t.question.is_empty()) {
+                        format!(
+                            "{}: no reply within the run limit",
+                            tasks::WAITING_FOR_INPUT
+                        )
+                    } else {
+                        limit_error(limit)
+                    },
+                ),
                 Err(error) => Err(format!("{error:#}")),
             };
         if let Some(usage) = usage {
@@ -741,6 +826,9 @@ impl Agent {
                         if ticks % STEER_EVERY == 0 {
                             self.deliver_steering(vault, task_id, session, &mirror.run_id, &harness);
                         }
+                        if ticks % BEAT_EVERY == 0 {
+                            let _ = tasks::heartbeat(vault, task_id);
+                        }
                     }
                     event = events.recv(), if events_open => {
                         note_steering_accepted(vault, task_id, session, &event);
@@ -810,11 +898,16 @@ impl Agent {
             let mut events_open = true;
             let mut watch = tokio::time::interval(WATCH_EVERY * STEER_EVERY);
             watch.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            let mut beats = 0u32;
             let outcome = loop {
                 tokio::select! {
                     outcome = wait.as_mut() => break outcome,
                     _ = watch.tick() => {
                         self.deliver_steering(&self.vault, task_id, session, &mirror.run_id, &harness);
+                        beats = beats.wrapping_add(1);
+                        if beats % (BEAT_EVERY / STEER_EVERY) == 0 {
+                            let _ = tasks::heartbeat(&self.vault, task_id);
+                        }
                     }
                     event = events.recv(), if events_open => {
                         note_steering_accepted(&self.vault, task_id, session, &event);

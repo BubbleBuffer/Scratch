@@ -15,7 +15,9 @@ String runnerChipText(RunnerAssignment assignment) {
   return [
     assignment.runnerName,
     if (project != null && project.isNotEmpty) project,
-    assignment.state.label,
+    assignment.note == null
+        ? assignment.state.label
+        : '${assignment.state.label} (${assignment.note})',
   ].join(' · ');
 }
 
@@ -26,7 +28,10 @@ String? runnerProgressText(RunnerAssignment assignment) {
   final text = assignment.progress?.trim();
   if (text == null || text.isEmpty) return null;
   return switch (assignment.state) {
-    AssignState.running || AssignState.failed || AssignState.cancelled => text,
+    AssignState.running ||
+    AssignState.stalled ||
+    AssignState.failed ||
+    AssignState.cancelled => text,
     _ => null,
   };
 }
@@ -44,7 +49,10 @@ class RunnerChip extends StatelessWidget {
       AssignState.queued ||
       AssignState.cancelling ||
       AssignState.cancelled => c.bgSecondary,
-      AssignState.waiting => c.attnBg,
+      AssignState.waiting ||
+      AssignState.review ||
+      AssignState.needsInput ||
+      AssignState.stalled => c.attnBg,
       AssignState.running => c.infoBg,
       AssignState.done => c.okBg,
       AssignState.failed => c.dangerBg,

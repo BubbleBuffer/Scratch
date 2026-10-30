@@ -91,7 +91,7 @@ pub fn now_ms() -> i64 {
 
 fn api_status(stored: &str) -> String {
     match stored {
-        DONE => COMPLETED.to_string(),
+        DONE | tasks::REVIEW => COMPLETED.to_string(),
         s => s.to_string(),
     }
 }
@@ -353,7 +353,16 @@ pub fn finish(v: &Vault, id: &str, end: End) -> Result<()> {
             // A job about a page answers into it, like a desktop AI task.
             let t = tasks::get(v, &id)?;
             tasks::write_result(v, &t, md)?;
-            DONE
+            // A job started from a card waits for the user's acceptance.
+            if v.load_page(id.clone())?
+                .properties
+                .iter()
+                .any(|p| p.key == "review" && p.value != PropValue::Text(String::new()))
+            {
+                tasks::REVIEW
+            } else {
+                DONE
+            }
         }
         End::Failed(msg) => {
             let msg = if msg.trim().is_empty() {
@@ -384,7 +393,7 @@ pub fn finish(v: &Vault, id: &str, end: End) -> Result<()> {
         "status".into(),
         PropValue::Select(status.into()),
     )?;
-    if status != DONE {
+    if status != DONE && status != tasks::REVIEW {
         placeholder(v, &id, status)?;
     }
     Ok(())

@@ -243,6 +243,7 @@ class _TaskList extends StatelessWidget {
                   AiStatus.done => SStatusKind.ok,
                   AiStatus.failed => SStatusKind.bad,
                   AiStatus.running => SStatusKind.info,
+                  AiStatus.review => SStatusKind.warn,
                   _ => SStatusKind.off,
                 },
               ),
