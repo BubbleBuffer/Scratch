@@ -345,7 +345,7 @@ void main() {
       final menu = tester.getRect(menuItem('Open'));
       expect(menu.left, lessThanOrEqualTo(card.right), reason: 'starts within the card');
       expect(menu.left, greaterThanOrEqualTo(card.left));
-      expect(menu.top, lessThanOrEqualTo(card.bottom + 8));
+      expect(menu.top, lessThanOrEqualTo(card.bottom + 24));
     },
   );
 

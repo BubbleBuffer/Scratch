@@ -61,6 +61,10 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
   @override
   void initState() {
     super.initState();
+    // Tab skips the title, but Tab pressed while it has focus moves on.
+    _titleFocus.addListener(
+      () => _titleFocus.skipTraversal = !_titleFocus.hasPrimaryFocus,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _titleFocus.requestFocus();
     });
