@@ -183,6 +183,9 @@ fn the_last_progress_survives_every_ending() {
     let cancelled = running_task(&v, "Cancel");
     tasks::report_progress(&v, &cancelled, "Half way").unwrap();
     assert!(tasks::cancel(&v, &cancelled).unwrap());
+    // The runner acknowledges the cancel.
+    tasks::finish(&v, &cancelled, Err("the task was cancelled".into())).unwrap();
+    assert_eq!(tasks::get(&v, &cancelled).unwrap().status, "cancelled");
     assert_eq!(prop(&v, &cancelled, "progress"), "Half way");
 
     // Interrupted by a desktop restart: recovered as failed.
