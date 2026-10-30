@@ -171,3 +171,70 @@ fn starting_a_run_checks_the_runner_and_the_scope() {
     let scope = triage::scope(&f.v, &task.id).unwrap().unwrap();
     assert_eq!(scope.pages, vec![f.a.clone(), f.b.clone()]);
 }
+
+#[test]
+fn a_triage_run_applies_a_link_and_a_tag_and_records_them() {
+    let f = fixture();
+    let task = start_triage(&f);
+    let agent = open(
+        f._dir.path(),
+        f.v.clone(),
+        vec![
+            step("triage_link", json!({"from": f.a, "to": f.b})),
+            // The same link again changes nothing and records nothing.
+            step("triage_link", json!({"from": f.a, "to": f.b})),
+            step("triage_tag", json!({"page": f.b, "tag": "#meetings"})),
+            // Out of scope: refused.
+            step("triage_tag", json!({"page": f.outside, "tag": "meetings"})),
+        ],
+    );
+    let before = f.v.load_page(f.a.clone()).unwrap();
+    assert!(agent.run_task(&f.v, &task).unwrap().ok);
+
+    let after = f.v.load_page(f.a.clone()).unwrap();
+    let link = after.blocks.last().unwrap();
+    assert_eq!(link.kind, BlockKind::LinkToPage);
+    assert_eq!(link.target.as_deref(), Some(f.b.as_str()));
+    assert_eq!(after.blocks.len(), before.blocks.len() + 1);
+    let tags = |id: &str| {
+        f.v.load_page(id.into()).unwrap().properties.into_iter().find(|p| p.key == "tags")
+    };
+    assert_eq!(
+        tags(&f.b).map(|p| p.value),
+        Some(vault_core::PropValue::MultiSelect(vec!["meetings".into()]))
+    );
+    assert!(tags(&f.outside).is_none());
+
+    let done = triage::actions(&f.v, &task).unwrap();
+    assert_eq!(done.len(), 2, "{done:?}");
+    assert_eq!((done[0].kind.as_str(), done[0].page.as_str()), ("link", f.a.as_str()));
+    assert_eq!((done[1].kind.as_str(), done[1].target.as_str()), ("tag", "meetings"));
+
+    // The recorded state undoes both.
+    assert_eq!(triage::undo_actions(&f.v, &task).unwrap(), 2);
+    assert_eq!(f.v.load_page(f.a.clone()).unwrap().blocks, before.blocks);
+    assert!(tags(&f.b).is_none());
+    assert!(triage::actions(&f.v, &task).unwrap().is_empty());
+}
+
+#[test]
+fn undoing_a_tag_restores_the_previous_tags_exactly() {
+    let f = fixture();
+    f.v.set_property(
+        f.a.clone(),
+        "tags".into(),
+        vault_core::PropValue::MultiSelect(vec!["Work".into(), "q4".into()]),
+    )
+    .unwrap();
+    assert!(f.v.triage_tag(f.a.clone(), "work".into()).unwrap().is_none(), "ignoring case");
+    let action = f.v.triage_tag(f.a.clone(), "plan".into()).unwrap().unwrap();
+    assert_eq!(action.previous, Some(vec!["Work".to_string(), "q4".to_string()]));
+    f.v.triage_undo_action(&action).unwrap();
+    let value = f.v.load_page(f.a.clone()).unwrap().properties.into_iter().find(|p| p.key == "tags");
+    assert_eq!(
+        value.map(|p| p.value),
+        Some(vault_core::PropValue::MultiSelect(vec!["Work".into(), "q4".into()]))
+    );
+    assert!(f.v.triage_tag(f.a.clone(), "a,b".into()).is_err());
+    assert!(f.v.triage_link(f.a.clone(), f.outside.clone()).is_err(), "other project");
+}

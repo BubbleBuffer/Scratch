@@ -20,7 +20,7 @@ pub const PROPERTY: &str = "triage";
 pub const SCOPE_MAX_PAGES: usize = 300;
 
 /// The fixed prompt of a triage run.
-pub const PROMPT: &str = "Triage these notes. Call triage_pages to list the pages in scope (id, title, type, a short summary, created time). Find pages that duplicate or heavily overlap each other, judging from titles and summaries; read a page with the vault tools only when the summaries do not decide it. For each such pair call triage_propose with both page ids and a one-sentence reason. Only propose pairs of the same page type within the listed pages; the older page is kept and the newer one is merged into it after the user accepts. Do not edit, merge or delete pages yourself. When done, reply with a short summary of what you proposed.";
+pub const PROMPT: &str = "Triage these notes. Call triage_pages to list the pages in scope (id, title, type, a short summary, created time). Find pages that duplicate or heavily overlap each other, judging from titles and summaries; read a page with the vault tools only when the summaries do not decide it. For each such pair call triage_propose with both page ids and a one-sentence reason. Only propose pairs of the same page type within the listed pages; the older page is kept and the newer one is merged into it after the user accepts. Never merge, edit or delete pages yourself. You may also connect and label pages directly: call triage_link to link a page to a closely related page, and triage_tag to add a short topic tag to a page. Add only links and tags that clearly help; the user can undo them. When done, reply with a short summary of what you proposed.";
 
 /// What a triage run reviews: the subtree under `root`, or `pages`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,4 +75,46 @@ pub fn scope(v: &Vault, task: &str) -> Result<Option<Scope>> {
     serde_json::from_str(&json)
         .map(Some)
         .map_err(|e| crate::McpError(format!("bad triage scope: {e}")))
+}
+
+/// The task row's text property holding the run's applied links and tags, a
+/// JSON list of [`vault_core::TriageAction`] in the order they were made.
+pub const ACTIONS: &str = "triage_actions";
+
+/// The links and tags run `task` applied, oldest first.
+pub fn actions(v: &Vault, task: &str) -> Result<Vec<vault_core::TriageAction>> {
+    let page = v.load_page(task.to_owned())?;
+    let json = tasks::text(&page.properties, ACTIONS);
+    if json.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    serde_json::from_str(&json).map_err(|e| crate::McpError(format!("bad triage actions: {e}")))
+}
+
+/// Appends `action` to the run's record.
+pub fn record_action(v: &Vault, task: &str, action: &vault_core::TriageAction) -> Result<()> {
+    let mut all = actions(v, task)?;
+    all.push(action.clone());
+    let json = serde_json::to_string(&all).map_err(|e| crate::McpError(e.to_string()))?;
+    v.set_property(
+        task.to_owned(),
+        ACTIONS.into(),
+        vault_core::PropValue::Text(json),
+    )?;
+    Ok(())
+}
+
+/// Takes back everything run `task` applied, newest first, and empties the
+/// record. Returns how many actions were undone.
+pub fn undo_actions(v: &Vault, task: &str) -> Result<usize> {
+    let all = actions(v, task)?;
+    for action in all.iter().rev() {
+        v.triage_undo_action(action)?;
+    }
+    v.set_property(
+        task.to_owned(),
+        ACTIONS.into(),
+        vault_core::PropValue::Text("[]".into()),
+    )?;
+    Ok(all.len())
 }

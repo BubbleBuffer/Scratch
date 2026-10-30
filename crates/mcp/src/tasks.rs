@@ -177,6 +177,7 @@ pub fn schema() -> Vec<PropDef> {
         def("worktree_path", "Worktree path", PropKind::Text, vec![]),
         // A triage run (see [`crate::triage`]): its scope as JSON.
         def("triage", "Triage scope", PropKind::Text, vec![]),
+        def("triage_actions", "Triage actions", PropKind::Text, vec![]),
         // The todo the subtasks nest under (empty: the placeholder), and the
         // run's subtask tracking (see [`subtasks`]).
         def("source_block", "Source block", PropKind::Text, vec![]),
