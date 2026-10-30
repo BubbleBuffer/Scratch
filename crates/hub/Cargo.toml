@@ -40,7 +40,7 @@ notes_agent_wire = { path = "../agent_wire" }
 tokio-tungstenite = { version = "0.30", features = ["connect"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rsa = "0.9"
-rand = "0.10"
+rand = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 base64 = "0.23"
 sha2 = "0.11"

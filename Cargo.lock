@@ -3722,7 +3722,7 @@ dependencies = [
  "notes_agent_wire",
  "openidconnect",
  "pulldown-cmark",
- "rand 0.10.3",
+ "rand 0.8.8",
  "reqwest 0.12.28",
  "rsa",
  "serde",
