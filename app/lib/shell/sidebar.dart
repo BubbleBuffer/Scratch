@@ -24,7 +24,12 @@ import 'addons.dart';
 import '../addons/agent/api.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/sync/conflicts.dart' show ConflictRailGroup;
+import '../features/ai/ask_ai.dart' show AiMark;
 import '../features/trash/trash_panel.dart';
+import '../features/triage/proposals_panel.dart';
+import '../features/triage/triage_copy.dart';
+import '../features/triage/triage_start.dart';
+import '../features/triage/triage_store.dart';
 import '../features/updates/updates_settings.dart' show UpdateRailRow;
 import '../state/app_state.dart';
 import '../state/tree_store.dart';
@@ -244,6 +249,13 @@ class _SidebarState extends State<Sidebar> {
             label: 'Move to',
             onTap: () => Navigator.of(ctx).pop('move'),
           ),
+          if (p.parent == null)
+            MenuItem(
+              key: const ValueKey('tree-menu-triage'),
+              leading: AiMark(size: 20),
+              label: 'Triage',
+              onTap: () => Navigator.of(ctx).pop('triage'),
+            ),
           MenuItem(
             key: const ValueKey('tree-menu-favorite'),
             leading: fav
@@ -275,6 +287,12 @@ class _SidebarState extends State<Sidebar> {
         await context.app.vault.duplicatePage(p.id);
       case 'move':
         await showMoveTo(context, p.id, anchor: anchor);
+      case 'triage':
+        await startTriage(
+          context,
+          projectId: p.id,
+          projectTitle: displayTitle(p.title),
+        );
       case 'favorite':
         await tree.setFavorite(p.id, !fav);
       case 'trash':
@@ -725,6 +743,7 @@ class _SidebarState extends State<Sidebar> {
                         ),
                       ],
                     ),
+                    const _ProposalsRow(),
                     Builder(
                       builder: (row) => _NavRow(
                         key: const ValueKey('sidebar-trash'),
@@ -862,6 +881,48 @@ class _ResizeHandleState extends State<_ResizeHandle> {
   }
 }
 
+/// The "Merge proposals" row with the count of pending proposals. It shows
+/// only while there are proposals to decide or to undo.
+class _ProposalsRow extends StatelessWidget {
+  const _ProposalsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final store = TriageStore.of(context.app);
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        if (store.items.isEmpty) return const SizedBox.shrink();
+        final n = store.pending;
+        final c = context.colors;
+        return _NavRow(
+          key: const ValueKey('sidebar-proposals'),
+          icon: Ico.duplicate,
+          label: proposalsTitle,
+          onTap: () => showProposals(context),
+          trailing: n == 0
+              ? null
+              : Container(
+                  key: const ValueKey('sidebar-proposals-count'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.accent,
+                    borderRadius: Radii.pill,
+                  ),
+                  child: Text(
+                    '$n',
+                    style: ts(const TypeSpec(11, 15, 700), c.onAccent),
+                  ),
+                ),
+        );
+      },
+    );
+  }
+}
+
 class _NavRow extends StatefulWidget {
   const _NavRow({
     super.key,
@@ -869,11 +930,15 @@ class _NavRow extends StatefulWidget {
     required this.label,
     required this.onTap,
     this.selected = false,
+    this.trailing,
   });
   final Ico icon;
   final String label;
   final VoidCallback onTap;
   final bool selected;
+
+  /// Shown at the row's end (a count badge).
+  final Widget? trailing;
 
   @override
   State<_NavRow> createState() => _NavRowState();
@@ -923,6 +988,7 @@ class _NavRowState extends State<_NavRow> {
                   ),
                 ),
               ),
+              if (widget.trailing != null) widget.trailing!,
               if (widget.label == 'Search')
                 Opacity(
                   opacity: 0.7,

@@ -10,6 +10,7 @@ import 'api/agent.dart';
 import 'api/ai.dart';
 import 'api/clock.dart';
 import 'api/sync.dart';
+import 'api/triage.dart';
 import 'api/types.dart';
 import 'api/update.dart';
 import 'api/vault.dart';
@@ -733,6 +734,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TrashedPage> dco_decode_list_trashed_page(dynamic raw);
 
   @protected
+  List<TriageProposalDto> dco_decode_list_triage_proposal_dto(dynamic raw);
+
+  @protected
   List<TrustedHubCertificate> dco_decode_list_trusted_hub_certificate(
     dynamic raw,
   );
@@ -970,6 +974,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TrashedPage dco_decode_trashed_page(dynamic raw);
+
+  @protected
+  TriageProposalDto dco_decode_triage_proposal_dto(dynamic raw);
 
   @protected
   TrustedHubCertificate dco_decode_trusted_hub_certificate(dynamic raw);
@@ -1854,6 +1861,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TrashedPage> sse_decode_list_trashed_page(SseDeserializer deserializer);
 
   @protected
+  List<TriageProposalDto> sse_decode_list_triage_proposal_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<TrustedHubCertificate> sse_decode_list_trusted_hub_certificate(
     SseDeserializer deserializer,
   );
@@ -2129,6 +2141,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TrashedPage sse_decode_trashed_page(SseDeserializer deserializer);
+
+  @protected
+  TriageProposalDto sse_decode_triage_proposal_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   TrustedHubCertificate sse_decode_trusted_hub_certificate(
@@ -3244,6 +3261,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_triage_proposal_dto(
+    List<TriageProposalDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_trusted_hub_certificate(
     List<TrustedHubCertificate> self,
     SseSerializer serializer,
@@ -3584,6 +3607,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_trashed_page(TrashedPage self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_triage_proposal_dto(
+    TriageProposalDto self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_trusted_hub_certificate(

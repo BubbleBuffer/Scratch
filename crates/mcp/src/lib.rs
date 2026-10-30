@@ -19,6 +19,7 @@ mod server;
 pub mod stdio;
 pub mod tasks;
 pub mod tools;
+pub mod triage;
 
 pub use server::{BodyReply, McpServer, PROTOCOL_VERSIONS};
 

@@ -14,5 +14,6 @@ These pages describe the Flutter app: how it is built on the core, how note type
 - [Note types](note-types.md): Everything is a note; notes have types (document, database, kanban, chat, task), and a type registry selects how each type is drawn, embedded and edited.
 - [Add-ons](addons.md): The app as a thin shell plus a shared kit, every feature an isolated add-on registering types, blocks, views, commands, codecs, search sources and agent tools; enforced in CI.
 - [UI and agent-kit dependencies](agent-kit.md): bb-ui supplies tokens and primitives; agent-kit supplies the optional chat pane; repository pins and how to update them.
+- [Triage UI](triage-ui.md): The Triage action on a project, the runner choice, and the Merge proposals list with Merge, Dismiss and Undo.
 - [Feedback capture (state)](feedback.md): Shake, Ctrl+Shift+F or a Send feedback button opens a sheet with a screenshot and diagnostics; reports are hidden child pages of the Feedback system page.
 <!-- /wiki:children -->
