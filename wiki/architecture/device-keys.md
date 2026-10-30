@@ -1,13 +1,13 @@
 ---
 type: page
-summary: "Proposal: each device gets an Ed25519 key from bubblebuffer-identity; pairing and OIDC sign-in register it, and sync and /agent/ws prove possession for a short-lived session token. Agent tokens, MCP OAuth and the OIDC login stay."
+summary: "Proposal: each device gets an Ed25519 key from bubblebuffer-identity v0.1.0; pairing and OIDC sign-in register it, and sync and /agent/ws prove possession for a short-lived session token. Agent tokens, MCP OAuth and the OIDC login stay."
 parent: "[[architecture/index]]"
 status: proposed
 ---
 
 # Device keys (proposal)
 
-**Status:** proposed 2026-10-30, not decided, not built. It depends on [bubblebuffer-identity](https://github.com/BubbleBuffer/bubblebuffer-identity) v0.1.0, which isn't tagged yet. Once it's decided, the decision goes in the internal wiki and this page becomes the description of how it works.
+**Status:** proposed 2026-10-30, not decided, not built. It is written against [bubblebuffer-identity v0.1.0](https://github.com/BubbleBuffer/bubblebuffer-identity/releases/tag/v0.1.0) (tag `a539c7e8`). Once it's decided, the decision goes in the internal wiki and this page becomes the description of how it works.
 
 ## Why
 
@@ -22,16 +22,23 @@ So a token copied from a settings file, a backup, a log or a pairing QR works fr
 
 ## What changes
 
-1. **A key per device.** On first launch the app creates an Ed25519 device key with `bubblebuffer-device-key`. Its fingerprint is shown in Settings › Devices. The vault device id stays as it is: node records and history are keyed by it (`crates/core/src/ids.rs:108-112`). The key is bound to that id; it doesn't replace it.
+1. **A key per device.**
+   - On first launch the app calls `DeviceKey::generate()` from `bubblebuffer-device-key`, then `KeyFile::from_device(..)` and `to_json()`.
+   - The app saves that JSON in its data dir, because the crate does no file I/O.
+   - The library's `DeviceId` is the first 10 bytes of SHA-256 of the public key, written like `K7MQ-2X9F-D4RT-8WHN`. Settings › Devices shows it as the key's fingerprint.
+   - The vault device id stays as it is: node records and history are keyed by it (`crates/core/src/ids.rs:108-112`). The hub binds the key's `DeviceId` and public key to that vault id; the key doesn't replace it.
 2. **Pairing and sign-in register the public key.**
-   - **OIDC:** `/auth/redeem` takes the device's public key, alongside the one-time code it already takes. The hub stores the key in the device's `tokens.json` entry, next to the token hash.
+   - **OIDC:** `/auth/redeem` takes the device's public key, alongside the one-time code it already takes. The hub stores the key in the device's `tokens.json` entry.
    - **Add a device:** the pairing link and QR carry a one-time pairing code that expires after about 10 minutes, instead of a long-lived token. The new device redeems it with its public key, as with OIDC.
 3. **Sessions instead of a bare long-lived token.**
-   - The device asks the hub for a challenge (`POST /auth/challenge`).
-   - It signs the challenge, its device id and the hub URL, and sends the signature back (`POST /auth/session`).
-   - It gets a session token that lasts about 1 hour and is bound to that device id.
-   - Sync requests and `/agent/ws` send the session token as today's bearer does, so the sync protocol and `Hub::handle` keep their shape.
-   - `/agent/ws` checks the session token when the connection opens.
+   - The device asks the hub for a challenge (`POST /auth/challenge`). The hub returns a 32-byte random nonce and keeps it in memory, single use, for 60 seconds. The library has no nonce store or expiry, so freshness is the hub's job.
+   - The device signs `relay_proof_hash(label, role, origin, nonce, device_id, pubkey)` with `DeviceKey::sign`. The values are:
+     - `label`: `scratch/session/v1`;
+     - `origin`: the hub's origin, such as `https://notes.example.org`;
+     - `role`: `viewer`, because v0.1.0 only knows `host` and `viewer`.
+   - It sends the signature to `POST /auth/session` together with its vault device id.
+   - The hub checks the signature with `RelayProof::verify(..)` and confirms that the public key is the one bound to that vault id. It then returns a session token that lasts about 1 hour.
+   - Sync requests and `/agent/ws` send the session token as today's bearer does, so the sync protocol and `Hub::handle` keep their shape. `/agent/ws` checks it when the connection opens.
 
    This is one signature per hour, not one per request, which keeps sync's cost the same.
 4. **The device token becomes the key binding.** The hub entry holds the public key, label, account and last-seen time. Unpair removes the entry, which ends that device's sessions too. Signing in again replaces the key, as it replaces the token today.
@@ -39,7 +46,7 @@ So a token copied from a settings file, a backup, a log or a pairing QR works fr
 ## What migrates
 
 - **Paired devices** keep working. The hub accepts both kinds for a while:
-  - On its next connect, a device holding a legacy token creates its key and calls `POST /auth/upgrade`. That call sends the legacy token once, plus its public key and a signature over a fresh challenge. The hub marks the entry key-bound and stops accepting that bare token.
+  - On its next connect, a device holding a legacy token creates its key and calls `POST /auth/upgrade`. That call sends the legacy token once, plus its public key and a proof over a fresh challenge. The hub marks the entry key-bound and stops accepting that bare token.
   - A hub setting `require_device_keys` (off at first) later rejects any legacy token that hasn't been upgraded. A device that missed the window signs in or pairs again.
 - **Agent tokens** (`.vault/hub/agent-tokens.json`) stay as they are. They're already named, scoped, optionally expiring and accepted only on `/mcp`. They're meant for MCP clients such as the Claude plugin, which can only send a static bearer or do OAuth.
 - **MCP over OAuth** (Authentik JWTs, `mcp_oauth.rs`) stays as it is.
@@ -53,6 +60,20 @@ So a token copied from a settings file, a backup, a log or a pairing QR works fr
 - Vault device ids and node records.
 - The sync protocol itself.
 
+## Fit with v0.1.0
+
+- **`bubblebuffer-device-key` fits as it is.**
+  - Its dependencies are only RustCrypto and dalek crates, with no tokio and no `ring`, and it uses `#![forbid(unsafe_code)]`. That makes it cheap to add to `crates/sync` and the bridge for Windows and Android.
+  - `KeyFile` can be plain (`None`) or passphrase-protected (Argon2id with AES-256-GCM). There's no OS-keystore hook.
+- **Gaps to raise with the library:**
+  - **The proof's roles are relay-specific.** Only `host` and `viewer` exist. A role-free possession proof, or a `device` role, would be cleaner than borrowing `viewer`.
+  - **`Some("")` is accepted as a passphrase**, which gives a protected-looking file that isn't. The app has to guard against that, or the library should reject it.
+- **Toolchain.** The crates need Rust 1.88 and edition 2024, and are a git dependency (`publish = false`). Scratch builds on stable with edition 2021, and edition 2024 dependencies build fine there. The git dependency needs a pinned tag in `Cargo.toml`.
+- **`bubblebuffer-link` doesn't fit yet.**
+  - Scratch has no device-to-device sync: other devices connect to the hub, or to the hub built into the desktop app.
+  - The link's Noise tunnel (`Noise_XX_25519_ChaChaPoly_BLAKE2s`, carrier-agnostic through `FrameIo`) could work between a client and the hub. With `PairStore` and `PeerAuthorizer` it could secure the LAN and Tailscale path, which is plain HTTP today (`sync-state.md`, "trusted network only").
+  - That changes the transport for every client and brings in tokio and tungstenite, so it's a separate decision. Tailscale already encrypts most of those connections.
+
 ## Limits
 
 - **Key storage decides the real gain.** If the key file sits in plain text next to `settings.json`, anyone who copies the whole data dir gets both. What it does stop:
@@ -60,19 +81,19 @@ So a token copied from a settings file, a backup, a log or a pairing QR works fr
   - copies of a settings file;
   - session tokens past their hour.
 
-  Against theft of the whole device, the key needs OS-backed storage: DPAPI on Windows, a Keystore-wrapped secret on Android. The library protects the key file with a passphrase, so that passphrase would live in OS storage. The app has no secure-storage package yet.
-- **`bubblebuffer-link` (Noise pairing and tunnel) doesn't fit yet.** Scratch has no device-to-device sync: other devices connect to the hub, or to the hub built into the desktop app. Over LAN or Tailscale that connection is plain HTTP (`sync-state.md`, "trusted network only"). A Noise tunnel could secure that path, but it changes the transport for every client, so it's a separate decision. Tailscale already encrypts most of those connections.
+  Against theft of the whole device, the key file needs a passphrase held in OS storage: DPAPI on Windows, a Keystore-wrapped secret on Android. The app has no secure-storage package yet.
+- **The vault device id isn't in the signed transcript.** It's bound on the hub side, through the entry that links that vault id to the public key. That's enough, because the hub accepts a key only for the vault id it was registered with.
 
 ## Size
 
 - **Core and hub:**
-  - a new key-store module in `crates/sync`;
-  - three hub routes (`challenge`, `session`, `upgrade`) and the key field in `tokens.json`;
+  - a key-store module in `crates/sync` that wraps `DeviceKey` and `KeyFile`;
+  - three hub routes (`challenge`, `session`, `upgrade`), an in-memory nonce table, and the key field in `tokens.json`;
   - session checks in `Hub::handle` and `/agent/ws`.
-- **App:** key creation and storage, the upgrade at connect, the fingerprint in Settings › Devices, and the pairing-code change in `pairing_codec.dart`.
+- **App:** key creation and storage, the upgrade at connect, the fingerprint in Settings › Devices, and the pairing-code change in `app/lib/features/sync/pairing_codec.dart`.
 - **Tests:**
   - an upgrade from a legacy token;
-  - rejection of a replayed signature or a wrong key;
+  - rejection of a replayed nonce or a wrong key;
   - expiry of a session token;
   - unpair ending live sessions.
 
@@ -82,5 +103,6 @@ So a token copied from a settings file, a backup, a log or a pairing QR works fr
 2. Should sessions last 1 hour, or longer for phones that sleep?
 3. When should `require_device_keys` default to on: after one release, or never automatically?
 4. Should the `notes` CLI get a device key, or stay on agent tokens?
+5. Should Scratch borrow the `viewer` role, or wait for a role-free proof in the library?
 
 Found while reading the code, and not part of this proposal: connecting to a hub doesn't check for `https` on the client side (`app/lib/features/sync/sync_control.dart:94-108`). Yet `mobile-agent.md` says release Android builds require HTTPS. This needs checking.
