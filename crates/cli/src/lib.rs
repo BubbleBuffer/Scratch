@@ -20,6 +20,8 @@ use vault_agent::{Agent, AgentConfig, HostKind, PermissionMode, TestHooks, ToolP
 use vault_core::Vault;
 use vault_mcp::tasks;
 
+mod remote;
+
 /// How long `run-tasks` waits between polls when no task is queued.
 const POLL: Duration = Duration::from_secs(5);
 
@@ -28,7 +30,15 @@ const USAGE: &str = "usage:
   scratch-cli task create --vault <DIR> --prompt <TEXT> [--page <ID>] [--project <NAME-or-ID>]
   scratch-cli task show --vault <DIR> <ID>
   scratch-cli project add --vault <DIR> --name <NAME> --path <REPO>
-  scratch-cli page create --vault <DIR> --title <TITLE>";
+  scratch-cli page create --vault <DIR> --title <TITLE>
+  scratch-cli app status [--json] [--data-dir <DIR>]
+  scratch-cli app open <PAGE> [--json] [--data-dir <DIR>]
+  scratch-cli app navigate <ROUTE> [--json] [--data-dir <DIR>]
+  scratch-cli app screenshot <OUT.png> [--json] [--data-dir <DIR>]
+  scratch-cli app tree [--json] [--data-dir <DIR>]
+  scratch-cli app tap <ID> [--json] [--data-dir <DIR>]
+  scratch-cli app type <ID> <TEXT> [--json] [--data-dir <DIR>]
+  scratch-cli app key <COMBO> [--json] [--data-dir <DIR>]";
 
 /// Makes the agent's test hooks for each open (scripted provider, extra
 /// tools). Tests only.
@@ -51,6 +61,7 @@ pub fn run_with(args: &[String], out: &mut dyn Write, hooks: Option<Hooks>) -> R
         ["task", "show", rest @ ..] => task_show(&Flags::parse(rest)?, out),
         ["project", "add", rest @ ..] => project_add(&Flags::parse(rest)?, out, hooks),
         ["page", "create", rest @ ..] => page_create(&Flags::parse(rest)?, out),
+        ["app", rest @ ..] => remote::run(&Flags::parse(rest)?, out),
         [] | ["help" | "--help" | "-h", ..] => {
             writeln!(out, "{USAGE}")?;
             Ok(())
@@ -59,25 +70,29 @@ pub fn run_with(args: &[String], out: &mut dyn Write, hooks: Option<Hooks>) -> R
     }
 }
 
-/// `--name value` pairs, the `--once` switch and positional words.
+/// `--name value` pairs, the `--once` and `--json` switches and positional
+/// words.
 #[derive(Default)]
 struct Flags {
     values: Vec<(String, String)>,
     once: bool,
+    json: bool,
     positional: Vec<String>,
 }
 
 impl Flags {
     fn parse(words: &[&str]) -> Result<Flags> {
-        const VALUED: [&str; 9] = [
+        const VALUED: [&str; 10] = [
             "--vault", "--device", "--model", "--prompt", "--page", "--project", "--name",
-            "--path", "--title",
+            "--path", "--title", "--data-dir",
         ];
         let mut flags = Flags::default();
         let mut words = words.iter();
         while let Some(word) = words.next() {
             if *word == "--once" {
                 flags.once = true;
+            } else if *word == "--json" {
+                flags.json = true;
             } else if VALUED.contains(word) {
                 let value = words
                     .next()
