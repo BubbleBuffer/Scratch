@@ -9,13 +9,13 @@ use std::time::Duration;
 use anyhow::{bail, ensure, Context, Result};
 use async_trait::async_trait;
 use bubblepaw_sdk::approvals::{Approval, ApprovalMode};
+use bubblepaw_sdk::core::Run;
 use bubblepaw_sdk::harness::{ClientInfo, Harness, RunOptions};
-use bubblepaw_sdk::core::{Run};
 use bubblepaw_sdk::tools::{Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult};
 use serde_json::{json, Value};
 use vault_core::{PropValue, Vault};
 use vault_mcp::jobs::NODE_HUB;
-use vault_mcp::tasks::{self, PromptTools, Task, CANCELLED};
+use vault_mcp::tasks::{self, attempts, PromptTools, Task};
 
 use crate::{permission_policy, Agent, PermissionMode};
 use subtasks::TodoMirror;
@@ -201,9 +201,10 @@ fn runs_here(vault: &Vault, task: &Task) -> bool {
     task.node.is_empty() || (task.node == vault.device_id() && task.node != NODE_HUB)
 }
 
-/// Whether the task's row says it was cancelled (here, or by sync).
+/// Whether the task's row says it was cancelled, or a cancel was asked for
+/// and not yet acknowledged (here, or by sync).
 fn is_cancelled(vault: &Vault, task_id: &str) -> bool {
-    tasks::get(vault, task_id).is_ok_and(|t| t.status == CANCELLED)
+    attempts::is_cancelling(vault, task_id)
 }
 
 impl Agent {
@@ -228,27 +229,46 @@ impl Agent {
             bail!("the task is pinned to another device or runs on the hub");
         }
         if is_cancelled(vault, task_id) {
+            // A cancel that came before the run started is acknowledged here.
+            if task.status == tasks::RUNNING && task.cancel_requested_ms.is_some() {
+                let _ = tasks::finish_attempt(vault, task_id, None, Err(CANCELLED_TEXT.into()));
+            }
             bail!("the task was cancelled before it started");
         }
         let prompt =
             tasks::agent_prompt(vault, &task, PromptTools::Js).map_err(anyhow::Error::msg)?;
+        // The attempt record starts here when nothing claimed the row first
+        // (the app and the CLI claim through `tasks::claim_next`).
+        let attempt = attempts::ensure(vault, &task, "").map_err(anyhow::Error::msg)?;
         let session = self.create_session(&session_title(&task.prompt))?;
         vault.set_property(
             task_id.to_string(),
             "session".into(),
             PropValue::Text(session.id.clone()),
         )?;
-        let outcome = match self.run_task_and_wait(vault, task_id, &session.id, &prompt, limit) {
-            Ok(Ended::Run(run)) if run.status == "completed" => Ok(run.text.unwrap_or_default()),
-            Ok(Ended::Run(run)) => Err(run
-                .error
-                .filter(|e| !e.trim().is_empty())
-                .unwrap_or_else(|| format!("the agent run ended: {}", run.status))),
-            Ok(Ended::Cancelled) => Err(CANCELLED_TEXT.into()),
-            Ok(Ended::Limit) => Err(limit_error(limit)),
-            Err(error) => Err(format!("{error:#}")),
-        };
-        tasks::finish(vault, task_id, outcome.clone()).map_err(anyhow::Error::msg)?;
+        let mut usage = None;
+        let outcome =
+            match self.run_task_and_wait(vault, task_id, &attempt, &session.id, &prompt, limit) {
+                Ok(Ended::Run(run)) if run.status == "completed" => {
+                    usage = run
+                        .usage
+                        .as_ref()
+                        .and_then(|u| serde_json::to_value(u).ok());
+                    Ok(run.text.unwrap_or_default())
+                }
+                Ok(Ended::Run(run)) => Err(run
+                    .error
+                    .filter(|e| !e.trim().is_empty())
+                    .unwrap_or_else(|| format!("the agent run ended: {}", run.status))),
+                Ok(Ended::Cancelled) => Err(CANCELLED_TEXT.into()),
+                Ok(Ended::Limit) => Err(limit_error(limit)),
+                Err(error) => Err(format!("{error:#}")),
+            };
+        if let Some(usage) = usage {
+            let _ = attempts::set_usage(vault, task_id, &attempt, usage);
+        }
+        tasks::finish_attempt(vault, task_id, Some(&attempt), outcome.clone())
+            .map_err(anyhow::Error::msg)?;
         let (ok, text) = match outcome {
             Ok(text) => (true, text),
             Err(error) => (false, error),
@@ -275,6 +295,7 @@ impl Agent {
         &self,
         vault: &Vault,
         task_id: &str,
+        attempt: &str,
         session: &str,
         prompt: &str,
         limit: Duration,
@@ -283,6 +304,19 @@ impl Agent {
         let selected = self.default_model();
         self.check_model(&selected)?;
         let model = Some(selected).filter(|m| !m.trim().is_empty());
+        if let Ok(task) = tasks::get(vault, task_id) {
+            let _ = attempts::started(
+                vault,
+                task_id,
+                attempt,
+                attempts::Started {
+                    session: session.into(),
+                    brief: prompt.into(),
+                    source_rev: tasks::source_revision(vault, &task),
+                    model: model.clone(),
+                },
+            );
+        }
         let mut system_prompt = self.run_prompt(session)?;
         system_prompt.push_str(DELEGATED_PROMPT);
         let mut approval = permission_policy(PermissionMode::Bypass);
@@ -573,8 +607,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let (vault, agent) = open_agent(crate::HostKind::Desktop, dir.path());
         let (_, session) = delegated(&agent, &vault);
-        let cancelled =
-            call_todo(&agent, &session, true, json!({"items": [item("Late", "pending")]}));
+        let cancelled = call_todo(
+            &agent,
+            &session,
+            true,
+            json!({"items": [item("Late", "pending")]}),
+        );
         assert!(cancelled.is_error);
         assert_eq!(cancelled.content, "Execution cancelled");
         assert_eq!(stored_todos(&agent, &session), None);

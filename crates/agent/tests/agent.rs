@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use vault_agent::bubblepaw_sdk::approvals::Approval;
 use vault_agent::bubblepaw_sdk::events::EventKind;
-use vault_agent::bubblepaw_sdk::tools::{Tool, ToolCall, ToolContext, ToolDefinition, ToolResult};
 use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
+use vault_agent::bubblepaw_sdk::tools::{Tool, ToolCall, ToolContext, ToolDefinition, ToolResult};
 use vault_agent::{
     tasks::{limit_error, session_title, TaskRun, RUN_LIMIT},
     Agent, AgentConfig, Forwarded, PermissionMode, Sent, TestHooks,
@@ -615,8 +615,16 @@ fn ai_task_cancel_stops_the_engine_and_the_row_stays_cancelled() {
     assert!(!run.ok, "{run:?}");
     let state = agent.session_state(&session).unwrap();
     assert_eq!(state.runs.last().expect("a run").status, "cancelled");
-    // The late result was dropped by the finish guard.
+    // The runner acknowledged the cancel, and the attempt keeps its record.
     assert_eq!(tasks::get(&v, &task.id).unwrap().status, tasks::CANCELLED);
+    let record = &vault_mcp::tasks::attempts::list(&v, &task.id).unwrap()[0];
+    assert_eq!(record.session, session);
+    assert!(record.brief.contains("Hold on"), "{}", record.brief);
+    assert_eq!(record.outcome.as_deref(), Some("cancelled"));
+    let kinds: Vec<&str> = record.events.iter().map(|e| e.kind.as_str()).collect();
+    assert!(kinds.contains(&"started"), "{kinds:?}");
+    assert!(kinds.contains(&"cancel_requested"), "{kinds:?}");
+    assert!(kinds.contains(&"cancel_acknowledged"), "{kinds:?}");
 }
 
 #[test]

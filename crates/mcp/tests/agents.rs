@@ -287,8 +287,11 @@ fn ask_ai_on_this_device_is_pinned_and_cancellable() {
     // Cancelled while running: the late result is dropped and the
     // placeholder says it was cancelled.
     assert!(tasks::cancel(v, &got.id).unwrap());
-    assert_eq!(tasks::get(v, &got.id).unwrap().status, tasks::CANCELLED);
-    tasks::finish(v, &got.id, Ok("Too late".into())).unwrap();
+    // Not stopped until the runner says so: still running, cancel requested.
+    let asked = tasks::get(v, &got.id).unwrap();
+    assert_eq!(asked.status, tasks::RUNNING);
+    assert!(asked.cancel_requested_ms.is_some());
+    tasks::finish_attempt(v, &got.id, Some(&asked.attempt), Ok("Too late".into())).unwrap();
     let after = texts(v, &page);
     assert!(after.iter().all(|t| !t.contains("Too late")), "{after:?}");
     assert!(

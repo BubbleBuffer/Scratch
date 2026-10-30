@@ -131,7 +131,11 @@ fn no_progress_is_written_after_cancel() {
 
     assert!(tasks::cancel(&v, &id).unwrap());
     assert!(tasks::report_progress(&v, &id, "Still going").is_err());
+    // The cancel is a request until the runner acknowledges it.
+    assert_eq!(tasks::get(&v, &id).unwrap().status, "running");
+    tasks::finish(&v, &id, Err("the task was cancelled".into())).unwrap();
     assert_eq!(tasks::get(&v, &id).unwrap().status, "cancelled");
+    assert!(tasks::report_progress(&v, &id, "Still going").is_err());
     assert_eq!(prop(&v, &id, "progress"), reported);
     assert_eq!(prop(&v, &id, "progress_at"), at);
 }
@@ -179,6 +183,9 @@ fn the_last_progress_survives_every_ending() {
     let cancelled = running_task(&v, "Cancel");
     tasks::report_progress(&v, &cancelled, "Half way").unwrap();
     assert!(tasks::cancel(&v, &cancelled).unwrap());
+    // The runner acknowledges the cancel.
+    tasks::finish(&v, &cancelled, Err("the task was cancelled".into())).unwrap();
+    assert_eq!(tasks::get(&v, &cancelled).unwrap().status, "cancelled");
     assert_eq!(prop(&v, &cancelled, "progress"), "Half way");
 
     // Interrupted by a desktop restart: recovered as failed.
