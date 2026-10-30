@@ -64,6 +64,19 @@ class AppSettings extends ChangeNotifier {
   /// Phones: a shake opens the feedback sheet. Device-local, on by default.
   bool shakeToSend = true;
 
+  /// Phones: a notice when a delegated run finishes or fails (see
+  /// features/ai/run_notices.dart). Device-local, on by default.
+  bool runNotices = true;
+
+  /// Run notices already handled, task id to the state that was noticed. Null
+  /// until the first look at the task rows, which only records them. Kept so
+  /// a restart never repeats a notice.
+  Map<String, String>? runNoticesSeen;
+
+  /// When that first look happened (epoch ms). Rows last changed before it
+  /// never get a notice.
+  int? runNoticesSince;
+
   /// Windows updates: also offer nightly builds. Off by default.
   bool updatesIncludeNightly = false;
 
@@ -131,6 +144,15 @@ class AppSettings extends ChangeNotifier {
     scheduleRunsHere = (j['scheduleRunsHere'] as bool?) ?? false;
     hubUsesThisComputer = (j['hubUsesThisComputer'] as bool?) ?? false;
     shakeToSend = (j['shakeToSend'] as bool?) ?? true;
+    runNotices = (j['runNotices'] as bool?) ?? true;
+    runNoticesSince = j['runNoticesSince'] as int?;
+    if (j['runNoticesSeen'] case final Map seen) {
+      runNoticesSeen = {
+        for (final e in seen.entries)
+          if (e.key is String && e.value is String)
+            e.key as String: e.value as String,
+      };
+    }
     updatesIncludeNightly = (j['updatesIncludeNightly'] as bool?) ?? false;
     updatesAutoDownload = (j['updatesAutoDownload'] as bool?) ?? true;
     hubAddress = (j['hubAddress'] as String?) ?? defaultHubAddress;
@@ -174,6 +196,9 @@ class AppSettings extends ChangeNotifier {
     'scheduleRunsHere': scheduleRunsHere,
     'hubUsesThisComputer': hubUsesThisComputer,
     'shakeToSend': shakeToSend,
+    'runNotices': runNotices,
+    'runNoticesSeen': ?runNoticesSeen,
+    'runNoticesSince': ?runNoticesSince,
     'updatesIncludeNightly': updatesIncludeNightly,
     'updatesAutoDownload': updatesAutoDownload,
     'hubAddress': hubAddress,

@@ -123,6 +123,8 @@ class _FakeSource extends ChangeNotifier implements AiTaskSource {
   List<AiTask> tasks = [];
   @override
   bool hubUsable = true;
+  @override
+  void Function()? onDelegated;
   int refreshes = 0;
 
   @override

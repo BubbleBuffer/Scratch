@@ -187,3 +187,14 @@ Today coverage uses the real core for week boundaries, limited overdue/count, op
 - `flutter build linux` has not been run: WSL Ubuntu lacks clang, cmake, ninja, libgtk-3-dev and a Flutter SDK, which need sudo to install.
 - There are no font options; "Add comment" does nothing. Dragging a block to the left edge of a plain block does not make columns (only the right edge, or either edge of a column list), so a plain drop just inside the text still moves.
 - Unknown block kinds are not a gap: the core keeps their kind, text and target, and they never load as paragraphs. The app shows the unsupported card for them.
+
+## Run notices (Android)
+
+A phone notice when a delegated run ends. Source: [run_notices.dart](../../app/lib/features/ai/run_notices.dart); test: [run_notices_test.dart](../../app/test/run_notices_test.dart).
+
+- **How state arrives:** a run is a row of the AI tasks collection. The runner (a desktop agent, or the Hub) writes its status, error and progress into the row, and the row syncs to the phone like any page. The change feed applies it, `AiStore` reloads its `tasks`, and the kanban runner chip reads the same list. The notices listen to that store, so nothing polls the Hub and no push server is involved.
+- **What notifies:** `runNoticeOf` is the one function that reads run states. `done` gives "Task finished: <note title>", `failed` and `interrupted` give "Task failed: <note title>" with the reason as the body. `queued`, `running`, `cancelled` and unknown states give none. A new state that needs attention is added there. A tap opens the task's note through `openReminder` (payload `{"page": ...}`).
+- **No repeats:** `settings.json` keeps `runNoticesSeen` (task id to the state already handled, forgotten when the row is active again, so a retry that ends again is noticed) and `runNoticesSince` (the first look). The first look only records the rows. Rows last changed before it, rows this device ran itself and notes in the trash or deleted give no notice. Every row of the vault counts as the user's: rows carry no owner.
+- **Setting:** Settings > Preferences > "Notify when a run finishes or fails" (Android only, `runNotices`, on by default). Turning it off still records rows, so turning it on later does not replay old runs.
+- **Permission:** the Android notification permission is requested when the setting is turned on and the first time a task is assigned to a runner from this phone (the shared `reminders.permissionAsked` flag keeps it to one prompt). Notices are posted on the `agent-runs` channel by `ReminderBackend.showNow`.
+- **Coverage:** there is no background service or WorkManager job. A notice arrives when the app process is alive and its sync applies the change (foreground, or shortly after leaving it while the process still runs), and at the next start of the app for a run that ended meanwhile. A killed or frozen app notices nothing until it runs again. Desktop shows none.
