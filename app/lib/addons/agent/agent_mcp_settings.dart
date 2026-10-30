@@ -12,9 +12,6 @@
 
 import 'package:flutter/widgets.dart';
 
-import '../../features/settings/settings_kit.dart';
-import '../../features/settings/settings_screen.dart'
-    show SettingsSection, openSettingsSection;
 import '../../services/addon_services.dart';
 import '../../ui/ui.dart';
 import 'agent_mcp_controller.dart';
