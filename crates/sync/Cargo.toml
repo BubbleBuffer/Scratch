@@ -27,27 +27,27 @@ tiny_http = { version = "0.12", default-features = false }
 # same on Windows, Linux and Android. Exact pin: src/tls.rs builds the agent
 # from ureq's unversioned transport API (no semver guarantee) to verify with
 # pinned hub certificates; re-check that file before moving it.
-ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
+ureq = { version = "=3.5.0", default-features = false, features = ["rustls"] }
 # The pinning certificate verifier (src/tls.rs): the same rustls, ring
 # provider and webpki roots ureq uses.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-pki-types = "1"
 webpki-roots = "1"
-sha2 = "0.10"
+sha2 = "0.11"
 # Stateless challenge nonces (src/keys.rs): an HMAC tag under a per-process key.
-hmac = "0.12"
+hmac = "0.13"
 # Details of a hub certificate the user is asked to trust.
 x509-parser = "0.18"
-getrandom = "0.3"
+getrandom = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Compressed /sync and /push bodies (the zstd-v1 capability): libzstd, level 3.
-zstd = "0.13"
+zstd = "0.14"
 tracing = "0.1"
 # Device keys: Ed25519 identities, key files and possession proofs.
 bubblebuffer-device-key = { git = "https://github.com/BubbleBuffer/bubblebuffer-identity", tag = "v0.1.0" }
 
 [dev-dependencies]
 # Test certificates (unit tests in src/tls.rs and tests/tls.rs).
-rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
+rcgen = { version = "0.14", default-features = false, features = ["ring", "pem"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
