@@ -4,9 +4,53 @@
 // the card to the one chosen. Open and Remove work on both; Remove keeps the
 // note itself.
 
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notes_app/addons/kanban/api.dart';
 
 import 'kanban_fixture.dart';
+
+/// The card's own focus node (the card is a keyboard focus stop).
+FocusNode _cardFocus(WidgetTester tester) => tester
+    .widgetList<Focus>(find.byType(Focus))
+    .map((f) => f.focusNode)
+    .whereType<FocusNode>()
+    .firstWhere((n) => n.debugLabel == 'kanban card');
+
+/// True when the keyboard focus is on, or inside, a widget found by [finder].
+bool _focusIsIn(Finder finder) {
+  final context = FocusManager.instance.primaryFocus?.context;
+  if (context == null) return false;
+  final targets = finder.evaluate().toSet();
+  if (targets.contains(context)) return true;
+  var found = false;
+  context.visitAncestorElements((e) {
+    found = targets.contains(e);
+    return !found;
+  });
+  return found;
+}
+
+Future<String> _boardWithGarden(WidgetTester tester) async {
+  final f = await pumpApp(
+    tester,
+    mobile: false,
+    runners: RunnerAssignments(FakeRunnerBackend.demo()),
+  );
+  final garden = f.pages['Garden plan']!;
+  final board = await seedKanban(
+    tester,
+    title: 'Launch board',
+    columns: {
+      'To do': [garden],
+      'Doing': [],
+      'Done': [],
+    },
+  );
+  await openNote(tester, board, 'Launch board');
+  return garden;
+}
 
 /// Waits until [column] stores exactly [expected] (the write is asynchronous
 /// behind the widget), then lets the screen settle.
@@ -242,4 +286,69 @@ void main() {
       expect(note.title, 'Garden plan');
     },
   );
+
+  appTest(
+    'desktop keyboard: the context-menu key opens the card menu, arrows move between items, Esc closes it and focus returns to the card',
+    (tester) async {
+      final garden = await _boardWithGarden(tester);
+
+      _cardFocus(tester).requestFocus();
+      await settle(tester);
+      expect(menuOpacity(tester, garden), 1, reason: 'shown while focused');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
+      await settle(tester);
+      expect(menuItem('Open'), findsOneWidget);
+      expect(_focusIsIn(menuItem('Open')), isTrue, reason: 'first item');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await settle(tester);
+      expect(_focusIsIn(menuItem('Assign to Agent')), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await settle(tester);
+      expect(_focusIsIn(menuItem(removeFromBoardLabel)), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await settle(tester);
+      expect(_focusIsIn(menuItem('Assign to Agent')), isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(menuItem('Open'), findsNothing, reason: 'Esc closes the menu');
+      expect(_cardFocus(tester).hasPrimaryFocus, isTrue);
+    },
+  );
+
+  appTest('desktop keyboard: Shift+F10 opens the menu and Enter runs the focused item', (
+    tester,
+  ) async {
+    await _boardWithGarden(tester);
+
+    _cardFocus(tester).requestFocus();
+    await settle(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.f10);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await settle(tester);
+    expect(menuItem('Open'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await settle(tester);
+    expect(editableWith('Some text about garden plan.'), findsOneWidget);
+  });
+
+  appTest('desktop keyboard: Enter on the focused menu button opens the card menu', (
+    tester,
+  ) async {
+    final garden = await _boardWithGarden(tester);
+
+    _cardFocus(tester).requestFocus();
+    await settle(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await settle(tester);
+    expect(_focusIsIn(cardMenuTrigger(garden)), isTrue, reason: 'Tab reaches the button');
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await settle(tester);
+    expect(menuItem('Open'), findsOneWidget);
+  });
 }

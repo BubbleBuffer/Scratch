@@ -2,9 +2,10 @@
 // ellipsis menu, the Run on picker (a popover at 700 px and wider, a bottom
 // sheet below), assigning, and the runner chip for each state.
 
-import 'package:flutter/widgets.dart' show ValueKey;
+import 'package:flutter/widgets.dart' show Size, ValueKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/kanban/api.dart';
+import 'package:notes_app/ui/menu.dart' show MenuSurface;
 import 'package:notes_app/ui/sheet.dart' show SheetSurface;
 
 import 'kanban_fixture.dart';
@@ -250,4 +251,31 @@ void main() {
     );
     expect(find.text('Studio-PC · queued'), findsOneWidget);
   });
+
+  appTest(
+    'desktop at 1280 px: the picker opens below the card menu button, inside the window, and leaves the column headers uncovered',
+    (tester) async {
+      final backend = FakeRunnerBackend.demo();
+      final f = await pumpApp(
+        tester,
+        mobile: false,
+        runners: RunnerAssignments(backend),
+      );
+      tester.view.physicalSize = const Size(1280, 800);
+      final garden = f.pages['Garden plan']!;
+      await _openBoard(tester, garden);
+      await hoverCard(tester, 'Garden plan');
+      final button = tester.getRect(cardMenuTrigger(garden));
+      final header = tester.getRect(find.text('To do').first);
+      await _openPicker(tester, garden);
+
+      final picker = tester.getRect(
+        find.ancestor(of: find.text('Run on'), matching: find.byType(MenuSurface)),
+      );
+      expect(picker.top, greaterThanOrEqualTo(button.bottom), reason: 'below the button');
+      expect(picker.top, greaterThan(header.bottom), reason: 'the column header stays visible');
+      expect(picker.right, lessThanOrEqualTo(1280));
+      expect(picker.bottom, lessThanOrEqualTo(800));
+    },
+  );
 }
