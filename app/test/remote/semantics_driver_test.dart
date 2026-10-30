@@ -13,7 +13,6 @@ void main() {
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
     final controller = TextEditingController();
     addTearDown(controller.dispose);
     var taps = 0;
@@ -79,11 +78,11 @@ void main() {
     await driver.type(field.id, 'Fresh', replace: true);
     await tester.pump();
     expect(controller.text, 'Fresh');
+    semantics.dispose();
   });
 
   testWidgets('unknown ids are 404; wrong targets are 400', (tester) async {
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -109,6 +108,7 @@ void main() {
       driver.type('plain', 'x', replace: true),
       throwsA(isA<RemoteError>().having((e) => e.status, 'status', 400)),
     );
+    semantics.dispose();
   });
 
   testWidgets('key reaches a focused widget as a key event', (tester) async {

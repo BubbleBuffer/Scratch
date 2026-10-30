@@ -250,8 +250,12 @@ class SemanticsDriver {
       } else if (node.actions.contains('tap')) {
         owner.performAction(node.nodeId, ui.SemanticsAction.tap);
       }
-      await _nextFrame();
-      node = _find(id);
+      // Focus lands on one frame and the semantics update on the next.
+      for (var i = 0; i < 3; i++) {
+        await _nextFrame();
+        node = _find(id);
+        if (node.actions.contains('setText')) break;
+      }
     }
     if (!node.actions.contains('setText')) {
       throw RemoteError(400, 'field "$id" does not accept text (read-only?)');

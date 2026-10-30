@@ -1,8 +1,6 @@
 // The `key` command: a key combination delivered the way the engine delivers
-// a physical key, as [ui.KeyData] to the key event manager. The keyboard
+// a physical key, as key events to the focus tree. The keyboard
 // state, focus handlers and app shortcuts see an ordinary key press.
-
-import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
 
@@ -94,30 +92,40 @@ void pressKeyCombo(KeyCombo combo) {
   ];
   var stamp = Duration(microseconds: DateTime.now().microsecondsSinceEpoch);
 
-  void send(ui.KeyEventType type, _Key k, {String? character}) {
+  void send(bool down, _Key k, {String? character}) {
     stamp += const Duration(microseconds: 1);
+    final KeyEvent event = down
+        ? KeyDownEvent(
+            physicalKey: k.physical,
+            logicalKey: k.logical,
+            character: character,
+            timeStamp: stamp,
+          )
+        : KeyUpEvent(
+            physicalKey: k.physical,
+            logicalKey: k.logical,
+            timeStamp: stamp,
+          );
+    // The engine's key-data path pairs events with legacy raw messages that
+    // never arrive here, so update the keyboard state and hand the event to
+    // the focus tree directly.
+    HardwareKeyboard.instance.handleKeyEvent(event);
     // ignore: deprecated_member_use
-    manager.handleKeyData(
-      ui.KeyData(
-        timeStamp: stamp,
-        type: type,
-        physical: k.physical.usbHidUsage,
-        logical: k.logical.keyId,
-        character: character,
-        synthesized: false,
-      ),
+    manager.keyMessageHandler?.call(
+      // ignore: deprecated_member_use
+      KeyMessage(<KeyEvent>[event], null),
     );
   }
 
   for (final m in mods) {
-    send(ui.KeyEventType.down, m);
+    send(true, m);
   }
   try {
-    send(ui.KeyEventType.down, key, character: key.character);
-    send(ui.KeyEventType.up, key);
+    send(true, key, character: key.character);
+    send(false, key);
   } finally {
     for (final m in mods.reversed) {
-      send(ui.KeyEventType.up, m);
+      send(false, m);
     }
   }
 }

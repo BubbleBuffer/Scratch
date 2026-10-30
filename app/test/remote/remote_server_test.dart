@@ -41,7 +41,7 @@ void main() {
       if (token != null) {
         req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       }
-      req.write(body);
+      if (method != 'GET') req.write(body);
       final res = await req.close();
       final text = await res.transform(utf8.decoder).join();
       expect(res.headers.contentType?.mimeType, 'application/json');
