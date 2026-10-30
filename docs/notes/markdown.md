@@ -35,6 +35,7 @@ Each built-in block type and how it is written. Kinds the app writes itself are 
 - `toc`: `<!-- toc -->` alone on its line. Shows the page's headings.
 - `chat_ref`: a reference to an agent chat. App-written: leave it as `read_page` shows it.
 - `query`: a fence labelled `query`. A saved search card with no children; its text is a search spec. Leave it alone unless the user asks for one.
+- `view`: a fence labelled `view`. Its text is the view's settings JSON (layout, sorts, filter, visible properties), plus `"page"` when it lists another page's children. Consecutive view blocks show as tabs. App-written: leave it as `read_page` shows it.
 - `embed`: a live link to another page. App-written: leave it as `read_page` shows it.
 <!-- /check -->
 

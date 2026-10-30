@@ -16,7 +16,6 @@ import '../../../core/models.dart';
 import '../../../core/vault.dart';
 import '../../../registry/block_codecs.dart';
 import '../../../registry/block_registry.dart';
-import '../../../editor/model.dart';
 import '../../../state/app_state.dart';
 import '../../../state/collection_store.dart';
 import '../../../ui/database/values.dart';
