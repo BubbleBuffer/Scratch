@@ -116,7 +116,7 @@ const render = {
           ctl: `<div class="inline"><input class="field" placeholder="https://notes.example.com" aria-label="Hub address">${btn("Sign in", { kind: "primary" })}</div>` })
         + adv("Connect with a pairing code", "for a hub on another of your computers", row({ label: "Pairing code or hub address", stack: true,
           desc: "On the computer that runs the hub, open Settings › Sync and devices › Add a device, then paste the code here.",
-          ctl: `<div style="width:100%"><input class="field mono" placeholder="notes://pair?… or http://192.168.1.20:47100" aria-label="Pairing code or hub address">
+          ctl: `<div style="width:100%"><input class="field mono" placeholder="notes://pair?… or http://203.0.113.20:47100" aria-label="Pairing code or hub address">
             <label class="field-label">Token</label><input class="field mono" placeholder="Filled in by the pairing code"><div class="field-hint">Pasting a pairing code fills both fields.</div>
             <div style="margin-top:10px">${btn("Connect")}</div></div>` }));
     const devices = filled()
@@ -138,7 +138,7 @@ const render = {
         row({ label: "Share this vault with your devices", desc: "This computer runs a hub while Scratch is open. Your phone syncs with it over your network or Tailscale.",
           help: help("Turn on if you have no hub on a server. Turn off if you sync through a hosted hub and don’t need this computer to serve."), ctl: sw("hubShare", "Share this vault with your devices") })
         + (S.hubShare ? row({ label: "Reachable at", desc: "Devices can use any of these addresses.", stack: true,
-          ctl: `<div style="width:100%;display:grid;gap:6px">${copyline("http://192.168.1.20:47100")}${copyline("http://100.64.0.12:47100")}</div>` })
+          ctl: `<div style="width:100%;display:grid;gap:6px">${copyline("http://203.0.113.20:47100")}${copyline("http://198.51.100.12:47100")}</div>` })
           + row({ label: "Paired devices", desc: "Unpairing revokes a device’s access; it stops syncing.", stack: true, ctl: `<div style="width:100%">${devices}${pair}</div>` })
           + adv("Advanced", "network address", row({ label: "Listen address", desc: "Which network connections the hub accepts, and on which port.",
             help: help("Only if a firewall or another program needs a different port.", "<b>0.0.0.0</b> accepts connections from every network this computer is on. A port of 0 picks a free one."),
