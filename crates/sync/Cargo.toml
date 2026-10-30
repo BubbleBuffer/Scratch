@@ -42,6 +42,8 @@ serde_json = "1"
 # Compressed /sync and /push bodies (the zstd-v1 capability): libzstd, level 3.
 zstd = "0.13"
 tracing = "0.1"
+# Device keys: Ed25519 identities, key files and possession proofs.
+bubblebuffer-device-key = { git = "https://github.com/BubbleBuffer/bubblebuffer-identity", tag = "v0.1.0" }
 
 [dev-dependencies]
 # Test certificates (unit tests in src/tls.rs and tests/tls.rs).
