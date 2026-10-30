@@ -48,6 +48,9 @@ class _KanbanBoardState extends State<KanbanBoard> {
   /// The card whose panel is open beside the board (desktop), and the node
   /// that had focus before, which gets it back when the panel closes.
   BoardCard? _open;
+
+  /// Keeps the board's state when the panel opens beside it.
+  final _boardKey = GlobalKey();
   FocusNode? _restoreFocus;
 
   @override
@@ -87,17 +90,18 @@ class _KanbanBoardState extends State<KanbanBoard> {
             _cardMenu(context, column, card, anchor, focus),
       ),
     );
+    final keyed = KeyedSubtree(key: _boardKey, child: board);
     final content = ListenableBuilder(
       listenable: _source,
       builder: (context, _) {
         final open = _open;
-        if (open == null || widget.inline || context.mobile) return board;
+        if (open == null || widget.inline || context.mobile) return keyed;
         final column = _columnOf(open.id);
-        if (column == null) return board;
+        if (column == null) return keyed;
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: board),
+            Expanded(child: keyed),
             _sidePanel(context, open, column),
           ],
         );
@@ -325,7 +329,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
               label: 'Open',
               onTap: () {
                 Navigator.of(panel).pop();
-                source.openCard(context, card);
+                source.openNote(context, card);
               },
             ),
             if (runners != null)

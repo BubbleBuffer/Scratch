@@ -64,11 +64,8 @@ void main() {
       );
       expect(find.byKey(const ValueKey('kanban-panel-status')), findsOneWidget);
       expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('kanban-panel-status')),
-          matching: find.text('To do'),
-        ),
-        findsOneWidget,
+        tester.widget<Text>(find.byKey(const ValueKey('kanban-panel-status'))).data,
+        'To do',
       );
       expect(find.text('Not assigned'), findsOneWidget);
       expect(find.byKey(_assign), findsOneWidget);
