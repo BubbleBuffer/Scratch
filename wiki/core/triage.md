@@ -45,3 +45,14 @@ Ordinary tasks, chats and the MCP gateway do not get them.
 ## Bridge
 
 `triage_start(scope_project_id, page_ids, runner)` returns the task id; `triage_proposals()` lists pending proposals (`triage_all_proposals()` all of them) as `TriageProposalDto`; `triage_accept(id)`, `triage_dismiss(id)` and `triage_undo(id)` return the updated dto; `triage_page_id()` is the Nodes page id, whose change in the change feed means the list changed.
+
+## Links and tags by the run
+
+Built 2026-10-30. A triage run also gets `triage_link({from, to})` and `triage_tag({page, tag})`, for triage runs only. They apply at once (merges are only ever proposed), and both pages must be in the run's scope.
+
+- `triage_link` appends a link-to-page block at the end of `from`. Pages of different types may be linked; pages of different projects may not. A page that already links to the target (block or inline page link) is left alone.
+- `triage_tag` adds a tag to the page's `tags` property (a multi-select; the tag is trimmed, a leading `#` dropped, 1 to 64 characters, no commas). A tag the page has already (ignoring case) is left alone.
+- Each change is appended to the task row's text property `triage_actions` (the run's outcome), a JSON list of `{kind, page, target, block?, previous?}`: a link records its inserted block, a tag the page's previous `tags` value (absent when it had none).
+- `vault_mcp::triage::undo_actions(task)` takes back all of a run's changes newest first and empties the record (`Vault::triage_undo_action` does one). A link's block is deleted if it is still there; tags are restored to the previous list, so tag edits made since are lost. Edits to other properties and blocks stay.
+
+The bridge does not expose the record yet: a UI that lists or undoes a run's links and tags needs a new bridge function over `triage::actions` and `triage::undo_actions` (and regenerated bindings).
