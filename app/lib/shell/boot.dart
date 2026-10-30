@@ -16,17 +16,20 @@ import 'dart:io';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/widgets.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/link_previews.dart';
 import '../core/models.dart';
 import '../core/paths.dart';
 import '../core/vault.dart';
 import '../features/bakeoff.dart';
+import '../features/settings/settings_screen.dart' show appVersion;
 import '../features/settings/settings_store.dart';
 import '../features/sync/sync_control.dart';
 import '../features/updates/update_controller.dart';
 import '../features/getting_started.dart';
 import '../features/showcase.dart';
+import '../remote/app_remote.dart';
 import '../features/demo.dart';
 import '../state/app_state.dart';
 import '../state/ui_state.dart';
@@ -54,6 +57,7 @@ class _NotesAppState extends State<NotesApp> {
   late final AppLifecycleListener _lifecycle;
   late final AppSettings _settings = AppSettings.load(File('${widget.dataDir}${Platform.pathSeparator}settings.json'));
   AppState? _app;
+  AppRemote? _remote;
   bool _seeding = false;
   int _seeded = 0;
   String? _error;
@@ -127,6 +131,7 @@ class _NotesAppState extends State<NotesApp> {
         return;
       }
       setState(() => _app = app);
+      unawaited(_startRemote());
       unawaited(
         startSyncAtBoot(app.sync, _settings).whenComplete(
           () => app.runNotices.start().catchError((Object e) {
@@ -143,6 +148,28 @@ class _NotesAppState extends State<NotesApp> {
     } catch (e) {
       AppLog.info('open failed: $e');
       if (mounted) setState(() => _error = '$e');
+    }
+  }
+
+  /// The app remote-control endpoint (wiki/integrations/app-remote.md): Windows
+  /// and Linux desktop only, off with SCRATCH_REMOTE=0. Never blocks or fails
+  /// the boot.
+  Future<void> _startRemote() async {
+    if (!(Platform.isWindows || Platform.isLinux)) return;
+    if (Platform.environment['SCRATCH_REMOTE'] == '0' || Platform.environment.containsKey('FLUTTER_TEST') || _remote != null) return;
+    try {
+      var version = appVersion;
+      try {
+        version = (await PackageInfo.fromPlatform()).version;
+      } catch (_) {}
+      final remote = await AppRemote.start(dataDir: widget.dataDir, app: () => _app, version: version);
+      if (!mounted) {
+        await remote.stop();
+        return;
+      }
+      _remote = remote;
+    } catch (e) {
+      AppLog.info('remote control failed to start: $e');
     }
   }
 
@@ -164,6 +191,8 @@ class _NotesAppState extends State<NotesApp> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    unawaited(_remote?.stop());
+    _remote = null;
     UpdateController.current?.dispose();
     UpdateController.current = null;
     _app?.dispose();
