@@ -410,6 +410,9 @@ impl Vault {
         }
         let mut repointed = Vec::new();
         if repoint {
+            // The link index is written when pages are flushed; bring it up to
+            // date so a page edited a moment ago is found.
+            self.flush()?;
             let sources: Vec<String> = {
                 let db = lock(&self.inner.db);
                 let mut v = db.link_sources(&dropped)?;

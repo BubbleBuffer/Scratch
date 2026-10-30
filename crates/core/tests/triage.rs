@@ -402,6 +402,7 @@ fn accepting_repoints_every_link_and_undo_restores_the_linking_pages() {
     };
     assert_eq!(rel_of(&plan_row), Some(PropValue::Relation(vec![a.clone()])));
     assert_eq!(rel_of(&plan_only_b), Some(PropValue::Relation(vec![a.clone()])));
+    v.flush().unwrap();
     assert!(v.backlinks(b.clone()).unwrap().is_empty(), "no live page links to it");
     assert_eq!(links_in(&v, &keeps_link), vec![format!("block:{a}")], "other links stay");
     let mut recorded: Vec<_> = done.repointed.iter().map(|r| r.page.clone()).collect();
