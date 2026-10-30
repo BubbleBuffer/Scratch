@@ -26,6 +26,7 @@ class BoardRenderer extends StatefulWidget {
     this.inlinePageSize = 25,
     this.addCardLabel = 'New page',
     this.cardBuilder,
+    this.onCardMenu,
     this.columnLabelBuilder,
     this.columnMenu,
     this.trailing,
@@ -41,6 +42,11 @@ class BoardRenderer extends StatefulWidget {
   /// may keep its existing pointer handling; descendant keyboard focus is
   /// excluded so the board provides one focus stop and one open callback.
   final BoardCardBuilder? cardBuilder;
+
+  /// Opens a card's menu from the keyboard: the context-menu key or Shift+F10
+  /// on a focused card. [anchor] is the card's rectangle; [focus] is the
+  /// card's focus node, which gets focus back when the menu closes.
+  final BoardCardMenuOpener? onCardMenu;
   final BoardColumnLabelBuilder? columnLabelBuilder;
   final BoardColumnMenu? columnMenu;
   final Widget? trailing;
@@ -133,6 +139,10 @@ class _BoardRendererState extends State<BoardRenderer> {
     return _BoardCardSurface(
       key: ValueKey('board-card-${card.id}'),
       onOpen: () => widget.source.openCard(context, card),
+      onMenu: widget.onCardMenu == null
+          ? null
+          : (anchor, focus) =>
+                widget.onCardMenu!(context, column, card, anchor, focus),
       child: body,
     );
   }
@@ -190,14 +200,53 @@ class _BoardRendererState extends State<BoardRenderer> {
   );
 }
 
+/// Opens the menu of [card] under [anchor]; see [BoardRenderer.onCardMenu].
+typedef BoardCardMenuOpener =
+    void Function(
+      BuildContext context,
+      BoardColumn column,
+      BoardCard card,
+      Rect anchor,
+      FocusNode focus,
+    );
+
+/// Tells a card's body whether its card has keyboard focus, and which node
+/// it is. The body sits under the card's focus stop, so it cannot read the
+/// focus itself.
+class BoardCardFocus extends InheritedWidget {
+  const BoardCardFocus({
+    super.key,
+    required this.focused,
+    required this.node,
+    required super.child,
+  });
+
+  final bool focused;
+  final FocusNode node;
+
+  /// The card focus around [context], or null outside a card.
+  static BoardCardFocus? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<BoardCardFocus>();
+
+  @override
+  bool updateShouldNotify(BoardCardFocus old) =>
+      focused != old.focused || node != old.node;
+}
+
+class _CardMenuIntent extends Intent {
+  const _CardMenuIntent();
+}
+
 /// One keyboard stop for any card presentation, including interactive cards.
 class _BoardCardSurface extends StatefulWidget {
   const _BoardCardSurface({
     super.key,
     required this.onOpen,
+    required this.onMenu,
     required this.child,
   });
   final VoidCallback onOpen;
+  final void Function(Rect anchor, FocusNode focus)? onMenu;
   final Widget child;
   @override
   State<_BoardCardSurface> createState() => _BoardCardSurfaceState();
@@ -206,6 +255,7 @@ class _BoardCardSurface extends StatefulWidget {
 class _BoardCardSurfaceState extends State<_BoardCardSurface> {
   final _focus = FocusNode();
   bool _highlight = false;
+  bool _focused = false;
   @override
   void dispose() {
     _focus.dispose();
@@ -216,9 +266,14 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
   Widget build(BuildContext context) => FocusableActionDetector(
     focusNode: _focus,
     onShowFocusHighlight: (highlight) => setState(() => _highlight = highlight),
-    shortcuts: const {
-      SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-      SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+    shortcuts: {
+      const SingleActivator(LogicalKeyboardKey.enter): const ActivateIntent(),
+      const SingleActivator(LogicalKeyboardKey.space): const ActivateIntent(),
+      if (widget.onMenu != null) ...const {
+        SingleActivator(LogicalKeyboardKey.contextMenu): _CardMenuIntent(),
+        SingleActivator(LogicalKeyboardKey.f10, shift: true):
+            _CardMenuIntent(),
+      },
     },
     actions: {
       ActivateIntent: CallbackAction<ActivateIntent>(
@@ -227,7 +282,17 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
           return null;
         },
       ),
+      _CardMenuIntent: CallbackAction<_CardMenuIntent>(
+        onInvoke: (_) {
+          final box = context.findRenderObject();
+          if (box is RenderBox && box.hasSize) {
+            widget.onMenu?.call(box.localToGlobal(Offset.zero) & box.size, _focus);
+          }
+          return null;
+        },
+      ),
     },
+    onFocusChange: (focused) => setState(() => _focused = focused),
     child: CustomPaint(
       foregroundPainter: _highlight
           ? _BoardFocusRing(context.colors.focus)
@@ -235,7 +300,11 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onOpen,
-        child: ExcludeFocus(child: widget.child),
+        child: BoardCardFocus(
+          focused: _focused,
+          node: _focus,
+          child: ExcludeFocus(child: widget.child),
+        ),
       ),
     ),
   );

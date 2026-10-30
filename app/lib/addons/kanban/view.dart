@@ -12,6 +12,7 @@ import '../../ui/board/board_source.dart';
 import '../../services/addon_services.dart' show AddonServices;
 import '../../ui/database/widgets.dart' show showPanel;
 import '../../ui/ui.dart';
+import 'keyboard_menu.dart';
 import 'runner_backend.dart';
 import 'runner_chip.dart';
 import 'runner_fake.dart';
@@ -75,6 +76,8 @@ class _KanbanBoardState extends State<KanbanBoard> {
         gutter: widget.inline ? 0 : widget.gutter,
         addCardLabel: 'New card',
         cardBuilder: _card,
+        onCardMenu: (context, column, card, anchor, focus) =>
+            _cardMenu(context, column, card, anchor, focus),
       ),
     );
     // Without a scope above, the board uses the agent's runners. The
@@ -115,15 +118,11 @@ class _KanbanBoardState extends State<KanbanBoard> {
       key: ValueKey('kanban-card-${card.id}'),
       lifted: lifted,
       menuKey: ValueKey('kanban-card-menu-${card.id}'),
-      onMenu: () => _cardMenu(context, column, card),
+      onMenu: (anchor, restoreFocus) =>
+          _cardMenu(context, column, card, anchor, restoreFocus),
       body: runners == null ? body : _withChip(body, runners, card.id),
     );
-    if (lifted) return ExcludeFocus(child: shell);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onSecondaryTapUp: (_) => _cardMenu(context, column, card),
-      child: shell,
-    );
+    return lifted ? ExcludeFocus(child: shell) : shell;
   }
 
   /// The card's body, with its runner chip under it once the card has an
@@ -183,60 +182,70 @@ class _KanbanBoardState extends State<KanbanBoard> {
 
   /// The card's menu, from its button or a right-click. Removing only drops
   /// the reference; the note stays. A phone also moves the card to another
-  /// column, where it is appended; desktop moves by dragging.
-  void _cardMenu(BuildContext context, BoardColumn column, BoardCard card) {
+  /// column, where it is appended; desktop moves by dragging. [anchor] is the
+  /// card's menu button. The menu takes keyboard focus on its first item;
+  /// Esc closes it and gives focus back to [restoreFocus].
+  void _cardMenu(
+    BuildContext context,
+    BoardColumn column,
+    BoardCard card,
+    Rect anchor,
+    FocusNode? restoreFocus,
+  ) {
     final source = _source;
     final phone = context.mobile;
     final runners = RunnerScope.maybeOf(context);
-    final anchor = globalRectOf(context);
     final others = [
       for (final other in source.columns)
         if (other.id != column.id) other,
     ];
     showPanel<void>(
       context,
-      globalRectOf(context),
-      (panel) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          MenuItem(
-            key: const ValueKey('kanban-open-card'),
-            label: 'Open',
-            onTap: () {
-              Navigator.of(panel).pop();
-              source.openCard(context, card);
-            },
-          ),
-          if (runners != null)
+      anchor,
+      (panel) => KeyboardMenu(
+        restoreFocus: restoreFocus,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             MenuItem(
-              key: const ValueKey('kanban-assign-card'),
-              label: 'Assign to Agent',
-              icon: Ico.sendHorizontal,
+              key: const ValueKey('kanban-open-card'),
+              label: 'Open',
               onTap: () {
                 Navigator.of(panel).pop();
-                _assignCard(context, anchor, card, runners);
+                source.openCard(context, card);
               },
             ),
-          if (phone && others.isNotEmpty)
+            if (runners != null)
+              MenuItem(
+                key: const ValueKey('kanban-assign-card'),
+                label: 'Assign to Agent',
+                icon: Ico.sendHorizontal,
+                onTap: () {
+                  Navigator.of(panel).pop();
+                  _assignCard(context, anchor, card, runners);
+                },
+              ),
+            if (phone && others.isNotEmpty)
+              MenuItem(
+                key: const ValueKey('kanban-move-card'),
+                label: 'Move to column…',
+                onTap: () {
+                  Navigator.of(panel).pop();
+                  _moveMenu(context, column, card, others);
+                },
+              ),
             MenuItem(
-              key: const ValueKey('kanban-move-card'),
-              label: 'Move to column…',
+              key: const ValueKey('kanban-remove-card'),
+              label: 'Remove from board',
+              danger: true,
               onTap: () {
                 Navigator.of(panel).pop();
-                _moveMenu(context, column, card, others);
+                source.removeCard(column.id, card.id);
               },
             ),
-          MenuItem(
-            key: const ValueKey('kanban-remove-card'),
-            label: 'Remove from board',
-            danger: true,
-            onTap: () {
-              Navigator.of(panel).pop();
-              source.removeCard(column.id, card.id);
-            },
-          ),
-        ],
+          ],
+        ),
       ),
       width: 220,
     );
@@ -294,8 +303,13 @@ class _KanbanBoardState extends State<KanbanBoard> {
 
 /// A card's box: its note body, with the card menu button in its own column
 /// at the top right, so the button never covers the note's text. On desktop
-/// the button shows while the pointer is over the card; on a phone it is
-/// always shown. The space is kept either way, so the body does not shift.
+/// the button shows while the pointer is over the card or the card has
+/// keyboard focus; on a phone it is always shown. The space is kept either
+/// way, so the body does not shift.
+///
+/// The board gives each card one keyboard stop. The context-menu key and
+/// Shift+F10 on it open the card menu (see `KanbanBoard.onCardMenu`); the
+/// button itself is for the pointer and for touch.
 class _CardShell extends StatefulWidget {
   const _CardShell({
     super.key,
@@ -306,7 +320,10 @@ class _CardShell extends StatefulWidget {
   });
   final bool lifted;
   final Key menuKey;
-  final VoidCallback onMenu;
+
+  /// Opens the menu under [anchor] (the menu button); the second argument is
+  /// the node that gets focus back when the menu is closed with Esc.
+  final void Function(Rect anchor, FocusNode? restoreFocus) onMenu;
   final Widget body;
 
   @override
@@ -315,12 +332,23 @@ class _CardShell extends StatefulWidget {
 
 class _CardShellState extends State<_CardShell> {
   bool _hovered = false;
+  final _buttonKey = GlobalKey();
+
+  void _openMenu() {
+    final box = _buttonKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    widget.onMenu(
+      box.localToGlobal(Offset.zero) & box.size,
+      BoardCardFocus.maybeOf(context)?.node,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final phone = context.mobile;
-    final shown = phone || _hovered;
+    final focused = BoardCardFocus.maybeOf(context)?.focused ?? false;
+    final shown = phone || _hovered || focused;
     final content = widget.lifted
         ? widget.body
         : Row(
@@ -332,6 +360,7 @@ class _CardShellState extends State<_CardShell> {
                 child: ExcludeFocus(
                   excluding: !shown,
                   child: Opacity(
+                    key: _buttonKey,
                     opacity: shown ? 1 : 0,
                     child: IgnorePointer(
                       ignoring: !shown,
@@ -342,7 +371,7 @@ class _CardShellState extends State<_CardShell> {
                         glyph: 20,
                         color: c.iconTertiary,
                         semanticLabel: 'Card menu',
-                        onTap: widget.onMenu,
+                        onTap: _openMenu,
                       ),
                     ),
                   ),
@@ -350,7 +379,7 @@ class _CardShellState extends State<_CardShell> {
               ),
             ],
           );
-    return MouseRegion(
+    final box = MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: DecoratedBox(
@@ -362,6 +391,12 @@ class _CardShellState extends State<_CardShell> {
         ),
         child: content,
       ),
+    );
+    if (widget.lifted) return box;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapUp: (_) => _openMenu(),
+      child: box,
     );
   }
 }
