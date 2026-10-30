@@ -35,6 +35,16 @@ During a Markdown folder import, every JSON string value anywhere in type data t
 - **A view** is a saved query (filter, sort, group) plus a renderer: list, table, board, calendar, timeline, gallery. A calendar is a view over pages with a date property, so tasks, events and Google Calendar entries all appear there.
 - Views can also query across collections, for example "everything with a date this week".
 
+### View blocks
+
+A `view` block displays a page's children using the settings of a `ViewDef` in its JSON text. The block id is the view id; a stored `id` is ignored. `source` is `"contents"` (also the default when missing), and the optional block target is the source page id; no target means the page containing the block. Markdown uses a `view` fence containing that JSON object, with an optional `page` field for the target.
+
+`Vault::load_page`, shared by the app and MCP `read_page`, lazily migrates database pages once. The synced page metadata marker `views_migrated: 1` gates conversion. Saved views become blocks appended in `view_order`, with deterministic ids derived from the page and legacy view ids. A database with saved views and no schema properties besides the implicit title becomes a document with one default List view instead; its child pages are untouched. A database without saved views receives only the marker. The legacy `views` and `view_order` remain for existing APIs; the new blocks own their settings independently.
+
+Loro can retain two physical nodes with the same logical block id after concurrent migration. Each page open checks for duplicate `view` ids after migration, including pages already marked or converted. It keeps the first node in document order. A later node with identical text, target and children is deleted; a differing node is copied in place under a fresh id before the old node is deleted. Copies preserve settings, target, colour and descendants. Replacement ids are derived from the old physical node so simultaneous repairs can themselves be deduplicated. Opening an unchanged page adds no edits.
+
+View settings JSON contributes no searchable text (index version 14); ordinary descendant content remains searchable. Markdown folder import assigns fresh block ids as usual and remaps explicit source targets when their pages are imported in the same batch. Missing or ambiguous source targets are preserved.
+
 ## Links
 
 - Links point at page ids, not paths, so renaming or moving a page never breaks them. Backlinks are computed by the index.

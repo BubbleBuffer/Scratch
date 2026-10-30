@@ -1125,14 +1125,17 @@ pub(crate) fn embed_title(target: Option<&str>, titles: &dyn Fn(&str) -> Option<
 }
 
 /// All block texts joined by newlines, in document order (for search). An
-/// embed contributes its target's title, as drawn; a query contributes no text.
+/// embed contributes its target's title, as drawn; queries and view settings
+/// contribute no text.
 pub(crate) fn plain_text(blocks: &[Block], titles: &dyn Fn(&str) -> Option<String>) -> String {
     fn walk(b: &[Block], titles: &dyn Fn(&str) -> Option<String>, out: &mut String) {
         for x in b {
             if x.kind == BlockKind::Query {
                 continue;
             }
-            let text = if x.kind == BlockKind::Embed {
+            let text = if x.kind == BlockKind::View {
+                std::borrow::Cow::Borrowed("")
+            } else if x.kind == BlockKind::Embed {
                 std::borrow::Cow::Owned(embed_title(x.target.as_deref(), titles))
             } else {
                 std::borrow::Cow::Borrowed(x.text.as_str())
@@ -1242,7 +1245,7 @@ fn check_marks(text: &str, marks: &[Mark]) -> Result<()> {
 /// The page type stored in a page's meta map. A `type` string wins; without
 /// one, the old `collection: true` flag reads as a database; otherwise a
 /// document.
-fn read_page_type(m: &LoroMap) -> String {
+pub(crate) fn read_page_type(m: &LoroMap) -> String {
     if let Some(t) = map_str(m, "type") {
         return t;
     }

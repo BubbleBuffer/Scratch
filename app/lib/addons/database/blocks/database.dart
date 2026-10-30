@@ -1,13 +1,12 @@
-// Compatibility renderer for stored database blocks. The Database menu
-// inserts a kit embed and creates its database target through createTarget.
-// Old targetless database blocks retain their original lazy creation path.
+// Compatibility renderer for stored inline database blocks. The `/` menu no
+// longer offers them (View lists a page's child pages instead). Old
+// targetless database blocks retain their original lazy creation path.
 
 import 'package:flutter/widgets.dart';
 
 import '../create.dart';
 import '../database_view.dart';
 import '../../../registry/block_registry.dart';
-import '../../../registry/embed_block.dart';
 import '../../../state/app_state.dart';
 import '../../../ui/icon_x.dart';
 import '../../../ui/ui.dart';
@@ -35,7 +34,7 @@ Widget _body(BlockContext b) {
       height: 40,
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Text('Creating database…', style: ts(b.type.body, b.colors.textTertiary)),
+        child: Text('Creating…', style: ts(b.type.body, b.colors.textTertiary)),
       ),
     );
   }
@@ -51,19 +50,15 @@ Widget _body(BlockContext b) {
 
 double _handleTop(BlockContext b) => 6;
 
-Future<String?> _createTarget(BuildContext context, String pageId) =>
-    createInlineDatabase(context.app.vault, pageId);
-
 const databaseBlock = BlockType(
   kind: databaseKind,
-  label: 'Database',
-  hint: 'Add an inline database.',
+  label: 'Inline view',
+  hint: 'Pages shown inline.',
   iconX: Ix.table,
   aliases: 'database table inline db collection',
   editable: false,
   acceptsChildren: false,
   body: _body,
   handleTop: _handleTop,
-  insertKind: embedKind,
-  createTarget: _createTarget,
+  inMenu: false,
 );

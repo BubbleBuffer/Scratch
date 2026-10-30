@@ -73,10 +73,20 @@ class _Blocks {
 PropDef _def(String name, PropKind kind, {List<SelectOption> options = const [], String config = ''}) =>
     PropDef(key: '', name: name, kind: kind, options: options, config: config);
 
-Future<String> _collection(Vault vault, String parent, String title, List<PropDef> schema) async {
+/// A page with [schema] for its children and one view block: the default
+/// table, or what [view] makes of it.
+Future<String> _collection(
+  Vault vault,
+  String parent,
+  String title,
+  List<PropDef> schema, {
+  ViewDef Function(ViewDef table, List<PropDef> schema)? view,
+}) async {
   final id = await vault.createPage(parent: parent, title: title);
   await vault.run((v) => v.makeCollection(page: id), writes: true);
-  await vault.run((v) => v.setSchema(collection: id, schema: schema), writes: true);
+  final saved = await vault.run((v) => v.setSchema(collection: id, schema: schema), writes: true);
+  final table = (await vault.run((v) => v.listViews(collection: id))).first;
+  await seedViewBlocks(vault, id, [view == null ? table : view(table, saved)]);
   return id;
 }
 
@@ -210,17 +220,9 @@ Future<Map<String, String>> createDemo(Vault vault) async {
         SelectOption(id: '', name: 'Booked', color: 'green'),
       ],
     ),
-  ]);
+  ], view: (table, schema) => table.copyWith(name: 'Board', kind: ViewKind.board, groupBy: schema.single.key));
   ids['Bookings'] = bookings;
   final bookingStatus = (await vault.run((v) => v.getSchema(collection: bookings))).single;
-  final bookingViews = await vault.run((v) => v.listViews(collection: bookings));
-  await vault.run(
-    (v) => v.updateView(
-      collection: bookings,
-      view: bookingViews.first.copyWith(name: 'Board', kind: ViewKind.board, groupBy: bookingStatus.key),
-    ),
-    writes: true,
-  );
   for (final (title, done) in const [('Apartment in Alfama', true), ('Train to Sintra', false), ('Dinner at Prado', false)]) {
     final row = await page(title, parent: bookings);
     await vault.run(
@@ -236,6 +238,12 @@ Future<Map<String, String>> createDemo(Vault vault) async {
   }
   await vault.apply(packing, packingBlocks.ops);
 
+  // The bookings board again, inside the trip page.
+  final bookingsBoard = await vault.run(
+    (v) => v.viewBlockText(
+      view: ViewDef(id: '', name: 'Board', kind: ViewKind.board, sorts: const [], groupBy: bookingStatus.key, visibleProps: const [], config: ''),
+    ),
+  );
   final rich = _Blocks();
   rich.add(Kinds.callout, 'Flights confirmed. Keep the confirmation and travel documents here.', target: '✈️');
   final columns = rich.add(Kinds.columnList, '');
@@ -260,7 +268,7 @@ Future<Map<String, String>> createDemo(Vault vault) async {
     '12 May: arrive and settle in. 13 May: explore Alfama. 14 May: museums and a slow lunch. Keep the rest open.',
     parent: daily,
   );
-  rich.add('database', '', target: bookings);
+  rich.add('view', bookingsBoard, target: bookings);
   rich.mention('Discuss the plan in ', 'Weekly review', weekly);
   rich.add(Kinds.image, 'A favourite Lisbon view goes here.');
   await vault.apply(lisbon, rich.ops);

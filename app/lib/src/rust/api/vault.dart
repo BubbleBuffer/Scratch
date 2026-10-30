@@ -220,6 +220,17 @@ abstract class NotesVault implements RustOpaqueInterface {
 
   Future<List<Progress>> inMotion({required int limit});
 
+  /// Insert a contents view. None for target means the containing page.
+  /// Parent and after use the same positioning rules as a regular Insert.
+  Future<void> insertViewBlock({
+    required String pageId,
+    required String id,
+    String? parent,
+    String? after,
+    required ViewDef view,
+    String? target,
+  });
+
   /// Links a task under the day's Tasks toggle, returning whether added.
   Future<bool> linkTaskToDay({
     required PlatformInt64 dayMs,
@@ -590,6 +601,12 @@ abstract class NotesVault implements RustOpaqueInterface {
     required String source,
     required ExternalSearchRow row,
   });
+
+  /// Read settings using the block's identity. Invalid JSON gives a List view.
+  Future<ViewDef> viewBlockDef({required String id, required String text});
+
+  /// Encode settings with a contents source; identity belongs to the block.
+  Future<String> viewBlockText({required ViewDef view});
 
   /// `poll_changes` that blocks up to `timeout_ms` for a change. Holds a
   /// bridge worker thread while it waits.

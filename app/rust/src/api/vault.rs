@@ -493,6 +493,35 @@ impl NotesVault {
         self.inner.apply(page_id, ops).map_err(err)
     }
 
+    /// Read settings using the block's identity. Invalid JSON gives a List view.
+    pub fn view_block_def(&self, id: String, text: String) -> ViewDef {
+        let block = vault_core::Block {
+            id, kind: vault_core::BlockKind::View, text, marks: vec![], checked: false,
+            children: vec![], target: None, color: None, width: None, numbered_start: None,
+        };
+        view_from(vault_core::ViewBlock::def(&block))
+    }
+
+    /// Encode settings with a contents source; identity belongs to the block.
+    pub fn view_block_text(&self, view: ViewDef) -> Result<String, String> {
+        Ok(vault_core::view_block_text(&view_to(view)?))
+    }
+
+    /// Insert a contents view. None for target means the containing page.
+    /// Parent and after use the same positioning rules as a regular Insert.
+    pub fn insert_view_block(&self, page_id: String, id: String, parent: Option<String>, after: Option<String>, view: ViewDef, target: Option<String>) -> Result<(), String> {
+        let text = vault_core::view_block_text(&view_to(view)?);
+        let mut ops = vec![vault_core::BlockOp::Insert {
+            parent, after, block: vault_core::NewBlock {
+                id: id.clone(), kind: vault_core::BlockKind::View, text, marks: vec![], checked: false,
+            },
+        }];
+        if target.is_some() {
+            ops.push(vault_core::BlockOp::SetTarget { id, target });
+        }
+        self.inner.apply(page_id, ops).map_err(err)
+    }
+
     /// Waits for the background writer (call before the app is suspended).
     pub fn flush(&self) -> Result<(), String> {
         self.inner.flush().map_err(err)
@@ -1284,6 +1313,47 @@ mod conflict_tests {
         assert_eq!(restored.blocks[0], before);
         assert_eq!(restored.blocks[1].text, "Later unrelated edit");
         assert!(local.undo_conflict(page, conflict.id).is_err(), "the consumed application cannot be undone twice");
+    }
+}
+
+#[cfg(test)]
+mod view_block_tests {
+    use super::*;
+
+    #[test]
+    fn settings_and_contents_insertion_cross_the_bridge() {
+        struct TempRoot(std::path::PathBuf);
+        impl Drop for TempRoot {
+            fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+        }
+        let root = TempRoot(std::env::temp_dir().join(format!("notes_bridge_views_{}", vault_core::new_id())));
+        let vault = NotesVault {
+            inner: Arc::new(Vault::open(root.0.to_string_lossy().into_owned()).unwrap()),
+            runner: LocalRunner::Unconfigured,
+        };
+        let page = vault.inner.create_page(None, "Contents".into()).unwrap();
+        let mut def = vault.view_block_def("view-a".into(), "{broken".into());
+        assert_eq!(def.id, "view-a");
+        assert_eq!(def.kind, ViewKind::List);
+        def.kind = ViewKind::Gallery;
+        def.name = "Cards".into();
+        def.config = r#"{"cardSize":"large"}"#.into();
+        let encoded = vault.view_block_text(def.clone()).unwrap();
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&encoded).unwrap()["source"], "contents");
+        vault.insert_view_block(page.clone(), "view-a".into(), None, None, def.clone(), None).unwrap();
+        vault.insert_view_block(page.clone(), "view-b".into(), None, Some("view-a".into()), def,
+            Some("source-page".into())).unwrap();
+        let loaded = vault.load_page(page).unwrap();
+        assert_eq!(loaded.blocks.len(), 2);
+        assert_eq!(loaded.blocks[0].kind, "view");
+        assert_eq!(loaded.blocks[0].text, encoded);
+        assert_eq!(loaded.blocks[0].target, None);
+        assert_eq!(loaded.blocks[1].target.as_deref(), Some("source-page"));
+        let restored = vault.view_block_def(loaded.blocks[1].id.clone(), loaded.blocks[1].text.clone());
+        assert_eq!(restored.id, "view-b");
+        assert_eq!(restored.kind, ViewKind::Gallery);
+        assert_eq!(restored.name, "Cards");
+        assert_eq!(restored.config, r#"{"cardSize":"large"}"#);
     }
 }
 

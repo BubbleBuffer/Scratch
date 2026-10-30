@@ -1,7 +1,7 @@
-// The top of a page: the property rows of a database row (name column with
-// the type icon, the value, "+ Add a property", hidden ones behind "N more
-// properties"), and the switch between the page editor and a full-page
-// database.
+// The top of a child page: its property rows (name column with the type
+// icon, the value, "+ Add a property", hidden ones behind "N more
+// properties"). Properties belong to the parent: adding one asks first,
+// since every page under the parent gets it.
 //
 // The page editor reaches this file through two insertion points in
 // editor/page_screen.dart: [PageProperties] under the title and
@@ -15,6 +15,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/change_feed.dart';
 import '../../core/models.dart';
+import '../../core/vault.dart';
 import '../../registry/property_registry.dart';
 import '../../state/app_state.dart';
 import '../../state/collection_store.dart';
@@ -151,14 +152,54 @@ class _PagePropertiesState extends State<PageProperties> {
   }
 
   Future<void> _add(BuildContext anchor) async {
+    final s = _store;
+    if (s == null) return;
+    final vault = context.app.vault;
     final kind = await pickPropertyType(anchor, globalRectOf(anchor));
-    if (kind == null || _store == null) return;
+    if (kind == null || _store != s || !anchor.mounted) return;
 
-    final key = await _store!.addProperty(kind, inView: null);
+    final name = s.freePropName(kind);
+    final parent = s.title.trim().isEmpty ? 'Untitled' : s.title.trim();
+    final count = (await vault.run(
+      (v) => v.query(scope: s.collection, sorts: const [], offset: 0, limit: 1),
+    )).total;
+    if (_store != s || !anchor.mounted) return;
+    final ok = await showConfirm(
+      anchor,
+      title: count == 1
+          ? 'Add $name to the 1 page under $parent?'
+          : 'Add $name to all $count pages under $parent?',
+      message: 'They get an empty $name, and new pages under $parent start with it.',
+      confirmLabel: 'Add',
+    );
+    if (!ok || _store != s) return;
+
+    final key = await s.addProperty(kind, name: name, inView: null);
+    await _showInParentViews(vault, s.collection, key);
     final d = _store?.def(key);
     if (d != null && anchor.mounted) {
       await showPropertyMenu(anchor, _ctl!, d, editing: true, inPage: true);
     }
+  }
+
+  static bool _showsChildren(FlatBlock b, String parent) =>
+      b.kind == 'view' && (b.target == null || b.target!.isEmpty || b.target == parent);
+
+  /// The new property becomes a column of the parent's view blocks that
+  /// list its children.
+  static Future<void> _showInParentViews(Vault vault, String parent, String key) async {
+    final p = await vault.run((v) => v.loadPage(id: parent));
+    final ops = <BOp>[];
+    for (final b in p.blocks) {
+      if (!_showsChildren(b, parent)) continue;
+      final d = await vault.run((v) => v.viewBlockDef(id: b.id, text: b.text));
+      if (d.visibleProps.contains(key)) continue;
+      final text = await vault.run(
+        (v) => v.viewBlockText(view: d.copyWith(visibleProps: [...d.visibleProps, key])),
+      );
+      ops.add(BOp(op: OpKind.setText, id: b.id, kind: b.kind, text: text, marks: const [], checked: b.checked));
+    }
+    if (ops.isNotEmpty) await vault.run((v) => v.apply(pageId: parent, ops: ops));
   }
 
   @override
@@ -174,7 +215,11 @@ class _PagePropertiesState extends State<PageProperties> {
     final s = _store;
     final mobile = context.mobile;
     final pad = EdgeInsets.only(left: widget.left, bottom: 8);
-    if (s == null || !s.loaded || !s.isDatabase) {
+    // Pages under a document or a page with properties; other page types
+    // (a journal, a mod's type) keep their own children.
+    if (s == null ||
+        !s.loaded ||
+        (s.pageType != databaseType && s.pageType != documentType)) {
       return const SizedBox.shrink();
     }
     final r = _row;
@@ -227,9 +272,11 @@ class _PagePropertiesState extends State<PageProperties> {
                 label: 'Add a property',
                 onTap: _add,
               ),
-              const SizedBox(height: 8),
-              HLine(color: c.divider),
-              const SizedBox(height: 4),
+              if (s.schema.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                HLine(color: c.divider),
+                const SizedBox(height: 4),
+              ],
             ],
           ),
         ),

@@ -5,18 +5,17 @@ import 'package:flutter/widgets.dart';
 
 import '../../registry/addon_registry.dart';
 import '../../registry/block_codecs.dart';
-import '../../registry/command_registry.dart';
 import '../../registry/note_type_registry.dart';
 import '../../ui/note_preview.dart';
 import 'blocks/database.dart';
-import 'create.dart';
+import 'blocks/view.dart';
 import 'database_view.dart';
 import 'properties/properties.dart';
 import 'views/views.dart';
 
 export 'blocks/database.dart' show databaseBlock, databaseKind;
+export 'blocks/view.dart' show viewBlock, viewKind, PageChildrenView;
 export 'controller.dart' show DbController;
-export 'create.dart' show makeDatabase;
 export 'editors/date_picker.dart' show DatePicker;
 export 'page_properties.dart' show PageProperties;
 export 'property_menu.dart' show propIcon;
@@ -34,31 +33,20 @@ class DatabaseAddon extends Addon {
   List<String> get dependsOn => const [];
   @override
   void register(AddonContext ctx) {
+    // A page with child pages opens in the editor like any page; its view
+    // blocks show the children.
     ctx.registerNoteType(
       NoteType(
         id: 'database',
-        label: 'Database',
+        label: 'Page',
         chip: noteChip,
         card: noteCard,
         embed: _embed,
-        fullPage: _fullPage,
-        usesEditor: false,
-        changes: madeDatabases,
-        claimsPage: (id) => madeDatabases.value.contains(id),
-        commands: [
-          Command(
-            id: 'database.make',
-            label: 'Turn into database',
-            isEnabled: (context) =>
-                ctx.services.selectedPageId(context) != null,
-            run: (context) {
-              final id = ctx.services.selectedPageId(context);
-              if (id != null) makeDatabase(ctx.services.vault(context), id);
-            },
-          ),
-        ],
+        fullPage: (context, args) => args.editor,
       ),
     );
+    ctx.blockKinds.register(viewBlock, before: 'callout');
+    // Old inline database blocks keep rendering; the `/` menu offers View.
     ctx.blockKinds.register(
       databaseBlock.inGroup(databaseBlock.group, codecs: genericBlockCodecs),
       before: 'callout',
@@ -67,13 +55,6 @@ class DatabaseAddon extends Addon {
     registerBuiltinViews(ctx.views);
   }
 }
-
-Widget _fullPage(BuildContext context, NoteArgs args) => DatabaseView(
-  key: ValueKey('db-page-${args.pageId}'),
-  collection: args.pageId,
-  title: args.titleController,
-  onTitleChanged: args.onTitleChanged,
-);
 
 Widget _embed(BuildContext context, NoteArgs args) => LayoutBuilder(
   builder: (context, box) => DatabaseView(

@@ -1,7 +1,7 @@
 ---
 type: topic
 layer: implementation
-summary: "The database note type, inline block, property implementations and five layouts."
+summary: "View blocks, the database page type, the old inline block, property implementations and five layouts."
 parent: "[[addons/index]]"
 status: current
 ---
@@ -10,12 +10,14 @@ status: current
 
 `DatabaseAddon` in `app/lib/addons/database/api.dart` is required and has no add-on dependencies. It registers:
 
-- The `database` note type: chip, card, inline embed and full-page builders. Full pages draw through `NoteTypeRegistry`; `madeDatabases` notifies optimistic conversions immediately.
-- The existing `database` inline block with its explicit clipboard/plain-text fallback, in its original slash-menu position. New inserts use the kit's `embed` kind and create a database target. Old `database` blocks keep their original renderer and are not rewritten on read; both presentations use the same inline `DatabaseView`.
+- The `view` block (`blocks/view.dart`): a page's child pages in a layout. "/View" inserts a List view of the current page. Consecutive view blocks are one group shown as tabs: the first block draws the tab bar and the active view. Each tab's menu renames it, sets its layout (List, Table, Board, Calendar, Gallery, Timeline), duplicates or deletes it. "+ Add view" inserts a List view block after the group and selects it. Filter, sort and view settings save into the block's text (`viewBlockText`) through the editor, so they are page edits with undo. The active tab is kept in memory per group, keyed by the first block's id (`viewBlockTabs`). A plain page works as a source: its rows are its child pages and its only column is the title.
+- The `database` page type: chip, card and inline embed. Its pages open in the normal editor: title, properties, body and view blocks. One without view blocks shows a List of its children under the body; the list is written as a block once it is changed.
+- The old `database` inline block, kept for stored pages and out of the slash menu. It draws the inline `DatabaseView` as before; embeds of a database page do too.
 - The existing property implementations and Table, Timeline, Calendar, List and Gallery layouts. Board registers separately.
-- `database.make`, the existing turn-into-database action exposed as a type command, enabled when the host has a selected page.
 
-Files: `database_view.dart` is the frame; `controller.dart`, `create.dart`, `page_properties.dart`, filter/property/view settings and `editors/` provide its behavior; `properties/` owns property implementations; `views/` owns the five layouts and shared card helpers; `blocks/database.dart` is the inline block. The public `api.dart` exposes only the pieces used by Board and transitional app consumers.
+Nothing in the app creates a database any more. `PageProperties` shows on every child page of a document or database page. "+ Add a property" picks a kind, then asks "Add <Name> to all <N> pages under <Parent>?"; Add writes it into the parent's schema (promoting a document to the database type) and shows it in the parent's view blocks, Cancel adds nothing. When a document is promoted, `CollectionStore.setSchema` deletes the saved view the core creates, so migration adds no block.
+
+Files: `database_view.dart` is the frame (full, inline, or view-block tabs fed by a `ViewSource`); `controller.dart`, `create.dart`, `page_properties.dart`, filter/property/view settings and `editors/` provide its behavior; `properties/` owns property implementations; `views/` owns the five layouts and shared card helpers; `blocks/database.dart` is the inline block. The public `api.dart` exposes only the pieces used by Board and transitional app consumers.
 
 Shared config, value helpers, icons, theme and widgets are kit in `app/lib/ui/database/`. `CollectionStore` remains in `state/`; `ViewController` is the registry interface. Navigation, templates and attachment picking use the temporary host facade in `services/legacy_host.dart`.
 

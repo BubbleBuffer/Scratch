@@ -23,9 +23,9 @@ use crate::types::{
 };
 
 /// An index of another version is rebuilt from the vault documents. Version
-/// 13 retains undated to-dos and task notes with NULL dates in the derived
-/// agenda cache. Rebuilding preserves the existing document representation.
-const SCHEMA_VERSION: i64 = 13;
+/// 14 excludes view settings JSON from searchable text. Rebuilding preserves
+/// the existing document representation.
+const SCHEMA_VERSION: i64 = 14;
 
 /// Broad queries exceed the larger of 200 documents or 5% of live pages.
 /// No letter-count rule: selectivity comes from this vault's indexed words.
