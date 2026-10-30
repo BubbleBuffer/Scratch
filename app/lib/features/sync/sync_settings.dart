@@ -21,7 +21,7 @@ import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
 import '../settings/controls.dart';
 import '../settings/settings_kit.dart';
-import '../settings/settings_screen.dart' show pushSettingsPage;
+import '../settings/settings_screen.dart' show pushSettingsPage, showPanel;
 import '../settings/settings_store.dart';
 import 'cert_trust.dart';
 import 'certificate_view.dart';
@@ -764,7 +764,7 @@ class TrustedCertificatesSettings extends StatelessWidget {
     return SAdvanced(
       headerKey: const ValueKey('trusted-certificates'),
       title: 'Trusted certificates',
-      summary: pins.length == 1 ? '1 certificate' : '${pins.length} certificates',
+      summary: pins.entries.length == 1 ? '1 certificate' : '${pins.entries.length} certificates',
       children: [
         SBlock(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

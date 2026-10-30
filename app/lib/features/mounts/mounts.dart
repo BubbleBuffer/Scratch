@@ -12,7 +12,6 @@ import 'package:flutter/widgets.dart';
 import '../../src/rust/api/types.dart';
 import '../../state/app_state.dart';
 import '../../ui/app_name.dart';
-import '../../ui/ui.dart';
 import '../settings/settings_kit.dart';
 
 class MountsSection extends StatefulWidget {
@@ -134,6 +133,15 @@ class _MountsSectionState extends State<MountsSection> {
             title: 'Mount a folder',
             desc:
                 'Its Markdown files become pages, and edits are saved back to the files. Changes made outside $appName show up within a few seconds.',
+            actions: [
+              SButton('Cancel', key: const ValueKey('mount-cancel'), kind: SButtonKind.quiet, onTap: _cancel),
+              SButton(
+                _busy ? 'Mounting…' : 'Mount',
+                key: const ValueKey('mount-add'),
+                kind: SButtonKind.primary,
+                onTap: _busy ? null : _add,
+              ),
+            ],
             children: [
               SField(
                 label: 'Folder',
@@ -147,15 +155,6 @@ class _MountsSectionState extends State<MountsSection> {
               ),
               if (_error != null)
                 SNotice(_error!, kind: SNoticeKind.bad, textKey: const ValueKey('mount-error')),
-            ],
-            actions: [
-              SButton('Cancel', key: const ValueKey('mount-cancel'), kind: SButtonKind.quiet, onTap: _cancel),
-              SButton(
-                _busy ? 'Mounting…' : 'Mount',
-                key: const ValueKey('mount-add'),
-                kind: SButtonKind.primary,
-                onTap: _busy ? null : _add,
-              ),
             ],
           ),
       ],
