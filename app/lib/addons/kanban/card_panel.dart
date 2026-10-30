@@ -21,6 +21,10 @@ class KanbanCardPanel extends StatefulWidget {
     required this.onClose,
     required this.onOpenNote,
     required this.onAssign,
+    this.onAccept,
+    this.onMarkFailed,
+    this.onAddStep,
+    this.onOpenSession,
     this.sheet = false,
   });
 
@@ -39,6 +43,18 @@ class KanbanCardPanel extends StatefulWidget {
 
   /// Opens the Run on picker under [anchor], the Assign button.
   final void Function(Rect anchor) onAssign;
+
+  /// Accepts the run's result; the card moves to the board's last column.
+  final VoidCallback? onAccept;
+
+  /// Fails a stalled run.
+  final VoidCallback? onMarkFailed;
+
+  /// Adds a step to the running task.
+  final void Function(String text)? onAddStep;
+
+  /// Opens the chat of the run's session.
+  final VoidCallback? onOpenSession;
 
   /// True in a bottom sheet, which has its own surface and no close button.
   final bool sheet;
@@ -165,6 +181,18 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                             ),
                           ),
                   ),
+                if (runners != null)
+                  ListenableBuilder(
+                    listenable: runners,
+                    builder: (context, _) => _RunActions(
+                      state: runners.of(widget.cardId)?.state,
+                      hasSession: runners.sessionOf(widget.cardId) != null,
+                      onAccept: widget.onAccept,
+                      onMarkFailed: widget.onMarkFailed,
+                      onAddStep: widget.onAddStep,
+                      onOpenSession: widget.onOpenSession,
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 SecondaryButton(
                   key: const ValueKey('kanban-panel-open-note'),
@@ -176,6 +204,104 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The run's actions under the runner row: Accept on a result waiting for
+/// review, Mark failed on a stalled run, Add step on a running one, and Open
+/// session whenever the run has a chat.
+class _RunActions extends StatefulWidget {
+  const _RunActions({
+    required this.state,
+    required this.hasSession,
+    required this.onAccept,
+    required this.onMarkFailed,
+    required this.onAddStep,
+    required this.onOpenSession,
+  });
+
+  final AssignState? state;
+  final bool hasSession;
+  final VoidCallback? onAccept;
+  final VoidCallback? onMarkFailed;
+  final void Function(String text)? onAddStep;
+  final VoidCallback? onOpenSession;
+
+  @override
+  State<_RunActions> createState() => _RunActionsState();
+}
+
+class _RunActionsState extends State<_RunActions> {
+  final _step = TextEditingController();
+
+  @override
+  void dispose() {
+    _step.dispose();
+    super.dispose();
+  }
+
+  void _add(String value) {
+    final text = value.trim();
+    final add = widget.onAddStep;
+    if (text.isEmpty || add == null) return;
+    _step.clear();
+    add(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final state = widget.state;
+    final children = <Widget>[];
+    if (state == AssignState.review && widget.onAccept != null) {
+      children.add(
+        PrimaryButton(
+          key: const ValueKey('kanban-panel-accept'),
+          label: 'Accept',
+          onTap: widget.onAccept!,
+        ),
+      );
+    }
+    if (state == AssignState.stalled && widget.onMarkFailed != null) {
+      children.add(
+        SecondaryButton(
+          key: const ValueKey('kanban-panel-mark-failed'),
+          label: 'Mark failed',
+          onTap: widget.onMarkFailed!,
+        ),
+      );
+    }
+    if (state == AssignState.running && widget.onAddStep != null) {
+      children.add(
+        InputBox(
+          child: PlainField(
+            key: const ValueKey('kanban-panel-add-step'),
+            controller: _step,
+            style: ts(context.type.ui, c.textPrimary),
+            placeholder: 'Add step',
+            textInputAction: TextInputAction.done,
+            onSubmitted: _add,
+          ),
+        ),
+      );
+    }
+    if (widget.hasSession && widget.onOpenSession != null) {
+      children.add(
+        SecondaryButton(
+          key: const ValueKey('kanban-panel-open-session'),
+          label: 'Open session',
+          onTap: widget.onOpenSession!,
+        ),
+      );
+    }
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final child in children)
+          Padding(padding: const EdgeInsets.only(bottom: 8), child: child),
+      ],
     );
   }
 }

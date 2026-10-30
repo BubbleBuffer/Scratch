@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../state/editor_focus.dart';
 import '../features/ai/ai_settings.dart';
 import '../features/ai/ai_store.dart';
+import '../addons/agent/api.dart' show AgentStore, openAgent;
 import '../registry/addon_registry.dart';
 import '../shell/page_stack.dart';
 
@@ -54,6 +55,14 @@ class AddonServices {
 
   /// The agent's task rows and runner calls (the kanban runner picker).
   AiTaskSource aiTasks(BuildContext context) => AiStore.of(context.app);
+
+  /// Opens the agent chat of a run's session.
+  Future<void> openAgentSession(BuildContext context, String sessionId) async {
+    await AgentStore.of(context.app).openSession(sessionId);
+    if (!context.mounted) return;
+    await openAgent(context);
+  }
+
   bool addonEnabled(String id) =>
       activeAddonContext?.installedIds.contains(id) ?? true;
   void closeRoute(BuildContext context, String name) {

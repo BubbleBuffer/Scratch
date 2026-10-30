@@ -1,6 +1,8 @@
 // The kanban's widgets: the full page (title, then the board) and the compact
 // board an embed draws. Both use the kit's BoardRenderer.
 
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../../core/models.dart';
@@ -71,6 +73,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
 
   @override
   void dispose() {
+    _watched?.removeListener(_onRunners);
     _source.dispose();
     super.dispose();
   }
@@ -110,11 +113,83 @@ class _KanbanBoardState extends State<KanbanBoard> {
     );
     // Without a scope above, the board uses the agent's runners. The
     // SEED_DEMO build uses the fake runners instead.
-    if (RunnerScope.maybeOf(context) != null) return content;
+    final above = RunnerScope.maybeOf(context);
+    if (above != null) {
+      _watch(above);
+      return content;
+    }
     final assignments = runnerSeedDemo
         ? demoRunnerAssignments
         : aiRunnerAssignments(AddonServices().aiTasks(context));
+    _watch(assignments);
     return RunnerScope(assignments: assignments, child: content);
+  }
+
+  RunnerAssignments? _watched;
+
+  /// The state each card's run was last seen in, to spot a run that has just
+  /// reached review while this board was open.
+  final Map<String, AssignState> _seen = {};
+
+  void _watch(RunnerAssignments assignments) {
+    if (identical(_watched, assignments)) return;
+    _watched?.removeListener(_onRunners);
+    _watched = assignments..addListener(_onRunners);
+  }
+
+  /// A run that reaches review moves its card to the column named Review, if
+  /// the board has one. A board without one leaves the card where it is.
+  void _onRunners() {
+    final runners = _watched;
+    if (runners == null || !mounted) return;
+    BoardColumn? review;
+    for (final column in _source.columns) {
+      if (column.title.trim().toLowerCase() == 'review') review = column;
+    }
+    for (final column in _source.columns) {
+      for (final card in _source.loadedCards(column.id)) {
+        final now = runners.of(card.id)?.state;
+        final before = _seen[card.id];
+        if (now == null) {
+          _seen.remove(card.id);
+          continue;
+        }
+        _seen[card.id] = now;
+        if (now == AssignState.review &&
+            before != null &&
+            before != AssignState.review &&
+            review != null &&
+            review.id != column.id) {
+          unawaited(_source.moveCardToEnd(card.id, column.id, review.id));
+        }
+      }
+    }
+  }
+
+  /// Accepts the run's result and moves the card to the board's last column.
+  Future<void> _accept(
+    BuildContext context,
+    BoardCard card,
+    RunnerAssignments runners,
+  ) async {
+    try {
+      await runners.accept(card.id);
+    } on RunnerUnavailable catch (e) {
+      if (context.mounted) showToast(context, e.reason);
+      return;
+    }
+    final columns = _source.columns;
+    final from = _columnOf(card.id);
+    if (columns.isEmpty || from == null || columns.last.id == from.id) return;
+    await _source.moveCardToEnd(card.id, from.id, columns.last.id);
+  }
+
+  Future<void> _runCall(BuildContext context, Future<void> call) async {
+    try {
+      await call;
+    } on RunnerUnavailable catch (e) {
+      if (context.mounted) showToast(context, e.reason);
+    }
   }
 
   /// The column that holds [cardId], or null when no loaded column does.
@@ -203,6 +278,23 @@ class _KanbanBoardState extends State<KanbanBoard> {
       onAssign: (anchor) {
         if (runners != null) _assignCard(context, anchor, card, runners);
       },
+      onAccept: runners == null ? null : () => _accept(context, card, runners),
+      onMarkFailed: runners == null
+          ? null
+          : () => _runCall(context, runners.markFailed(card.id)),
+      onAddStep: runners == null
+          ? null
+          : (text) => _runCall(context, runners.addStep(card.id, text)),
+      onOpenSession: runners == null
+          ? null
+          : () {
+              final session = runners.sessionOf(card.id);
+              if (session == null) return;
+              close();
+              unawaited(
+                const AddonServices().openAgentSession(this.context, session),
+              );
+            },
     );
   }
 
