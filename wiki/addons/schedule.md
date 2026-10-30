@@ -27,12 +27,12 @@ The hub link rule is copied from the agent add-on, not shared with it.
 
 ## "Run schedules on this device" setting
 
-- Registered by the add-on in Settings > Add-ons under "Schedules" ([settings.dart](../../app/lib/addons/schedule/settings.dart)). Desktop only: Android never registers it.
+- Shown on Settings > Sync and devices as "Run schedules on this device"; the add-on registers it ([settings.dart](../../app/lib/addons/schedule/settings.dart)). Desktop only: Android never registers it.
 - Stored device-locally in the settings file (`scheduleRunsHere` in [settings_store.dart](../../app/lib/features/settings/settings_store.dart)), never in the vault. Off by default.
-- Turning it on or off calls `localRunnerSetAvailable` on the vault. The switch shows the error when the runner does not change.
+- Turning it on or off calls `localRunnerSetAvailable` on the vault. The setting is saved only after the runner change succeeds; when the runner does not change, the switch shows the error and keeps its old value.
 - The runner starts with the stored value once per vault, when the schedule add-on first builds its backend for that vault ([local_runner.dart](../../app/lib/addons/schedule/local_runner.dart)).
-- Gap: the add-on has no hook at app start, so the runner starts only when a schedule or the Add-ons settings is first shown. A desktop with the setting on runs nothing until then. Fix needs an add-on startup hook in the kit, in [boot.dart](../../app/lib/shell/boot.dart).
-- The Add-ons panel ignores a section's `isVisible`, so the add-on checks the platform when it registers the setting.
+- Gap: the add-on has no hook at app start, so the runner starts only when a schedule or Settings > Sync and devices is first shown. A desktop with the setting on runs nothing until then. Fix needs an add-on startup hook in the kit, in [boot.dart](../../app/lib/shell/boot.dart).
+- Settings has no Add-ons panel any more (removed 2026-10-30), so the add-on checks the platform itself when it registers the setting.
 
 ## Tests
 

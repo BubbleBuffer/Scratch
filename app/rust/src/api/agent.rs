@@ -125,8 +125,13 @@ pub struct AgentToolCall {
 /// Detected local runtime paths. Remote hosts do not expose filesystem paths.
 #[derive(Debug, Clone)]
 pub struct AgentClaudeDetection {
+    /// The `bun` that runs Claude Code: the override when it is a file, otherwise
+    /// the one found on PATH, in `~/.bun/bin` or in the app's bundle.
     pub bun_path: Option<String>,
     pub claude_code_dir: Option<String>,
+    /// The bun override from settings when it is not a file. It was ignored, and
+    /// `bun_path` is what detection found instead.
+    pub ignored_bun_override: Option<String>,
 }
 
 /// A page explicitly attached to a user message.

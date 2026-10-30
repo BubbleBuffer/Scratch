@@ -111,6 +111,8 @@ void main() {
     expect(s.trustedCertificates.lookup(hubUrl)?.sha256, leafSha);
     expect(hubs.calls.last.$2, [leafSha]);
     expect(key('connect-error'), findsNothing);
+    await tester.ensureVisible(key('trusted-certificates'));
+    await tapAndSettle(tester, key('trusted-certificates'));
     expect(key('cert-pin-https://hub.home-lab.example.test:8443'), findsOneWidget);
     // The issuer the hub sent is kept and passed on as this origin's anchor.
     final pin = s.trustedCertificates.lookup(hubUrl)!;
@@ -150,6 +152,8 @@ void main() {
     s.update((s) => s.trustedCertificates = old);
     await tapAndSettle(tester, key('sidebar-settings'));
     await tapAndSettle(tester, key('settings-nav-sync'));
+    await tester.ensureVisible(key('trusted-certificates'));
+    await tapAndSettle(tester, key('trusted-certificates'));
     await tester.ensureVisible(key('cert-pin-$origin'));
     await settle(tester);
 
@@ -199,6 +203,8 @@ void main() {
     await tapAndSettle(tester, key('sidebar-settings'));
     await tapAndSettle(tester, key('settings-nav-sync'));
     const origin = 'https://hub.home-lab.example.test:8443';
+    await tester.ensureVisible(key('trusted-certificates'));
+    await tapAndSettle(tester, key('trusted-certificates'));
     expect(find.textContaining('AB:CD:EF:01:23:45…'), findsOneWidget);
     expect(find.textContaining('valid until Mar 1, 2027'), findsOneWidget);
 

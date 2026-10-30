@@ -65,9 +65,10 @@ fn open_with(
         AgentConfig {
             data_dir: t.data.clone(),
             default_model: "scripted/scripted".into(),
-            // An explicit missing override keeps these scripted tests independent
-            // of Claude/Bun installations discovered on the developer machine.
-            bun_path: Some(t.data.join("missing-test-bun")),
+            // An explicit missing extension folder disables Claude Code, keeping these
+            // scripted tests independent of Claude/Bun on the developer machine. A missing
+            // bun override only falls back to PATH, so it cannot do this.
+            claude_code_dir: Some(t.data.join("missing-test-claude-code")),
             permission_mode: PermissionMode::Manual,
             test: TestHooks {
                 scripted: Some((steps, "All done.".into())),
@@ -730,4 +731,27 @@ fn ai_task_past_the_limit_is_cancelled_and_fails() {
     );
     let state = agent.session_state(&run.session_id).unwrap();
     assert_eq!(state.runs.last().expect("a run").status, "cancelled");
+}
+
+#[test]
+fn an_invalid_bun_override_is_ignored_and_reported() {
+    let t = temp();
+    let missing = t.data.join("missing-bun");
+    let agent = Agent::open(
+        t.vault.clone(),
+        AgentConfig {
+            data_dir: t.data.clone(),
+            bun_path: Some(missing.clone()),
+            claude_code_dir: Some(t.data.join("missing-test-claude-code")),
+            ..AgentConfig::default()
+        },
+    )
+    .unwrap();
+    let detected = agent.claude_detection();
+    assert_eq!(detected.ignored_bun_override, Some(missing.clone()));
+    // Whatever PATH or ~/.bun/bin holds on this machine, the ignored file is never used.
+    assert!(detected
+        .bun_path
+        .iter()
+        .all(|path| path.is_file() && *path != missing));
 }

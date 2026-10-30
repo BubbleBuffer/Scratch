@@ -1,14 +1,16 @@
-// MCP servers in Settings > AI > Agent (desktop): add, edit and remove save
-// in this device's AI settings and reach the engine; each server's state and
+// MCP servers in Settings > Connectors > Tools for the agent (desktop): add,
+// edit and remove save in this device's AI settings and reach the engine; each
+// server's state and
 // a refused list show in the section; an old mcp.toml is imported once.
 // The engine's MCP calls go through AgentStore's debug hooks.
 
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/features/ai/ai_settings.dart';
-import 'package:notes_app/features/settings/controls.dart';
+import 'package:notes_app/features/settings/settings_kit.dart';
 
 import 'agent_test.dart' show fakeAgentSettings, openAgentStore;
 import 'ai_test.dart' show aiStore, closeAi;
@@ -26,9 +28,11 @@ AiSettings _settings(File file, Map<String, Map<String, dynamic>> servers) {
     ..agentMcpServers = servers;
 }
 
+/// The servers are on Settings > Connectors, in "Tools for the agent".
 Future<void> _openAgentSettings(WidgetTester t) async {
   await tapAndSettle(t, key('sidebar-settings'));
-  await tapAndSettle(t, key('settings-nav-ai'));
+  await tapAndSettle(t, key('settings-nav-connectors'));
+  await _tap(t, 'connectors-tools');
   await t.ensureVisible(key('agent-mcp-servers'));
   await settle(t);
 }
@@ -42,6 +46,11 @@ Future<void> _enter(WidgetTester t, String k, String text) async {
   await t.ensureVisible(key(k));
   await enterField(t, k, text);
 }
+
+/// The label of a status pill (SStatus) found by key.
+String _pill(WidgetTester t, String k) => t
+    .widget<Text>(find.descendant(of: key(k), matching: find.byType(Text)))
+    .data!;
 
 void _resetHooks() {
   AgentStore.debugSetMcpServers = null;
@@ -108,19 +117,13 @@ void main() {
       // Add: a name that isn't taken and a command are required.
       await _tap(t, 'agent-mcp-add');
       await _tap(t, 'agent-mcp-save');
-      expect(textOf(t, 'agent-mcp-editor-error'), 'Give the server a name.');
+      expect(find.text('Give the server a name.'), findsOneWidget);
       await _enter(t, 'agent-mcp-name', 'docs');
       await _tap(t, 'agent-mcp-save');
-      expect(
-        textOf(t, 'agent-mcp-editor-error'),
-        'A server named docs already exists.',
-      );
+      expect(find.text('A server named docs already exists.'), findsOneWidget);
       await _enter(t, 'agent-mcp-name', 'files');
       await _tap(t, 'agent-mcp-save');
-      expect(
-        textOf(t, 'agent-mcp-editor-error'),
-        'Enter the command that starts it.',
-      );
+      expect(find.text('Enter the command that starts it.'), findsOneWidget);
       await _enter(t, 'agent-mcp-command', 'npx');
       await _enter(t, 'agent-mcp-args', '-y\n@example/files\n');
       await _enter(t, 'agent-mcp-env', 'EXAMPLE_ROOT=/tmp/files');
@@ -136,12 +139,12 @@ void main() {
 
       // Edit a URL server: headers take env var names; unknown keys stay.
       await _tap(t, 'agent-mcp-edit-docs');
-      expect(t.widget<SelectButton<bool>>(key('agent-mcp-type')).value, isTrue);
+      expect(t.widget<SSegmented<bool>>(key('agent-mcp-type')).value, isTrue);
       await _enter(t, 'agent-mcp-headers', 'Authorization=EXAMPLE');
       await _tap(t, 'agent-mcp-save');
       expect(
-        textOf(t, 'agent-mcp-editor-error'),
-        'EXAMPLE must end in _API_KEY, _KEY or _TOKEN.',
+        find.text('EXAMPLE must end in _API_KEY, _KEY or _TOKEN.'),
+        findsOneWidget,
       );
       await _enter(t, 'agent-mcp-headers', 'Authorization=EXAMPLE_TOKEN');
       await _tap(t, 'agent-mcp-save');
@@ -154,8 +157,7 @@ void main() {
 
       // Edit the command server into a URL server.
       await _tap(t, 'agent-mcp-edit-files');
-      await _tap(t, 'agent-mcp-type');
-      await tapAndSettle(t, key('option-URL'));
+      await _tap(t, 'agent-mcp-type-url');
       await _enter(t, 'agent-mcp-url', 'https://files.example.com/mcp');
       await _tap(t, 'agent-mcp-save');
       expect(AiSettings.load(file).agentMcpServers['files'], {
@@ -166,7 +168,10 @@ void main() {
       // Turn off, then remove.
       await _tap(t, 'agent-mcp-enabled-files');
       expect(AiSettings.load(file).agentMcpServers['files']?['enabled'], false);
+      // Remove asks first; the confirm button is labelled "Remove server".
       await _tap(t, 'agent-mcp-remove-files');
+      expect(find.text('Remove “files”?'), findsOneWidget);
+      await tapAndSettle(t, find.text('Remove server'));
       expect(key('agent-mcp-server-files'), findsNothing);
       expect(AiSettings.load(file).agentMcpServers.keys, ['docs']);
       expect(sent.last, isNot(contains('"files"')));
@@ -201,14 +206,16 @@ void main() {
     try {
       expect(store.mcpError, 'server files: url must be https');
       await _openAgentSettings(t);
-      expect(textOf(t, 'agent-mcp-status-docs'), 'Running, 3 tools');
+      expect(_pill(t, 'agent-mcp-status-docs'), 'Running, 3 tools');
+      // The pill says "Failed"; the reason is the row's error line.
+      expect(_pill(t, 'agent-mcp-status-files'), 'Failed');
       expect(
-        textOf(t, 'agent-mcp-status-files'),
-        'Failed: spawn npx: program not found',
+        find.text('Failed: spawn npx: program not found'),
+        findsOneWidget,
       );
       expect(
-        textOf(t, 'agent-mcp-error'),
-        contains('server files: url must be https'),
+        find.textContaining('server files: url must be https'),
+        findsOneWidget,
       );
       expect(key('agent-mcp-note'), findsNothing);
     } finally {

@@ -9,7 +9,7 @@ status: current
 
 Implemented on `mobile-agent` on 2026-10-11. Android always uses the Hub agent; the local engine remains Windows/Linux only. Desktop host selection and local-agent settings are unchanged. iOS and the desktop relay (stage 4d) are outside this change.
 
-The default Hub address is `https://notes.example.com`. Settings > AI > Agent exposes the editable address, browser sign-in/sign-out, the returned account (or the device label for an older Hub), sync status, agent opening status and the Hub's model list. The signed-out chat offers Sign in. New chat becomes available after sign-in. The existing chat, outline and note-reference cards remain in place, along with the merged mobile dock and swipe panels.
+The default Hub address is `https://notes.example.com`. Settings > Agent exposes the editable address, browser sign-in/sign-out, the returned account (or the device label for an older Hub), sync status, agent opening status and the Hub's model list. The signed-out chat offers Sign in. New chat becomes available after sign-in. The existing chat, outline and note-reference cards remain in place, along with the merged mobile dock and swipe panels.
 
 ## Login and notes
 

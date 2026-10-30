@@ -1,6 +1,6 @@
 [package]
 name = "vault_mcp"
-description = "MCP server for notes-app vaults (stdio and streamable HTTP), AI tasks and the desktop agent runner."
+description = "MCP server for notes-app vaults (stdio), AI tasks and the desktop agent runner."
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
@@ -16,10 +16,5 @@ path = "src/bin/notes-mcp.rs"
 [dependencies]
 vault_core = { path = "../core" }
 vault_tools = { path = "../tools" }
-# The same small HTTP stack as vault_sync: no async runtime, no TLS (the
-# server binds 127.0.0.1; remote access goes through a tunnel that adds TLS).
-tiny_http = { version = "0.12", default-features = false }
-ureq = { version = "3", default-features = false }
-getrandom = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

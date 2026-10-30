@@ -8,6 +8,7 @@ status: current
 # Product
 
 <!-- wiki:children -->
+- [Settings](settings.md): The Settings pages in order, what each one holds, and how its options explain and guard themselves.
 - [Design](design.md): The built design: the Stacks look (a warm desk of paper sheets, space colours and Calico tabs), the Lucide icon set and AppTooltip rule, and the app icon.
 - [Calendar](calendar.md): The calendar: one task note type for everything dated, coloured calendars as categories, one vault-wide view, and what is built so far.
 - [Performance](performance.md): Measured speed of the built app: search and UI timings, and the profile checks behind them.

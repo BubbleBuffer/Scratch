@@ -1,9 +1,9 @@
-// Under "Let the hub use this computer" (Settings > Sync, desktop) while it
-// is on: the name this computer has on the hub, the relay's connection state
-// (read every [HostRelayLink.statusInterval] while shown) and the connector
-// address for ChatGPT or claude.ai, with Copy, and what it shares: this
-// computer's tools and MCP servers, with a link to the MCP servers (shown in
-// Settings > AI whichever runner the vault uses while this is on).
+// Settings > Connectors > "This computer for hub apps" while "Let the hub
+// use this computer" is on: the name this computer has on the hub, the
+// relay's connection state (read every [HostRelayLink.statusInterval] while
+// shown), what it shares (this computer's tools and MCP servers, with a link
+// to the MCP servers panel) and the connector addresses for ChatGPT or
+// claude.ai, with Copy.
 //
 // The name is the hub's label for this device (`clientDeviceLabel`), from
 // sign-in or a Rename here; the hub matches `?host=` against it (exactly,
@@ -39,9 +39,12 @@ String hostRelayToolsLine(AgentStore store) {
   };
 }
 
-/// Opens Settings > AI at the MCP servers.
-Future<void> showMcpServers(BuildContext context) async {
-  await openSettingsSection(context, SettingsSection.ai);
+/// Opens Settings > Connectors; with [open], with "Tools for the agent"
+/// open and scrolled to the MCP servers.
+Future<void> showMcpServers(BuildContext context, {bool open = true}) async {
+  if (open) connectorPanels.value = {...connectorPanels.value, 'tools'};
+  await openSettingsSection(context, SettingsSection.connectors);
+  if (!open) return;
   SchedulerBinding.instance.addPostFrameCallback((_) {
     final target = mcpServersAnchor.currentContext;
     if (target != null && target.mounted) Scrollable.ensureVisible(target);
@@ -145,59 +148,58 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
   }
 
   Widget? _nameTrailing(AppColors c) {
-    if (!_renaming) {
-      if (widget.onRename == null) return null;
-      return TextBtn(
-        'Rename',
-        key: const ValueKey('host-relay-rename'),
-        onTap: () => setState(() {
-          _renaming = true;
-          _renameError = null;
-          _rename.text = widget.name;
-        }),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: SettingsField(
-                fieldKey: const ValueKey('host-relay-rename-field'),
-                controller: _rename,
-                autofocus: true,
-                onSubmitted: (_) => _saveName(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            TextBtn(
-              'Save',
-              key: const ValueKey('host-relay-rename-save'),
-              onTap: _saving ? null : _saveName,
-            ),
-            TextBtn(
-              'Cancel',
-              key: const ValueKey('host-relay-rename-cancel'),
-              onTap: () => setState(() {
-                _renaming = false;
-                _renameError = null;
-              }),
-            ),
-          ],
-        ),
-        if (_renameError case final error?)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              error,
-              key: const ValueKey('host-relay-rename-error'),
-              style: tsRaw(12, 16, 400, c.inlineCodeText),
-            ),
-          ),
-      ],
+    if (_renaming || widget.onRename == null) return null;
+    return SButton(
+      'Rename',
+      key: const ValueKey('host-relay-rename'),
+      onTap: () => setState(() {
+        _renaming = true;
+        _renameError = null;
+        _rename.text = widget.name;
+      }),
     );
   }
+
+  Widget _renameEditor() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: STextField(
+              fieldKey: const ValueKey('host-relay-rename-field'),
+              controller: _rename,
+              autofocus: true,
+              onSubmitted: (_) => _saveName(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SButton(
+            'Cancel',
+            key: const ValueKey('host-relay-rename-cancel'),
+            kind: SButtonKind.quiet,
+            onTap: () => setState(() {
+              _renaming = false;
+              _renameError = null;
+            }),
+          ),
+          const SizedBox(width: 4),
+          SButton(
+            'Save',
+            key: const ValueKey('host-relay-rename-save'),
+            kind: SButtonKind.primary,
+            onTap: _saving ? null : _saveName,
+          ),
+        ],
+      ),
+      if (_renameError case final error?)
+        SNotice(
+          error,
+          kind: SNoticeKind.bad,
+          textKey: const ValueKey('host-relay-rename-error'),
+        ),
+    ],
+  );
 
   /// The state in words, and whether it is a problem.
   (String, bool) _describe(AgentHostRelayStatus? s) {
@@ -228,32 +230,36 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SettingsRow(
+        SRow(
           key: const ValueKey('host-relay-name'),
           label: _renaming
               ? 'Name on the hub'
               : 'Appears on the hub as ${widget.name}',
-          description:
+          desc:
               'The name AI apps use for this computer. Renaming it changes '
-              'the address below; the old address stops working.',
-          stack: _renaming,
-          trailing: _nameTrailing(c),
+              'the addresses below; the old ones stop working.',
+          control: _nameTrailing(c),
+          below: _renaming ? _renameEditor() : null,
         ),
         ValueListenableBuilder<AgentHostRelayStatus?>(
           valueListenable: widget.link.status,
           builder: (context, status, _) {
             final (text, problem) = _describe(status);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                text,
+            return SRow(
+              label: 'Connection',
+              desc: text,
+              control: SStatus(
+                status?.state == 'connected'
+                    ? 'Connected'
+                    : problem
+                    ? 'Problem'
+                    : 'Not connected',
                 key: const ValueKey('host-relay-status'),
-                style: tsRaw(
-                  12,
-                  16,
-                  400,
-                  problem ? c.inlineCodeText : c.textSecondary,
-                ),
+                kind: status?.state == 'connected'
+                    ? SStatusKind.ok
+                    : problem
+                    ? SStatusKind.bad
+                    : SStatusKind.off,
               ),
             );
           },
@@ -261,38 +267,36 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
         if (widget.store case final store?)
           ListenableBuilder(
             listenable: store,
-            builder: (context, _) => SettingsRow(
+            builder: (context, _) => SRow(
               key: const ValueKey('host-relay-tools'),
               label: 'What it shares',
-              description: hostRelayToolsLine(store),
-              trailing: OutlineButton(
+              desc: hostRelayToolsLine(store),
+              control: SButton(
+                'Edit MCP servers',
                 key: const ValueKey('host-relay-mcp-link'),
-                label: 'Edit MCP servers',
                 onTap: () => showMcpServers(context),
               ),
             ),
           ),
         // Two connector addresses for ChatGPT or claude.ai: pinned to this
         // computer, or any computer with the relay on (the assistant picks).
-        SettingsRow(
+        SRow(
           label: 'This computer only',
-          description:
+          desc:
               'Add it as a custom connector in ChatGPT or claude.ai to use '
               'this computer through the hub.',
-          stack: true,
-          trailing: CopyableText(
+          below: SCopyLine(
             hostConnectorUrl(widget.hubUrl, widget.name),
             key: const ValueKey('host-relay-url'),
             textKey: const ValueKey('host-relay-url-text'),
           ),
         ),
-        SettingsRow(
+        SRow(
           label: 'Any of your computers',
-          description:
+          desc:
               'One connector for every computer with this setting on; the AI '
               'picks which one to use.',
-          stack: true,
-          trailing: CopyableText(
+          below: SCopyLine(
             anyComputerConnectorUrl(widget.hubUrl),
             key: const ValueKey('host-relay-any-url'),
             textKey: const ValueKey('host-relay-any-url-text'),

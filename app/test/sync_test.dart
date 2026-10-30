@@ -31,14 +31,20 @@ void main() {
   appTest('pair a device from settings; edits sync both ways; unpair', (tester) async {
     final tv = await pumpApp(tester, mobile: false);
     final other = await openOtherDevice(tester);
+    // Discovery is deterministic; the transport below reaches this same hub
+    // through loopback, since the test does not own a physical LAN address.
+    debugHubAddresses = const [HubAddress('192.168.0.5', AddressKind.lan, 'test')];
+    addTearDown(() => debugHubAddresses = null);
     try {
       final sync = tv.app.sync;
-      await real(tester, () => sync.startHub('127.0.0.1:0'));
+      await real(tester, () => sync.startHub('0.0.0.0:0'));
       await settle(tester);
 
       await tapAndSettle(tester, key('sidebar-settings'));
-      await tapAndSettle(tester, key('settings-nav-devices'));
-      expect(find.text('No devices yet.'), findsOneWidget);
+      // Devices are part of the "Sync and devices" page, below the sync part.
+      await tapAndSettle(tester, key('settings-nav-sync'));
+      expect(find.text('No devices paired yet'), findsOneWidget);
+      await tester.ensureVisible(key('devices-add'));
       await tapAndSettle(tester, key('devices-add'));
       await enterField(tester, 'device-name-field', 'Pixel');
       await tester.tap(key('create-pairing'));
@@ -49,7 +55,7 @@ void main() {
       final url = textOf(tester, 'pair-url');
       final code = Pairing.parse(textOf(tester, 'pair-code'))!;
       expect(key('pairing-qr'), findsOneWidget);
-      expect(url, 'http://${sync.hubAddress}');
+      expect(url, 'http://192.168.0.5:${portOf(sync.hubAddress!)}');
       expect(code.url, url);
       expect(code.code, pairCode);
       expect(code.token, isEmpty);
@@ -58,11 +64,14 @@ void main() {
       expect(key('device-Pixel'), findsOneWidget);
 
       // The other device's first sync brings every page.
+      // The pairing URL names the fake LAN address; the other device reaches the
+      // hub on loopback.
+      final reachable = 'http://127.0.0.1:${portOf(sync.hubAddress!)}';
       final token = await real(
         tester,
-        () => redeemPairingCode(vault: other.vault.raw, hubUrl: url, code: pairCode, trusted: const []),
+        () => redeemPairingCode(vault: other.vault.raw, hubUrl: reachable, code: pairCode, trusted: const []),
       );
-      other.client = NotesSync(vault: other.vault.raw, url: url, token: token);
+      other.client = NotesSync(vault: other.vault.raw, url: reachable, token: token);
       final first = await real(tester, () => other.client!.syncOnce());
       expect(first.full, isTrue);
       // Both desktop app opens publish their node record under hidden Nodes.
@@ -72,7 +81,7 @@ void main() {
       // Close settings (Escape), then an edit there shows up here.
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await settle(tester);
-      expect(key('settings-nav-devices'), findsNothing);
+      expect(key('settings-nav-sync'), findsNothing);
       await real(tester, () => other.vault.renamePage(tv.pages['Budget']!, 'Budget 2027'));
       await real(tester, () => other.client!.syncOnce());
       await settleUntil(tester, () => find.text('Budget 2027').evaluate().isNotEmpty);
@@ -109,9 +118,10 @@ void main() {
 
       // Unpair: the device is listed as connected, then its token stops working.
       await tapAndSettle(tester, key('sidebar-settings'));
-      await tapAndSettle(tester, key('settings-nav-devices'));
+      await tapAndSettle(tester, key('settings-nav-sync'));
       await settleUntil(tester, () => sync.devices.any((d) => d.device != null));
       expect(sync.devices.single.device, other.vault.deviceId);
+      await tester.ensureVisible(key('unpair-Pixel'));
       await tester.tap(key('unpair-Pixel'));
       await settleUntil(tester, () => sync.devices.isEmpty);
       expect(key('device-Pixel'), findsNothing);
@@ -215,9 +225,11 @@ void main() {
       await openMobileSettings(tester);
       await tapAndSettle(tester, key('settings-nav-sync'));
       expect(key('hub-toggle'), findsNothing, reason: 'phones do not host');
+      await tapAndSettle(tester, key('connect-advanced'));
       await enterField(tester, 'connect-hub-field', code);
       expect(tester.widget<EditableText>(find.descendant(of: key('connect-token-field'), matching: find.byType(EditableText))).controller.text,
           isEmpty, reason: 'a code link fills only the hub; connecting redeems the code');
+      await tester.ensureVisible(key('connect-button'));
       await tester.tap(key('connect-button'));
       final sync = tv.app.sync;
       await settleUntil(tester, () => sync.status.lastOkMs != null, timeout: const Duration(seconds: 20));
@@ -264,6 +276,7 @@ void main() {
       await tester.tap(key('disconnect-button'));
       await settleUntil(tester, () => !sync.connected && current.app.settings.clientUrl == null);
       expect(current.app.settings.clientUrl, isNull);
+      await tapAndSettle(tester, key('connect-advanced'));
       expect(key('connect-button'), findsOneWidget);
     } finally {
       await real(tester, () => tv.app.sync.disconnect());
@@ -291,8 +304,7 @@ void main() {
   appTest('the theme setting switches to dark', (tester) async {
     await pumpApp(tester, mobile: false);
     await tapAndSettle(tester, key('sidebar-settings'));
-    await tapAndSettle(tester, key('theme-select'));
-    await tapAndSettle(tester, key('option-Dark'));
+    await tapAndSettle(tester, key('theme-dark'));
     expect(current.app.settings.theme, ThemePref.dark);
     expect(current.app.settings.theme.forceDark, isTrue);
   });

@@ -103,12 +103,19 @@ String conflictDeviceBroughtFromTrash(String device) => '$device brought it back
 
 const conflictsSectionTitle = 'Changed on two devices';
 
-/// Settings empty state. // provisional
-const conflictsNone = 'Nothing changed on two devices.';
+/// Settings page title, and its intro.
+const conflictsSettingsTitle = 'Conflicts';
+const conflictsIntro =
+    'When the same page changes on two devices before they sync, Scratch keeps both versions and lists the page here.';
 
-const conflictAutoResolveName = 'Resolve changes on their own';
+/// Settings empty state.
+const conflictsNoneTitle = 'Nothing to review';
+const conflictsNone = 'No page has changed on two devices at once.';
+
+const conflictAutoResolveName = 'Resolve simple conflicts on their own';
 const conflictAutoResolveDesc =
-    'On: a cloud change settles itself and leaves the list. Off: it waits in the list until you tap OK.';
+    'On: a change that can settle itself leaves this list. Off: it waits here until you confirm it.';
+const conflictAutoResolveHelp = 'Turn off if you want to see every conflict, even ones Scratch can settle.';
 
 /// The auto-resolve switch could not be saved; it goes back to its old value. // provisional
 const conflictAutoResolveSaveFailed = 'Could not change this setting. Try again.';
@@ -116,7 +123,7 @@ const conflictAutoResolveSaveFailed = 'Could not change this setting. Try again.
 // ---- review log (Settings > Conflicts, Recent) ----
 
 /// The log's heading. // provisional
-const conflictsRecentTitle = 'Recent';
+const conflictsRecentTitle = 'Resolved in the last 30 days';
 
 /// The log is empty. // provisional
 const conflictsRecentNone = 'Nothing resolved in the last 30 days.';
