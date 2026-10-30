@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM --platform=linux/amd64 rust:1.97.1-bookworm AS core-source
+FROM --platform=linux/amd64 rust:1.99.0-bookworm AS core-source
 COPY Cargo.lock /tmp/Cargo.lock
 # Fetch runtime assets from the same public Core commit as the Rust dependencies.
 RUN set -eu; \
@@ -11,7 +11,7 @@ RUN set -eu; \
     git -C /core checkout --detach FETCH_HEAD; \
     test "$(git -C /core rev-parse HEAD)" = "$revision"
 
-FROM --platform=linux/amd64 rust:1.97.1-bookworm AS builder
+FROM --platform=linux/amd64 rust:1.99.0-bookworm AS builder
 WORKDIR /src/notes-app
 COPY . .
 RUN --mount=type=cache,id=notes-hub-registry,target=/usr/local/cargo/registry,sharing=locked \
@@ -20,8 +20,8 @@ RUN --mount=type=cache,id=notes-hub-registry,target=/usr/local/cargo/registry,sh
     cargo build --release -p notes_hub --locked \
     && install -Dm755 target/release/notes-hub /out/notes-hub
 
-FROM --platform=linux/amd64 node:22.18.0-bookworm-slim AS node
-FROM --platform=linux/amd64 oven/bun:1.4.2 AS bun
+FROM --platform=linux/amd64 node:26.12.0-bookworm-slim AS node
+FROM --platform=linux/amd64 oven/bun:1.4.4 AS bun
 FROM --platform=linux/amd64 debian:bookworm-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git tini curl libstdc++6 \
