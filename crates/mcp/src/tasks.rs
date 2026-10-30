@@ -124,6 +124,11 @@ pub struct Task {
     /// every minute. None for a row whose runner does not write one.
     #[serde(default)]
     pub heartbeat_ms: Option<i64>,
+    /// The worker's open question to the user (see [`ask`]), empty when it
+    /// has none. A running task with a question is waiting for the user's
+    /// reply (`needs_input`).
+    #[serde(default)]
+    pub question: String,
     /// The agent session of the run, empty until it starts or after it expired.
     #[serde(default)]
     pub session: String,
@@ -212,6 +217,9 @@ pub fn schema() -> Vec<PropDef> {
         // The runner's last sign of life, and the review policy.
         def(HEARTBEAT, "Heartbeat", PropKind::Text, vec![]),
         def(REVIEW_POLICY, "Review", PropKind::Text, vec![]),
+        // The worker's question to the user and the user's reply.
+        def(QUESTION, "Question", PropKind::Text, vec![]),
+        def(REPLY, "Reply", PropKind::Text, vec![]),
     ]
 }
 
@@ -321,6 +329,7 @@ fn task_of(row: &PageSummary) -> Task {
         attempt: text(p, attempts::CURRENT),
         cancel_requested_ms: text(p, attempts::CANCEL_REQUESTED).parse().ok(),
         heartbeat_ms: text(p, HEARTBEAT).parse().ok(),
+        question: text(p, QUESTION),
         session: text(p, "session"),
         created_ms: row.created_ms,
         updated_ms: row.updated_ms,
@@ -720,6 +729,65 @@ pub fn claim_next(v: &Vault, device: &str) -> Result<Option<Task>> {
 
 /// The row property holding the runner's last sign of life (ms).
 pub(crate) const HEARTBEAT: &str = "heartbeat";
+pub(crate) const QUESTION: &str = "question";
+pub(crate) const REPLY: &str = "reply";
+
+/// The most characters of a question or reply kept.
+pub const QUESTION_MAX: usize = 2000;
+
+/// A run that ended while it waited for the user's reply starts its error
+/// with this: the attempt's outcome is "waiting for input", not a failure.
+pub const WAITING_FOR_INPUT: &str = "waiting for input";
+
+/// The worker asks the user a question and waits (the `ask_user` tool). The
+/// task stays `running` with the question set; the card shows it with a reply
+/// field. Refused when the task is not running or a cancel is pending.
+pub fn ask(v: &Vault, id: &str, question: &str) -> Result<()> {
+    let t = get(v, id)?;
+    if t.status != RUNNING || t.cancel_requested_ms.is_some() {
+        return err("the task is not running");
+    }
+    let q: String = question.trim().chars().take(QUESTION_MAX).collect();
+    if q.is_empty() {
+        return err("ask_user needs a question");
+    }
+    v.remove_property(t.id.clone(), REPLY.into())?;
+    v.set_property(t.id.clone(), QUESTION.into(), PropValue::Text(q.clone()))?;
+    let _ = attempts::event(v, id, None, attempts::kind::QUESTION, &q);
+    Ok(())
+}
+
+/// The user answers the worker's question. The reply is stored for the
+/// waiting tool and the question is cleared, which puts the task back to
+/// plain `running`. False when there is no open question on a running task.
+pub fn reply(v: &Vault, id: &str, text_in: &str) -> Result<bool> {
+    let t = get(v, id)?;
+    let r: String = text_in.trim().chars().take(QUESTION_MAX).collect();
+    if t.status != RUNNING || t.question.is_empty() || r.is_empty() {
+        return Ok(false);
+    }
+    v.set_property(t.id.clone(), REPLY.into(), PropValue::Text(r.clone()))?;
+    v.remove_property(t.id.clone(), QUESTION.into())?;
+    let _ = attempts::event(v, id, None, attempts::kind::REPLY, &r);
+    Ok(true)
+}
+
+/// What the waiting tool looks at: `Some(reply)` once the user answered (the
+/// reply is taken), `None` while the question is open, an error when the
+/// task is no longer running.
+pub fn take_reply(v: &Vault, id: &str) -> Result<Option<String>> {
+    let t = get(v, id)?;
+    if t.status != RUNNING || t.cancel_requested_ms.is_some() {
+        return err("the task is no longer running");
+    }
+    let row = v.load_page(t.id.clone())?;
+    let r = text(&row.properties, REPLY);
+    if t.question.is_empty() && !r.is_empty() {
+        v.remove_property(t.id.clone(), REPLY.into())?;
+        return Ok(Some(r));
+    }
+    Ok(None)
+}
 /// The row property that makes a successful run end in `review`.
 pub(crate) const REVIEW_POLICY: &str = "review";
 
@@ -852,6 +920,8 @@ pub fn retry(v: &Vault, id: &str) -> Result<()> {
     v.remove_property(t.id.clone(), "error".into())?;
     v.remove_property(t.id.clone(), attempts::CANCEL_REQUESTED.into())?;
     v.remove_property(t.id.clone(), HEARTBEAT.into())?;
+    v.remove_property(t.id.clone(), QUESTION.into())?;
+    v.remove_property(t.id.clone(), REPLY.into())?;
     // The last attempt's progress line belongs to that attempt.
     v.remove_property(t.id.clone(), "progress".into())?;
     v.remove_property(t.id.clone(), "progress_at".into())?;
@@ -1064,7 +1134,14 @@ pub fn finish_attempt(
 ) -> Result<()> {
     let t = get(v, id)?;
     let summary = outcome_text(&result);
-    let outcome = if result.is_ok() { DONE } else { FAILED };
+    let waiting = matches!(&result, Err(m) if m.starts_with(WAITING_FOR_INPUT));
+    let outcome = if result.is_ok() {
+        DONE
+    } else if waiting {
+        WAITING_FOR_INPUT
+    } else {
+        FAILED
+    };
     let current = (!t.attempt.is_empty()).then(|| t.attempt.clone());
     let stale = match (attempt, &current) {
         (Some(a), Some(c)) => a != c,
@@ -1109,6 +1186,10 @@ pub fn finish_attempt(
         let _ = attempts::event(v, id, attempt, attempts::kind::CANCEL_ACKNOWLEDGED, "");
         return Ok(());
     }
+    if !waiting {
+        v.remove_property(t.id.clone(), QUESTION.into())?;
+        v.remove_property(t.id.clone(), REPLY.into())?;
+    }
     let closed = attempts::close(v, id, attempt, outcome, Some(&summary), false);
     if let Err(e) = closed {
         // The history never blocks the task's own end.
@@ -1143,13 +1224,10 @@ pub fn finish_attempt(
                 msg
             };
             v.set_property(t.id.clone(), "error".into(), PropValue::Text(msg.clone()))?;
-            v.set_property(
-                t.id.clone(),
-                "status".into(),
-                PropValue::Select(FAILED.into()),
-            )?;
+            let end = if waiting { INTERRUPTED } else { FAILED };
+            v.set_property(t.id.clone(), "status".into(), PropValue::Select(end.into()))?;
             let t = Task { error: msg, ..t };
-            set_placeholder(v, &t, FAILED)
+            set_placeholder(v, &t, end)
         }
     }
 }

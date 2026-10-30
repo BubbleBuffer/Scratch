@@ -448,3 +448,37 @@ fn a_reviewed_run_moves_its_card_to_review_and_accept_to_the_last_column() {
     assert_eq!(column_of(&v, &without, &card), "y");
     assert_eq!(tasks::board::move_card(&v, &card, tasks::board::Target::Last).unwrap(), 0);
 }
+
+#[test]
+fn a_question_is_open_until_the_reply_and_a_run_that_ends_waiting_is_not_failed() {
+    let t = Temp::new();
+    let v = t.open();
+    let (_, id) = running_task(&v, "Decide");
+    assert!(tasks::ask(&v, &id, "  ").is_err());
+    tasks::ask(&v, &id, "Which one?").unwrap();
+    assert_eq!(tasks::get(&v, &id).unwrap().question, "Which one?");
+    assert_eq!(tasks::get(&v, &id).unwrap().status, tasks::RUNNING);
+    assert_eq!(tasks::take_reply(&v, &id).unwrap(), None);
+    assert!(!tasks::reply(&v, &id, "  ").unwrap());
+    assert!(tasks::reply(&v, &id, "The first").unwrap());
+    assert!(!tasks::reply(&v, &id, "again").unwrap(), "no open question");
+    assert!(tasks::get(&v, &id).unwrap().question.is_empty());
+    assert_eq!(tasks::take_reply(&v, &id).unwrap().as_deref(), Some("The first"));
+    assert_eq!(tasks::take_reply(&v, &id).unwrap(), None);
+
+    // The run ends while it waits: the attempt says so and the row is not failed.
+    tasks::ask(&v, &id, "Still there?").unwrap();
+    tasks::finish_attempt(
+        &v,
+        &id,
+        None,
+        Err(format!("{}: no reply within the run limit", tasks::WAITING_FOR_INPUT)),
+    )
+    .unwrap();
+    let row = tasks::get(&v, &id).unwrap();
+    assert_eq!(row.status, tasks::INTERRUPTED);
+    assert_eq!(row.question, "Still there?");
+    let a = attempts::list(&v, &id).unwrap();
+    assert_eq!(a.last().unwrap().outcome.as_deref(), Some(tasks::WAITING_FOR_INPUT));
+    assert!(!tasks::reply(&v, &id, "late").unwrap(), "nobody is waiting");
+}

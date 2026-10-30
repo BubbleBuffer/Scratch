@@ -54,6 +54,10 @@ pub mod kind {
     pub const UPDATE_SENT: &str = "update_sent";
     pub const CANCEL_REQUESTED: &str = "cancel_requested";
     pub const CANCEL_ACKNOWLEDGED: &str = "cancel_acknowledged";
+    /// The worker asked the user a question; the text is the question.
+    pub const QUESTION: &str = "question";
+    /// The user's reply to it.
+    pub const REPLY: &str = "reply";
     pub const RESULT: &str = "result";
     /// A result that came after the attempt was no longer current, or after
     /// a cancel: kept here, never applied to the task.

@@ -14263,6 +14263,7 @@ impl SseDecode for crate::api::ai::AiTask {
         let mut var_stale = <bool>::sse_decode(deserializer);
         let mut var_stalledSinceMs = <Option<i64>>::sse_decode(deserializer);
         let mut var_session = <String>::sse_decode(deserializer);
+        let mut var_question = <String>::sse_decode(deserializer);
         return crate::api::ai::AiTask {
             id: var_id,
             prompt: var_prompt,
@@ -14284,6 +14285,7 @@ impl SseDecode for crate::api::ai::AiTask {
             stale: var_stale,
             stalled_since_ms: var_stalledSinceMs,
             session: var_session,
+            question: var_question,
         };
     }
 }
@@ -19435,6 +19437,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::ai::AiTask {
             self.stale.into_into_dart().into_dart(),
             self.stalled_since_ms.into_into_dart().into_dart(),
             self.session.into_into_dart().into_dart(),
+            self.question.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -22499,6 +22502,7 @@ impl SseEncode for crate::api::ai::AiTask {
         <bool>::sse_encode(self.stale, serializer);
         <Option<i64>>::sse_encode(self.stalled_since_ms, serializer);
         <String>::sse_encode(self.session, serializer);
+        <String>::sse_encode(self.question, serializer);
     }
 }
 

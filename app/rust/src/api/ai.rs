@@ -137,6 +137,9 @@ pub struct AiTask {
     pub stalled_since_ms: Option<i64>,
     /// The agent session of the run, empty when it has none or it expired.
     pub session: String,
+    /// The worker's open question to the user, empty when it has none. A
+    /// running task with a question waits for `ai_reply_task`.
+    pub question: String,
 }
 
 fn task(t: tasks::Task) -> AiTask {
@@ -162,6 +165,7 @@ fn task(t: tasks::Task) -> AiTask {
         stale: false,
         stalled_since_ms,
         session: t.session,
+        question: t.question,
     }
 }
 
@@ -327,6 +331,12 @@ pub fn ai_cancel_task(vault: &NotesVault, id: String) -> Result<bool, String> {
 /// Returns whether it was in review.
 pub fn ai_accept_task(vault: &NotesVault, id: String) -> Result<bool, String> {
     tasks::accept(&vault.inner, &id).map_err(err)
+}
+
+/// Answers the worker's open question. The worker gets the reply and the task
+/// is plain running again. Returns false when there was no open question.
+pub fn ai_reply_task(vault: &NotesVault, id: String, text: String) -> Result<bool, String> {
+    tasks::reply(&vault.inner, &id, &text).map_err(err)
 }
 
 /// Fails a task whose runner has been silent for over ten minutes. Returns
