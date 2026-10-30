@@ -308,3 +308,76 @@ fn a_mismatched_key_id_is_rejected() {
     let a = call(&hub, "POST", "/auth/pair", None, DEVICE, body.to_string().as_bytes());
     assert_eq!(a.status, 400);
 }
+
+#[test]
+fn a_tampered_nonce_is_rejected() {
+    let (_d, hub) = hub("dk_tampered_nonce");
+    let token = hub.pair_legacy_token("laptop").unwrap();
+    let key = DeviceKey::generate().unwrap();
+    upgrade(&hub, &token, &key);
+    // A real nonce with its issue time moved forward (to stretch its
+    // life), and one with a changed random part: the tag no longer fits.
+    let mut later = nonce(&hub);
+    later[23] = later[23].wrapping_add(1);
+    let mut other = nonce(&hub);
+    other[0] ^= 0xff;
+    for n in [later, other] {
+        let a = call(&hub, "POST", "/auth/session", None, DEVICE, &proof(&key, DEVICE, ORIGIN, &n));
+        assert_eq!(a.status, 401);
+    }
+    assert_eq!(session(&hub, &key).status, 200);
+}
+
+#[test]
+fn many_open_challenges_never_lock_anyone_out() {
+    let (_d, hub) = hub("dk_many_challenges");
+    let token = hub.pair_legacy_token("laptop").unwrap();
+    let key = DeviceKey::generate().unwrap();
+    upgrade(&hub, &token, &key);
+    for _ in 0..10_000 {
+        assert_eq!(call(&hub, "POST", "/auth/challenge", None, DEVICE, b"{}").status, 200);
+    }
+    assert_eq!(session(&hub, &key).status, 200);
+}
+
+#[test]
+fn a_failed_proof_does_not_use_up_its_nonce() {
+    let (_d, hub) = hub("dk_failed_proof_nonce");
+    let token = hub.pair_legacy_token("laptop").unwrap();
+    let key = DeviceKey::generate().unwrap();
+    upgrade(&hub, &token, &key);
+    // A key nobody bound signs a live nonce: refused, and the nonce stays
+    // unused (only authorized proofs are recorded).
+    let n = nonce(&hub);
+    let stranger = DeviceKey::generate().unwrap();
+    let a = call(&hub, "POST", "/auth/session", None, DEVICE, &proof(&stranger, DEVICE, ORIGIN, &n));
+    assert_eq!(a.status, 401);
+    let a = call(&hub, "POST", "/auth/session", None, DEVICE, &proof(&key, DEVICE, ORIGIN, &n));
+    assert_eq!(a.status, 200, "{:?}", a.json);
+    let a = call(&hub, "POST", "/auth/session", None, DEVICE, &proof(&key, DEVICE, ORIGIN, &n));
+    assert_eq!(a.status, 401, "a replay after a valid use");
+}
+
+#[test]
+fn re_pairing_a_device_with_a_new_key_ends_its_old_sessions() {
+    let (dir, hub) = hub("dk_repair_new_key");
+    let token = hub.pair_legacy_token("laptop").unwrap();
+    let old_key = DeviceKey::generate().unwrap();
+    let old = upgrade(&hub, &token, &old_key);
+    assert_eq!(changes(&hub, &old), 200);
+
+    // Another process (the CLI) unpairs the device and pairs it again;
+    // the device redeems the new code with a new key. The running hub
+    // never sees the unpair itself.
+    let cli = Hub::new(dir.open()).unwrap();
+    assert_eq!(cli.unpair("laptop").unwrap(), 1);
+    let code = cli.pair("laptop").unwrap();
+    let new_key = DeviceKey::generate().unwrap();
+    assert_eq!(redeem(&cli, &code, &new_key).status, 200);
+
+    assert_eq!(changes(&hub, &old), 401, "a session of the old key");
+    let s = session(&hub, &new_key);
+    assert_eq!(s.status, 200, "{:?}", s.json);
+    assert_eq!(changes(&hub, s.json["session"].as_str().unwrap()), 200);
+}
+

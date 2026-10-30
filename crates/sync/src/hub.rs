@@ -351,7 +351,9 @@ impl Hub {
     /// then on. Refused when it is already.
     pub fn bind_device_key(&self, token: &str, device: &str, pubkey: &str, key_id: &str) -> Result<()> {
         let key = bound_key(pubkey, key_id)?;
-        self.tokens.bind_key(token, device, &self.device, &key)
+        self.tokens.bind_key(token, device, &self.device, &key)?;
+        self.keys.drop_device(device);
+        Ok(())
     }
 
     /// Drops `token` (a device signing out) and ends the device's
@@ -585,11 +587,12 @@ impl Hub {
     /// `require_device_keys`, none).
     fn authorize(&self, token: &str, device: &str) -> Result<()> {
         if let Some(verdict) = self.keys.check_session(token, device) {
-            verdict?;
+            let pubkey = verdict?;
             // tokens.json may have changed under a running hub (an unpair
-            // from the CLI): a session lives only while its device keeps a
-            // key-bound entry.
-            if self.tokens.key_of(device)?.is_none() {
+            // from the CLI, a re-pair with a new key): a session lives only
+            // while its device stays bound to the key that bought it.
+            let bound = self.tokens.key_of(device)?;
+            if !bound.is_some_and(|b| crate::ct_eq(b.pubkey.as_bytes(), pubkey.as_bytes())) {
                 self.keys.drop_device(device);
                 return Err(SyncError::Status(401, "this device is no longer paired".into()));
             }
@@ -631,11 +634,13 @@ impl Hub {
                 let b: PairBody = serde_json::from_slice(&body).map_err(bad)?;
                 let key = bound_key(&b.pubkey, &b.key_id)?;
                 let (token, label) = self.tokens.redeem_code(b.code.trim(), &b.device, &self.device, &key)?;
+                // A new key for this device id: its earlier sessions end.
+                self.keys.drop_device(&b.device);
                 Ok(json(serde_json::json!({ "token": token, "label": label })))
             }
             "/auth/session" | "/auth/upgrade" => {
                 let proof: SessionProof = serde_json::from_slice(&body).map_err(bad)?;
-                let key = self.verify_proof(&proof, req.header("Host"))?;
+                let (key, nonce) = self.verify_proof(&proof, req.header("Host"))?;
                 if path == "/auth/upgrade" {
                     let token = req
                         .header("Authorization")
@@ -651,6 +656,7 @@ impl Hub {
                         ));
                     }
                     self.tokens.bind_key(&token, &proof.device, &self.device, &key)?;
+                    self.keys.drop_device(&proof.device);
                 } else {
                     let bound = self.tokens.key_of(&proof.device)?;
                     let matches = bound.is_some_and(|b| {
@@ -663,7 +669,12 @@ impl Hub {
                         ));
                     }
                 }
-                let (session, expires_in) = self.keys.create_session(&proof.device)?;
+                // Recorded only now, after the proof is verified and
+                // authorized, so unauthenticated callers can't grow the set.
+                if !self.keys.use_nonce(&nonce)? {
+                    return Err(SyncError::Status(401, "this challenge was used already".into()));
+                }
+                let (session, expires_in) = self.keys.create_session(&proof.device, &key.pubkey)?;
                 Ok(json(serde_json::json!({ "session": session, "expires_in": expires_in })))
             }
             _ => Err(SyncError::Status(404, format!("no route POST {path}"))),
@@ -671,12 +682,13 @@ impl Hub {
     }
 
     /// Checks a session proof: the origin this hub answers at, a live
-    /// challenge (taken, so it is never used twice) and the signature.
-    /// Returns the key it proves.
-    fn verify_proof(&self, p: &SessionProof, host: Option<&str>) -> Result<BoundKey> {
+    /// challenge this hub issued and the signature. Returns the key it
+    /// proves and the nonce; the caller records the nonce as used once the
+    /// proof is also authorized.
+    fn verify_proof(&self, p: &SessionProof, host: Option<&str>) -> Result<(BoundKey, [u8; 32])> {
         let refused = |m: &str| SyncError::Status(401, m.to_string());
         let nonce: [u8; 32] = hex_array(&p.nonce, "nonce")?;
-        if !self.keys.take_nonce(&nonce) {
+        if !self.keys.nonce_is_live(&nonce) {
             return Err(refused("unknown or expired challenge"));
         }
         let origin_ok = match &self.keys.policy().public_url {
@@ -696,7 +708,7 @@ impl Hub {
         let id = DeviceId::parse(&key.key_id).map_err(|_| SyncError::Status(400, "bad key_id".into()))?;
         RelayProof::verify(PROOF_LABEL, PROOF_ROLE, &p.origin, nonce, id, pubkey, sig)
             .map_err(|_| refused("the proof does not verify"))?;
-        Ok(key)
+        Ok((key, nonce))
     }
 
     /// The hub's current change feed position.

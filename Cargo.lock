@@ -6906,6 +6906,7 @@ version = "0.1.0"
 dependencies = [
  "bubblebuffer-device-key",
  "getrandom 0.3.4",
+ "hmac",
  "rcgen",
  "rustls",
  "rustls-pki-types",
