@@ -62,19 +62,14 @@ void main() {
       expect(key('device-Pixel'), findsOneWidget);
 
       // The other device's first sync brings every page.
-<<<<<<< HEAD
+      // The pairing URL names the fake LAN address; the other device reaches the
+      // hub on loopback.
+      final reachable = 'http://127.0.0.1:${portOf(sync.hubAddress!)}';
       final token = await real(
         tester,
-        () => redeemPairingCode(vault: other.vault.raw, hubUrl: url, code: pairCode, trusted: const []),
+        () => redeemPairingCode(vault: other.vault.raw, hubUrl: reachable, code: pairCode, trusted: const []),
       );
-      other.client = NotesSync(vault: other.vault.raw, url: url, token: token);
-=======
-      other.client = NotesSync(
-        vault: other.vault.raw,
-        url: 'http://127.0.0.1:${portOf(sync.hubAddress!)}',
-        token: token,
-      );
->>>>>>> 3ce0706 (Keep hub sharing state accurate and omit loopback pairing URLs)
+      other.client = NotesSync(vault: other.vault.raw, url: reachable, token: token);
       final first = await real(tester, () => other.client!.syncOnce());
       expect(first.full, isTrue);
       // Both desktop app opens publish their node record under hidden Nodes.
