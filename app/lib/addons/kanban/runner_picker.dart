@@ -6,11 +6,13 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../services/addon_services.dart'
     show SettingsSection, showSettings;
 import '../../ui/ui.dart';
+import 'keyboard_menu.dart';
 import 'runner_backend.dart';
 
 /// Below this width the picker is a bottom sheet; at or above it, a popover.
@@ -197,7 +199,9 @@ class _RunnerPickerState extends State<_RunnerPicker> {
         final runners = snap.data ?? const <Runner>[];
         final chosen = _chosen ?? defaultRunnerId(runners);
         final now = DateTime.now();
-        return Column(
+        return KeyboardMenu(
+          focusFirst: false,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -261,6 +265,7 @@ class _RunnerPickerState extends State<_RunnerPicker> {
               ),
             ),
           ],
+          ),
         );
       },
     );
@@ -338,8 +343,7 @@ class _ProjectRow extends StatelessWidget {
       button: true,
       selected: selected,
       label: name,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: _FocusRow(
         onTap: onTap,
         child: Container(
           margin: const EdgeInsets.only(bottom: 4),
@@ -407,9 +411,9 @@ class _RunnerRow extends StatelessWidget {
       button: true,
       selected: selected,
       label: r.name,
-      child: GestureDetector(
+      child: _FocusRow(
         key: ValueKey('runner-row-${r.id}'),
-        behavior: HitTestBehavior.opaque,
+        autofocus: selected,
         onTap: onTap,
         child: Container(
           margin: const EdgeInsets.only(bottom: 4),
@@ -538,6 +542,65 @@ class _RadioDot extends StatelessWidget {
               ),
             )
           : null,
+    );
+  }
+}
+
+/// A picker row that takes keyboard focus: Space or Enter selects it, and a
+/// ring shows while it has focus from the keyboard. [autofocus] puts focus
+/// on it when the picker opens.
+class _FocusRow extends StatefulWidget {
+  const _FocusRow({
+    super.key,
+    required this.onTap,
+    required this.child,
+    this.autofocus = false,
+  });
+
+  final VoidCallback onTap;
+  final Widget child;
+  final bool autofocus;
+
+  @override
+  State<_FocusRow> createState() => _FocusRowState();
+}
+
+class _FocusRowState extends State<_FocusRow> {
+  bool _highlight = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return FocusableActionDetector(
+      autofocus: widget.autofocus,
+      onShowFocusHighlight: (v) => setState(() => _highlight = v),
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
+        ),
+      },
+      child: DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          borderRadius: Radii.field,
+          border: Border.all(
+            color: _highlight ? c.focus : const Color(0x00000000),
+            width: 2,
+          ),
+        ),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: widget.child,
+        ),
+      ),
     );
   }
 }

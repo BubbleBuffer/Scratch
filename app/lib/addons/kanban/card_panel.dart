@@ -49,18 +49,26 @@ class KanbanCardPanel extends StatefulWidget {
 
 class _KanbanCardPanelState extends State<KanbanCardPanel> {
   final _scope = FocusScopeNode(debugLabel: 'kanban card panel');
+
+  /// Focus rests on the title when the panel opens, so no control shows a
+  /// focus ring until the user tabs. Tab skips it.
+  final _titleFocus = FocusNode(
+    debugLabel: 'kanban card panel title',
+    skipTraversal: true,
+  );
   final _assignKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _scope.nextFocus();
+      if (mounted) _titleFocus.requestFocus();
     });
   }
 
   @override
   void dispose() {
+    _titleFocus.dispose();
     _scope.dispose();
     super.dispose();
   }
@@ -106,10 +114,13 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                       onTap: widget.onClose,
                     ),
                   ),
-                Text(
-                  widget.title,
-                  key: const ValueKey('kanban-panel-title'),
-                  style: tsDisplay(const TypeSpec(22, 28, 700), c.textPrimary),
+                Focus(
+                  focusNode: _titleFocus,
+                  child: Text(
+                    widget.title,
+                    key: const ValueKey('kanban-panel-title'),
+                    style: tsDisplay(const TypeSpec(22, 28, 700), c.textPrimary),
+                  ),
                 ),
                 if (widget.firstLine.trim().isNotEmpty)
                   Padding(

@@ -2,6 +2,7 @@
 // ellipsis menu, the Run on picker (a popover at 700 px and wider, a bottom
 // sheet below), assigning, and the runner chip for each state.
 
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter/widgets.dart' show Size, ValueKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/kanban/api.dart';
@@ -278,4 +279,66 @@ void main() {
       expect(picker.bottom, lessThanOrEqualTo(800));
     },
   );
+
+  appTest(
+    'desktop keyboard: arrows move through the runners and projects, Space selects, Enter on Assign submits',
+    (tester) async {
+      final backend = FakeRunnerBackend.demo();
+      final f = await pumpApp(
+        tester,
+        mobile: false,
+        runners: RunnerAssignments(backend),
+      );
+      final garden = f.pages['Garden plan']!;
+      await _openBoard(tester, garden);
+      await hoverCard(tester, 'Garden plan');
+      await _openPicker(tester, garden);
+
+      expect(
+        focusIsIn(find.byKey(const ValueKey('runner-row-studio'))),
+        isTrue,
+        reason: 'starts on the chosen runner',
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await settle(tester);
+      expect(focusIsIn(find.byKey(const ValueKey('project-row-none'))), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await settle(tester);
+      expect(focusIsIn(find.byKey(const ValueKey('project-row-notes-app'))), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await settle(tester);
+
+      final assign = find.byKey(const ValueKey('runner-assign'));
+      for (var i = 0; i < 12 && !focusIsIn(assign); i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await settle(tester);
+      }
+      expect(focusIsIn(assign), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await settle(tester);
+      expect(backend.calls, contains('assign:$garden:studio:notes-app'));
+      expect(find.text('Run on'), findsNothing);
+    },
+  );
+
+  appTest('desktop keyboard: Esc closes the picker without assigning', (
+    tester,
+  ) async {
+    final backend = FakeRunnerBackend.demo();
+    final f = await pumpApp(
+      tester,
+      mobile: false,
+      runners: RunnerAssignments(backend),
+    );
+    final garden = f.pages['Garden plan']!;
+    await _openBoard(tester, garden);
+    await hoverCard(tester, 'Garden plan');
+    await _openPicker(tester, garden);
+    expect(find.text('Run on'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await settle(tester);
+    expect(find.text('Run on'), findsNothing);
+    expect(backend.calls.where((c) => c.startsWith('assign')), isEmpty);
+  });
 }

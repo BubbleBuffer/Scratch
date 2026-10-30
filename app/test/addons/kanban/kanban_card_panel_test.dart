@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/kanban/api.dart';
+import 'package:notes_app/ui/board/board_renderer.dart' show BoardRenderer;
 import 'package:notes_app/ui/sheet.dart' show SheetSurface;
 
 import 'kanban_fixture.dart';
@@ -34,18 +35,6 @@ Future<String> _openBoard(WidgetTester tester, {required bool mobile}) async {
   await openNote(tester, board, 'Launch board');
   return garden;
 }
-
-/// The board's keyboard stop for the first card.
-FocusNode _cardFocus(WidgetTester tester) => tester
-    .widget<FocusableActionDetector>(
-      find
-          .descendant(
-            of: allCardSurfaces().first,
-            matching: find.byType(FocusableActionDetector),
-          )
-          .first,
-    )
-    .focusNode!;
 
 void main() {
   setUpAll(initCore);
@@ -115,7 +104,7 @@ void main() {
     (tester) async {
       await _openBoard(tester, mobile: false);
 
-      _cardFocus(tester).requestFocus();
+      cardFocus(tester).requestFocus();
       await settle(tester);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await settle(tester);
@@ -125,7 +114,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await settle(tester);
       expect(find.byKey(_panel), findsNothing);
-      expect(_cardFocus(tester).hasPrimaryFocus, isTrue);
+      expect(cardFocus(tester).hasPrimaryFocus, isTrue);
     },
   );
 
@@ -142,4 +131,53 @@ void main() {
     await tapAndSettle(tester, find.byKey(_openNote));
     expect(editableWith('Some text about garden plan.'), findsOneWidget);
   });
+
+  appTest(
+    'desktop at 1280 px: the panel is docked, the board keeps scrolling beside it and the last column stays reachable',
+    (tester) async {
+      await _openBoard(tester, mobile: false);
+      tester.view.physicalSize = const Size(1280, 800);
+      await settle(tester);
+      await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
+
+      final panel = tester.getRect(find.byKey(_panel));
+      expect(panel.width, 320);
+      expect(panel.right, lessThanOrEqualTo(1280));
+      final board = find.byType(BoardRenderer);
+      expect(tester.getRect(board).right, lessThanOrEqualTo(panel.left));
+
+      final horizontal = tester
+          .stateList<ScrollableState>(
+            find.descendant(of: board, matching: find.byType(Scrollable)),
+          )
+          .firstWhere((s) => s.axisDirection == AxisDirection.right);
+      horizontal.position.jumpTo(horizontal.position.maxScrollExtent);
+      await settle(tester);
+      expect(
+        tester.getRect(columnNamed('Done')).right,
+        lessThanOrEqualTo(panel.left),
+        reason: 'Done scrolls into view beside the panel, not under it',
+      );
+    },
+  );
+
+  appTest(
+    'desktop: focus starts on the panel, not on Close, so no ring or tooltip shows until Tab',
+    (tester) async {
+      await _openBoard(tester, mobile: false);
+      await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
+
+      expect(FocusManager.instance.primaryFocus?.debugLabel, 'kanban card panel title');
+      expect(focusIsIn(find.byKey(const ValueKey('kanban-panel-close'))), isFalse);
+      expect(find.text('Close'), findsNothing, reason: 'no tooltip');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await settle(tester);
+      expect(focusIsIn(find.byKey(const ValueKey('kanban-panel-close'))), isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(find.byKey(_panel), findsNothing, reason: 'Esc closes from a control too');
+    },
+  );
 }
