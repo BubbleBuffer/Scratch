@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'vault.dart';
 
-// These functions are ignored because they are not marked as `pub`: `lock`, `task`
+// These functions are ignored because they are not marked as `pub`: `lock`, `task_in`, `task`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// The default listen address of the app's MCP endpoint.
@@ -94,6 +94,20 @@ Future<AiTask> aiCreateTaskHere({
 /// Hub jobs are cancelled on the hub.
 Future<bool> aiCancelTask({required NotesVault vault, required String id}) =>
     RustLib.instance.api.crateApiAiAiCancelTask(vault: vault, id: id);
+
+/// Asks the runner to send the running worker the note's current version.
+/// Returns whether the task was running and took the request.
+Future<bool> aiSendUpdate({required NotesVault vault, required String id}) =>
+    RustLib.instance.api.crateApiAiAiSendUpdate(vault: vault, id: id);
+
+/// Adds a to-do under the running task; the runner puts it on the worker's
+/// list and sends it as a steering message.
+Future<void> aiAddStep({
+  required NotesVault vault,
+  required String id,
+  required String text,
+}) =>
+    RustLib.instance.api.crateApiAiAiAddStep(vault: vault, id: id, text: text);
 
 /// The newest tasks first.
 Future<List<AiTask>> aiListTasks({
@@ -282,6 +296,12 @@ class AiTask {
   final String worktreeBranch;
   final String worktreePath;
 
+  /// A cancel was requested and the runner has not acknowledged it yet.
+  final bool cancelRequested;
+
+  /// The note changed after the running worker got its brief.
+  final bool stale;
+
   const AiTask({
     required this.id,
     required this.prompt,
@@ -299,6 +319,8 @@ class AiTask {
     required this.project,
     required this.worktreeBranch,
     required this.worktreePath,
+    required this.cancelRequested,
+    required this.stale,
   });
 
   @override
@@ -318,7 +340,9 @@ class AiTask {
       node.hashCode ^
       project.hashCode ^
       worktreeBranch.hashCode ^
-      worktreePath.hashCode;
+      worktreePath.hashCode ^
+      cancelRequested.hashCode ^
+      stale.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -340,5 +364,7 @@ class AiTask {
           node == other.node &&
           project == other.project &&
           worktreeBranch == other.worktreeBranch &&
-          worktreePath == other.worktreePath;
+          worktreePath == other.worktreePath &&
+          cancelRequested == other.cancelRequested &&
+          stale == other.stale;
 }

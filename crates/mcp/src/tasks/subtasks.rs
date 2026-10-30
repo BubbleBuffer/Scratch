@@ -72,6 +72,111 @@ pub(super) fn owned_blocks(tracking: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// A to-do the user added under the running task: steering for the worker.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Step {
+    pub block: String,
+    pub text: String,
+}
+
+/// The block steps nest under: the attempt's parent once it began, else the
+/// task's own.
+fn steps_parent(t: &Task, state: &State) -> Option<String> {
+    Some(state.parent.clone())
+        .filter(|p| !p.is_empty())
+        .or_else(|| nest_under(t))
+}
+
+/// The to-dos under a running task that the user added and the worker has not
+/// been told about: unchecked, with text, not owned by the run, not there
+/// when the run began and not sent already. Empty unless the task runs and is
+/// not being cancelled.
+pub fn pending_steps(v: &Vault, task_id: &str) -> Result<Vec<Step>> {
+    let (t, state, _) = running(v, task_id)?;
+    if t.cancel_requested_ms.is_some() {
+        return Ok(Vec::new());
+    }
+    let (Some(page), Some(parent)) = (t.page.clone(), steps_parent(&t, &state)) else {
+        return Ok(Vec::new());
+    };
+    let p = v.load_page(page)?;
+    let Some(pb) = find(&p.blocks, &parent) else {
+        return Ok(Vec::new());
+    };
+    let attempt = super::attempts::list(v, task_id)?
+        .into_iter()
+        .find(|a| a.id == t.attempt)
+        .unwrap_or_default();
+    let owned: Vec<&String> = state.items.iter().filter_map(|i| i.block.as_ref()).collect();
+    Ok(pb
+        .children
+        .iter()
+        .filter(|c| {
+            c.kind == BlockKind::Todo
+                && !c.checked
+                && !c.text.trim().is_empty()
+                && !owned.contains(&&c.id)
+                && !attempt.steered.contains(&c.id)
+                && !attempt.baseline.contains(&c.id)
+        })
+        .map(|c| Step {
+            block: c.id.clone(),
+            text: c.text.trim().to_string(),
+        })
+        .collect())
+}
+
+/// Notes the to-dos under the task now as the user's own, so they are never
+/// sent as steering. Call once the attempt's subtasks have begun.
+pub fn record_baseline(v: &Vault, task_id: &str) -> Result<()> {
+    let (t, state, _) = running(v, task_id)?;
+    let (Some(page), Some(parent)) = (t.page.clone(), steps_parent(&t, &state)) else {
+        return Ok(());
+    };
+    let p = v.load_page(page)?;
+    let ids: Vec<String> = find(&p.blocks, &parent)
+        .map(|pb| pb.children.iter().map(|c| c.id.clone()).collect())
+        .unwrap_or_default();
+    super::attempts::update(v, task_id, None, |a| a.baseline = ids)
+}
+
+/// Adds a to-do with `text` under the running task, for the worker: the
+/// runner sends it as steering. The task must be running and not being
+/// cancelled.
+pub fn add_step(v: &Vault, task_id: &str, text: &str) -> Result<()> {
+    let text = text.trim();
+    if text.is_empty() {
+        return err("the step needs text");
+    }
+    let (t, state, _) = running(v, task_id)?;
+    if t.cancel_requested_ms.is_some() {
+        return err("the task is being cancelled");
+    }
+    let Some(page) = t.page.clone() else {
+        return err("the task has no page");
+    };
+    let p = v.load_page(page.clone())?;
+    let Some(parent) = steps_parent(&t, &state).filter(|b| find(&p.blocks, b).is_some()) else {
+        return err("no block to add the step under");
+    };
+    let after = find(&p.blocks, &parent).and_then(|b| b.children.last().map(|c| c.id.clone()));
+    v.apply(
+        page,
+        vec![BlockOp::Insert {
+            parent: Some(parent),
+            after,
+            block: NewBlock {
+                id: vault_core::new_id(),
+                kind: BlockKind::Todo,
+                text: text.to_string(),
+                marks: vec![],
+                checked: false,
+            },
+        }],
+    )?;
+    Ok(())
+}
+
 /// The task, which must be running, its tracking, and the session its row
 /// names (empty when none).
 fn running(v: &Vault, task_id: &str) -> Result<(Task, State, String)> {
@@ -228,6 +333,15 @@ pub fn mirror_subtasks(
         return err("the block the subtasks nest under is gone");
     };
 
+    // To-dos the user added that the worker was told about: the worker's list
+    // now holds them too, so a new item with the same text takes the user's
+    // to-do instead of adding a second one.
+    let steered: Vec<String> = super::attempts::list(v, task_id)?
+        .into_iter()
+        .find(|a| a.id == t.attempt)
+        .map(|a| a.steered)
+        .unwrap_or_default();
+
     let wanted: Vec<(String, bool)> = items
         .iter()
         .filter(|i| !i.text.trim().is_empty())
@@ -269,6 +383,13 @@ pub fn mirror_subtasks(
         ops.extend(removal(b));
     }
 
+    let mut adoptable: Vec<&Block> = pb
+        .children
+        .iter()
+        .filter(|c| {
+            steered.contains(&c.id) && !have.iter().any(|h| h.block.as_deref() == Some(&c.id))
+        })
+        .collect();
     let mut next = Vec::new();
     let mut desired: Vec<String> = Vec::new();
     let mut inserts: Vec<(String, String, bool)> = Vec::new();
@@ -294,6 +415,24 @@ pub fn mirror_subtasks(
                 }
                 next.push(Item {
                     block,
+                    text: line.clone(),
+                });
+            }
+            None if adoptable.iter().any(|b| b.text.trim() == line.trim()) => {
+                let at = adoptable
+                    .iter()
+                    .position(|b| b.text.trim() == line.trim())
+                    .unwrap_or_default();
+                let b = adoptable.remove(at);
+                if b.checked != *done {
+                    ops.push(BlockOp::SetChecked {
+                        id: b.id.clone(),
+                        checked: *done,
+                    });
+                }
+                desired.push(b.id.clone());
+                next.push(Item {
+                    block: Some(b.id.clone()),
                     text: line.clone(),
                 });
             }

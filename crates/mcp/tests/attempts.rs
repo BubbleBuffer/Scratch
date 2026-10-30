@@ -274,3 +274,31 @@ fn the_source_revision_follows_the_note_and_ignores_the_run() {
         tasks::source_revision(&v, &tasks::get(&v, &task.id).unwrap())
     );
 }
+
+#[test]
+fn an_old_ended_job_loses_its_session_but_keeps_its_row_and_attempts() {
+    use vault_mcp::jobs::{self, End};
+    let t = Temp::new();
+    let v = t.open();
+    let job = jobs::create(&v, "Old job", "agent:a", "read", "hub").unwrap();
+    jobs::mark_running(&v, &job.id, "session-1").unwrap();
+    jobs::finish(&v, &job.id, End::Completed("The result".into())).unwrap();
+    let now = jobs::now_ms();
+    let day = 86_400_000;
+
+    // Too young: nothing expires.
+    assert!(jobs::expired_sessions(&v, "hub", 30 * day, now).unwrap().is_empty());
+    // Old enough: the session is due, the row is still there.
+    let due = jobs::expired_sessions(&v, "hub", 30 * day, now + 31 * day).unwrap();
+    assert_eq!(due.len(), 1);
+    assert_eq!(due[0].session, "session-1");
+
+    jobs::session_expired(&v, &job.id).unwrap();
+    assert!(jobs::expired_sessions(&v, "hub", 30 * day, now + 31 * day)
+        .unwrap()
+        .is_empty());
+    let kept = jobs::get(&v, &job.id).unwrap().unwrap();
+    assert_eq!(kept.status, "completed");
+    assert!(kept.session.is_empty());
+    assert!(!attempts::list(&v, &job.id).unwrap().is_empty());
+}

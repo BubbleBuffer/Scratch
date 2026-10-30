@@ -17,8 +17,8 @@
 //!   engine that registers exactly that set's tools, with no approval prompts.
 //!   Read callers can't create jobs.
 //! - Limits ([`JobLimits`]): one running job per owner, 4 queued per hub,
-//!   `wait` at most 60 s, runs stopped and failed after 1 h, ended jobs trashed after
-//!   30 days. A restart marks running jobs interrupted; they are not queued
+//!   `wait` at most 60 s, runs stopped and failed after 1 h, ended jobs keep their outcome and lose their
+//!   transcript after 30 days. A restart marks running jobs interrupted; they are not queued
 //!   again.
 
 use std::collections::{HashMap, HashSet};
@@ -52,7 +52,8 @@ pub struct JobLimits {
     pub max_wait: Duration,
     /// A run still going after this is cancelled and the job fails.
     pub max_run: Duration,
-    /// Ended jobs older than this move to the trash.
+    /// An ended job's session (transcript and logs) is deleted after this long;
+    /// the job row stays.
     pub keep: Duration,
     /// How often the worker looks for work and old jobs without a wake-up.
     pub tick: Duration,
@@ -440,14 +441,34 @@ pub(crate) async fn run_worker(state: Arc<AppState>) {
             return;
         }
         let st = state.clone();
-        let taken = tokio::task::spawn_blocking(move || {
-            let keep = st.jobs.limits.keep.as_millis() as i64;
-            if let Err(e) = jobs::sweep(st.hub.vault(), NODE_HUB, keep, jobs::now_ms()) {
-                tracing::warn!("jobs: cleanup failed: {}", e.0);
+        let keep = st.jobs.limits.keep.as_millis() as i64;
+        let expired = {
+            let st = st.clone();
+            tokio::task::spawn_blocking(move || {
+                jobs::expired_sessions(st.hub.vault(), NODE_HUB, keep, jobs::now_ms())
+            })
+            .await
+        };
+        // Transcripts and logs expire; the job row, its outcome and its
+        // attempt history stay.
+        if let Ok(Ok(list)) = expired {
+            for job in list {
+                let set: ToolSet = job.tools.parse().unwrap_or(ToolSet::Read);
+                let Ok(engine) = state.agent.job_engine(set).await else {
+                    continue;
+                };
+                let st = state.clone();
+                let _ = tokio::task::spawn_blocking(move || {
+                    // A session that is already gone counts as expired.
+                    let _ = engine.delete_session(&job.session);
+                    if let Err(e) = jobs::session_expired(st.hub.vault(), &job.id) {
+                        tracing::warn!("jobs: cleanup failed: {}", e.0);
+                    }
+                })
+                .await;
             }
-            st.jobs.take_ready()
-        })
-        .await;
+        }
+        let taken = tokio::task::spawn_blocking(move || st.jobs.take_ready()).await;
         match taken {
             Ok(Ok(taken)) => {
                 for job in taken {

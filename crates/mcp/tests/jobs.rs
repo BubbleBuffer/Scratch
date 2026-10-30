@@ -79,7 +79,7 @@ fn pinned_desktop_tasks_are_never_jobs() {
     // time; the task API still owns them.
     tasks::finish(&v, &mine.id, Ok("Done".into())).unwrap();
     assert_eq!(jobs::recover(&v, "hub").unwrap(), 0);
-    assert_eq!(jobs::sweep(&v, "hub", 0, jobs::now_ms() + 1).unwrap(), 0);
+    assert!(jobs::expired_sessions(&v, "hub", 0, jobs::now_ms() + 1).unwrap().is_empty());
     assert_eq!(tasks::get(&v, &mine.id).unwrap().status, tasks::DONE);
     // Cancelling a pinned desktop task is the task API's; only hub jobs
     // are cancelled through the jobs API.
@@ -88,7 +88,7 @@ fn pinned_desktop_tasks_are_never_jobs() {
 }
 
 #[test]
-fn recover_interrupts_and_sweep_trashes() {
+fn recover_interrupts_and_only_the_session_expires() {
     let t = Temp::new();
     let v = t.open();
     let a = jobs::create(&v, "A", "agent:a", "write", "hub").unwrap();
@@ -100,12 +100,18 @@ fn recover_interrupts_and_sweep_trashes() {
     assert!(a.error.contains("restarted"));
     assert_eq!(jobs::get(&v, &b.id).unwrap().unwrap().status, "queued");
 
-    // Only ended jobs older than the keep time go.
+    // Only the sessions of ended jobs older than the keep time expire; the
+    // row stays.
     let now = jobs::now_ms();
-    assert_eq!(jobs::sweep(&v, "hub", 60_000, now).unwrap(), 0);
-    assert_eq!(jobs::sweep(&v, "hub", 60_000, now + 120_000).unwrap(), 1);
-    assert!(jobs::get(&v, &a.id).unwrap().is_none());
-    assert!(v.load_page(a.id.clone()).unwrap().in_trash);
+    assert!(jobs::expired_sessions(&v, "hub", 60_000, now).unwrap().is_empty());
+    let due = jobs::expired_sessions(&v, "hub", 60_000, now + 120_000).unwrap();
+    assert_eq!(due.len(), 1);
+    jobs::session_expired(&v, &a.id).unwrap();
+    assert!(jobs::expired_sessions(&v, "hub", 60_000, now + 120_000).unwrap().is_empty());
+    let kept = jobs::get(&v, &a.id).unwrap().unwrap();
+    assert_eq!(kept.status, "interrupted");
+    assert!(kept.session.is_empty());
+    assert!(!v.load_page(a.id.clone()).unwrap().in_trash);
     jobs::finish(&v, &b.id, End::Cancelled).unwrap();
     assert_eq!(jobs::get(&v, &b.id).unwrap().unwrap().status, "cancelled");
 }
