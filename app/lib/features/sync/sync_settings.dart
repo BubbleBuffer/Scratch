@@ -1,11 +1,14 @@
-// The Sync and Devices settings sections and the "Add a device" flow.
+// The Sync and devices settings page and the "Add a device" flow.
 //
-// - Hub (desktop): on/off, listen address, the addresses other devices can
-//   use, and pairing: a token for a named device, shown as text and as a QR
-//   code of the pairing string.
-// - Connect to a hub (any device): a pairing string, or a hub address and
-//   a token; then the background loop runs until "Disconnect".
+// - Status card: whether this vault syncs, with "Sync now".
+// - Your hub: sign in to a hub (or sign out), or connect with a pairing code
+//   (collapsed): a pairing string, or a hub address and a token; then the
+//   background loop runs until "Disconnect".
 // - Attachments: background download, or "Download all" now.
+// - This computer as a hub (desktop): on/off, the addresses other devices can
+//   use, the devices paired to it with "Add a device" (a token for a named
+//   device, shown as text and as a QR code of the pairing string), and the
+//   listen address (collapsed).
 // - Trusted certificates: hubs whose unknown-issuer certificate this device
 //   trusts, each viewable and revocable.
 
@@ -17,7 +20,8 @@ import '../../state/sync_store.dart';
 import '../../ui/app_name.dart';
 import '../../ui/ui.dart';
 import '../settings/controls.dart';
-import '../settings/settings_screen.dart';
+import '../settings/settings_kit.dart';
+import '../settings/settings_screen.dart' show pushSettingsPage;
 import '../settings/settings_store.dart';
 import 'cert_trust.dart';
 import 'certificate_view.dart';
@@ -25,35 +29,128 @@ import 'pairing_codec.dart';
 import 'hub_auth.dart';
 import 'qr.dart';
 import 'sync_control.dart';
-import 'sync_icons.dart';
 import 'sync_indicator.dart';
 
 // ---------------------------------------------------------------------------
-// Sync
+// The page
 
-class SyncBody extends StatelessWidget {
-  const SyncBody({super.key});
+/// The whole page. [extra] are add-on sections placed with the hub ("Run
+/// schedules on this device").
+class SyncAndDevicesPage extends StatelessWidget {
+  const SyncAndDevicesPage({super.key, this.extra = const []});
+  final List<Widget> extra;
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Sync', primary: true),
-      const SettingsHeading('Hub'),
-      const HubSignInSettings(),
-      const SizedBox(height: 28),
-      if (SyncStore.canHost) ...[
-        const HubSettings(),
-        const SizedBox(height: 28),
-        const SettingsHeading('Connect to a hub'),
+    final sync = context.watch<SyncStore>();
+    final s = AppSettings.of(context);
+    final signedIn =
+        s.clientToken != null && s.clientUrl != null && s.clientDeviceLabel != null;
+    return SPage(
+      title: 'Sync and devices',
+      intro:
+          'Keep this vault the same on all your devices. A **hub** is the computer or server your devices sync through.',
+      children: [
+        const SyncStatusCard(),
+        SSection(
+          title: 'Your hub',
+          children: [
+            if (sync.connected && !signedIn)
+              const HubConnectionRow()
+            else
+              const HubSignInSettings(),
+            if (!signedIn && !sync.connected) const ConnectSettings(),
+          ],
+        ),
+        const SSection(title: 'Attachments', children: [SBlock(child: AttachmentSettings())]),
+        if (SyncStore.canHost)
+          SSection(
+            title: 'This computer as a hub',
+            intro: 'Let your other devices sync with this computer directly, without a server.',
+            children: [HubSettings(extra: extra)],
+          )
+        else if (extra.isNotEmpty)
+          SSection(children: extra),
+        const TrustedCertificatesSettings(),
       ],
-      const ConnectSettings(),
-      const TrustedCertificatesSettings(),
-      const SizedBox(height: 28),
-      const SettingsHeading('Attachments'),
-      const AttachmentSettings(),
+    );
+  }
+}
+
+/// Whether the vault syncs, and with whom; "Sync now" while connected. The
+/// error of a failed sync, or of an unknown certificate, comes under it.
+class SyncStatusCard extends StatelessWidget {
+  const SyncStatusCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final sync = context.watch<SyncStore>();
+    if (!sync.connected) {
+      return const SStatusCard(
+        icon: Sx.cloudOff,
+        title: 'Not syncing',
+        text: 'This vault lives only on this device. Connect a hub to use it on your other devices.',
+        ok: false,
+      );
+    }
+    final (phase, message) = sync.phase;
+    final ok = sync.status.lastOkMs;
+    final good = phase == SyncPhase.synced || phase == SyncPhase.syncing;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      SStatusCard(
+        icon: switch (phase) {
+          SyncPhase.synced => Sx.check,
+          SyncPhase.syncing => Sx.sync,
+          SyncPhase.offline => Sx.cloudOff,
+          _ => Sx.alert,
+        },
+        title: phaseLabel(phase),
+        text: [
+          'With ${sync.hubUrl}',
+          if (ok != null) 'last synced ${relativeTime(ok.toInt()).toLowerCase()}',
+        ].join(' · '),
+        ok: good,
+        action: SButton('Sync now', key: const ValueKey('sync-now-button'), icon: Sx.sync, onTap: sync.syncNow),
+      ),
+      if (sync.untrustedCertificate)
+        const Padding(
+          padding: EdgeInsets.only(top: 12),
+          child: SyncCertificateProblem(messageKey: ValueKey('connect-error')),
+        )
+      else if (message != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Text(message, key: const ValueKey('connect-error'), style: tsRaw(13, 18, 400, c.dangerText)),
+        ),
     ]);
   }
 }
+
+/// Connected by a pairing code, so there is no account to sign out of.
+class HubConnectionRow extends StatelessWidget {
+  const HubConnectionRow({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final sync = context.watch<SyncStore>();
+    final s = AppSettings.of(context);
+    return SRow(
+      label: 'Hub connection',
+      desc: 'Connected to ${sync.hubUrl}.',
+      help: 'Disconnect to sync with another hub. Your pages stay on this device.',
+      control: SButton(
+        'Disconnect',
+        key: const ValueKey('disconnect-button'),
+        kind: SButtonKind.danger,
+        onTap: () => disconnectFromHub(sync, s),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Your hub
 
 class HubSignInSettings extends StatefulWidget {
   const HubSignInSettings({super.key, this.auth});
@@ -133,7 +230,6 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     final s = AppSettings.of(context);
     final signedIn =
         s.clientToken != null &&
@@ -143,152 +239,61 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (signedIn)
-          SettingsRow(
+          SRow(
+            label: 'Hub account',
             // An older hub reports no account: then the device name it
             // registered this device under is shown, never a made-up account.
-            label:
+            desc:
                 'Signed in to ${Uri.tryParse(s.clientUrl!)?.host ?? s.clientUrl} as ${s.clientAccount ?? s.clientDeviceLabel}',
-            stack: context.mobile,
-            trailing: OutlineButton(
+            help: 'Sign out to switch hubs or accounts. Your pages stay on this device.',
+            control: SButton(
+              _signingOut ? 'Signing out…' : 'Sign out',
               key: const ValueKey('hub-sign-out'),
-              label: _signingOut ? 'Signing out…' : 'Sign out',
               onTap: _signingOut ? null : _signOut,
             ),
           )
         else if (_waiting)
-          SettingsRow(
+          SRow(
             label: 'Waiting for the browser…',
-            trailing: OutlineButton(
+            desc: 'Finish signing in there. This page updates when you are done.',
+            control: SButton(
+              'Cancel',
               key: const ValueKey('hub-sign-in-cancel'),
-              label: 'Cancel',
               onTap: _cancel,
             ),
           )
-        else ...[
-          SettingsField(
-            fieldKey: const ValueKey('hub-sign-in-url'),
-            controller: _url,
-            placeholder: 'https://notes.example.com',
-            onChanged: (v) => AppSettings.read(context).update(
-              (s) => s.hubSignInUrl = v.trim(),
-            ),
-            onSubmitted: (_) => _signIn(),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              PrimaryButton(
-                key: const ValueKey('hub-sign-in'),
-                label: 'Sign in',
-                onTap: _signIn,
+        else
+          SRow(
+            label: 'Sign in to your hub',
+            desc: 'Your hub’s web address. $appName opens your browser to sign in.',
+            help:
+                'Use this if your hub runs on a server, such as one you host or one you were invited to.',
+            stack: true,
+            control: Row(children: [
+              Expanded(
+                child: STextField(
+                  fieldKey: const ValueKey('hub-sign-in-url'),
+                  controller: _url,
+                  placeholder: 'https://notes.example.com',
+                  onChanged: (v) => AppSettings.read(context).update(
+                    (s) => s.hubSignInUrl = v.trim(),
+                  ),
+                  onSubmitted: (_) => _signIn(),
+                ),
               ),
-            ],
+              const SizedBox(width: 8),
+              SButton('Sign in', key: const ValueKey('hub-sign-in'), kind: SButtonKind.primary, onTap: _signIn),
+            ]),
           ),
-        ],
         if (_error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              _error!,
-              key: const ValueKey('hub-sign-in-error'),
-              style: tsRaw(13, 18, 400, c.inlineCodeText),
-            ),
-          ),
+          SNotice(_error!, kind: SNoticeKind.bad, textKey: const ValueKey('hub-sign-in-error')),
       ],
     );
   }
 }
 
-class HubSettings extends StatefulWidget {
-  const HubSettings({super.key});
-
-  @override
-  State<HubSettings> createState() => _HubSettingsState();
-}
-
-class _HubSettingsState extends State<HubSettings> {
-  late final _addr = TextEditingController(text: AppSettings.read(context).hubAddress);
-  List<(String, String)> _urls = const [];
-  String? _urlsFor;
-
-  @override
-  void dispose() {
-    _addr.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadUrls(String bound) async {
-    _urlsFor = bound;
-    final u = await hubUrls(bound);
-    if (mounted && _urlsFor == bound) setState(() => _urls = u);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final sync = context.watch<SyncStore>();
-    final s = AppSettings.of(context);
-    final bound = sync.hubAddress;
-    if (bound != null && bound != _urlsFor) _loadUrls(bound);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SettingsRow(
-        label: 'Share this vault with your devices',
-        description: 'This computer runs the hub. Your phone syncs with it over your network or Tailscale.',
-        trailing: Toggle(
-          key: const ValueKey('hub-toggle'),
-          value: s.hubEnabled,
-          onChanged: (v) => setHubEnabled(sync, s, v),
-        ),
-      ),
-      SettingsRow(
-        label: 'Listen address',
-        description: '0.0.0.0 accepts every network; a port of 0 picks a free one.',
-        trailing: SizedBox(
-          width: 220,
-          child: Row(children: [
-            Expanded(
-              child: SettingsField(
-                fieldKey: const ValueKey('hub-address-field'),
-                controller: _addr,
-                mono: true,
-                onSubmitted: (v) => setHubAddress(sync, s, v.trim()),
-              ),
-            ),
-            const SizedBox(width: 6),
-            TextBtn('Apply', onTap: () => setHubAddress(sync, s, _addr.text.trim()), color: c.textSecondary),
-          ]),
-        ),
-      ),
-      if (sync.hubError != null)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Text(sync.hubError!, key: const ValueKey('hub-error'), style: tsRaw(13, 18, 400, c.inlineCodeText)),
-        ),
-      if (bound != null)
-        SettingsRow(
-          label: 'Hub addresses',
-          description: 'Serving on $bound. Devices can reach it at:',
-          stack: true,
-          trailing: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            for (final (url, kind) in _urls)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(children: [
-                  Text(url, style: ts(const TypeSpec(13, 19, 400), c.textPrimary, mono: true)),
-                  const SizedBox(width: 8),
-                  Text(kind, style: tsRaw(12, 16, 400, c.textTertiary)),
-                ]),
-              ),
-          ]),
-        ),
-      const SizedBox(height: 8),
-      Row(children: [
-        PrimaryButton(key: const ValueKey('add-device'), label: 'Add a device', onTap: () => showAddDevice(context)),
-      ]),
-    ]);
-  }
-}
-
+/// Connect with a pairing code (collapsed): for a hub on another of this
+/// person's computers.
 class ConnectSettings extends StatefulWidget {
   const ConnectSettings({super.key});
 
@@ -411,85 +416,62 @@ class _ConnectSettingsState extends State<ConnectSettings> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final sync = context.watch<SyncStore>();
-    final s = AppSettings.of(context);
-    if (sync.connected) {
-      final (phase, message) = sync.phase;
-      final ok = sync.status.lastOkMs;
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SettingsRow(
-          label: 'Connected to ${sync.hubUrl}',
-          description: [
-            phaseLabel(phase),
-            if (ok != null) 'last synced ${relativeTime(ok.toInt()).toLowerCase()}',
-          ].join(' · '),
-          trailing: SyncIcon(phaseIcon(phase), size: 20, color: phase == SyncPhase.error ? c.inlineCodeText : c.iconSecondary),
+    return SAdvanced(
+      headerKey: const ValueKey('connect-advanced'),
+      title: 'Connect with a pairing code',
+      summary: 'for a hub on another of your computers',
+      initiallyOpen: _error != null,
+      children: [
+        SRow(
+          label: 'Pairing code or hub address',
+          desc: SyncStore.canHost
+              ? 'On the computer that runs the hub, open Settings › Sync and devices › Add a device, then paste the code here.'
+              : 'On the computer that runs the hub, open Settings › Sync and devices › Add a device, then paste the pairing code here.',
+          stack: true,
+          control: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            STextField(
+              fieldKey: const ValueKey('connect-hub-field'),
+              controller: _hub,
+              mono: true,
+              placeholder: 'notes://pair?… or http://100.101.102.103:47100',
+              onChanged: _hubChanged,
+            ),
+            SField(
+              label: 'Token',
+              hint: 'Pasting a pairing code fills both fields.',
+              child: STextField(
+                fieldKey: const ValueKey('connect-token-field'),
+                controller: _token,
+                mono: true,
+                placeholder: 'Filled in by the pairing code',
+                onSubmitted: (_) => _connect(),
+              ),
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: isUntrustedCertificateError(_error)
+                    ? _failedCertificate(context)
+                    : Text(_error!, style: tsRaw(13, 18, 400, c.dangerText)),
+              ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SButton(
+                _busy ? 'Connecting…' : 'Connect',
+                key: const ValueKey('connect-button'),
+                onTap: _busy ? null : _connect,
+              ),
+            ),
+          ]),
         ),
-        if (sync.untrustedCertificate)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: SyncCertificateProblem(messageKey: ValueKey('connect-error')),
-          )
-        else if (message != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(message, key: const ValueKey('connect-error'), style: tsRaw(13, 18, 400, c.inlineCodeText)),
-          ),
-        const SizedBox(height: 4),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          OutlineButton(key: const ValueKey('sync-now-button'), label: 'Sync now', onTap: sync.syncNow),
-          if (s.clientDeviceLabel == null) OutlineButton(
-            key: const ValueKey('disconnect-button'),
-            label: 'Disconnect',
-            danger: true,
-            onTap: () => disconnectFromHub(sync, s),
-          ),
-        ]),
-      ]);
-    }
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(
-        SyncStore.canHost
-            ? 'Sync this vault with a hub on another computer instead.'
-            : 'On the computer that runs the hub, open Settings › Sync › Add a device, then paste the pairing code here.',
-        style: context.mobile ? tsRaw(15, 21, 400, c.textSecondary) : tsRaw(14, 20, 400, c.textSecondary),
-      ),
-      const SizedBox(height: 14),
-      _label(context, 'Pairing code or hub address'),
-      SettingsField(
-        fieldKey: const ValueKey('connect-hub-field'),
-        controller: _hub,
-        placeholder: 'notes://pair?… or http://100.101.102.103:47100',
-        onChanged: _hubChanged,
-      ),
-      const SizedBox(height: 10),
-      _label(context, 'Token'),
-      SettingsField(
-        fieldKey: const ValueKey('connect-token-field'),
-        controller: _token,
-        mono: true,
-        placeholder: 'Filled in by the pairing code',
-        onSubmitted: (_) => _connect(),
-      ),
-      if (_error != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: isUntrustedCertificateError(_error)
-              ? _failedCertificate(context)
-              : Text(_error!, style: tsRaw(13, 18, 400, c.inlineCodeText)),
-        ),
-      const SizedBox(height: 14),
-      Row(children: [
-        PrimaryButton(key: const ValueKey('connect-button'), label: _busy ? 'Connecting…' : 'Connect', onTap: _busy ? () {} : _connect),
-      ]),
-    ]);
+      ],
+    );
   }
-
-  Widget _label(BuildContext context, String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text, style: tsRaw(context.mobile ? 13 : 12, 16, 500, context.colors.textSecondary)),
-      );
 }
+
+// ---------------------------------------------------------------------------
+// Attachments
 
 class AttachmentSettings extends StatelessWidget {
   const AttachmentSettings({super.key});
@@ -500,31 +482,214 @@ class AttachmentSettings extends StatelessWidget {
     final s = AppSettings.of(context);
     final progress = sync.attachmentProgress;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SettingsRow(
+      SRow(
         label: 'Download attachments in the background',
-        description: 'Otherwise files and images download when a page shows them.',
-        trailing: Toggle(
+        desc: 'Otherwise files and images download when a page shows them.',
+        help:
+            'Turn on to have every file available offline. Leave off on a phone with little storage or a metered connection.',
+        control: SSwitch(
           key: const ValueKey('prefetch-toggle'),
+          label: 'Download attachments in the background',
           value: s.prefetchAttachments,
           onChanged: (v) => setPrefetch(sync, s, v),
         ),
       ),
-      SettingsRow(
-        label: 'Download all attachments',
-        description: progress != null
+      const SRule(),
+      SRow(
+        label: 'Download all attachments now',
+        desc: progress != null
             ? 'Downloading ${progress.$1} of ${progress.$2}…'
             : sync.connected
-                ? 'Get every file now, to have them offline.'
+                ? 'Get every file once, to have them offline.'
                 : 'Connect to a hub first.',
-        trailing: OutlineButton(
+        control: SButton(
+          'Download',
           key: const ValueKey('download-attachments'),
-          label: 'Download',
           onTap: sync.connected && progress == null ? () => sync.fetchAllAttachments() : null,
         ),
       ),
     ]);
   }
 }
+
+// ---------------------------------------------------------------------------
+// This computer as a hub
+
+class HubSettings extends StatefulWidget {
+  const HubSettings({super.key, this.extra = const []});
+
+  /// Rows placed after the hub's own ("Run schedules on this device").
+  final List<Widget> extra;
+
+  @override
+  State<HubSettings> createState() => _HubSettingsState();
+}
+
+class _HubSettingsState extends State<HubSettings> {
+  late final _addr = TextEditingController(text: AppSettings.read(context).hubAddress);
+  List<(String, String)> _urls = const [];
+  String? _urlsFor;
+
+  @override
+  void dispose() {
+    _addr.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUrls(String bound) async {
+    _urlsFor = bound;
+    final u = await hubUrls(bound);
+    if (mounted && _urlsFor == bound) setState(() => _urls = u);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sync = context.watch<SyncStore>();
+    final s = AppSettings.of(context);
+    final bound = sync.hubAddress;
+    if (bound != null && bound != _urlsFor) _loadUrls(bound);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      SRow(
+        label: 'Share this vault with your devices',
+        desc:
+            'This computer runs a hub while $appName is open. Your phone syncs with it over your network or Tailscale.',
+        help:
+            'Turn on if you have no hub on a server. Turn off if you sync through a hosted hub and don’t need this computer to serve.',
+        control: SSwitch(
+          key: const ValueKey('hub-toggle'),
+          label: 'Share this vault with your devices',
+          value: s.hubEnabled,
+          onChanged: (v) => setHubEnabled(sync, s, v),
+        ),
+      ),
+      if (sync.hubError != null)
+        SNotice(sync.hubError!, kind: SNoticeKind.bad, textKey: const ValueKey('hub-error')),
+      if (bound != null) ...[
+        const SRule(),
+        SRow(
+          label: 'Reachable at',
+          desc: 'Devices can use any of these addresses.',
+          stack: true,
+          control: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (final (url, _) in _urls) ...[
+              SCopyLine(url),
+              const SizedBox(height: 6),
+            ],
+          ]),
+        ),
+        const SRule(),
+        const SRow(
+          label: 'Paired devices',
+          desc: 'Unpairing revokes a device’s access; it stops syncing.',
+          stack: true,
+          control: PairedDevices(),
+        ),
+        SAdvanced(
+          title: 'Advanced',
+          summary: 'network address',
+          children: [
+            SRow(
+              label: 'Listen address',
+              desc: 'Which network connections the hub accepts, and on which port.',
+              help: 'Only if a firewall or another program needs a different port.',
+              extra:
+                  '**0.0.0.0** accepts connections from every network this computer is on. A port of 0 picks a free one.',
+              stack: true,
+              control: Row(children: [
+                Expanded(
+                  child: STextField(
+                    fieldKey: const ValueKey('hub-address-field'),
+                    controller: _addr,
+                    mono: true,
+                    onSubmitted: (v) => setHubAddress(sync, s, v.trim()),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SButton('Apply', key: const ValueKey('hub-address-apply'), onTap: () => setHubAddress(sync, s, _addr.text.trim())),
+              ]),
+            ),
+          ],
+        ),
+      ],
+      for (final e in widget.extra) ...[
+        const SRule(),
+        e,
+      ],
+    ]);
+  }
+}
+
+/// The devices paired with this computer's hub, with "Add a device".
+class PairedDevices extends StatefulWidget {
+  const PairedDevices({super.key});
+
+  @override
+  State<PairedDevices> createState() => _PairedDevicesState();
+}
+
+class _PairedDevicesState extends State<PairedDevices> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<SyncStore>().refreshDevices();
+  }
+
+  Future<void> _unpair(String label) async {
+    final sync = context.read<SyncStore>();
+    await sync.unpair(label);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sync = context.watch<SyncStore>();
+    final add = SButton(
+      'Add a device',
+      key: const ValueKey('devices-add'),
+      kind: sync.devices.isEmpty ? SButtonKind.primary : SButtonKind.normal,
+      icon: Sx.plus,
+      onTap: () => showAddDevice(context),
+    );
+    if (sync.devices.isEmpty) {
+      return SEmpty(
+        icon: Sx.phone,
+        title: 'No devices paired yet',
+        text:
+            'Pair your phone or another computer to sync with this one. You’ll get a code to scan or paste.',
+        action: add,
+      );
+    }
+    return SList(
+      foot: SListFoot(children: [add]),
+      children: [
+        for (final d in sync.devices)
+          KeyedSubtree(
+            key: ValueKey('device-${d.label}'),
+            child: SItem(
+              icon: Sx.phone,
+              name: d.label,
+              status: d.device == null
+                  ? const SStatus('Waiting')
+                  : const SStatus('Paired', kind: SStatusKind.ok),
+              sub: d.device == null
+                  ? 'Paired ${relativeTime(d.createdMs.toInt()).toLowerCase()}, not connected yet'
+                  : 'Device ${d.device!.substring(0, d.device!.length.clamp(0, 8))} · paired ${relativeTime(d.createdMs.toInt()).toLowerCase()}',
+              trailing: [
+                SButton(
+                  'Unpair',
+                  key: ValueKey('unpair-${d.label}'),
+                  kind: SButtonKind.danger,
+                  onTap: () => _unpair(d.label),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trusted certificates
 
 /// The certificates this device trusts for hubs with an unknown issuer, one
 /// row per server; shown only when there are any.
@@ -573,20 +738,20 @@ class TrustedCertificatesSettings extends StatelessWidget {
     final org = [?name.o, ?name.ou].join(' · ');
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(cn ?? host,
-          key: ValueKey('cert-pin-title-$origin'), style: tsRaw(m ? 16 : 14, 20, 500, c.textPrimary)),
+          key: ValueKey('cert-pin-title-$origin'), style: tsRaw(m ? 15 : 14, 19, 680, c.textPrimary)),
       if (cn != null && org.isNotEmpty) ...[
         const SizedBox(height: 2),
-        Text(org, key: ValueKey('cert-pin-org-$origin'), style: tsRaw(12, 16, 400, c.textSecondary)),
+        Text(org, key: ValueKey('cert-pin-org-$origin'), style: sHint(context)),
       ],
       const SizedBox(height: 2),
       Text.rich(
         key: ValueKey('cert-pin-detail-$origin'),
         TextSpan(children: [
           if (cn != null) TextSpan(text: 'for $host · '),
-          TextSpan(text: shortFingerprint(pin.sha256), style: ts(const TypeSpec(12, 16, 400), c.textSecondary, mono: true)),
+          TextSpan(text: shortFingerprint(pin.sha256), style: sMono(context, color: c.textTertiary)),
           if (pin.notAfterMs > 0) TextSpan(text: ' · valid until ${formatCertDate(pin.notAfterMs)}'),
         ]),
-        style: tsRaw(12, 16, 400, c.textSecondary),
+        style: sHint(context),
       ),
     ]);
   }
@@ -594,106 +759,53 @@ class TrustedCertificatesSettings extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
     final pins = AppSettings.of(context).trustedCertificates;
     if (pins.isEmpty) return const SizedBox.shrink();
-    return Column(key: const ValueKey('trusted-certificates'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SizedBox(height: 28),
-      const SettingsHeading('Trusted certificates'),
-      Text('Hub certificates with an issuer this device doesn’t know, trusted on this device only.',
-          style: m ? tsRaw(15, 21, 400, c.textSecondary) : tsRaw(14, 20, 400, c.textSecondary)),
-      const SizedBox(height: 8),
-      for (final (origin, pin) in pins.entries) ...[
-        Padding(
-          key: ValueKey('cert-pin-$origin'),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(children: [
-            Expanded(
-              child: Hover(
-                key: ValueKey('cert-pin-open-$origin'),
-                onTap: () => _open(context, origin, pin),
-                radius: Radii.md,
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                child: _pinSummary(context, origin, pin),
+    return SAdvanced(
+      headerKey: const ValueKey('trusted-certificates'),
+      title: 'Trusted certificates',
+      summary: pins.length == 1 ? '1 certificate' : '${pins.length} certificates',
+      children: [
+        SBlock(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 10),
+              child: Text(
+                'Hub certificates with an issuer this device doesn’t know, trusted on this device only.',
+                style: sDesc(context),
               ),
             ),
-            const SizedBox(width: 8),
-            OutlineButton(
-                key: ValueKey('cert-pin-revoke-$origin'), label: 'Revoke', onTap: () => _revoke(context, origin)),
-          ]),
-        ),
-        HLine(color: c.borderSubtle),
-      ],
-    ]);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Devices
-
-class DevicesBody extends StatefulWidget {
-  const DevicesBody({super.key});
-
-  @override
-  State<DevicesBody> createState() => _DevicesBodyState();
-}
-
-class _DevicesBodyState extends State<DevicesBody> {
-  @override
-  void initState() {
-    super.initState();
-    context.read<SyncStore>().refreshDevices();
-  }
-
-  Future<void> _unpair(String label) async {
-    final sync = context.read<SyncStore>();
-    await sync.unpair(label);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final sync = context.watch<SyncStore>();
-    final m = context.mobile;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Devices', primary: true),
-      Text('Devices paired with the hub on this computer. Unpairing revokes a device\'s token; it stops syncing.',
-          style: m ? tsRaw(15, 21, 400, c.textSecondary) : tsRaw(14, 20, 400, c.textSecondary)),
-      const SizedBox(height: 16),
-      if (sync.devices.isEmpty)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Text('No devices yet.', style: tsRaw(14, 20, 400, c.textTertiary)),
-        ),
-      for (final d in sync.devices) ...[
-        Padding(
-          key: ValueKey('device-${d.label}'),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(children: [
-            SyncIcon(SyncIco.device, size: 20, color: c.iconSecondary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(d.label, style: tsRaw(m ? 16 : 14, 20, 500, c.textPrimary)),
-                Text(
-                  [
-                    d.device == null ? 'Not connected yet' : 'Device ${d.device!.substring(0, d.device!.length.clamp(0, 8))}',
-                    'paired ${relativeTime(d.createdMs.toInt()).toLowerCase()}',
-                  ].join(' · '),
-                  style: tsRaw(12, 16, 400, c.textSecondary),
+            SList(children: [
+              for (final (origin, pin) in pins.entries)
+                Padding(
+                  key: ValueKey('cert-pin-$origin'),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                  child: Row(children: [
+                    SIcon(Sx.shieldCheck, size: 17, color: c.textSecondary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Hover(
+                        key: ValueKey('cert-pin-open-$origin'),
+                        onTap: () => _open(context, origin, pin),
+                        radius: Radii.md,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                        child: _pinSummary(context, origin, pin),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SButton(
+                      'Revoke',
+                      key: ValueKey('cert-pin-revoke-$origin'),
+                      kind: SButtonKind.danger,
+                      onTap: () => _revoke(context, origin),
+                    ),
+                  ]),
                 ),
-              ]),
-            ),
-            OutlineButton(key: ValueKey('unpair-${d.label}'), label: 'Unpair', onTap: () => _unpair(d.label)),
+            ]),
           ]),
         ),
-        HLine(color: c.borderSubtle),
       ],
-      const SizedBox(height: 16),
-      Row(children: [
-        PrimaryButton(key: const ValueKey('devices-add'), label: 'Add a device', onTap: () => showAddDevice(context)),
-      ]),
-    ]);
+    );
   }
 }
 
@@ -809,7 +921,7 @@ class _AddDeviceViewState extends State<AddDeviceView> {
       final url = _url ?? 'http://127.0.0.1:47100';
       final code = Pairing.code(url, token).encode();
       children.addAll([
-        Text('On the device, open $appName › Settings › Sync › Connect to a hub, and scan or paste this code. '
+        Text('On the device, open $appName › Settings › Sync and devices › Connect with a pairing code, and scan or paste this code. '
             'The token works for one device and is shown only now.', style: body),
         const SizedBox(height: 20),
         Center(
@@ -828,7 +940,7 @@ class _AddDeviceViewState extends State<AddDeviceView> {
         if (!sync.hosting)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Text('The hub is off. Turn it on in Sync so the device can connect.',
+            child: Text('The hub is off. Turn it on in Sync and devices so the device can connect.',
                 style: tsRaw(13, 18, 400, c.inlineCodeText)),
           ),
         Row(children: [

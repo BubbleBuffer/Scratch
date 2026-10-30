@@ -114,13 +114,16 @@ class _RunnerSettingState extends State<_RunnerSetting> {
       builder: (context, _) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SettingsRow(
+          SRow(
             label: 'Run schedules on this device',
-            description:
-                'This computer runs schedules while the app is open. '
-                'Off by default.',
-            trailing: Toggle(
+            desc:
+                'While the app is open, this computer runs the vault’s schedules. Each step creates a note from a template; no AI model is involved.',
+            scope: 'Desktop',
+            help:
+                'Turn it on for the one computer that’s usually on, because otherwise schedules don’t run.',
+            control: SSwitch(
               key: const ValueKey('schedule-runs-here'),
+              label: 'Run schedules on this device',
               value: runner.on,
               onChanged: runner.busy ? null : (on) => runner.set(on),
             ),

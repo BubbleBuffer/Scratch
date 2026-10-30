@@ -31,7 +31,6 @@ import '../share/shared_links_settings.dart';
 import '../sync/sync_settings.dart';
 import '../updates/updates_settings.dart';
 import 'connectors_body.dart';
-import 'controls.dart';
 import 'settings_kit.dart';
 import 'settings_store.dart';
 
@@ -66,7 +65,7 @@ Widget sectionIcon(SettingsSection s, Color color, double size) =>
     SIcon(s.icon, size: size, color: color);
 
 Widget sectionBody(SettingsSection s) => switch (s) {
-  SettingsSection.general => const PreferencesBody(),
+  SettingsSection.general => const GeneralBody(),
   SettingsSection.reminders => const RemindersBody(),
   SettingsSection.sync => const _SyncAndDevicesBody(),
   SettingsSection.conflicts => const ConflictsBody(),
@@ -77,8 +76,10 @@ Widget sectionBody(SettingsSection s) => switch (s) {
   SettingsSection.about => const AboutBody(),
 };
 
-/// Sync, then (desktop) the devices paired with this computer's hub, then
-/// add-on sections placed with them ("Run schedules on this device").
+/// Sync and devices: the hub this device syncs with, attachments and, on a
+/// computer, the hub it runs itself with the devices paired to it. Add-on
+/// sections placed with them ("Run schedules on this device") come last in
+/// the hub group.
 class _SyncAndDevicesBody extends StatelessWidget {
   const _SyncAndDevicesBody();
 
@@ -87,18 +88,7 @@ class _SyncAndDevicesBody extends StatelessWidget {
     final extra = appAddonContext.settingsSections.all.where(
       (s) => s.location == 'addons' && (s.isVisible?.call(context) ?? true),
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SyncBody(),
-        if (SyncStore.canHost) ...[
-          const SizedBox(height: 24),
-          const DevicesBody(),
-        ],
-        for (final s in extra)
-          SSection(title: s.label, children: [s.build(context)]),
-      ],
-    );
+    return SyncAndDevicesPage(extra: [for (final s in extra) s.build(context)]);
   }
 }
 
@@ -533,48 +523,77 @@ class SettingsPage extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Sections without sync
 
-class PreferencesBody extends StatelessWidget {
-  const PreferencesBody({super.key});
+class GeneralBody extends StatelessWidget {
+  const GeneralBody({super.key});
+
+  static String _themeLabel(ThemePref t) => switch (t) {
+    ThemePref.system => 'System',
+    ThemePref.light => 'Light',
+    ThemePref.dark => 'Dark',
+  };
 
   @override
   Widget build(BuildContext context) {
     final s = AppSettings.of(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Preferences', primary: true),
-      SettingsRow(
-        label: 'Appearance',
-        description: 'Customize how $appName looks on this device.',
-        trailing: SelectButton<ThemePref>(
-          key: const ValueKey('theme-select'),
+    final m = context.mobile;
+    final phone = defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    return SPage(
+      title: 'General',
+      children: [
+        SSection(
           title: 'Appearance',
-          value: s.theme,
-          options: ThemePref.values,
-          labelOf: (t) => t.label,
-          onChanged: (t) => s.update((s) => s.theme = t),
+          first: true,
+          children: [
+            SRow(
+              label: 'Theme',
+              desc: 'Light or dark colours, on this device only.',
+              help:
+                  'Leave it on System to follow Windows or Android, including their night schedule.',
+              stack: m,
+              control: SSegmented<ThemePref>(
+                value: s.theme,
+                options: ThemePref.values,
+                labelOf: _themeLabel,
+                keyOf: (t) => ValueKey('theme-${t.name}'),
+                onChanged: (t) => s.update((s) => s.theme = t),
+              ),
+            ),
+          ],
         ),
-      ),
-      const SettingsHeading('Feedback', top: 24),
-      SettingsRow(
-        label: 'Send feedback',
-        description: 'Write what happened. A screenshot and the app’s diagnostics go with it.',
-        trailing: TextBtn(
-          'Open',
-          key: const ValueKey('send-feedback'),
-          onTap: () => FeedbackHost.of(context).open(context),
+        SSection(
+          title: 'Feedback',
+          children: [
+            SRow(
+              label: 'Send feedback',
+              desc:
+                  'Write what happened. A screenshot and the app’s diagnostics go with it.',
+              help: 'Whenever something breaks, looks wrong or confuses you.',
+              stack: m,
+              control: SButton(
+                'Write feedback',
+                key: const ValueKey('send-feedback'),
+                icon: Sx.feedback,
+                onTap: () => FeedbackHost.of(context).open(context),
+              ),
+            ),
+            if (phone)
+              SRow(
+                label: 'Shake to send feedback',
+                desc: 'Shake the phone to open the feedback sheet.',
+                scope: 'Phone',
+                help: 'Turn off if it opens by accident, for example while walking.',
+                control: SSwitch(
+                  key: const ValueKey('shake-to-send'),
+                  label: 'Shake to send feedback',
+                  value: s.shakeToSend,
+                  onChanged: (on) => s.update((s) => s.shakeToSend = on),
+                ),
+              ),
+          ],
         ),
-      ),
-      if (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS)
-        SettingsRow(
-          label: 'Shake to send feedback',
-          description: 'Shake the phone to open the feedback sheet.',
-          trailing: Toggle(
-            key: const ValueKey('shake-to-send'),
-            value: s.shakeToSend,
-            onChanged: (on) => s.update((s) => s.shakeToSend = on),
-          ),
-        ),
-    ]);
+      ],
+    );
   }
 }
 
@@ -589,61 +608,77 @@ class RemindersBody extends StatelessWidget {
     final s = AppSettings.of(context);
     final r = s.reminders;
     final store = context.watch<ReminderStore>();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final blocked = defaultTargetPlatform == TargetPlatform.android &&
+        store.permissionGranted == false;
+    final off = r.enabled ? null : 'Turn on Reminders to change this.';
+    return SPage(
+      title: 'Reminders',
+      intro:
+          'Notifications on this device for upcoming events, and one summary of your day each morning.',
       children: [
-        const SettingsHeading('Reminders', primary: true),
-        SettingsRow(
-          label: 'Reminders',
-          trailing: Toggle(
-            key: const ValueKey('reminders-enabled'),
-            value: r.enabled,
-            onChanged: (enabled) =>
-                s.update((s) => s.reminders = r.copyWith(enabled: enabled)),
+        if (blocked)
+          SNotice(
+            '**Notifications are off for $appName in Android settings.** Your reminder settings are kept; turn notifications on for $appName in Android’s settings to get them.',
+            kind: SNoticeKind.warn,
+            textKey: const ValueKey('reminders-permission-note'),
           ),
-        ),
-        SettingsRow(
-          label: 'Remind me before events',
-          trailing: SelectButton<int>(
-            key: const ValueKey('reminders-lead'),
-            title: 'Remind me before events',
-            value: r.leadMinutes,
-            options: const [0, 5, 10, 30],
-            labelOf: (minutes) => minutes == 0 ? 'At start' : '$minutes min',
-            onChanged: r.enabled
-                ? (lead) => s.update(
-                    (s) => s.reminders = r.copyWith(leadMinutes: lead),
-                  )
-                : null,
-          ),
-        ),
-        SettingsRow(
-          label: 'Morning summary at',
-          trailing: SelectButton<int>(
-            key: const ValueKey('reminders-morning'),
-            title: 'Morning summary at',
-            value: r.morning,
-            options: [
-              for (var minutes = 300; minutes <= 720; minutes += 30) minutes,
-            ],
-            labelOf: _time,
-            onChanged: r.enabled
-                ? (morning) => s.update(
-                    (s) => s.reminders = r.copyWith(morning: morning),
-                  )
-                : null,
-          ),
-        ),
-        if (defaultTargetPlatform == TargetPlatform.android &&
-            store.permissionGranted == false)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              'Notifications are off for $appName in Android settings.',
-              key: const ValueKey('reminders-permission-note'),
-              style: tsRaw(13, 18, 400, context.colors.textSecondary),
+        SSection(
+          first: !blocked,
+          children: [
+            SRow(
+              label: 'Reminders',
+              desc: 'Notify me about events and send a morning summary.',
+              help:
+                  'Turn off on a device where you don’t want to be notified, such as a shared computer.',
+              control: SSwitch(
+                key: const ValueKey('reminders-enabled'),
+                label: 'Reminders',
+                value: r.enabled,
+                onChanged: (enabled) =>
+                    s.update((s) => s.reminders = r.copyWith(enabled: enabled)),
+              ),
             ),
-          ),
+            SRow(
+              label: 'Remind me before events',
+              desc: 'How early the notification comes.',
+              disabled: !r.enabled,
+              reason: off,
+              control: SSelect<int>(
+                key: const ValueKey('reminders-lead'),
+                title: 'Remind me before events',
+                value: r.leadMinutes,
+                options: const [0, 5, 10, 30],
+                labelOf: (minutes) =>
+                    minutes == 0 ? 'At start' : '$minutes min before',
+                onChanged: r.enabled
+                    ? (lead) => s.update(
+                        (s) => s.reminders = r.copyWith(leadMinutes: lead),
+                      )
+                    : null,
+              ),
+            ),
+            SRow(
+              label: 'Morning summary',
+              desc: 'When the day’s summary arrives.',
+              disabled: !r.enabled,
+              reason: off,
+              control: SSelect<int>(
+                key: const ValueKey('reminders-morning'),
+                title: 'Morning summary time',
+                value: r.morning,
+                options: [
+                  for (var minutes = 300; minutes <= 720; minutes += 30) minutes,
+                ],
+                labelOf: _time,
+                onChanged: r.enabled
+                    ? (morning) => s.update(
+                        (s) => s.reminders = r.copyWith(morning: morning),
+                      )
+                    : null,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -689,60 +724,86 @@ class _VaultBodyState extends State<VaultBody> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     final s = AppSettings.of(context);
     final root = context.app.vault.root;
     final pending = s.vaultPath != null && s.vaultPath != root ? s.vaultPath : null;
     final desktop = !context.mobile;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('Vault', primary: true),
-      SettingsRow(
-        label: 'Location',
-        description: 'The folder that holds your pages, as Markdown files and their history.',
-        stack: true,
-        trailing: CopyableText(root, textKey: const ValueKey('vault-path')),
-      ),
-      if (pending != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 4, bottom: 8),
-          child: Text('$appName opens $pending the next time it starts.',
-              key: const ValueKey('vault-pending'), style: tsRaw(13, 18, 400, c.textSecondary)),
-        ),
-      if (desktop) ...[
-        const SizedBox(height: 8),
-        SettingsRow(
-          label: 'Open another folder',
-          description: 'An empty folder starts a new vault; a vault folder opens it. Takes effect after a restart.',
-          stack: true,
-          trailing: Row(children: [
-            Expanded(
-              child: SettingsField(
-                fieldKey: const ValueKey('vault-path-field'),
-                controller: _path,
-                placeholder: Platform.isWindows ? r'D:\Notes' : '/home/me/Notes',
-                onSubmitted: (_) => _use(s),
+    return SPage(
+      title: 'Storage',
+      intro:
+          'Where this vault’s pages live on this device. Pages are Markdown files you can open with other apps.',
+      children: [
+        SSection(
+          title: 'Vault folder',
+          first: true,
+          children: [
+            SRow(
+              label: 'Location',
+              desc: 'The folder that holds your pages and their history.',
+              stack: true,
+              control: SCopyLine(root, textKey: const ValueKey('vault-path')),
+              below: pending == null
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '$appName opens $pending the next time it starts.',
+                        key: const ValueKey('vault-pending'),
+                        style: sHint(context),
+                      ),
+                    ),
+            ),
+            if (desktop)
+              SAdvanced(
+                headerKey: const ValueKey('vault-open-another'),
+                title: 'Open another folder',
+                summary: 'starts or opens a different vault',
+                children: [
+                  SRow(
+                    label: 'Use a different folder',
+                    desc:
+                        'An empty folder starts a new vault; a vault folder opens it. Takes effect after a restart.',
+                    help:
+                        'To keep separate vaults (for example work and personal), or to move the vault to another drive.',
+                    stack: true,
+                    control: Row(children: [
+                      Expanded(
+                        child: STextField(
+                          fieldKey: const ValueKey('vault-path-field'),
+                          controller: _path,
+                          mono: true,
+                          placeholder: Platform.isWindows ? r'D:\Notes' : '/home/me/Notes',
+                          onSubmitted: (_) => _use(s),
+                        ),
+                      ),
+                      if (FileDialogs.instance.folders) ...[
+                        const SizedBox(width: 8),
+                        SButton('Choose…', key: const ValueKey('vault-choose'), onTap: () => _choose(s)),
+                      ],
+                      const SizedBox(width: 8),
+                      SButton('Use folder', key: const ValueKey('vault-use'), onTap: () => _use(s)),
+                    ]),
+                    below: _error == null
+                        ? null
+                        : SNotice(_error!, kind: SNoticeKind.bad, textKey: const ValueKey('vault-error')),
+                  ),
+                  if (s.vaultPath != null)
+                    SRow(
+                      label: 'Default location',
+                      desc: 'Go back to the folder $appName picked when it was installed.',
+                      control: SButton(
+                        'Use the default location',
+                        key: const ValueKey('vault-use-default'),
+                        onTap: () => s.update((s) => s.vaultPath = null),
+                      ),
+                    ),
+                ],
               ),
-            ),
-            if (FileDialogs.instance.folders) ...[
-              const SizedBox(width: 8),
-              OutlineButton(key: const ValueKey('vault-choose'), label: 'Choose…', onTap: () => _choose(s)),
-            ],
-            const SizedBox(width: 8),
-            OutlineButton(key: const ValueKey('vault-use'), label: 'Use folder', onTap: () => _use(s)),
-          ]),
+          ],
         ),
-        if (_error != null) Text(_error!, style: tsRaw(13, 18, 400, c.inlineCodeText)),
-        if (s.vaultPath != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: TextBtn('Use the default location', onTap: () => s.update((s) => s.vaultPath = null), color: c.textSecondary),
-            ),
-          ),
-        const MountsSection(),
+        if (desktop) const MountsSection(),
       ],
-    ]);
+    );
   }
 }
 
@@ -752,20 +813,25 @@ class AboutBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vault = context.app.vault;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SettingsHeading('About', primary: true),
-      const SettingsRow(label: 'Version', description: '$appName $appVersion'),
-      SettingsRow(
-        label: 'Device ID',
-        description: 'Identifies this device to the hub and in conflicts.',
-        stack: true,
-        trailing: CopyableText(vault.deviceId, textKey: const ValueKey('device-id')),
-      ),
-      // Windows only: the installed build and its updates, under the version.
-      if (updatesAvailableHere()) ...[
-        const SizedBox(height: 24),
-        const UpdatesBody(embedded: true),
+    return SPage(
+      title: 'About',
+      children: [
+        SSection(
+          first: true,
+          children: [
+            const SRow(label: 'Version', desc: '$appName $appVersion'),
+            SRow(
+              label: 'Device ID',
+              desc:
+                  'Identifies this device to the hub and in conflicts. Support may ask for it.',
+              stack: true,
+              control: SCopyLine(vault.deviceId, textKey: const ValueKey('device-id')),
+            ),
+          ],
+        ),
+        // Windows only: the installed build and its updates, under the version.
+        if (updatesAvailableHere()) const UpdatesBody(embedded: true),
       ],
-    ]);
+    );
   }
 }

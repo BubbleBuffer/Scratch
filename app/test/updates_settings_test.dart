@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:notes_app/features/settings/controls.dart';
+import 'package:notes_app/features/settings/settings_kit.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
 import 'package:notes_app/features/updates/update_controller.dart';
 import 'package:notes_app/src/rust/api/update.dart';
@@ -50,7 +50,7 @@ class FakeBackend implements UpdateBackend {
 }
 
 String statusText(WidgetTester tester) =>
-    tester.widgetList<SettingsRow>(find.byType(SettingsRow)).firstWhere((r) => r.label == 'Status').description!;
+    tester.widgetList<SRow>(find.byType(SRow)).firstWhere((r) => r.label == 'Status').desc!;
 
 void main() {
   setUpAll(initCore);
@@ -144,7 +144,7 @@ void main() {
   appTest('updates section: development build never checks', (tester) async {
     final (fake, _, _) = await openUpdates(tester, tag: '');
     expect(statusText(tester), 'Development build: updates are off.');
-    expect(tester.widget<Toggle>(key('updates-nightly')).onChanged, isNull);
+    expect(tester.widget<SSwitch>(key('updates-nightly')).onChanged, isNull);
     await tapAndSettle(tester, key('updates-check-now'));
     expect(fake.calls, isEmpty);
   });

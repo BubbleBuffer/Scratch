@@ -66,7 +66,17 @@ enum Sx {
   alert((LucideIcons.circleAlert300, LucideIcons.circleAlert, LucideIcons.circleAlert500)),
   warn((LucideIcons.triangleAlert300, LucideIcons.triangleAlert, LucideIcons.triangleAlert500)),
   laptop((LucideIcons.laptop300, LucideIcons.laptop, LucideIcons.laptop500)),
-  phone((LucideIcons.smartphone300, LucideIcons.smartphone, LucideIcons.smartphone500));
+  phone((LucideIcons.smartphone300, LucideIcons.smartphone, LucideIcons.smartphone500)),
+  feedback((LucideIcons.messageSquareWarning300, LucideIcons.messageSquareWarning, LucideIcons.messageSquareWarning500)),
+  cloudOff((LucideIcons.cloudOff300, LucideIcons.cloudOff, LucideIcons.cloudOff500)),
+  folderSync((LucideIcons.folderSync300, LucideIcons.folderSync, LucideIcons.folderSync500)),
+  shieldCheck((LucideIcons.shieldCheck300, LucideIcons.shieldCheck, LucideIcons.shieldCheck500)),
+  fileText((LucideIcons.fileText300, LucideIcons.fileText, LucideIcons.fileText500)),
+  circleCheck((LucideIcons.circleCheck300, LucideIcons.circleCheck, LucideIcons.circleCheck500)),
+  history((LucideIcons.history300, LucideIcons.history, LucideIcons.history500)),
+  undo((LucideIcons.undo2300, LucideIcons.undo2, LucideIcons.undo2500)),
+  tablet((LucideIcons.tablet300, LucideIcons.tablet, LucideIcons.tablet500)),
+  bellOff((LucideIcons.bellOff300, LucideIcons.bellOff, LucideIcons.bellOff500));
 
   const Sx(this.glyph);
   final LucideGlyph glyph;
@@ -172,12 +182,30 @@ class SSection extends StatelessWidget {
   }
 }
 
+/// Several rows, or one row built by another widget, that [SSection] treats
+/// as a single row: the line after it is drawn like the line after an [SRow].
+class SBlock extends StatelessWidget {
+  const SBlock({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => child;
+}
+
+/// The line between two rows inside an [SBlock].
+class SRule extends StatelessWidget {
+  const SRule({super.key});
+
+  @override
+  Widget build(BuildContext context) => Container(height: 1, color: context.colors.border);
+}
+
 List<Widget> _separated(List<Widget> rows, Color line) {
   final out = <Widget>[];
   for (var i = 0; i < rows.length; i++) {
     final last = i == rows.length - 1;
     final r = rows[i];
-    out.add(r is SRow && !last
+    out.add((r is SRow || r is SBlock) && !last
         ? DecoratedBox(decoration: BoxDecoration(border: Border(bottom: BorderSide(color: line))), child: r)
         : r);
   }
