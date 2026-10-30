@@ -15,4 +15,5 @@ These pages describe the Rust core that holds the vault: how pages, blocks and p
 - [Search queries and live queries](search-queries.md): Search operators (date:, tag:, in:, property filters) parsed into one query spec, filtered search inside the 20 ms budget, and live queries pushed after index commits.
 - [Conflict format v2](conflict-format.md): Approved Block, Subtree and Page conflicts, edit-beats-delete, synced resolutions and undo, journal repair log and vault-wide auto-resolve.
 - [Folder mounts](mounts.md): Any PC folder can be mounted at a vault path; devices see one logical vault, with no symlinks.
+- [Triage](triage.md): Merge proposals for duplicate pages, the merge and its undo, and the AI run that makes them.
 <!-- /wiki:children -->

@@ -62,7 +62,7 @@ pub fn start(v: &Vault, root: Option<&str>, pages: &[String], runner: &str) -> R
         return err("there are fewer than two pages to triage");
     }
     let json = serde_json::to_string(&scope).map_err(|e| crate::McpError(e.to_string()))?;
-    tasks::create_on_with(v, PROMPT, &page, None, "agent", runner, &[(PROPERTY, &json)])
+    tasks::create_on_with(v, PROMPT, &page, None, "agent", runner, &[(PROPERTY, json.as_str())])
 }
 
 /// The scope of task row `task`, `None` when it is not a triage run.
