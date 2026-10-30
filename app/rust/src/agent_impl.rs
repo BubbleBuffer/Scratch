@@ -112,8 +112,10 @@ impl Inner {
         device: String,
         token: String,
         trusted: Vec<TrustedCertificate>,
+        vault_root: String,
     ) -> Result<Inner, String> {
-        crate::agent_remote::Remote::connect(url, device, token, trusted).map(Inner::Remote)
+        crate::agent_remote::Remote::connect(url, device, token, trusted, vault_root)
+            .map(Inner::Remote)
     }
 
     /// Lets the hub at `url` use this computer (`/host/ws`). Only the agent
@@ -124,12 +126,13 @@ impl Inner {
         device: String,
         token: String,
         trusted: Vec<TrustedCertificate>,
+        vault_root: String,
     ) -> Result<(), String> {
         match self {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
-            Inner::Local(l) => l.host_relay_start(url, device, token, trusted),
+            Inner::Local(l) => l.host_relay_start(url, device, token, trusted, vault_root),
             Inner::Remote(_) => {
-                let _ = (url, device, token, trusted);
+                let _ = (url, device, token, trusted, vault_root);
                 Err(RELAY_LOCAL_ONLY.into())
             }
         }
@@ -457,6 +460,7 @@ mod desktop {
             device: String,
             token: String,
             trusted: Vec<TrustedCertificate>,
+            vault_root: String,
         ) -> Result<(), String> {
             let mut relay = self.1.lock().unwrap();
             if let Some(mut old) = relay.take() {
@@ -464,7 +468,7 @@ mod desktop {
             }
             let host: Arc<dyn crate::host_relay::RelayHost> = self.0.clone();
             *relay = Some(crate::host_relay::HostRelay::start(
-                host, &url, &device, &token, trusted,
+                host, &url, &device, &token, trusted, &vault_root,
             )?);
             Ok(())
         }

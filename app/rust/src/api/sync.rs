@@ -208,7 +208,9 @@ impl NotesHub {
         lock(&self.server).as_ref().map(|s| s.addr().to_string())
     }
 
-    /// A new pairing token for a device named `label` (shown once).
+    /// A one-time pairing code for a device named `label` (shown once;
+    /// redeemable for 10 minutes). The link is `notes://pair?hub=…&code=…`;
+    /// the device redeems it with [`redeem_pairing_code`].
     pub fn pair(&self, label: String) -> Result<String, String> {
         self.hub.pair(&label).map_err(err)
     }
@@ -218,6 +220,14 @@ impl NotesHub {
         Ok(self.hub.unpair(&label).map_err(err)? as u32)
     }
 
+    /// Refuse device tokens not bound to a device key yet (off by default).
+    #[frb(sync)]
+    pub fn set_require_device_keys(&self, required: bool) {
+        let mut policy = self.hub.key_policy();
+        policy.require_device_keys = required;
+        self.hub.set_key_policy(policy);
+    }
+
     pub fn devices(&self) -> Vec<PairedDevice> {
         self.hub
             .devices()
@@ -225,4 +235,54 @@ impl NotesHub {
             .map(|d| PairedDevice { label: d.label, device: d.device, created_ms: d.created_ms })
             .collect()
     }
+}
+
+/// The key id of this vault's device key (like `K7MQ-2X9F-D4RT-8WHN`),
+/// creating the key on first use (`.vault/device-key.json`).
+pub fn device_key_id(vault: &NotesVault) -> Result<String, String> {
+    vault_sync::device_key::key_id(&vault.inner.root()).map_err(err)
+}
+
+fn device_session(
+    vault: &NotesVault,
+    hub_url: &str,
+    token: &str,
+) -> Result<Arc<vault_sync::DeviceSession>, String> {
+    let v = &vault.inner;
+    vault_sync::DeviceSession::shared(&v.root(), &v.device_id(), hub_url, token, None).map_err(err)
+}
+
+/// The bearer for an HTTP call to the hub at `hub_url` with the device
+/// `token`: a short-lived session proved with this vault's device key
+/// (upgrading the token on first use), or the bare token for a hub without
+/// device keys. Shared with the sync client. Blocking: may handshake.
+pub fn hub_bearer(vault: &NotesVault, hub_url: String, token: String) -> Result<String, String> {
+    device_session(vault, &hub_url, &token)?.bearer().map_err(err)
+}
+
+/// Forgets `bearer` after the hub answered 401 to it, so the next
+/// [`hub_bearer`] proves the key for a new session.
+pub fn hub_bearer_invalidate(
+    vault: &NotesVault,
+    hub_url: String,
+    token: String,
+    bearer: String,
+) -> Result<(), String> {
+    device_session(vault, &hub_url, &token)?.invalidate(&bearer);
+    Ok(())
+}
+
+/// Redeems a one-time pairing `code` at the hub at `hub_url` with this
+/// vault's device key; returns the device token (key-bound) to store.
+pub fn redeem_pairing_code(
+    vault: &NotesVault,
+    hub_url: String,
+    code: String,
+    trusted: Vec<TrustedHubCertificate>,
+) -> Result<String, String> {
+    let v = &vault.inner;
+    let trust = vault_sync::tls::Trust::for_hub(&hub_url, &TrustedHubCertificate::to_sync(trusted));
+    vault_sync::session::redeem_pairing_code(&v.root(), &v.device_id(), &hub_url, &code, trust)
+        .map(|(token, _label)| token)
+        .map_err(err)
 }

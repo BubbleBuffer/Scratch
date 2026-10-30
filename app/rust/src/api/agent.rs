@@ -1093,15 +1093,24 @@ impl NotesAgent {
     /// unreachable". `close_events` (or dropping it) closes the socket.
     ///
     /// `trusted`: the device's trusted hub certificates, as for
-    /// `NotesSync::with_trusted_certificates`.
+    /// `NotesSync::with_trusted_certificates`. `vault_root`: the vault
+    /// whose device key proves this device (the bearer is a session, as for
+    /// sync); empty sends the bare token.
     pub fn connect(
         url: String,
         device: String,
         token: String,
         trusted: Vec<TrustedHubCertificate>,
+        vault_root: String,
     ) -> Result<NotesAgent, String> {
         Ok(NotesAgent {
-            inner: Inner::connect(url, device, token, TrustedHubCertificate::to_sync(trusted))?,
+            inner: Inner::connect(
+                url,
+                device,
+                token,
+                TrustedHubCertificate::to_sync(trusted),
+                vault_root,
+            )?,
             data_dir: None,
         })
     }
@@ -1112,16 +1121,23 @@ impl NotesAgent {
     /// (desktop pack included, no approval prompts). Restarts a running
     /// relay; drops reconnect with backoff. Fails on a hub connection.
     /// `trusted`: the device's trusted hub certificates, as for
-    /// `NotesSync::with_trusted_certificates`.
+    /// `NotesSync::with_trusted_certificates`. `vault_root`: as for
+    /// `connect`.
     pub fn host_relay_start(
         &self,
         url: String,
         device: String,
         token: String,
         trusted: Vec<TrustedHubCertificate>,
+        vault_root: String,
     ) -> Result<(), String> {
-        self.inner
-            .host_relay_start(url, device, token, TrustedHubCertificate::to_sync(trusted))
+        self.inner.host_relay_start(
+            url,
+            device,
+            token,
+            TrustedHubCertificate::to_sync(trusted),
+            vault_root,
+        )
     }
 
     /// Gives the running host relay the device's trusted hub certificates

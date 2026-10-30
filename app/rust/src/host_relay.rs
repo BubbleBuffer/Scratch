@@ -35,7 +35,7 @@ use vault_agent::Agent;
 
 use vault_sync::tls::{Trust, TrustedCertificate};
 
-use crate::agent_remote::{host_ws_url, open_device_socket, Socket};
+use crate::agent_remote::{device_session, host_ws_url, open_device_socket, Socket};
 
 const PING_EVERY: Duration = Duration::from_secs(30);
 const SILENCE: Duration = Duration::from_secs(90);
@@ -152,6 +152,10 @@ struct Shared {
     url: String,
     device: String,
     token: String,
+    /// The hub's base URL and the vault whose device key proves this
+    /// device (empty: the bare token).
+    base: String,
+    vault_root: String,
     /// The device's trusted hub certificates, read on each attempt.
     trusted: Mutex<Vec<TrustedCertificate>>,
     /// Cuts a retry wait short (the trust changed).
@@ -181,12 +185,15 @@ impl HostRelay {
         device: &str,
         token: &str,
         trusted: Vec<TrustedCertificate>,
+        vault_root: &str,
     ) -> Result<HostRelay, String> {
         let shared = Arc::new(Shared {
             host,
             url: host_ws_url(base)?,
             device: device.to_owned(),
             token: token.to_owned(),
+            base: base.to_owned(),
+            vault_root: vault_root.to_owned(),
             trusted: Mutex::new(trusted),
             retry_now: Notify::new(),
             stopped: AtomicBool::new(false),
@@ -265,9 +272,10 @@ async fn run(shared: Arc<Shared>) {
     let mut backoff = BACKOFF_FIRST;
     while !stopped(&shared) {
         let trust = trust(&shared);
+        let session = device_session(&shared.vault_root, &shared.base, &shared.device, &shared.token, &trust);
         let opened = tokio::select! {
             _ = shared.stop.notified() => break,
-            opened = open_device_socket(&shared.url, &shared.device, &shared.token, trust) => opened,
+            opened = open_device_socket(&shared.url, &shared.device, &shared.token, trust, session) => opened,
         };
         match opened {
             Ok(socket) => {
@@ -543,6 +551,8 @@ mod tests {
             url: String::new(),
             device: String::new(),
             token: String::new(),
+            base: String::new(),
+            vault_root: String::new(),
             trusted: Mutex::new(Vec::new()),
             retry_now: Notify::new(),
             stopped: AtomicBool::new(false),
@@ -623,7 +633,7 @@ mod tests {
         };
 
         let fake = Arc::new(Fake::default());
-        let mut relay = HostRelay::start(fake.clone(), &url, "dev-pc", &token, Vec::new()).unwrap();
+        let mut relay = HostRelay::start(fake.clone(), &url, "dev-pc", &token, Vec::new(), "").unwrap();
         wait(1);
         assert!(relay.connected());
         relay.stop();
@@ -634,7 +644,7 @@ mod tests {
 
         // A replaced token is refused; the relay keeps retrying, not connecting,
         // and reports the hub's answer.
-        let refused = HostRelay::start(fake, &url, "dev-pc", "not-the-token", Vec::new()).unwrap();
+        let refused = HostRelay::start(fake, &url, "dev-pc", "not-the-token", Vec::new(), "").unwrap();
         let status = wait_retrying(&refused);
         let error = status.error.unwrap_or_default();
         assert!(error.contains("the hub refused this device"), "{error}");
@@ -668,7 +678,7 @@ mod tests {
             .unwrap()
             .port();
         let url = format!("http://127.0.0.1:{port}");
-        let mut relay = HostRelay::start(Arc::new(Fake::default()), &url, "pc", "t", Vec::new()).unwrap();
+        let mut relay = HostRelay::start(Arc::new(Fake::default()), &url, "pc", "t", Vec::new(), "").unwrap();
         let status = wait_retrying(&relay);
         let error = status.error.unwrap_or_default();
         assert!(error.starts_with("hub unreachable"), "{error}");
@@ -685,6 +695,8 @@ mod tests {
             url: String::new(),
             device: String::new(),
             token: String::new(),
+            base: String::new(),
+            vault_root: String::new(),
             trusted: Mutex::new(Vec::new()),
             retry_now: Notify::new(),
             stopped: AtomicBool::new(false),
