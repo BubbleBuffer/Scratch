@@ -471,7 +471,7 @@ impl<In: Transport> Connector<In> for PinningConnector {
                 .clone(),
             name,
         )?;
-        let mut sock = TransportAdapter::new(transport.boxed());
+        let mut sock = TransportAdapter::new(transport.boxed(), details.current_time.clone());
         sock.set_timeout(details.timeout);
         conn.complete_io(&mut sock)?;
         let buffers = LazyBuffers::new(
