@@ -1,0 +1,45 @@
+# TEMPORARY, branch lane/triage-applied only: regenerates the flutter_rust_bridge
+# bindings and commits them back. Deleted before the branch is finished.
+name: regen-bindings
+
+on:
+  push:
+    branches: [lane/triage-applied]
+    paths: [".github/workflows/regen-bindings.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: lane/triage-applied
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - name: flutter pub get
+        working-directory: app
+        run: |
+          sed -i '/^org\.gradle\.java\.home=/d' android/gradle.properties
+          flutter pub get
+      - name: Install codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+      - name: Regenerate
+        run: bash scripts/regen-bindings.sh
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/rust/src/frb_generated.rs app/lib/src/rust
+          git diff --cached --quiet || git commit -m "Regenerate bridge bindings"
+          git push origin HEAD:lane/triage-applied
