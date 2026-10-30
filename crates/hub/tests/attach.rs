@@ -221,10 +221,10 @@ async fn attachments_sync_to_devices_and_read_back() {
     let hub = env.server.hub().clone();
     let phone_token = blocking({
         let hub = hub.clone();
-        move || hub.pair("phone").unwrap()
+        move || hub.pair_legacy_token("phone").unwrap()
     })
     .await;
-    let laptop_token = blocking(move || hub.pair("laptop").unwrap()).await;
+    let laptop_token = blocking(move || hub.pair_legacy_token("laptop").unwrap()).await;
 
     // An agent attaches an image on the hub.
     env.ok("create_page", json!({"title":"Trip"})).await;

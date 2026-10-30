@@ -106,7 +106,7 @@ async fn env_with(
         .unwrap();
     let url = format!("http://{}/mcp", server.addr());
     let hub = server.hub().clone();
-    let device = tokio::task::spawn_blocking(move || hub.pair("phone"))
+    let device = tokio::task::spawn_blocking(move || hub.pair_legacy_token("phone"))
         .await
         .unwrap()
         .unwrap();
@@ -735,7 +735,7 @@ async fn any_device_cancels_a_device_job_but_agents_do_not_see_it() {
     // Another signed-in device, with its own token (a device token stays
     // bound to the device that first used it).
     let hub = env.server.as_ref().unwrap().hub().clone();
-    let phone = tokio::task::spawn_blocking(move || hub.pair("phone2"))
+    let phone = tokio::task::spawn_blocking(move || hub.pair_legacy_token("phone2"))
         .await
         .unwrap()
         .unwrap();
