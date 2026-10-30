@@ -138,10 +138,13 @@ void main() {
       'http://hub.example.com/mcp/agent',
     );
 
-    await tapAndSettle(
-      tester,
-      find.descendant(of: key('host-relay-url'), matching: find.text('Copy')),
+    final copy = find.descendant(
+      of: key('host-relay-url'),
+      matching: find.text('Copy'),
     );
+    await tester.ensureVisible(copy);
+    await tester.pumpAndSettle();
+    await tapAndSettle(tester, copy);
     expect(copied, [url]);
     expect(
       find.descendant(of: key('host-relay-url'), matching: find.text('Copied')),
