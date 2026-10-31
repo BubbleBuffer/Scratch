@@ -640,6 +640,9 @@ class _CardShellState extends State<_CardShell> {
     if (widget.lifted) return box;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      // A tap recogniser adds a tap action to semantics even for a secondary
+      // tap; the board's card node already has the tap and the menu button.
+      excludeFromSemantics: true,
       onSecondaryTapUp: (_) => _openMenu(),
       child: box,
     );
