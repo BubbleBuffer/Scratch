@@ -20,3 +20,10 @@ String triageIntro(String project) =>
 
 String triageFailed(Object e) => 'Triage did not start: $e';
 String decisionFailed(String action, Object e) => '$action failed: $e';
+
+const appliedTitle = 'Links and tags added by Triage';
+String appliedLink(String from, String to) => "Linked '$from' to '$to'";
+String appliedTag(String page, String tag) => "Tagged '$page' with $tag";
+const appliedUndoNote =
+    'Undo removes the added links and restores the previous tags of these pages. '
+    'Tag changes made since are lost.';

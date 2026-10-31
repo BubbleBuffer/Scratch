@@ -19,7 +19,7 @@ A project is a top-level page. **Triage** is an item of the sidebar "•••" 
 
 **Merge proposals** is a standalone screen (phone) or panel (desktop), not part of Settings. It opens from the sidebar row of the same name and from the page "•••" menu of a top-level page. The sidebar row appears only while there are pending proposals or merges that can be undone, with the pending count as a badge.
 
-Each entry shows the page kept (the older) and the page merged in (the newer), both as links that open the page, the reason, and what Merge does. **Merge** calls `triage_accept`; the entry then reads "Merged" and offers **Undo** (`triage_undo`, which restores through page history). **Dismiss** calls `triage_dismiss`; dismissed entries leave the list. Empty state: "No proposals. Run Triage on a project to look for duplicates."
+Each entry shows the page kept (the older) and the page merged in (the newer), both as links that open the page, the reason, and what Merge does. **Merge** calls `triage_accept`; the entry then reads "Merged" and offers **Undo** (`triage_undo`, which restores through page history). Under the proposals, each triage run that applied links or tags is listed as "Links and tags added by Triage" with one line per change and an **Undo** (`triage_undo_applied`): it removes the added links and restores the previous tags of those pages, and tag edits made since are lost. **Dismiss** calls `triage_dismiss`; dismissed entries leave the list. Empty state: "No proposals. Run Triage on a project to look for duplicates."
 
 ## Store
 

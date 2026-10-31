@@ -98,18 +98,19 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
   }
 
   Future<void> _act(
-    TriageProposalDto p,
+    Object target,
     String label,
     Future<void> Function(String id) call,
   ) async {
-    if (!_busy.add(p.id)) return;
+    final id = target is TriageProposalDto ? target.id : target as String;
+    if (!_busy.add(id)) return;
     setState(() {});
     try {
-      await call(p.id);
+      await call(id);
     } catch (e) {
       if (mounted) showErrorToast(context, decisionFailed(label, e));
     } finally {
-      _busy.remove(p.id);
+      _busy.remove(id);
       if (mounted) setState(() {});
     }
   }
@@ -119,7 +120,8 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
     final c = context.colors;
     final ty = context.type;
     final items = widget.store.items;
-    if (items.isEmpty) {
+    final applied = widget.store.applied;
+    if (items.isEmpty && applied.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -140,9 +142,11 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
         horizontal: context.mobile ? Layout.gutter : 12,
         vertical: 8,
       ),
-      itemCount: items.length,
+      itemCount: items.length + applied.length,
       separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (_, i) => _entry(context, items[i]),
+      itemBuilder: (_, i) => i < items.length
+          ? _entry(context, items[i])
+          : _run(context, applied[i - items.length]),
     );
   }
 
@@ -232,6 +236,77 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
                   onTap: busy ? () {} : () => _act(p, 'Merge', widget.store.merge),
                 ),
               ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _run(BuildContext context, TriageRunDto run) {
+    final c = context.colors;
+    final ty = context.type;
+    final busy = _busy.contains(run.task);
+    final h = context.mobile ? 42.0 : 32.0;
+    return Container(
+      key: ValueKey('applied-${run.task}'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: c.bgSecondary,
+        borderRadius: Radii.ctl,
+        border: Border.all(color: c.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            appliedTitle,
+            style: ts(ty.ui, c.textPrimary, weight: 600),
+          ),
+          const SizedBox(height: 6),
+          for (final a in run.actions)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onOpenPage == null
+                    ? null
+                    : () => widget.onOpenPage!(
+                        a.pageId,
+                        displayTitle(a.pageTitle),
+                      ),
+                child: Text(
+                  a.kind == 'link'
+                      ? appliedLink(
+                          displayTitle(a.pageTitle),
+                          displayTitle(a.targetTitle),
+                        )
+                      : appliedTag(displayTitle(a.pageTitle), a.target),
+                  style: ts(ty.ui, c.accentText, weight: 400),
+                ),
+              ),
+            ),
+          const SizedBox(height: 2),
+          Text(
+            appliedUndoNote,
+            style: ts(ty.uiSmall, c.textTertiary, weight: 400),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Spacer(),
+              SecondaryButton(
+                key: ValueKey('applied-undo-${run.task}'),
+                label: 'Undo',
+                height: h,
+                onTap: busy
+                    ? null
+                    : () => _act(
+                        run.task,
+                        'Undo',
+                        (_) => widget.store.undoRun(run.task),
+                      ),
+              ),
             ],
           ),
         ],

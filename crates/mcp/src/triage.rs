@@ -118,3 +118,26 @@ pub fn undo_actions(v: &Vault, task: &str) -> Result<usize> {
     )?;
     Ok(all.len())
 }
+
+/// A triage run that applied links or tags, with what it applied.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppliedRun {
+    pub task: String,
+    pub actions: Vec<vault_core::TriageAction>,
+}
+
+/// The triage runs (newest first, among the latest 200 tasks) whose record
+/// still holds applied links or tags.
+pub fn applied_runs(v: &Vault) -> Result<Vec<AppliedRun>> {
+    let mut out = Vec::new();
+    for t in tasks::list(v, 200)? {
+        if scope(v, &t.id)?.is_none() {
+            continue;
+        }
+        let actions = actions(v, &t.id)?;
+        if !actions.is_empty() {
+            out.push(AppliedRun { task: t.id, actions });
+        }
+    }
+    Ok(out)
+}
