@@ -188,6 +188,9 @@ class AppRemoteBackend implements RemoteBackend {
   Future<void> tap(String id) async => driver.tap(id);
 
   @override
+  Future<bool> focus(String id) => driver.focus(id);
+
+  @override
   Future<void> type(String id, String text, {required bool replace}) =>
       driver.type(id, text, replace: replace);
 

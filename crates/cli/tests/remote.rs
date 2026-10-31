@@ -395,7 +395,7 @@ fn tree_prints_one_line_per_node() {
     let out = run_ok(&["app", "--data-dir", app.path(), "tree"]);
     assert_eq!(
         out,
-        "n1 button \"Save\" (tap)\ntitle textfield \"Title\" [Hello] (tap, setText)\n"
+        "n1 button \"Save\" (tap)\ntitle textfield \"Title\" [Hello] (tap, setText) focused\n"
     );
 }
 
@@ -449,4 +449,25 @@ fn chunked_reply_is_read() {
     });
     let out = run_ok(&["app", "--data-dir", dir.path().to_str().unwrap(), "status"]);
     assert!(out.contains("version: 9.9.9"), "{out}");
+}
+
+#[test]
+fn focus_sends_the_id_and_prints_the_resulting_state() {
+    let app = App::start(token(), |_| (200, json!({ "ok": true, "focused": true })));
+    assert_eq!(
+        run_ok(&["app", "--data-dir", app.path(), "focus", "card-1"]),
+        "focused\n"
+    );
+    let requests = app.take_requests();
+    assert_eq!(requests[0].command, "focus");
+    assert_eq!(requests[0].body, json!({ "id": "card-1" }));
+
+    let app = App::start(token(), |_| (200, json!({ "ok": true, "focused": false })));
+    assert_eq!(
+        run_ok(&["app", "--data-dir", app.path(), "focus", "card-1"]),
+        "not focused\n"
+    );
+    let json_out = run_ok(&["app", "--data-dir", app.path(), "focus", "card-1", "--json"]);
+    let parsed: serde_json::Value = serde_json::from_str(json_out.trim()).unwrap();
+    assert_eq!(parsed, json!({ "ok": true, "focused": false }));
 }

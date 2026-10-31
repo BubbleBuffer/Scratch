@@ -204,4 +204,67 @@ void main() {
     expect(node.hasPrimaryFocus, isTrue);
     semantics.dispose();
   });
+
+  testWidgets('focus runs the focus action and reports the focused flag', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final node = FocusNode();
+    addTearDown(node.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              Semantics(
+                container: true,
+                identifier: 'card',
+                child: TextButton(
+                  focusNode: node,
+                  onPressed: () {},
+                  child: const Text('Card'),
+                ),
+              ),
+              // The flag set by hand, with no Focus widget behind it.
+              Semantics(
+                container: true,
+                identifier: 'flagged',
+                focused: true,
+                label: 'Flagged',
+                child: const SizedBox(width: 50, height: 20),
+              ),
+              Semantics(
+                container: true,
+                identifier: 'plain',
+                label: 'Plain',
+                child: const SizedBox(width: 50, height: 20),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final driver = SemanticsDriver(nextFrame: () async => tester.pump());
+    UiNode byLabel(String l) =>
+        driver.snapshot().singleWhere((n) => n.label == l);
+    final card = byLabel('Card');
+    final flagged = byLabel('Flagged');
+    expect(card.focused, isFalse);
+    // Semantics(focused: true) shows up as focused in the tree.
+    expect(flagged.focused, isTrue);
+    expect(flagged.toJson()['focused'], isTrue);
+
+    expect(await driver.focus(card.id), isTrue);
+    expect(node.hasPrimaryFocus, isTrue);
+
+    await expectLater(
+      () => driver.focus('missing'),
+      throwsA(isA<RemoteError>().having((e) => e.status, 'status', 404)),
+    );
+    await expectLater(
+      () => driver.focus(byLabel('Plain').id),
+      throwsA(isA<RemoteError>().having((e) => e.status, 'status', 400)),
+    );
+    semantics.dispose();
+  });
 }

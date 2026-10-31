@@ -7,7 +7,7 @@ status: current
 
 # App remote control
 
-`scratch-cli app ...` drives a running desktop app (Windows and Linux): status, open a page, navigate, screenshot, a semantic dump of the visible UI, tap, type and key presses. It exists so an agent or script can use the app without a screen. The endpoint lives in the Dart app, because only the Flutter side can render frames and act on widgets. It is separate from the vault MCP server (`crates/mcp`), which is Rust-only, off by default and has no path to the UI.
+`scratch-cli app ...` drives a running desktop app (Windows and Linux): status, open a page, navigate, screenshot, a semantic dump of the visible UI, tap, focus, type and key presses. It exists so an agent or script can use the app without a screen. The endpoint lives in the Dart app, because only the Flutter side can render frames and act on widgets. It is separate from the vault MCP server (`crates/mcp`), which is Rust-only, off by default and has no path to the UI.
 
 ## Endpoint
 
@@ -29,6 +29,7 @@ Success: HTTP 200 with `{"ok": true, ...}`. Failure: `{"ok": false, "error": "<m
 | `screenshot` | `{"pixel_ratio": 1.0}` (optional) | `width`, `height`, `png_base64` (the app's own frame, rendered from its root RepaintBoundary) |
 | `tree` | `{}` | `nodes`: list in reading order of `{"id","role","label","value","hint","actions":[...],"enabled","focused","rect":{"x","y","w","h"}}` for each visible semantics node with a label, value or action. `role` is one of `button`, `textfield`, `link`, `checkbox`, `switch`, `slider`, `image`, `header`, `text`, `other` |
 | `tap` | `{"id": "<id>"}` | `{}`; moves focus to the node (when it can take focus), then performs its tap action; 404 if the id is not in the current tree |
+| `focus` | `{"id": "<id>"}` | `{"focused": bool}`; performs the node's focus action, waits a frame and reports whether the node now shows as focused; 404 if the id is not in the current tree, 400 if the node has no focus action |
 | `type` | `{"id": "<id>", "text": "...", "replace": true}` | `{}`; focuses the field and sets or inserts text (`replace` defaults to true) |
 | `key` | `{"combo": "ctrl+k"}` | `{}`; Enter on a focused single-line text field also sends the field its submit action (a key event alone never does); modifiers `ctrl`, `shift`, `alt`, `meta` joined with `+`, then a key name (`enter`, `escape`, `tab`, `up`, `down`, `left`, `right`, `backspace`, `delete`, `space`, a letter, a digit, `f1`..`f12`) |
 
@@ -44,7 +45,8 @@ All commands take `--json` (print the response body as is) and `--data-dir <DIR>
 - `scratch-cli app screenshot <OUT.png>`
 - `scratch-cli app tree`
 - `scratch-cli app tap <ID>`
+- `scratch-cli app focus <ID>`
 - `scratch-cli app type <ID> <TEXT>`
 - `scratch-cli app key <COMBO>`
 
-Without `--json` each prints short text lines. If the app is not running (no endpoint file, or the connection is refused) the command exits non-zero with `Scratch is not running (no endpoint at <path>); start the app first`. A rejected token or any `ok: false` response exits non-zero with the app's error message. `scratch-cli app start` is not provided: the app is a full Flutter desktop window, and starting it hidden is not a cheap, portable change.
+Without `--json` each prints short text lines. `tree` lines end with `focused` for a node that reports focus; `focus` prints `focused` or `not focused`. If the app is not running (no endpoint file, or the connection is refused) the command exits non-zero with `Scratch is not running (no endpoint at <path>); start the app first`. A rejected token or any `ok: false` response exits non-zero with the app's error message. `scratch-cli app start` is not provided: the app is a full Flutter desktop window, and starting it hidden is not a cheap, portable change.

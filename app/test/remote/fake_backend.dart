@@ -64,6 +64,13 @@ class FakeBackend implements RemoteBackend {
   }
 
   @override
+  Future<bool> focus(String id) async {
+    _call('focus $id');
+    if (id == 'gone') throw const RemoteError(404, 'no element');
+    return id == 'save';
+  }
+
+  @override
   Future<void> type(String id, String text, {required bool replace}) async =>
       _call('type $id "$text" replace=$replace');
 

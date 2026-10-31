@@ -37,6 +37,7 @@ const USAGE: &str = "usage:
   scratch-cli app screenshot <OUT.png> [--json] [--data-dir <DIR>]
   scratch-cli app tree [--json] [--data-dir <DIR>]
   scratch-cli app tap <ID> [--json] [--data-dir <DIR>]
+  scratch-cli app focus <ID> [--json] [--data-dir <DIR>]
   scratch-cli app type <ID> <TEXT> [--json] [--data-dir <DIR>]
   scratch-cli app key <COMBO> [--json] [--data-dir <DIR>]";
 
