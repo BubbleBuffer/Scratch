@@ -36,6 +36,7 @@ pub fn run(flags: &Flags, out: &mut dyn Write) -> Result<()> {
         }
         ["tree"] => ("tree", json!({})),
         ["tap", id] => ("tap", json!({ "id": *id })),
+        ["focus", id] => ("focus", json!({ "id": *id })),
         ["type", id, text @ ..] if !text.is_empty() => (
             "type",
             json!({ "id": *id, "text": text.join(" "), "replace": true }),
@@ -63,6 +64,10 @@ pub fn run(flags: &Flags, out: &mut dyn Write) -> Result<()> {
     match words.as_slice() {
         ["status"] => print_status(&value, out)?,
         ["tree"] => print_tree(&value, out)?,
+        ["focus", _] => {
+            let focused = value.get("focused").and_then(Value::as_bool).unwrap_or(false);
+            writeln!(out, "{}", if focused { "focused" } else { "not focused" })?;
+        }
         ["screenshot", path] => {
             let width = number(value.get("width"));
             let height = number(value.get("height"));
@@ -299,6 +304,9 @@ fn print_tree(value: &Value, out: &mut dyn Write) -> Result<()> {
             .unwrap_or_default();
         if !actions.is_empty() {
             line.push_str(&format!(" ({})", actions.join(", ")));
+        }
+        if node.get("focused").and_then(Value::as_bool) == Some(true) {
+            line.push_str(" focused");
         }
         writeln!(out, "{line}")?;
     }

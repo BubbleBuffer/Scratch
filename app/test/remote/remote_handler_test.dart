@@ -190,6 +190,15 @@ void main() {
       expect((await post('tap')).status, 400);
     });
 
+    test('focus returns the focused state; unknown id is 404', () async {
+      final ok = await post('focus', body: {'id': 'save'});
+      expect(ok.status, 200);
+      expect(ok.body, {'ok': true, 'focused': true});
+      expect(backend.calls, ['focus save']);
+      expect((await post('focus', body: {'id': 'gone'})).status, 404);
+      expect((await post('focus')).status, 400);
+    });
+
     test('type passes text and replace (default true)', () async {
       expect(
         (await post('type', body: {'id': 'f', 'text': 'hi'})).status,

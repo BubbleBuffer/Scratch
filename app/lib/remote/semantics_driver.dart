@@ -240,6 +240,18 @@ class SemanticsDriver {
     _requireOwner().performAction(node.nodeId, ui.SemanticsAction.tap);
   }
 
+  /// Runs the node's focus action, waits a frame and returns whether the node
+  /// now reports focus.
+  Future<bool> focus(String id) async {
+    final node = _find(id);
+    if (!node.actions.contains('focus')) {
+      throw RemoteError(400, 'element "" has no focus action');
+    }
+    _requireOwner().performAction(node.nodeId, ui.SemanticsAction.focus);
+    await _nextFrame();
+    return _find(id).focused;
+  }
+
   /// Focuses the field, waits a frame (a field offers setText only while
   /// focused) and sets its text. With [replace] false the text is appended.
   Future<void> type(String id, String text, {required bool replace}) async {

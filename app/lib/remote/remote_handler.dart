@@ -113,6 +113,11 @@ abstract interface class RemoteBackend {
   /// 404 [RemoteError] when [id] is not in the current tree.
   Future<void> tap(String id);
 
+  /// Runs the node's focus action, waits a frame and returns whether the node
+  /// now reports focus. 404 when [id] is not in the current tree, 400 when it
+  /// has no focus action.
+  Future<bool> focus(String id);
+
   Future<void> type(String id, String text, {required bool replace});
 
   Future<void> key(KeyCombo combo);
@@ -184,6 +189,7 @@ class RemoteHandler {
     'screenshot',
     'tree',
     'tap',
+    'focus',
     'type',
     'key',
   };
@@ -259,6 +265,8 @@ class RemoteHandler {
       case 'tap':
         await backend.tap(_string(args, 'id'));
         return const {};
+      case 'focus':
+        return {'focused': await backend.focus(_string(args, 'id'))};
       case 'type':
         final text = args['text'];
         if (text is! String) {
