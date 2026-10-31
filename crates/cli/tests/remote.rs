@@ -395,7 +395,7 @@ fn tree_prints_one_line_per_node() {
     let out = run_ok(&["app", "--data-dir", app.path(), "tree"]);
     assert_eq!(
         out,
-        "n1 button \"Save\" (tap)\ntitle textfield \"Title\" [Hello] (tap, setText)\n"
+        "n1 button \"Save\" (tap)\ntitle textfield \"Title\" [Hello] (tap, setText) focused\n"
     );
 }
 
