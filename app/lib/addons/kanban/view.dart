@@ -56,6 +56,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
   /// Keeps the board's state when the panel opens beside it.
   final _boardKey = GlobalKey();
   FocusNode? _restoreFocus;
+  final _boardFocus = BoardFocusHandle();
 
   @override
   void initState() {
@@ -98,6 +99,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
         gutter: widget.inline ? 0 : (docked ? math.min(widget.gutter, 24) : widget.gutter),
         addCardLabel: 'New card',
         cardBuilder: _card,
+        focusHandle: _boardFocus,
         cardLabel: (card) =>
             card.title.trim().isEmpty ? 'Untitled' : card.title,
         onCardMenu: (context, column, card, anchor, focus) =>
@@ -176,7 +178,10 @@ class _KanbanBoardState extends State<KanbanBoard> {
     }
     setState(() {
       _open = card;
-      _restoreFocus = FocusManager.instance.primaryFocus;
+      // A click does not focus the card, so the card is named, not read from
+      // the focus: Esc or Close then returns to it whichever way it opened.
+      _restoreFocus =
+          _boardFocus.cardNode(card.id) ?? FocusManager.instance.primaryFocus;
     });
   }
 
