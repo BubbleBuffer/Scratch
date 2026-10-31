@@ -139,4 +139,69 @@ void main() {
     expect(seen, contains('escape'));
     expect(HardwareKeyboard.instance.isControlPressed, isFalse);
   });
+
+  testWidgets('key enter submits the focused single-line field', (tester) async {
+    final submitted = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TextField(
+            autofocus: true,
+            onSubmitted: submitted.add,
+            controller: TextEditingController(text: 'card title'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    pressKeyCombo(parseKeyCombo('enter'));
+    expect(submitted, ['card title']);
+  });
+
+  testWidgets('key enter leaves a multiline field alone', (tester) async {
+    final submitted = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TextField(
+            autofocus: true,
+            maxLines: null,
+            onSubmitted: submitted.add,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    pressKeyCombo(parseKeyCombo('enter'));
+    expect(submitted, isEmpty);
+  });
+
+  testWidgets('tap focuses the element it taps', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final node = FocusNode();
+    addTearDown(node.dispose);
+    var taps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Semantics(
+            container: true,
+            identifier: 'card',
+            child: TextButton(
+              focusNode: node,
+              onPressed: () => taps++,
+              child: const Text('Card'),
+            ),
+          ),
+        ),
+      ),
+    );
+    final driver = SemanticsDriver(nextFrame: () async => tester.pump());
+    final card = driver.snapshot().singleWhere((n) => n.label == 'Card');
+    driver.tap(card.id);
+    await tester.pump();
+    expect(taps, 1);
+    expect(node.hasPrimaryFocus, isTrue);
+    semantics.dispose();
+  });
 }

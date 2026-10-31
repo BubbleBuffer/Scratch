@@ -28,9 +28,9 @@ Success: HTTP 200 with `{"ok": true, ...}`. Failure: `{"ok": false, "error": "<m
 | `navigate` | `{"route": "<route>"}` | `route`; routes: `home`, `settings`, `search`, `back`, `page/<id>`; other values are 400 and the error lists the routes |
 | `screenshot` | `{"pixel_ratio": 1.0}` (optional) | `width`, `height`, `png_base64` (the app's own frame, rendered from its root RepaintBoundary) |
 | `tree` | `{}` | `nodes`: list in reading order of `{"id","role","label","value","hint","actions":[...],"enabled","focused","rect":{"x","y","w","h"}}` for each visible semantics node with a label, value or action. `role` is one of `button`, `textfield`, `link`, `checkbox`, `switch`, `slider`, `image`, `header`, `text`, `other` |
-| `tap` | `{"id": "<id>"}` | `{}`; performs the node's tap action; 404 if the id is not in the current tree |
+| `tap` | `{"id": "<id>"}` | `{}`; moves focus to the node (when it can take focus), then performs its tap action; 404 if the id is not in the current tree |
 | `type` | `{"id": "<id>", "text": "...", "replace": true}` | `{}`; focuses the field and sets or inserts text (`replace` defaults to true) |
-| `key` | `{"combo": "ctrl+k"}` | `{}`; modifiers `ctrl`, `shift`, `alt`, `meta` joined with `+`, then a key name (`enter`, `escape`, `tab`, `up`, `down`, `left`, `right`, `backspace`, `delete`, `space`, a letter, a digit, `f1`..`f12`) |
+| `key` | `{"combo": "ctrl+k"}` | `{}`; Enter on a focused single-line text field also sends the field its submit action (a key event alone never does); modifiers `ctrl`, `shift`, `alt`, `meta` joined with `+`, then a key name (`enter`, `escape`, `tab`, `up`, `down`, `left`, `right`, `backspace`, `delete`, `space`, a letter, a digit, `f1`..`f12`) |
 
 Element ids: a node's `Semantics.identifier` when the widget sets one, else `n<semantics node id>`. Ids from `tree` are valid until the UI changes; take a fresh `tree` after navigating.
 

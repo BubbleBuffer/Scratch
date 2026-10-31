@@ -233,6 +233,10 @@ class SemanticsDriver {
     if (!node.actions.contains('tap')) {
       throw RemoteError(400, 'element "$id" has no tap action');
     }
+    // A click moves focus to what it hits; a semantic tap alone would not.
+    if (node.actions.contains('focus') && !node.focused) {
+      _requireOwner().performAction(node.nodeId, ui.SemanticsAction.focus);
+    }
     _requireOwner().performAction(node.nodeId, ui.SemanticsAction.tap);
   }
 
