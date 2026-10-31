@@ -98,6 +98,8 @@ class _KanbanBoardState extends State<KanbanBoard> {
         gutter: widget.inline ? 0 : (docked ? math.min(widget.gutter, 24) : widget.gutter),
         addCardLabel: 'New card',
         cardBuilder: _card,
+        cardLabel: (card) =>
+            card.title.trim().isEmpty ? 'Untitled' : card.title,
         onCardMenu: (context, column, card, anchor, focus) =>
             _cardMenu(context, column, card, anchor, focus),
       ),
@@ -236,6 +238,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
       onAssign: (anchor) {
         if (runners != null) _assignCard(context, anchor, card, runners);
       },
+      onStatus: (anchor) => _statusMenu(context, anchor, card),
       onAccept: runners == null ? null : () => _accept(context, card, runners),
       onMarkFailed: runners == null
           ? null
@@ -290,7 +293,11 @@ class _KanbanBoardState extends State<KanbanBoard> {
       menuKey: ValueKey('kanban-card-menu-${card.id}'),
       onMenu: (anchor, restoreFocus) =>
           _cardMenu(context, column, card, anchor, restoreFocus),
-      body: runners == null ? body : _withChip(body, runners, card.id),
+      // The card's semantics node (the board's focus stop) is named by its
+      // title, so the note body's own text is left out of it.
+      body: runners == null
+          ? ExcludeSemantics(child: body)
+          : _withChip(ExcludeSemantics(child: body), runners, card.id),
     );
     return lifted ? ExcludeFocus(child: shell) : shell;
   }
@@ -310,7 +317,10 @@ class _KanbanBoardState extends State<KanbanBoard> {
               if (assignment == null) return const SizedBox.shrink();
               return Padding(
                 padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-                child: RunnerChip(assignment: assignment),
+                child: Semantics(
+                  container: true,
+                  child: RunnerChip(assignment: assignment),
+                ),
               );
             },
           ),
@@ -466,6 +476,39 @@ class _KanbanBoardState extends State<KanbanBoard> {
     );
   }
 
+  /// The Status choice in the card panel: every column, the card's own marked.
+  /// Choosing another moves the card to the end of that column.
+  void _statusMenu(BuildContext context, Rect anchor, BoardCard card) {
+    final from = _columnOf(card.id);
+    if (from == null) return;
+    final source = _source;
+    showPanel<void>(
+      context,
+      anchor,
+      (panel) => KeyboardMenu(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final target in source.columns)
+              MenuItem(
+                key: ValueKey('kanban-status-choice-${target.id}'),
+                label: target.title,
+                selected: target.id == from.id,
+                onTap: () {
+                  Navigator.of(panel).pop();
+                  if (target.id != from.id) {
+                    source.moveCardToEnd(card.id, from.id, target.id);
+                  }
+                },
+              ),
+          ],
+        ),
+      ),
+      width: 220,
+    );
+  }
+
   /// The phone's column list for Move to column…. Choosing one appends the
   /// card to the end of that column.
   void _moveMenu(
@@ -562,14 +605,18 @@ class _CardShellState extends State<_CardShell> {
                     opacity: shown ? 1 : 0,
                     child: IgnorePointer(
                       ignoring: !shown,
-                      child: IconBtn(
-                        Ico.more,
-                        key: widget.menuKey,
-                        size: phone ? 40 : 28,
-                        glyph: 20,
-                        color: c.iconTertiary,
-                        semanticLabel: 'Card menu',
-                        onTap: _openMenu,
+                      // Its own semantics node, apart from the card's.
+                      child: Semantics(
+                        container: true,
+                        child: IconBtn(
+                          Ico.more,
+                          key: widget.menuKey,
+                          size: phone ? 40 : 28,
+                          glyph: 20,
+                          color: c.iconTertiary,
+                          semanticLabel: 'Card menu',
+                          onTap: _openMenu,
+                        ),
                       ),
                     ),
                   ),
@@ -593,6 +640,9 @@ class _CardShellState extends State<_CardShell> {
     if (widget.lifted) return box;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      // A tap recogniser adds a tap action to semantics even for a secondary
+      // tap; the board's card node already has the tap and the menu button.
+      excludeFromSemantics: true,
       onSecondaryTapUp: (_) => _openMenu(),
       child: box,
     );

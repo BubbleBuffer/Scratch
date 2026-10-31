@@ -4,6 +4,7 @@
 // opens it and Esc closes it, returning focus to the card.
 
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart' show SemanticsAction, SemanticsNode;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/kanban/api.dart';
@@ -32,9 +33,20 @@ Future<String> _openBoard(WidgetTester tester, {required bool mobile}) async {
       'Done': [],
     },
   );
+  _lastBoard = board;
   await openNote(tester, board, 'Launch board');
   return garden;
 }
+
+String? _lastBoard;
+
+/// The id of the board page the last [_openBoard] seeded.
+Future<String> _boardId(WidgetTester tester) async => _lastBoard!;
+
+/// The focus node of the button [row] is: the Focus above its tap target.
+FocusNode focusNode(Finder row) => Focus.of(
+  find.descendant(of: row, matching: find.byType(GestureDetector)).evaluate().first,
+);
 
 void main() {
   setUpAll(initCore);
@@ -174,9 +186,9 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await settle(tester);
       expect(
-        focusIsIn(find.byKey(_assign)),
+        focusIsIn(find.byKey(const ValueKey('kanban-panel-status-row'))),
         isTrue,
-        reason: 'Tab leaves the title for the first control after it',
+        reason: 'Tab leaves the title for the Status row, the control after it',
       );
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -184,4 +196,112 @@ void main() {
       expect(find.byKey(_panel), findsNothing, reason: 'Esc closes from a control too');
     },
   );
+
+  appTest(
+    'desktop: Tab reaches Status then Runner, and Enter opens the column choice and the runner picker',
+    (tester) async {
+      await _openBoard(tester, mobile: false);
+      await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
+      final status = find.byKey(const ValueKey('kanban-panel-status-row'));
+      final runner = find.byKey(const ValueKey('kanban-panel-runner-row'));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await settle(tester);
+      expect(focusIsIn(status), isTrue, reason: 'Status follows the title');
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await settle(tester);
+      final columns = await storedKanban(tester, await _boardId(tester));
+      final doing = columnIdOf(columns, 'Doing');
+      expect(
+        find.byKey(ValueKey('kanban-status-choice-$doing')),
+        findsOneWidget,
+        reason: 'Enter opens the choice of column',
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(find.byKey(ValueKey('kanban-status-choice-$doing')), findsNothing);
+
+      // Esc closed the choice only; the panel is still open.
+      expect(find.byKey(_panel), findsOneWidget);
+      focusNode(status).requestFocus();
+      await settle(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await settle(tester);
+      expect(focusIsIn(runner), isTrue, reason: 'Runner follows Status');
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await settle(tester);
+      expect(find.text('Run on'), findsOneWidget, reason: 'Space opens the picker');
+    },
+  );
+
+  appTest('desktop: choosing a column in the Status choice moves the card there', (
+    tester,
+  ) async {
+    final garden = await _openBoard(tester, mobile: false);
+    await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
+    await tapAndSettle(tester, find.byKey(const ValueKey('kanban-panel-status-row')));
+    final board = await _boardId(tester);
+    final doing = columnIdOf(await storedKanban(tester, board), 'Doing');
+    await tapAndSettle(tester, find.byKey(ValueKey('kanban-status-choice-$doing')));
+    for (var i = 0; i < 40; i++) {
+      if (storedCards(await storedKanban(tester, board), 'Doing').contains(garden)) break;
+      await settle(tester, min: Duration.zero);
+    }
+    await settle(tester);
+    expect(storedCards(await storedKanban(tester, board), 'Doing'), [garden]);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('kanban-panel-status'))).data,
+      'Doing',
+    );
+  });
+
+  appTest('each card is one semantics node named by its title, and the panel rows are buttons', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await _openBoard(tester, mobile: false);
+    await settle(tester);
+
+    final node = tester.getSemantics(allCardSurfaces().first);
+    expect(node.label, 'Garden plan');
+    final flags = node.getSemanticsData().flagsCollection;
+    expect(flags.isButton, isTrue);
+
+    // No second node with the title, and no empty-label twin.
+    final all = <SemanticsNode>[];
+    void walk(SemanticsNode n) {
+      all.add(n);
+      n.visitChildren((c) {
+        walk(c);
+        return true;
+      });
+    }
+    // The card's own subtree and its siblings in the column; the page tree in
+    // the sidebar lists the same title and is not part of the board.
+    walk(node.parent!);
+    expect(all.where((n) => n.label.contains('Garden plan')), hasLength(1));
+    expect(
+      all.where((n) {
+        final d = n.getSemanticsData();
+        return d.label.isEmpty &&
+            d.hasAction(SemanticsAction.tap) &&
+            n != node.parent;
+      }),
+      isEmpty,
+      reason: 'no empty-label tappable duplicate over the card',
+    );
+
+    await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
+    for (final key in ['kanban-panel-status-row', 'kanban-panel-runner-row']) {
+      final row = tester.getSemantics(find.byKey(ValueKey(key)));
+      expect(row.getSemanticsData().flagsCollection.isButton, isTrue, reason: key);
+      expect(row.getSemanticsData().hasAction(SemanticsAction.tap), isTrue, reason: key);
+      expect(row.label, anyOf('Status', 'Runner'));
+    }
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('kanban-panel-status-row'))).value,
+      'To do',
+    );
+    semantics.dispose();
+  });
 }
