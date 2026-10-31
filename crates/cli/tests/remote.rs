@@ -468,5 +468,6 @@ fn focus_sends_the_id_and_prints_the_resulting_state() {
         "not focused\n"
     );
     let json_out = run_ok(&["app", "--data-dir", app.path(), "focus", "card-1", "--json"]);
-    assert_eq!(json_out, "{\"focused\":false,\"ok\":true}\n");
+    let parsed: serde_json::Value = serde_json::from_str(json_out.trim()).unwrap();
+    assert_eq!(parsed, json!({ "ok": true, "focused": false }));
 }
