@@ -370,22 +370,10 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
   void initState() {
     super.initState();
     widget.board._registerCard(widget.cardId, _focus);
-    FocusManager.instance.addHighlightModeListener(_modeChanged);
-  }
-
-  void _modeChanged(FocusHighlightMode _) => _syncHighlight();
-
-  /// The ring shows while the card has focus and the keyboard drives it.
-  void _syncHighlight() {
-    final show =
-        _focus.hasFocus &&
-        FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
-    if (show != _highlight && mounted) setState(() => _highlight = show);
   }
 
   @override
   void dispose() {
-    FocusManager.instance.removeHighlightModeListener(_modeChanged);
     widget.board._unregisterCard(widget.cardId, _focus);
     _focus.dispose();
     super.dispose();
@@ -409,7 +397,11 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
   }
 
   @override
-  Widget build(BuildContext context) => _named(Shortcuts(
+  Widget build(BuildContext context) => _named(FocusableActionDetector(
+    focusNode: _focus,
+    // A named card puts the focus flag and action on its own node.
+    includeFocusSemantics: widget.label == null,
+    onShowFocusHighlight: (highlight) => setState(() => _highlight = highlight),
     shortcuts: {
       const SingleActivator(LogicalKeyboardKey.enter): const ActivateIntent(),
       const SingleActivator(LogicalKeyboardKey.space): const ActivateIntent(),
@@ -428,7 +420,6 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
             _CardMenuIntent(),
       },
     },
-    child: Actions(
     actions: {
       ActivateIntent: CallbackAction<ActivateIntent>(
         onInvoke: (_) {
@@ -449,14 +440,9 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
         },
       ),
     },
-    child: Focus(
-    focusNode: _focus,
-    // A named card puts the focus flag and action on its own node.
-    includeSemantics: widget.label == null,
     onFocusChange: (focused) {
       if (focused) widget.board._noteFocus(widget.cardId);
       setState(() => _focused = focused);
-      _syncHighlight();
     },
     child: CustomPaint(
       foregroundPainter: _highlight
@@ -473,7 +459,7 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
         ),
       ),
     ),
-  ))));
+  ));
 
   /// With a label the card is one named semantics node: the focus stop's
   /// focusable flag and the tap merge into it (they sit below it and are not
