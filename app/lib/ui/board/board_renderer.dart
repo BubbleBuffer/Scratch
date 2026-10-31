@@ -467,6 +467,7 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
     return Semantics(
       container: true,
       button: true,
+      focusable: true,
       label: label,
       onTap: widget.onOpen,
       child: child,

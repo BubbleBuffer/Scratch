@@ -43,13 +43,10 @@ String? _lastBoard;
 /// The id of the board page the last [_openBoard] seeded.
 Future<String> _boardId(WidgetTester tester) async => _lastBoard!;
 
-/// The focus node of the FocusableActionDetector inside [row].
-FocusNode focusNode(Finder row) => (find
-        .descendant(of: row, matching: find.byType(FocusableActionDetector))
-        .evaluate()
-        .first
-        .widget as FocusableActionDetector)
-    .focusNode!;
+/// The focus node of the button [row] is: the Focus above its tap target.
+FocusNode focusNode(Finder row) => Focus.of(
+  find.descendant(of: row, matching: find.byType(GestureDetector)).evaluate().first,
+);
 
 void main() {
   setUpAll(initCore);
@@ -279,18 +276,16 @@ void main() {
         return true;
       });
     }
-    var root = node;
-    while (root.parent != null) {
-      root = root.parent!;
-    }
-    walk(root);
+    // The card's own subtree and its siblings in the column; the page tree in
+    // the sidebar lists the same title and is not part of the board.
+    walk(node.parent!);
     expect(all.where((n) => n.label.contains('Garden plan')), hasLength(1));
     expect(
       all.where((n) {
         final d = n.getSemanticsData();
         return d.label.isEmpty &&
             d.hasAction(SemanticsAction.tap) &&
-            n.rect.overlaps(node.rect);
+            n != node.parent;
       }),
       isEmpty,
       reason: 'no empty-label tappable duplicate over the card',
