@@ -16,6 +16,15 @@ class BoardCardDrag {
   final String cardId, fromColumnId;
 }
 
+/// Lets a host find the keyboard stop of a card on a board it draws, for
+/// example to give a card focus back when a panel it opened closes.
+class BoardFocusHandle {
+  _BoardRendererState? _state;
+
+  /// The focus node of the card [id], or null while the card is not drawn.
+  FocusNode? cardNode(String id) => _state?._stops[id];
+}
+
 class BoardRenderer extends StatefulWidget {
   const BoardRenderer({
     super.key,
@@ -32,8 +41,12 @@ class BoardRenderer extends StatefulWidget {
     this.columnLabelBuilder,
     this.columnMenu,
     this.trailing,
+    this.focusHandle,
   });
   final BoardSource source;
+
+  /// Attached to this board for as long as it is drawn.
+  final BoardFocusHandle? focusHandle;
   final bool inline;
   final double gutter, columnWidth, columnGap;
   final int inlinePageSize;
@@ -69,6 +82,63 @@ class _BoardRendererState extends State<BoardRenderer> {
   /// card until one does) takes Tab. Arrow keys move between cards.
   final _stops = <String, FocusNode>{};
   String? _activeCard;
+
+  /// Each column's New card button, as the wrapper above its focus node.
+  final _adds = <String, FocusNode>{};
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusHandle?._state = this;
+  }
+
+  @override
+  void didUpdateWidget(BoardRenderer old) {
+    super.didUpdateWidget(old);
+    if (old.focusHandle != widget.focusHandle) {
+      if (old.focusHandle?._state == this) old.focusHandle!._state = null;
+      widget.focusHandle?._state = this;
+    }
+  }
+
+  void _show(FocusNode node) {
+    node.requestFocus();
+    final ctx = node.context;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 120),
+        alignment: 0.5,
+      );
+    }
+  }
+
+  /// The New card button of column [columnId] takes focus. False when the
+  /// button is not drawn.
+  bool _focusAdd(String columnId) {
+    final wrapper = _adds[columnId];
+    if (wrapper == null) return false;
+    for (final node in wrapper.descendants) {
+      if (node.canRequestFocus) {
+        _show(node);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// The last card of column [columnId] takes focus. False when the column
+  /// has no card with a focus stop.
+  bool _focusLastCard(String columnId) {
+    for (final card in widget.source.loadedCards(columnId).toList().reversed) {
+      final node = _stops[card.id];
+      if (node != null) {
+        _show(node);
+        return true;
+      }
+    }
+    return false;
+  }
 
   void _registerCard(String id, FocusNode node) {
     _stops[id] = node;
@@ -129,7 +199,13 @@ class _BoardRendererState extends State<BoardRenderer> {
       case TraversalDirection.up:
         if (row > 0) target = lists[col][row - 1];
       case TraversalDirection.down:
-        if (row < lists[col].length - 1) target = lists[col][row + 1];
+        if (row < lists[col].length - 1) {
+          target = lists[col][row + 1];
+        } else {
+          // Below the last card is the column's New card button.
+          _focusAdd(columns[col].id);
+          return;
+        }
       case TraversalDirection.left || TraversalDirection.right:
         final step = direction == TraversalDirection.left ? -1 : 1;
         for (var i = col + step; i >= 0 && i < lists.length; i += step) {
@@ -140,16 +216,7 @@ class _BoardRendererState extends State<BoardRenderer> {
         }
     }
     final node = target == null ? null : _stops[target];
-    if (node == null) return;
-    node.requestFocus();
-    final ctx = node.context;
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 120),
-        alignment: 0.5,
-      );
-    }
+    if (node != null) _show(node);
   }
 
   @override
@@ -518,8 +585,24 @@ class _BoardColumnState extends State<_BoardColumn> {
   late int _limit = b.widget.inlinePageSize;
   final _v = ScrollController();
 
+  /// Wraps the New card button: Up there goes to the card above it, which
+  /// directional focus would skip (only the board's Tab stop is traversable).
+  final _addFocus = FocusNode(
+    debugLabel: 'board new card',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    b._adds[g.id] = _addFocus;
+  }
+
   @override
   void dispose() {
+    if (b._adds[g.id] == _addFocus) b._adds.remove(g.id);
+    _addFocus.dispose();
     _v.dispose();
     super.dispose();
   }
@@ -733,11 +816,20 @@ class _BoardColumnState extends State<_BoardColumn> {
             _BoardLoadMore(
               onTap: () => setState(() => _limit += b.widget.inlinePageSize),
             ),
-          _BoardAddButton(
-            key: ValueKey('board-new-$label'),
-            label: b.widget.addCardLabel,
-            onTap: () => source.addCard(context, g.id),
-            height: m ? 40 : 32,
+          Focus(
+            focusNode: _addFocus,
+            onKeyEvent: (_, event) =>
+                event is! KeyUpEvent &&
+                    event.logicalKey == LogicalKeyboardKey.arrowUp &&
+                    b._focusLastCard(g.id)
+                ? KeyEventResult.handled
+                : KeyEventResult.ignored,
+            child: _BoardAddButton(
+              key: ValueKey('board-new-$label'),
+              label: b.widget.addCardLabel,
+              onTap: () => source.addCard(context, g.id),
+              height: m ? 40 : 32,
+            ),
           ),
         ],
       ),

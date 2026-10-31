@@ -3,6 +3,8 @@
 // through the Run on picker, and leads to the note. Enter on a focused card
 // opens it and Esc closes it, returning focus to the card.
 
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart' show SemanticsAction, SemanticsNode;
 import 'package:flutter/widgets.dart';
@@ -304,4 +306,74 @@ void main() {
     );
     semantics.dispose();
   });
+
+  appTest(
+    'desktop: after opening a card with the pointer, Esc or Close returns focus to that card',
+    (tester) async {
+      await _openBoard(tester, mobile: false);
+
+      await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
+      expect(find.byKey(_panel), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(find.byKey(_panel), findsNothing);
+      expect(cardFocus(tester).hasPrimaryFocus, isTrue, reason: 'Esc');
+
+      await tapAndSettle(tester, cardIn('To do', 'Garden plan'));
+      await tapAndSettle(tester, find.byKey(const ValueKey('kanban-panel-close')));
+      expect(find.byKey(_panel), findsNothing);
+      expect(cardFocus(tester).hasPrimaryFocus, isTrue, reason: 'Close');
+    },
+  );
+
+  appTest('a card with keyboard focus reports focused to accessibility', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await _openBoard(tester, mobile: false);
+    await settle(tester);
+    final card = allCardSurfaces().first;
+    expect(
+      tester.getSemantics(card).getSemanticsData().flagsCollection.isFocused,
+      Tristate.isFalse,
+    );
+
+    cardFocus(tester).requestFocus();
+    await settle(tester);
+    expect(
+      tester.getSemantics(card).getSemanticsData().flagsCollection.isFocused,
+      Tristate.isTrue,
+    );
+    semantics.dispose();
+  });
+
+  appTest(
+    'Up and Down move between the cards of a column and the New card button',
+    (tester) async {
+      final f = await pumpApp(tester, mobile: false);
+      final board = await seedKanban(
+        tester,
+        title: 'Launch board',
+        columns: {
+          'To do': [f.pages['Garden plan']!, f.pages['Recipes']!],
+          'Doing': [],
+          'Done': [],
+        },
+      );
+      await openNote(tester, board, 'Launch board');
+
+      cardFocus(tester, 1).requestFocus();
+      await settle(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await settle(tester);
+      expect(focusIsIn(addButton('To do')), isTrue, reason: 'last card, Down');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await settle(tester);
+      expect(cardFocus(tester, 1).hasPrimaryFocus, isTrue, reason: 'New card, Up');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await settle(tester);
+      expect(cardFocus(tester, 0).hasPrimaryFocus, isTrue, reason: 'card, Up');
+    },
+  );
 }
