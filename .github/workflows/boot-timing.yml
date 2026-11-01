@@ -3,8 +3,6 @@
 name: boot-timing
 on:
   workflow_dispatch:
-  push:
-    branches: [perf/boot-timing]
 permissions:
   contents: read
 env:
