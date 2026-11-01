@@ -39,8 +39,14 @@ void main() {
         maxHeight: 1300,
         child: Column(
           children: [
-            SizedBox(height: 640, child: AgentChat(store: store, panel: true)),
-            SizedBox(height: 640, child: AgentChat(store: store, panel: true)),
+            SizedBox(
+              height: 640,
+              child: ScratchChatPane(store: store, panel: true),
+            ),
+            SizedBox(
+              height: 640,
+              child: ScratchChatPane(store: store, panel: true),
+            ),
           ],
         ),
       ),

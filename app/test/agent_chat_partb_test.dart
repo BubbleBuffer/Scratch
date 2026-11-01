@@ -395,7 +395,7 @@ void main() {
         Center(
           child: SizedBox(
             width: 320,
-            child: AgentChat(store: store, panel: true),
+            child: ScratchChatPane(store: store, panel: true),
           ),
         ),
       );
@@ -435,7 +435,7 @@ void main() {
       Center(
         child: SizedBox(
           width: 400,
-          child: AgentChat(store: store, panel: true),
+          child: ScratchChatPane(store: store, panel: true),
         ),
       ),
     );
@@ -566,7 +566,7 @@ void main() {
       ))!;
       // Complete real view registration and catch-up before installing the
       // synthetic live run, which intentionally never becomes animation-idle.
-      await showWidget(tester, AgentChat(store: store));
+      await showWidget(tester, ScratchChatPane(store: store));
       store.debugSetSnapshot(snapshot(session: session, status: 'running'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
@@ -723,7 +723,7 @@ void main() {
         Center(
           child: SizedBox(
             width: 400,
-            child: AgentChat(store: store, panel: true),
+            child: ScratchChatPane(store: store, panel: true),
           ),
         ),
       );

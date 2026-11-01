@@ -45,7 +45,7 @@ Future<void> pumpHistoryChat(
           child: SizedBox(
             width: width,
             height: height,
-            child: AgentChat(store: store),
+            child: ScratchChatPane(store: store),
           ),
         ),
       ),

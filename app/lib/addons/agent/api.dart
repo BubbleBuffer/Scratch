@@ -3,7 +3,7 @@
 
 export 'add_to_note.dart';
 export 'agent_cells.dart';
-export 'agent_chat.dart';
+export 'scratch_chat_pane.dart' show ScratchChatPane;
 export 'agent_composer.dart';
 export 'agent_markdown.dart';
 export 'agent_mcp_controller.dart';

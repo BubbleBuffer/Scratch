@@ -45,7 +45,10 @@ void main() {
     final registry = CommandRegistry();
     registerShellCommands(registry);
     expect(
-      registry.run('agent.replay.live', tester.element(find.byType(AgentChat))),
+      registry.run(
+        'agent.replay.live',
+        tester.element(find.byType(ScratchChatPane)),
+      ),
       isTrue,
     );
     await settle(tester);
