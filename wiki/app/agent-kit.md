@@ -29,13 +29,13 @@ The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same f
 
 ## The pin
 
-`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui's `v0.6.0` tag. Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
+`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui's `v0.7.1` tag. Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
 
 ```yaml
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/bb-ui
-      ref: v0.6.0
+      ref: v0.7.1
       path: packages/bb_ui
 ```
 
@@ -51,7 +51,7 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The dev pane's packages
 
-The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.16.0`. `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent dev pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.16.5` (commit `154356fe`). `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
 
 ## The chat outline
 
@@ -164,7 +164,7 @@ The search presentation is bb_ui's (`package:bb_ui/search.dart`, imported as `bb
 
 ## Command palette
 
-The command palette is bb_ui's (`package:bb_ui/palette.dart`, bb-ui 0.6.0): `showCommandPalette` opens a 560-wide panel near the top of the window (the full screen with a Cancel button on a phone) over a list of neutral `PaletteCommand`s (id, title, subtitle, group, shortcut label, enabled with a reason, icon from `Ico`). Typing fuzzy-filters (case-insensitive, characters in order, a contiguous or word-start match ranks higher, matches marked); Up and Down move the selection and stop at the ends, Enter runs it, Escape closes, Tab stays in the field. A disabled command is listed with its reason and never runs. Focus goes back to what had it, and the future completes only after that, with the picked command.
+The command palette is bb_ui's (`package:bb_ui/palette.dart`, bb-ui 0.7.1): `showCommandPalette` opens a 560-wide panel near the top of the window (the full screen with a Cancel button on a phone) over a list of neutral `PaletteCommand`s (id, title, subtitle, group, shortcut label, enabled with a reason, icon from `Ico`). Typing fuzzy-filters (case-insensitive, characters in order, a contiguous or word-start match ranks higher, matches marked); Up and Down move the selection and stop at the ends, Enter runs it, Escape closes, Tab stays in the field. A disabled command is listed with its reason and never runs. Focus goes back to what had it, and the future completes only after that, with the picked command.
 
 Scratch's side is `app/lib/shell/command_palette.dart`: `paletteCommands` maps `commandRegistry` onto the neutral model, sorted by label (enabled checks run when the palette opens; `Command.disabledReason` is the text shown for a disabled one, "Not available now" when a command gave none; the shortcut label is the command's first shortcut), and `openCommandPalette` runs the picked command through `CommandRegistry.run`, so its `BuildContext` action, shortcut binding and enabled check stay in the registry. The palette lists every registered command except `palette.open`. The command `palette.open` ("Command palette") is registered with the shell commands and opens with **Ctrl+Shift+P**, because Ctrl+K and Ctrl+P already open search. `test/command_palette_test.dart` covers opening by the shortcut, filtering, running, focus restore, a disabled command and the phone layout without the native core.
 
