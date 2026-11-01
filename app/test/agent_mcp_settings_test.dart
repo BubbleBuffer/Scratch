@@ -104,7 +104,9 @@ void main() {
     });
     // openAgentStore waits for ensureOpen and expects no open error: before
     // the wait was bounded it never returned while the server hung.
-    final store = await openAgentStore(t, settings: settings);
+    // (openAgentStore settles at the end, which waits for the hung call.)
+    final store = AgentStore.attach(current.vault, settings);
+    await real(t, store.ensureOpen);
     expect(store.openError, isNull);
     expect(store.hostInfo, isNotNull);
     // The server finally answers: nothing is left in flight for the teardown.
