@@ -22,14 +22,17 @@ import 'hub_auth.dart';
 
 /// Called once the vault is open.
 Future<void> startSyncAtBoot(SyncStore sync, AppSettings s) async {
+  BootTiming.mark('sync boot: begin');
   if (SyncStore.canHost && s.hubEnabled) {
     await setHubEnabled(sync, s, true);
+    BootTiming.mark('sync boot: hub started');
   }
   final url = s.clientUrl, token = s.clientToken;
   if (url != null && token != null) {
     try {
       await sync.connect(url, token, options: syncOptionsFor(s), trusted: trustedFor(s, url));
       AppLog.info('sync client started for $url');
+      BootTiming.mark('sync boot: sync.connect done');
     } catch (e) {
       AppLog.info('sync client failed: $e');
     }
@@ -37,18 +40,23 @@ Future<void> startSyncAtBoot(SyncStore sync, AppSettings s) async {
   try {
     await sync.refreshConflicts();
   } catch (_) {}
+  BootTiming.mark('sync boot: refreshConflicts');
   // AI: the agent and queued AI tasks.
   try {
     final ai = AiSettings.beside(s.file);
     // The agent first: AI tasks with the Agent runner use it.
     final agent = AgentStore.attach(sync.vault, ai)..useAppSettings(s);
     // Desktop: an old `mcp.toml` becomes MCP servers in the AI settings once.
+    BootTiming.mark('sync boot: AgentStore.attach');
     if (localAgentPlatform) await agent.importMcpFile();
+    BootTiming.mark('sync boot: importMcpFile');
     if (agent.enabled) await agent.ensureOpen();
+    BootTiming.mark('sync boot: agent.ensureOpen (enabled=${agent.enabled})');
     // A hub job (Ask AI or a task assigned to the agent on the Hub) reads
     // the hub's copy of the page: one sync round first.
     final store = AiStore.attach(sync.vault, sync.feed, ai)..syncBeforeHubJob = () => sync.syncOnce();
     await store.start();
+    BootTiming.mark('sync boot: AiStore.start');
   } catch (e) {
     AppLog.info('ai failed: $e');
   }

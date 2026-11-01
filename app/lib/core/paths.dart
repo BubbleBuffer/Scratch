@@ -6,6 +6,7 @@ import '../feedback/log_buffer.dart';
 import 'clock.dart';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/services.dart';
 
 /// The app's data folder.
@@ -63,6 +64,21 @@ abstract final class BootTiming {
   static int? _startUs;
 
   static void start(int startedAtUs) => _startUs = startedAtUs;
+
+  /// Logs every frame slower than 24 ms (build or raster) during the first
+  /// 15 s: `boot: slow frame build=<ms> raster=<ms> at <ms>ms`.
+  static void logSlowFrames() {
+    final s = _startUs;
+    if (s == null) return;
+    SchedulerBinding.instance.addTimingsCallback((timings) {
+      final at = (clockNow().microsecondsSinceEpoch - s) / 1000;
+      if (at > 15000) return;
+      for (final t in timings) {
+        final b = t.buildDuration.inMicroseconds / 1000, r = t.rasterDuration.inMicroseconds / 1000;
+        if (b > 24 || r > 24) mark('slow frame build=${b.toStringAsFixed(0)}ms raster=${r.toStringAsFixed(0)}ms');
+      }
+    });
+  }
 
   static void mark(String step) {
     final s = _startUs;

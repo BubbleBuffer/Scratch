@@ -26,4 +26,5 @@ Future<void> main() async {
   Bakeoff.instance.init(logDir: dir);
   runApp(NotesApp(dataDir: dir, startedAtUs: startedAtUs));
   WidgetsBinding.instance.addPostFrameCallback((_) => BootTiming.mark('first frame'));
+  BootTiming.logSlowFrames();
 }

@@ -38,10 +38,12 @@ import 'app_shell.dart';
 import 'addons.dart';
 import 'home.dart';
 
-const seedBench = bool.fromEnvironment('SEED_BENCH');
+// Boot timing runs also take SCRATCH_SEED_BENCH=1 and SCRATCH_SEED_PAGES=<n>
+// (environment, desktop) so one build can measure small and large vaults.
+final seedBench = const bool.fromEnvironment('SEED_BENCH') || Platform.environment['SCRATCH_SEED_BENCH'] == '1';
 const seedDemo = bool.fromEnvironment('SEED_DEMO');
 const seedTaskRows = int.fromEnvironment('SEED_TASKS');
-const benchPages = 10000;
+final benchPages = int.tryParse(Platform.environment['SCRATCH_SEED_PAGES'] ?? '') ?? 10000;
 const benchBigPageBlocks = 2000;
 
 class NotesApp extends StatefulWidget {
@@ -111,7 +113,9 @@ class _NotesAppState extends State<NotesApp> {
       BootTiming.mark('before Vault.open');
       final vault = await Vault.open(root, dataDir: widget.dataDir);
       BootTiming.mark('after Vault.open');
-      if (_settings.scheduleRunsHere && (Platform.isWindows || Platform.isLinux)) vault.localRunnerSetAvailable(true).ignore();
+      if (_settings.scheduleRunsHere && (Platform.isWindows || Platform.isLinux)) {
+        vault.localRunnerSetAvailable(true).whenComplete(() => BootTiming.mark('localRunnerSetAvailable done')).ignore();
+      }
       if (fresh) {
         if (seedDemo) {
           await createDemo(vault);
@@ -138,13 +142,14 @@ class _NotesAppState extends State<NotesApp> {
       }
       setState(() => _app = app);
       BootTiming.mark('after setState');
-      unawaited(_startRemote());
+      unawaited(_startRemote().whenComplete(() => BootTiming.mark('remote start done')));
       unawaited(
-        startSyncAtBoot(app.sync, _settings).whenComplete(
-          () => app.runNotices.start().catchError((Object e) {
+        startSyncAtBoot(app.sync, _settings).whenComplete(() {
+          BootTiming.mark('startSyncAtBoot done');
+          return app.runNotices.start().catchError((Object e) {
             AppLog.info('run notices failed to start: $e');
-          }),
-        ),
+          }).whenComplete(() => BootTiming.mark('runNotices.start done'));
+        }),
       );
       if (syncing && !seedDemo && !seedBench) {
         unawaited(seedStarterPagesAfterPull(vault, app.sync.firstSyncOk(), createTasks: seedTaskRows == 0).catchError((Object e) {
@@ -268,7 +273,7 @@ class _Boot extends StatelessWidget {
     }
     // Loading: the theme's desk colour, the same one Home sits on.
     if (!seeding) return ColoredBox(color: c.desk, child: const SizedBox.expand());
-    const total = benchPages + 1;
+    final total = benchPages + 1;
     final frac = (seeded / total).clamp(0.0, 1.0);
     return Center(
       child: SizedBox(

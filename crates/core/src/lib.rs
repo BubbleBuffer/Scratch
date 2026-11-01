@@ -47,6 +47,7 @@ mod search_items;
 mod search_path;
 mod search_api;
 mod search_exec;
+pub mod boot_trace;
 pub mod seed;
 #[cfg(feature = "storage-metrics")]
 pub mod storage_metrics;

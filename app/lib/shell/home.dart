@@ -117,10 +117,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final id = ui.lastPage;
     if (id == null) return;
     try {
+      BootTiming.mark('restore last page: loadPage begin');
       final p = await context.app.vault.loadPage(id);
+      BootTiming.mark('restore last page: loadPage done');
       if (!mounted) return;
       if (p.inTrash) throw StateError('in the trash');
       await openPage(context, id, p.title);
+      BootTiming.mark('restore last page: openPage done');
     } catch (_) {
       if (ui.lastPage == id) {
         ui.lastPage = null;

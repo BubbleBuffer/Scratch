@@ -474,6 +474,8 @@ impl Agent {
             .enable_all()
             .build()?;
         let _context = runtime.enter();
+        let mut tr = vault_core::boot_trace::Trace::new(std::path::Path::new(&vault.root()), "Agent::open");
+        tr.mark("tokio runtime");
 
         let dir = config.data_dir.join("agent");
         let workspace = dir.join("workspace");
@@ -485,6 +487,7 @@ impl Agent {
             store.clone(),
         )?);
         let ui = Arc::new(ui::Ui::new());
+        tr.mark("agent.sqlite store+records");
 
         // This runner's tool set, from the vault, read once per engine start.
         // The conversation tools (js, history_*, chat_read, ui_*) are in every
@@ -496,6 +499,7 @@ impl Agent {
         tools::register_vault_tools(&mut tools, vault.clone(), records.clone(), tool_set)?;
         context::register_tools(&mut tools, store.clone(), records.clone(), vault.clone())?;
         ui::register(&mut tools, ui.clone(), vault.clone(), records.clone())?;
+        tr.mark("register vault tools");
         let permission_file = dir.join("permission-mode.json");
         // Startup configuration is authoritative. Older saved permission files
         // are preserved but cannot restore approvals in the Bypass-only hosts.
@@ -582,6 +586,7 @@ impl Agent {
         } else {
             None
         };
+        tr.mark("packs + MCP host reload (block_on)");
         let default_model = if config.default_model.trim().is_empty() {
             match config.host_kind {
                 HostKind::Desktop => DEFAULT_MODEL,
@@ -601,6 +606,7 @@ impl Agent {
             config.bun_path.as_deref(),
             config.claude_code_dir.as_deref(),
         );
+        tr.mark("claude::detect");
         let extension = match (
             &claude_detection.bun_path,
             &claude_detection.claude_code_dir,
@@ -788,6 +794,8 @@ impl Agent {
             .cloned()
             .context("the agent host did not build a context")?;
         drop(_context);
+        tr.mark("host + harness built");
+        tr.finish(false);
         Ok(Agent {
             mcp: mcp_state,
             base_tools: host.tools,

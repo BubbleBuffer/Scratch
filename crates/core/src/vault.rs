@@ -2725,6 +2725,7 @@ impl Vault {
     /// before returning, and finishes interrupted file writes in the background.
     pub fn open(root: String) -> Result<Vault> {
         let root = PathBuf::from(root);
+        let mut tr = crate::boot_trace::Trace::new(&root, "Vault::open");
         for d in [
             root.join("pages"),
             root.join(".vault").join("docs"),
@@ -2733,6 +2734,7 @@ impl Vault {
         ] {
             fs::create_dir_all(d)?;
         }
+        tr.mark("create dirs");
         let lock_file = OpenOptions::new()
             .create(true)
             .truncate(false)
@@ -2749,14 +2751,19 @@ impl Vault {
         } else {
             loro::LoroDoc::new().peer_id()
         };
+        tr.mark("lock+device id");
         let purged = read_purged(&root)?;
         let mounts = crate::mounts::read_table(&root);
+        tr.mark("purged+mounts");
         let db_path = root.join(".vault").join("index.sqlite");
         let (db, fresh) = Index::open(&db_path)?;
+        tr.mark(if fresh { "Index::open (fresh, schema rebuilt)" } else { "Index::open (existing)" });
         if !fresh {
             crate::calendars::refresh_legacy_calendar_rows(&db)?;
         }
+        tr.mark("refresh_legacy_calendar_rows");
         let (writer_db, _) = Index::open(&db_path)?;
+        tr.mark("Index::open writer");
         let flush_file = shared_flush_file(&root)?;
         let (tx, rx) = mpsc::channel();
         let cold_pages = fs::read_dir(root.join(".vault/cold"))?
@@ -2804,6 +2811,7 @@ impl Vault {
             nodes: Mutex::new(()),
             conflict_auto_resolve_cache: std::sync::atomic::AtomicBool::new(false),
         });
+        tr.mark("cold policy + Inner");
         let worker = inner.clone();
         let handle = std::thread::Builder::new()
             .name("vault-writer".into())
@@ -2817,6 +2825,7 @@ impl Vault {
             vault.recover_restorations()?;
             vault.recover_purged_leftovers()?;
         }
+        tr.mark("recover_restorations+purged");
         if fresh && fs::read_dir(vault.inner.docs_dir())?.next().is_some() {
             vault.reindex()?;
         } else if !fresh {
@@ -2832,9 +2841,11 @@ impl Vault {
             }
             vault.inner.recover_missing_rows(&db, &missing)?;
         }
+        tr.mark("reindex / docs scan + recover_missing_rows");
         // Typo correction's titles and vocabulary are built now, not on the
         // first misspelled query.
         lock(&vault.inner.db).refresh_fuzzy()?;
+        tr.mark("refresh_fuzzy");
         let mut seen = HashSet::new();
         for entry in fs::read_dir(vault.inner.logs_dir())? {
             let entry = entry?;
@@ -2869,15 +2880,22 @@ impl Vault {
                 }
             }
         }
+        tr.mark("logs dir scan");
         vault.repair_day_notes_on_open()?;
+        tr.mark("repair_day_notes_on_open");
         vault.rebuild_conflict_archive_mirror()?;
+        tr.mark("rebuild_conflict_archive_mirror");
         vault.refresh_conflict_policy()?;
+        tr.mark("refresh_conflict_policy");
         vault.sweep_conflict_policy()?;
+        tr.mark("sweep_conflict_policy");
         let (live_db, _) = Index::open(&db_path)?;
         let worker = vault.inner.clone();
         let live_worker = std::thread::Builder::new().name("vault-live-queries".into())
             .spawn(move || crate::live_query::run(worker, live_db))?;
         *lock(&vault.live_worker) = Some(live_worker);
+        tr.mark("live worker");
+        tr.finish(true);
         Ok(vault)
     }
 
