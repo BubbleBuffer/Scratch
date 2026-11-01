@@ -62,7 +62,7 @@ void main() {
       await vault.deletePage(id);
       return id;
     });
-    Future<void> arrive() => real(tester, () => vault.restorePage(id));
+    Future<void> arrive() => vault.restorePage(id);
     late ScriptedSync client;
     final hubs = FakeHubs();
     SyncStore.clientFactory = (v, url, token, trusted) =>
@@ -122,10 +122,10 @@ void main() {
 
   appTest('a hub that does not answer in time counts as offline', (tester) async {
     final (id, _, _) = await setup(tester, (ids, arrive) => Completer<PageFetch>().future);
-    unawaited(fetchLinkedPage(homeContext(tester), PageLink(id), timeout: const Duration(milliseconds: 50)));
+    unawaited(fetchLinkedPage(homeContext(tester), PageLink(id), timeout: const Duration(seconds: 2)));
     await settle(tester);
     expect(textOf(tester, 'link-fetch-title'), 'Loading page');
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(seconds: 3));
     await settle(tester);
     expect(textOf(tester, 'link-fetch-title'), 'Hub unreachable');
     expect(key('link-fetch-retry'), findsOneWidget);
@@ -133,7 +133,7 @@ void main() {
 
   appTest('a page the hub lacks ends in the not-found toast', (tester) async {
     final (id, _, _) = await setup(tester, (ids, arrive) async => result(PageFetchStatus.notOnHub));
-    await openPageLink(homeContext(tester), PageLink(id));
+    unawaited(openPageLink(homeContext(tester), PageLink(id)));
     await settle(tester);
     expect(key('link-fetch-title'), findsNothing);
     expect(find.text(PageLink.missingMessage), findsOneWidget);
@@ -179,7 +179,7 @@ void main() {
       await vault.deletePage(id);
       return id;
     });
-    await openPageLink(homeContext(tester), PageLink(id));
+    unawaited(openPageLink(homeContext(tester), PageLink(id)));
     await settle(tester);
     expect(key('link-fetch-title'), findsNothing);
     expect(find.text(PageLink.missingMessage), findsOneWidget);

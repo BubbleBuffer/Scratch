@@ -97,6 +97,7 @@ class _LinkFetchPanelState extends State<LinkFetchPanel> {
   String? _message;
   int _attempt = 0;
   HubAuthService? _auth;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -107,6 +108,7 @@ class _LinkFetchPanelState extends State<LinkFetchPanel> {
   @override
   void dispose() {
     _attempt++;
+    _timer?.cancel();
     _auth?.cancel();
     _auth?.dispose();
     super.dispose();
@@ -129,14 +131,24 @@ class _LinkFetchPanelState extends State<LinkFetchPanel> {
       return;
     }
     PageFetch? result;
+    final done = Completer<PageFetch?>();
+    _timer?.cancel();
+    _timer = Timer(widget.timeout, () {
+      if (!done.isCompleted) done.completeError(TimeoutException(null));
+    });
+    widget.sync.fetchPages([widget.pageId]).then((r) {
+      if (!done.isCompleted) done.complete(r);
+    }, onError: (Object e) {
+      if (!done.isCompleted) done.completeError(e);
+    });
     try {
-      result = await widget.sync
-          .fetchPages([widget.pageId])
-          .timeout(widget.timeout);
+      result = await done.future;
+      _timer?.cancel();
     } on TimeoutException {
       if (!stale()) _set(_Step.offline);
       return;
     } catch (e) {
+      _timer?.cancel();
       if (!stale()) _set(_Step.failed, '$e');
       return;
     }
