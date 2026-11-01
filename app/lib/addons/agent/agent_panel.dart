@@ -11,6 +11,7 @@ import '../../state/pages_store.dart';
 import '../../state/ui_state.dart';
 import '../../ui/ui.dart';
 import 'agent_screen.dart';
+import 'scratch_chat_pane.dart';
 import 'agent_store.dart';
 
 /// One dock outside page routes. A presentation navigator supplies the shared
@@ -353,7 +354,7 @@ class AgentPanel extends StatelessWidget {
                     ),
                   ),
                 ),
-                Expanded(child: AgentChat(store: store, panel: true)),
+                Expanded(child: ScratchChatPane(store: store, panel: true)),
               ],
             ),
           ),

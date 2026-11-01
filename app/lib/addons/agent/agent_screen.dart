@@ -20,7 +20,7 @@ import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
 import '../../ui/ui.dart';
-import 'agent_chat.dart';
+import 'scratch_chat_pane.dart';
 import 'agent_store.dart';
 
 class AgentScreen extends StatefulWidget {
@@ -125,7 +125,7 @@ class _AgentScreenState extends State<AgentScreen> {
                             const SizedBox(width: 12),
                           ],
                           Expanded(
-                            child: AgentChat(
+                            child: ScratchChatPane(
                               store: store,
                               title: store.outline.chapters.isEmpty
                                   ? null

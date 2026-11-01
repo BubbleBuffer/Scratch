@@ -31,7 +31,6 @@ export 'mobile_agent_settings.dart';
 export 'navigation.dart';
 export 'outline_names.dart';
 
-
 import '../../registry/addon_registry.dart';
 import '../../registry/block_codecs.dart';
 import '../../services/addon_services.dart';
@@ -45,7 +44,6 @@ import 'blocks/chat_ref.dart';
 import 'commands.dart';
 import 'chat_type.dart';
 import 'chat_search.dart';
-import 'kit_pane.dart';
 export 'chat_search.dart'
     show AgentChatSearchSource, ChatSearchTargetNavigation, openChatHit;
 export 'chat_search_target.dart' show ChatSearchTarget;
@@ -88,8 +86,7 @@ class AgentAddon extends Addon {
           final app = AppScope.maybeOf(context);
           return app != null && AgentStore.of(app).enabled;
         },
-        build: (_) =>
-            agentKitPane ? const AgentKitScreen() : const AgentScreen(),
+        build: (_) => const AgentScreen(),
         wrap: (_, child) => AgentPanelShell(child: child),
         headerAction: (_) => const AgentPanelToggle(),
       ),
