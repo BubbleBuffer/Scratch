@@ -871,6 +871,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PageData dco_decode_page_data(dynamic raw);
 
   @protected
+  PageFetch dco_decode_page_fetch(dynamic raw);
+
+  @protected
+  PageFetchStatus dco_decode_page_fetch_status(dynamic raw);
+
+  @protected
   PagePrefsData dco_decode_page_prefs_data(dynamic raw);
 
   @protected
@@ -2050,6 +2056,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PageData sse_decode_page_data(SseDeserializer deserializer);
+
+  @protected
+  PageFetch sse_decode_page_fetch(SseDeserializer deserializer);
+
+  @protected
+  PageFetchStatus sse_decode_page_fetch_status(SseDeserializer deserializer);
 
   @protected
   PagePrefsData sse_decode_page_prefs_data(SseDeserializer deserializer);
@@ -3518,6 +3530,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_page_data(PageData self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_page_fetch(PageFetch self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_page_fetch_status(
+    PageFetchStatus self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_page_prefs_data(PagePrefsData self, SseSerializer serializer);

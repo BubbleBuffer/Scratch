@@ -103,6 +103,11 @@ abstract class NotesSync implements RustOpaqueInterface {
 
   Future<int> fetchMissingAttachments();
 
+  /// Pulls these pages (and their missing ancestors) from the hub now,
+  /// without waiting for a running sync and without touching the sync
+  /// state. Blocking: call it off the UI thread.
+  Future<PageFetch> fetchPages({required List<String> ids});
+
   factory NotesSync({
     required NotesVault vault,
     required String url,
