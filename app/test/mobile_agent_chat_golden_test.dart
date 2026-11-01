@@ -10,8 +10,10 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notes_app/addons/agent/agent_store.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/shell/home.dart';
 
@@ -24,6 +26,14 @@ Future<void> shot(String name) async {
     find.byType(Directionality).first,
     matchesGoldenFile('goldens/$name.png'),
   );
+}
+
+/// The phone layout on the local engine: the phone shell stays, but the
+/// agent runs on this computer (a phone chat otherwise needs a signed-in hub).
+Future<AgentStore> _phoneStore(WidgetTester tester) async {
+  debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+  addTearDown(() => debugDefaultTargetPlatformOverride = null);
+  return openAgentStore(tester);
 }
 
 Future<void> _open(WidgetTester tester) async {
@@ -40,14 +50,14 @@ void main() {
 
     appTest('mobile agent chat empty $tag', (tester) async {
       await pumpApp(tester, mobile: true, dark: dark);
-      await openAgentStore(tester);
+      await _phoneStore(tester);
       await _open(tester);
       await shot('mobile-agent-chat-empty-$tag');
     });
 
     appTest('mobile agent chat conversation $tag', (tester) async {
       await pumpApp(tester, mobile: true, dark: dark);
-      final store = await openAgentStore(tester);
+      final store = await _phoneStore(tester);
       await _open(tester);
       final s = (await real(
         tester,
