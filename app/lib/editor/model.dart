@@ -18,6 +18,7 @@ class Node {
     this.target,
     this.color,
     this.width,
+    this.numberedStart,
   }) : marks = marks ?? [];
 
   final String id;
@@ -36,6 +37,9 @@ class Node {
 
   /// Image width in percent of the column, null for the full width.
   int? width;
+
+  /// Stored first number of a numbered run; null starts a run at one.
+  int? numberedStart;
   Node? parent;
   final List<Node> children = [];
 
@@ -62,7 +66,8 @@ class Node {
       depth: depth,
       target: target,
       color: color,
-      width: width);
+      width: width,
+      numberedStart: numberedStart);
 
   /// A copy with a new id (and new ids for the copied children).
   Node copy({bool deep = true}) {
@@ -74,7 +79,8 @@ class Node {
         checked: checked,
         target: target,
         color: color,
-        width: width);
+        width: width,
+        numberedStart: numberedStart);
     if (deep) {
       for (final k in children) {
         final kc = k.copy();
@@ -89,6 +95,9 @@ class Node {
 /// A new block id in the core's format.
 String newBlockId() => newId();
 
+/// The largest number a numbered run can start at: the core stores it as a u32.
+const maxNumberedStart = 0xFFFFFFFF;
+
 BOp _op(OpKind op, String id,
         {String? parent,
         String? after,
@@ -98,7 +107,8 @@ BOp _op(OpKind op, String id,
         bool checked = false,
         String? target,
         String? color,
-        int? width}) =>
+        int? width,
+        int? numberedStart}) =>
     BOp(
         op: op,
         id: id,
@@ -110,7 +120,8 @@ BOp _op(OpKind op, String id,
         checked: checked,
         target: target,
         color: color,
-        width: width);
+        width: width,
+        numberedStart: numberedStart);
 
 class Doc {
   Doc(this.pageId, this.title);
@@ -142,7 +153,8 @@ class Doc {
           checked: b.checked,
           target: b.target,
           color: b.color,
-          width: b.width);
+          width: b.width,
+          numberedStart: b.numberedStart);
       while (stack.length > b.depth) {
         stack.removeLast();
       }
@@ -165,11 +177,13 @@ class Doc {
   void reflatten() {
     final out = <Node>[];
     void walk(List<Node> list, int depth) {
-      var num = 0;
+      int? num;
       for (final n in list) {
         n.depth = depth;
-        num = n.kind == Kinds.numbered ? num + 1 : 0;
-        n.number = math.max(1, num);
+        num = n.kind == Kinds.numbered
+            ? (num == null ? n.numberedStart ?? 1 : num + 1)
+            : null;
+        n.number = num ?? 1;
         n.flatIndex = out.length;
         out.add(n);
         walk(n.children, depth + 1);
@@ -298,7 +312,8 @@ class Doc {
   List<BOp> _insertOps(Node n, Node? parent, Node? after) {
     final ops = [
       _op(OpKind.insert, n.id,
-          parent: parent?.id, after: after?.id, kind: n.kind, text: n.text, marks: List.of(n.marks), checked: n.checked),
+          parent: parent?.id, after: after?.id, kind: n.kind, text: n.text, marks: List.of(n.marks), checked: n.checked,
+          numberedStart: n.numberedStart),
       if (n.target != null) _op(OpKind.setTarget, n.id, target: n.target),
       if (n.color != null) _op(OpKind.setColor, n.id, color: n.color),
       if (n.width != null) _op(OpKind.setWidth, n.id, width: n.width),
@@ -341,6 +356,14 @@ class Doc {
     return [_op(OpKind.setKind, n.id, kind: kind)];
   }
 
+  /// Stores [start] as the first number of the numbered run [n] starts, or
+  /// clears it (null starts the run at one).
+  List<BOp> setNumberedStart(Node n, int? start) {
+    n.numberedStart = start;
+    reflatten(); // numbering may change
+    return [_op(OpKind.setNumberedStart, n.id, numberedStart: start)];
+  }
+
   List<BOp> setChecked(Node n, bool v) {
     n.checked = v;
     return [_op(OpKind.setChecked, n.id, checked: v)];
@@ -367,7 +390,8 @@ class Doc {
       final n = byId[o.id];
       switch (o.op) {
         case OpKind.insert:
-          final x = Node(id: o.id, kind: o.kind, text: o.text, marks: List.of(o.marks), checked: o.checked);
+          final x = Node(id: o.id, kind: o.kind, text: o.text, marks: List.of(o.marks), checked: o.checked,
+              numberedStart: o.numberedStart);
           final p = o.parent == null ? null : byId[o.parent];
           final a = o.after == null ? null : byId[o.after];
           _attach(x, p, a);
@@ -398,6 +422,8 @@ class Doc {
           n?.color = o.color;
         case OpKind.setWidth:
           n?.width = o.width;
+        case OpKind.setNumberedStart:
+          n?.numberedStart = o.numberedStart;
       }
     }
     reflatten();
@@ -406,7 +432,8 @@ class Doc {
   /// The blocks' state, for undo (see [diffSnapshots]).
   List<SnapBlock> snapshot() => [
         for (final n in flat)
-          SnapBlock(n.id, n.parent?.id, n.kind, n.text, List.of(n.marks), n.checked, n.target, n.color, n.width)
+          SnapBlock(n.id, n.parent?.id, n.kind, n.text, List.of(n.marks), n.checked, n.target, n.color, n.width,
+              n.numberedStart)
       ];
 
   /// Tab: become the last child of the previous sibling.
@@ -506,7 +533,8 @@ class Doc {
 
 class SnapBlock {
   const SnapBlock(
-      this.id, this.parent, this.kind, this.text, this.marks, this.checked, this.target, this.color, this.width);
+      this.id, this.parent, this.kind, this.text, this.marks, this.checked, this.target, this.color, this.width,
+      [this.numberedStart]);
   final String id;
   final String? parent;
   final String kind, text;
@@ -514,6 +542,7 @@ class SnapBlock {
   final bool checked;
   final String? target, color;
   final int? width;
+  final int? numberedStart;
 }
 
 /// The ops that turn the blocks of snapshot [a] into those of [b]: moves
@@ -544,7 +573,8 @@ List<BOp> diffSnapshots(List<SnapBlock> a, List<SnapBlock> b) {
       ops.add(_op(OpKind.move, x.id, parent: want, after: after));
     } else {
       ops.add(_op(OpKind.insert, x.id,
-          parent: want, after: after, kind: x.kind, text: x.text, marks: List.of(x.marks), checked: x.checked));
+          parent: want, after: after, kind: x.kind, text: x.text, marks: List.of(x.marks), checked: x.checked,
+          numberedStart: x.numberedStart));
       if (x.target != null) ops.add(_op(OpKind.setTarget, x.id, target: x.target));
       if (x.color != null) ops.add(_op(OpKind.setColor, x.id, color: x.color));
       if (x.width != null) ops.add(_op(OpKind.setWidth, x.id, width: x.width));
@@ -564,6 +594,9 @@ List<BOp> diffSnapshots(List<SnapBlock> a, List<SnapBlock> b) {
     if (o.target != x.target) ops.add(_op(OpKind.setTarget, x.id, target: x.target));
     if (o.color != x.color) ops.add(_op(OpKind.setColor, x.id, color: x.color));
     if (o.width != x.width) ops.add(_op(OpKind.setWidth, x.id, width: x.width));
+    if (o.numberedStart != x.numberedStart) {
+      ops.add(_op(OpKind.setNumberedStart, x.id, numberedStart: x.numberedStart));
+    }
   }
   for (final x in a) {
     if (bIds.contains(x.id)) continue;

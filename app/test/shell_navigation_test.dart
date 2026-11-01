@@ -3,7 +3,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/tasks/api.dart';
 import 'package:notes_app/registry/addon_registry.dart';
-import 'package:notes_app/shell/addons.dart';
 import 'package:notes_app/shell/home.dart';
 import 'package:notes_app/ui/ui.dart';
 
@@ -138,26 +137,6 @@ void main() {
     },
   );
 
-  testWidgets(
-    'boot without Tasks removes Calendar and task create action from phone',
-    (tester) async {
-      final previous = activeAddonContext;
-      final ctx = AddonContext();
-      bootAddons(enabledAddons({'tasks'}), ctx);
-      activeAddonContext = ctx;
-      addTearDown(() {
-        activeAddonContext = previous;
-        ctx.noteTypes.dispose();
-      });
-      await pumpFrame(tester, 'today');
-      expect(key('nav-calendar'), findsNothing);
-      expect(key('mobile-create'), findsNothing);
-      for (final name in ['nav-pages', 'nav-today', 'nav-search']) {
-        expect(key(name), findsOneWidget);
-      }
-    },
-  );
-
   appTest('Calendar sidebar entry opens and selects its own destination', (
     tester,
   ) async {
@@ -188,25 +167,4 @@ void main() {
     expect(find.byType(VaultCalendarScreen), findsNothing);
   });
 
-  appTest('boot without Tasks removes the Calendar sidebar entry', (
-    tester,
-  ) async {
-    final fixture = await pumpApp(tester, mobile: false, empty: true);
-    expect(key('today-add-task'), findsOneWidget);
-    final previous = activeAddonContext;
-    final ctx = AddonContext();
-    bootAddons(enabledAddons({'tasks'}), ctx);
-    activeAddonContext = ctx;
-    addTearDown(() {
-      activeAddonContext = previous;
-      ctx.noteTypes.dispose();
-    });
-    fixture.app.tree.setSidebarCollapsed(true);
-    await settle(tester);
-    fixture.app.tree.setSidebarCollapsed(false);
-    await settle(tester);
-    expect(key('sidebar-calendar'), findsNothing);
-    expect(key('sidebar-home'), findsOneWidget);
-    expect(key('today-add-task'), findsNothing);
-  });
 }

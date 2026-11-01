@@ -125,7 +125,7 @@ class FeedbackController {
     try {
       final box = captureKey.currentContext?.findRenderObject();
       if (box is! RenderRepaintBoundary) return null;
-      final ratio = math.min(MediaQuery.devicePixelRatioOf(context), 2.0);
+      final ratio = math.min(MediaQuery.devicePixelRatioOf(context), 3.0);
       final image = await box.toImage(pixelRatio: ratio);
       try {
         final data = await image.toByteData(format: ui.ImageByteFormat.png);

@@ -3,7 +3,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use bubblepaw_core::{Approval, Tool, ToolContext, ToolDefinition, ToolResult};
+use bubblepaw_sdk::approvals::Approval;
+use bubblepaw_sdk::tools::{Tool, ToolContext, ToolDefinition, ToolResult};
 use serde_json::{json, Value};
 
 /// The test tool's name: `tools.test_confirm({text})` inside `js`.

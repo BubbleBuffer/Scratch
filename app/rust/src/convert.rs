@@ -119,6 +119,7 @@ pub(crate) fn flat_block(b: vc::Block, depth: u32) -> (FlatBlock, Vec<vc::Block>
             target: b.target,
             color: b.color,
             width: b.width,
+            numbered_start: b.numbered_start,
         },
         b.children,
     )
@@ -301,7 +302,24 @@ pub(crate) fn progress(p: vc::Progress) -> Progress {
     }
 }
 
-pub(crate) fn block_op(o: BOp) -> Result<vc::BlockOp, String> {
+/// Expand insertion metadata into the same transaction as its new block.
+pub(crate) fn block_ops(ops: Vec<BOp>) -> Result<Vec<vc::BlockOp>, String> {
+    let mut out = Vec::with_capacity(ops.len());
+    for op in ops {
+        let numbered_start = if op.op == OpKind::Insert {
+            op.numbered_start.map(|start| (op.id.clone(), start))
+        } else {
+            None
+        };
+        out.push(block_op(op)?);
+        if let Some((id, start)) = numbered_start {
+            out.push(vc::BlockOp::SetNumberedStart { id, numbered_start: Some(start) });
+        }
+    }
+    Ok(out)
+}
+
+fn block_op(o: BOp) -> Result<vc::BlockOp, String> {
     Ok(match o.op {
         OpKind::Insert => {
             let marks = marks_to(&o.text, &o.marks);
@@ -328,6 +346,9 @@ pub(crate) fn block_op(o: BOp) -> Result<vc::BlockOp, String> {
         OpKind::SetTarget => vc::BlockOp::SetTarget { id: o.id, target: o.target },
         OpKind::SetColor => vc::BlockOp::SetColor { id: o.id, color: o.color },
         OpKind::SetWidth => vc::BlockOp::SetWidth { id: o.id, width: o.width },
+        OpKind::SetNumberedStart => vc::BlockOp::SetNumberedStart {
+            id: o.id, numbered_start: o.numbered_start,
+        },
     })
 }
 
@@ -957,10 +978,93 @@ pub(crate) fn sync_options_to(o: SyncOptions) -> vault_sync::SyncOptions {
 mod tests {
     use super::*;
 
+    struct TempVault(std::path::PathBuf);
+
+    impl TempVault {
+        fn new() -> Self {
+            Self(std::env::temp_dir().join(format!("notes_bridge_numbered_{}", vc::new_id())))
+        }
+
+        fn open(&self) -> vc::Vault {
+            vc::Vault::open(self.0.to_string_lossy().into_owned()).unwrap()
+        }
+    }
+
+    impl Drop for TempVault {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn block_edit(block: &FlatBlock, op: OpKind) -> BOp {
+        BOp {
+            op, id: block.id.clone(), parent: None, after: None,
+            kind: block.kind.clone(), text: block.text.clone(), marks: block.marks.clone(),
+            checked: block.checked, target: block.target.clone(), color: block.color.clone(),
+            width: block.width, numbered_start: block.numbered_start,
+        }
+    }
+
+    #[test]
+    fn numbered_start_flatten_and_recreate_preserves_markdown_and_default_start() {
+        let temp = TempVault::new();
+        let vault = temp.open();
+        for markdown in ["3. a\n4. b", "1. a\n2. b"] {
+            let mut flat = Vec::new();
+            flatten(vault.parse_markdown(markdown.into()), 0, &mut flat);
+            assert_eq!(flat[0].numbered_start, if markdown.starts_with('3') { Some(3) } else { None });
+            assert_eq!(flat[1].numbered_start, None);
+            let ops = flat.iter().enumerate().map(|(index, block)| {
+                let mut op = block_edit(block, OpKind::Insert);
+                op.after = index.checked_sub(1).map(|previous| flat[previous].id.clone());
+                op
+            }).collect();
+            let page = vault.create_page(None, "Recreated".into()).unwrap();
+            vault.apply(page.clone(), block_ops(ops).unwrap()).unwrap();
+            let recreated = page_data(vault.load_page(page.clone()).unwrap(), 0);
+            assert_eq!(recreated.blocks, flat);
+            assert_eq!(vault.page_markdown(page).unwrap(), markdown);
+        }
+    }
+
+    #[test]
+    fn numbered_start_flatten_preserves_nested_and_separate_run_metadata() {
+        let temp = TempVault::new();
+        let vault = temp.open();
+        let mut flat = Vec::new();
+        flatten(vault.parse_markdown("9. parent\n   4. child\n   5. child two\n10. next\n\nbreak\n\n6. separate".into()), 0, &mut flat);
+        assert_eq!(flat.iter().map(|block| (block.depth, block.numbered_start)).collect::<Vec<_>>(),
+            vec![(0, Some(9)), (1, Some(4)), (1, None), (0, None), (0, None), (0, Some(6))]);
+    }
+
+    #[test]
+    fn numbered_start_edit_survives_text_changes_and_explicitly_clears() {
+        let temp = TempVault::new();
+        let vault = temp.open();
+        let page = vault.create_page(None, "Edited".into()).unwrap();
+        let (flat, _) = flat_block(vault.parse_markdown("3. a".into()).remove(0), 0);
+        vault.apply(page.clone(), block_ops(vec![block_edit(&flat, OpKind::Insert)]).unwrap()).unwrap();
+
+        let mut text = block_edit(&flat, OpKind::SetText);
+        text.text = "edited".into();
+        text.numbered_start = None;
+        vault.apply(page.clone(), block_ops(vec![text]).unwrap()).unwrap();
+        assert_eq!(vault.page_markdown(page.clone()).unwrap(), "3. edited");
+
+        for (start, expected, stored) in [(Some(7), "7. edited", Some(7)), (None, "1. edited", None),
+            (Some(7), "7. edited", Some(7)), (Some(1), "1. edited", None)] {
+            let mut op = block_edit(&flat, OpKind::SetNumberedStart);
+            op.numbered_start = start;
+            vault.apply(page.clone(), block_ops(vec![op]).unwrap()).unwrap();
+            assert_eq!(vault.load_page(page.clone()).unwrap().blocks[0].numbered_start, stored);
+            assert_eq!(vault.page_markdown(page.clone()).unwrap(), expected);
+        }
+    }
+
     fn conflict_block(id: &str, text: &str, children: Vec<vc::Block>) -> vc::Block {
         vc::Block {
             id: id.into(), kind: vc::BlockKind::Paragraph, text: text.into(), marks: vec![],
-            checked: false, target: None, color: None, width: None, children,
+            checked: false, target: None, color: None, width: None, numbered_start: None, children,
         }
     }
 

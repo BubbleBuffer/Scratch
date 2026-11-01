@@ -179,6 +179,11 @@ Future<void> showWidget(
   }
 }
 
+/// The summary line that opens a turn's work.
+Finder workToggle(String turnId) => find
+    .descendant(of: key('agent-work-$turnId'), matching: find.byType(Text))
+    .first;
+
 Future<void> revealAndTap(WidgetTester tester, Finder target) async {
   await Scrollable.ensureVisible(tester.element(target), alignment: 0.5);
   await settle(tester);
@@ -390,7 +395,7 @@ void main() {
         Center(
           child: SizedBox(
             width: 320,
-            child: AgentChat(store: store, panel: true),
+            child: ScratchChatPane(store: store, panel: true),
           ),
         ),
       );
@@ -400,23 +405,18 @@ void main() {
       expectSendAtRight(tester);
       final row = key('agent-edit-edit');
       final rowBounds = tester.getRect(row);
-      for (final suffix in ['toggle', 'open', 'undo']) {
-        final control = key('agent-edit-edit-$suffix');
+      for (final name in ['Open', 'Undo']) {
+        final control = find.descendant(of: row, matching: find.text(name));
         expect(control.hitTestable(), findsOneWidget);
         final bounds = tester.getRect(control);
         expect(bounds.left, greaterThanOrEqualTo(rowBounds.left));
         expect(bounds.right, lessThanOrEqualTo(rowBounds.right));
       }
-      expect(
-        tester.widget<TextBtn>(key('agent-edit-edit-open')).onTap,
-        isNotNull,
+      await revealAndTap(
+        tester,
+        find.descendant(of: row, matching: find.textContaining('Edited ')),
       );
-      expect(
-        tester.widget<TextBtn>(key('agent-edit-edit-undo')).onTap,
-        isNotNull,
-      );
-      await revealAndTap(tester, key('agent-edit-edit-toggle'));
-      expect(key('agent-edit-edit-line-0'), findsOneWidget);
+      expect(find.text('old line'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -435,7 +435,7 @@ void main() {
       Center(
         child: SizedBox(
           width: 400,
-          child: AgentChat(store: store, panel: true),
+          child: ScratchChatPane(store: store, panel: true),
         ),
       ),
     );
@@ -467,16 +467,20 @@ void main() {
     );
     expect(find.text('Edited Garden plan'), findsOneWidget);
     final editBounds = tester.getRect(key('agent-edit-edit'));
-    final open = tester.getRect(key('agent-edit-edit-open'));
-    final undo = tester.getRect(key('agent-edit-edit-undo'));
-    final label = tester.getRect(key('agent-edit-edit-toggle'));
+    final open = tester.getRect(
+      find.descendant(of: key('agent-edit-edit'), matching: find.text('Open')),
+    );
+    final undo = tester.getRect(
+      find.descendant(of: key('agent-edit-edit'), matching: find.text('Undo')),
+    );
+    final label = tester.getRect(find.text('Edited Garden plan'));
     expect(open.width, lessThan(editBounds.width / 2));
     expect(undo.width, lessThan(editBounds.width / 2));
     expect((open.center.dy - undo.center.dy).abs(), lessThan(1));
     expect((open.center.dy - label.center.dy).abs(), lessThan(1));
     expect(find.text('+13'), findsOneWidget);
     expect(find.text('−1'), findsOneWidget);
-    expect(key('agent-edit-edit-line-0'), findsNothing);
+    expect(find.text('old line'), findsNothing);
     expect(key('agent-cell-call'), findsNothing);
     expect(
       find.text(
@@ -485,14 +489,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    await tapAndSettle(tester, key('agent-edit-edit-toggle'));
-    expect(key('agent-edit-edit-line-11'), findsOneWidget);
-    expect(key('agent-edit-edit-line-12'), findsNothing);
-    final removed = tester.widget<Text>(key('agent-edit-edit-line-0'));
-    expect(removed.style!.decoration, TextDecoration.lineThrough);
-    await revealAndTap(tester, key('agent-edit-edit-all'));
-    expect(key('agent-edit-edit-line-13'), findsOneWidget);
-    await revealAndTap(tester, key('agent-work-run-toggle'));
+    await tapAndSettle(tester, find.text('Edited Garden plan'));
+    expect(find.text('old line'), findsOneWidget);
+    expect(find.text('new line 12'), findsOneWidget);
+    await revealAndTap(tester, workToggle('run'));
     expect(find.text('Command failed'), findsOneWidget);
     expect(key('agent-cell-call'), findsNothing);
     await revealAndTap(tester, key('agent-work-run-code'));
@@ -538,22 +538,20 @@ void main() {
           ],
         ),
       );
-      expect(key('agent-edit-unavailable-undo'), findsNothing);
+      Finder undoOf(String id) => find.descendant(
+        of: key('agent-edit-$id'),
+        matching: find.text('Undo'),
+      );
+      expect(undoOf('unavailable'), findsNothing);
       expect(find.text('Created Garden plan'), findsOneWidget);
       expect(find.text('Moved Garden plan to trash'), findsOneWidget);
-      expect(find.text('+13'), findsNWidgets(3));
-      await tapAndSettle(tester, key('agent-edit-success-undo'));
+      expect(find.text('+13'), findsNWidgets(5));
+      await tapAndSettle(tester, undoOf('success'));
       expect(find.text('Undone'), findsOneWidget);
-      expect(
-        tester.widget<TextBtn>(key('agent-edit-success-undo')).onTap,
-        isNull,
-      );
+      expect(undoOf('success'), findsNothing);
       expect(calls, 1);
-      await tapAndSettle(tester, key('agent-edit-refused-undo'));
-      expect(
-        textOf(tester, 'agent-edit-refused-refusal'),
-        'Page changed since this edit',
-      );
+      await tapAndSettle(tester, undoOf('refused'));
+      expect(find.text('Page changed since this edit'), findsOneWidget);
     },
   );
 
@@ -568,13 +566,13 @@ void main() {
       ))!;
       // Complete real view registration and catch-up before installing the
       // synthetic live run, which intentionally never becomes animation-idle.
-      await showWidget(tester, AgentChat(store: store));
+      await showWidget(tester, ScratchChatPane(store: store));
       store.debugSetSnapshot(snapshot(session: session, status: 'running'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
       expect(textOf(tester, 'agent-working'), 'Working · Command failed');
       expect(key('agent-stop'), findsOneWidget);
-      await tester.tap(key('agent-work-run-toggle'));
+      await tester.tap(workToggle('run'));
       await tester.pump(const Duration(milliseconds: 50));
       expect(key('agent-work-run-code'), findsNothing);
       store.debugSetSnapshot(snapshot(session: session, status: 'cancelled'));
@@ -725,7 +723,7 @@ void main() {
         Center(
           child: SizedBox(
             width: 400,
-            child: AgentChat(store: store, panel: true),
+            child: ScratchChatPane(store: store, panel: true),
           ),
         ),
       );

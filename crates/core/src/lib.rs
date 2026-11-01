@@ -4,7 +4,7 @@
 //! The public surface is [`Vault`], the plain data types in [`types`], the
 //! single error type [`VaultError`] and [`seed::generate`]. Every public
 //! function takes owned arguments and is synchronous; run it off the UI
-//! thread. Design notes: `wiki/architecture/core-state.md`.
+//! thread. Design notes: `wiki/core/core-state.md`.
 
 mod agenda;
 mod agent_defaults;
@@ -53,9 +53,11 @@ pub mod storage_metrics;
 mod sync;
 mod templates;
 mod tree;
+mod triage;
 pub mod types;
 mod type_data;
 mod vault;
+mod view_blocks;
 
 pub use error::{Result, VaultError};
 pub use conflict_diff::{ConflictDiff, ConflictDiffSide, ConflictDiffBlock, ConflictDiffChange, ConflictDiffSpan};
@@ -65,6 +67,8 @@ pub use agent_defaults::{
 };
 pub use ids::{is_page_id, new_id, node_record_id, schedule_occurrence_id};
 pub use mdio::normalize_markdown;
+pub use triage::{TriageAction, TriageCandidate, TriageProposal, Repointed, TRIAGE_LINK, TRIAGE_TAG, TRIAGE_ACCEPTED, TRIAGE_DISMISSED, TRIAGE_PENDING};
+pub use nodes::{DeviceProject, DeviceRecord, DEVICE_ACTIVITY_INTERVAL_MS, RUNNER_ONLINE_WINDOW_MS};
 /// Roles of the hidden system pages (`role:` in their markdown).
 pub use markdown::ROLES as PAGE_ROLES;
 pub use type_data::ListItem;
@@ -73,4 +77,5 @@ pub use types::*;
 pub use search_query::{ParsedQuery, SearchExtras, SearchOperator, SearchSpec, SearchTerm, Token, TokenKind};
 pub use search_items::{ItemHit, ItemResults};
 pub use vault::Vault;
+pub use view_blocks::{view_block_text, ViewBlock};
 pub use live_query::LiveQuerySubscription;

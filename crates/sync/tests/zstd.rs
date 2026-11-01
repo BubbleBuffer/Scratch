@@ -406,7 +406,7 @@ fn an_old_client_pulls_and_pushes_plain_binary_v1() {
     let dir = TempDir::new("old");
     let v = dir.open();
     fill(&v, "old", 5, 20);
-    let token = net.hub.pair("old").unwrap();
+    let token = net.hub.pair_legacy_token("old").unwrap();
     old_client_sync(&v, &net.proxy.url, &token);
 
     // Both sides hold everything: the hub's 30 pages and the client's 5.
@@ -440,7 +440,7 @@ fn lone_hub(pages: usize) -> (TempDir, Arc<Hub>, String) {
         fill(&v, "lone", pages, 20);
     }
     let hub = Hub::new(v).unwrap();
-    let token = hub.pair("probe").unwrap();
+    let token = hub.pair_legacy_token("probe").unwrap();
     (dir, hub, token)
 }
 

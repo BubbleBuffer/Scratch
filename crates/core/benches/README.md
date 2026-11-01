@@ -132,32 +132,26 @@ revisions must resolve in the clone, so use a full clone (not `--depth`). The
 candidate must also be on origin, so push the candidate branch first.
 
 ```
-/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes <linux-host> 'git clone https://github.com/BubbleBuffer/notes-app.git /home/dev/work/search-ab'
+/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes <linux-host> 'git clone https://github.com/BubbleBuffer/Scratch.git /home/dev/work/search-ab'
 /c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes <linux-host> 'cd /home/dev/work/search-ab && git fetch origin <candidate-branch> && git checkout --detach origin/<candidate-branch> && python3 crates/core/benches/ab_search_gate.py selftest'
-/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes <linux-host> 'mkdir -p /home/dev/work/search-ab-worktrees && ln -sfn /home/dev/work/BubblePaw-base-agent /home/dev/work/search-ab-worktrees/BubblePaw-base-agent && test -d /home/dev/work/BubblePaw-base-agent && ulimit -n 65536 && cd /home/dev/work/search-ab && . /home/dev/.cargo/env && python3 crates/core/benches/ab_search_gate.py run --baseline <baseline-rev> --candidate <candidate-rev> --pairs 5 --jobs 2 --work-dir /home/dev/work/search-ab-worktrees --target-dir /home/dev/work/.target/search-ab --out-dir /home/dev/work/search-ab-results/<name>'
+/c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes <linux-host> 'mkdir -p /home/dev/work/search-ab-worktrees && ulimit -n 65536 && cd /home/dev/work/search-ab && . /home/dev/.cargo/env && python3 crates/core/benches/ab_search_gate.py run --baseline <baseline-rev> --candidate <candidate-rev> --pairs 5 --jobs 2 --work-dir /home/dev/work/search-ab-worktrees --target-dir /home/dev/work/.target/search-ab --out-dir /home/dev/work/search-ab-results/<name>'
 ```
 
-Worktree root and sibling dependencies. The clone must sit directly under
-`/home/dev/work`, next to the sibling `/home/dev/work/BubblePaw-base-agent`.
-The workspace's path dependencies are relative (for example
-`crates/agent/Cargo.toml`: `../../../BubblePaw-base-agent/...`). Cargo reads
-every workspace member's path dependencies to resolve the lockfile, so a
-missing sibling fails the build even with `-p vault_core`.
+Current Scratch revisions resolve BubblePaw dependencies from the public
+`BubbleBuffer/BubblePaw-Core` git source pinned in `Cargo.lock` (tag `v0.3.1`).
+They need network access or a populated Cargo git cache, not a sibling checkout.
+The explicit `--work-dir` keeps benchmark worktrees in a predictable location.
 
-- Each revision's worktree is `<work-dir>/<label>-<sha8>`. From there the
-  relative path reaches `<work-dir>/BubblePaw-base-agent`, not
-  `/home/dev/work/BubblePaw-base-agent`. The default temporary root
-  (`/tmp/search-gate-wt-*`) would look for `<temp-root>/BubblePaw-base-agent`,
-  which the harness never creates. So the run passes `--work-dir`.
-- The setup line creates the worktree parent and a symlink to the existing
-  sibling inside it. A symlink, not a copy, keeps one shared checkout of the
-  sibling. The harness never deletes the sibling: with `--work-dir` it does not
-  remove the root, and `git worktree remove` touches only each worktree.
+Historical baselines can still contain relative `BubblePaw-base-agent` path
+dependencies. Inspect the selected baseline manifests before running them. If a
+baseline needs that sibling, supply its matching checkout at
+`<work-dir>/BubblePaw-base-agent`; this is a historical benchmark requirement,
+not a requirement of the current Scratch tree. The harness does not create it.
+
 - `ulimit -n 65536` raises the open-file limit for the run. The baseline round
   failed during its untimed corpus setup with "Too many open files" under the
   default limit. This changes the environment, not the workload.
-- The private clone needs GitHub authentication; a transient credential helper
-  can supply credentials for clone/fetch without saving them on the Linux machine.
+- The current Scratch clone and Core source are public and need no private repository credentials.
 - The remote Linux build helper ships only the working tree (tracked and untracked files, no
   `.git`). It can run the selftest, but the gate resolves revisions from git
   history, so use the full clone above for a real run.
@@ -192,5 +186,5 @@ Without git history they fail, and the selftest reports that check as FAIL.
 - Earlier record, before the control band (rule: both median p50 and median p95
   ratios at most 1.05, no control): on the Linux machine, `4f978b9` versus `333d1ea` with
   five AB/BA pairs gave **FAIL**, with fourteen warm cases over 1.05 in median
-  p50. See the [superseded diagnostic record](../../../wiki/architecture/search-queries.md#interleaved-ab-acceptance-2026-10-13).
+  p50. See the [superseded diagnostic record](../../../wiki/core/search-queries.md#interleaved-ab-acceptance-2026-10-13).
   That result does not apply to the current rule.

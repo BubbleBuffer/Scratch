@@ -5,6 +5,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
@@ -22,6 +23,83 @@ PinnedCertificate pin(String fp, {int at = 1000}) => PinnedCertificate.of(
     );
 
 void main() {
+  group('issuer names and anchors', () {
+    test('nameParts takes CN, O and OU in any order, unescaped', () {
+      final n = nameParts('OU=Network Security,O=Example Corp,CN=Example Proxy CA');
+      expect(n.cn, 'Example Proxy CA');
+      expect(n.o, 'Example Corp');
+      expect(n.ou, 'Network Security');
+      final e = nameParts(r'CN=Proxy\, Inc+OU=Ops,O=A\2Bb,C=DE');
+      expect(e.cn, 'Proxy, Inc');
+      expect(e.ou, 'Ops');
+      expect(e.o, 'A+b');
+      final none = nameParts('O=No Name Inc');
+      expect(none.cn, isNull);
+      expect(nameParts('').cn, isNull);
+    });
+
+    test('a pin keeps the issuer DER the hub sent, and passes it on for its origin', () {
+      final der = Uint8List.fromList([0x30, 0x82, 0x01, 0x0A]);
+      final p = PinnedCertificate.of(
+        [
+          const CertDetails(subject: 'CN=notes.example.test', issuer: 'CN=Example Proxy CA,O=Example Corp', sha256: fp1),
+          const CertDetails(subject: 'CN=Example Proxy CA,O=Example Corp', issuer: 'CN=Root', sha256: fp2),
+        ],
+        trustedAtMs: 1,
+        issuerDer: der,
+      );
+      expect(p.issuerDer, der);
+      expect(p.issuerSha256, fp2);
+      expect(p.issuerName.cn, 'Example Proxy CA');
+
+      final t = TrustedCertificates()..add('https://notes.example.test', p);
+      final trust = t.trustFor('https://NOTES.example.test/x');
+      expect(trust.single.origin, 'https://notes.example.test:443');
+      expect(trust.single.sha256, fp1);
+      expect(trust.single.issuerDer, der);
+      expect(t.trustFor('https://other.example.test'), isEmpty);
+      expect(t.trustFor('https://notes.example.test:8443'), isEmpty);
+
+      // Round trip through the settings JSON.
+      final back = TrustedCertificates.fromJson(jsonDecode(jsonEncode(t.toJson())));
+      final q = back.lookup('https://notes.example.test')!;
+      expect(q.issuerDer, der);
+      expect(q.issuerSha256, fp2);
+      expect(back.trustKeyFor('https://notes.example.test'), t.trustKeyFor('https://notes.example.test'));
+    });
+
+    test('no issuer DER without an issuer in the chain', () {
+      final p = PinnedCertificate.of([const CertDetails(sha256: fp1)],
+          trustedAtMs: 1, issuerDer: Uint8List.fromList([1, 2, 3]));
+      expect(p.issuerDer, isNull);
+      expect(p.toJson().containsKey('issuerDer'), isFalse);
+    });
+
+    test('an entry saved before issuers were kept loads, with only its leaf pin', () {
+      final t = TrustedCertificates.fromJson({
+        'https://notes.corp.example.test:443': {
+          'sha256': fp1,
+          'subject': 'CN=notes.corp.example.test',
+          'issuer': 'CN=Example Proxy CA,O=Example Corp,OU=Network Security',
+          'notBeforeMs': 1,
+          'notAfterMs': 2,
+          'trustedAtMs': 3,
+          'chain': [],
+        },
+      });
+      final p = t.lookup('https://notes.corp.example.test')!;
+      expect(p.issuerDer, isNull);
+      expect(p.issuerSha256, '');
+      expect(p.issuerName.cn, 'Example Proxy CA');
+      expect(p.issuerName.o, 'Example Corp');
+      expect(p.issuerName.ou, 'Network Security');
+      final trust = t.trustFor('https://notes.corp.example.test').single;
+      expect(trust.sha256, fp1);
+      expect(trust.issuerDer, isNull);
+      expect(t.toJson()['https://notes.corp.example.test:443'], isNot(contains('issuerDer')));
+    });
+  });
+
   group('originOf', () {
     test('lowercases scheme and host and fills in the default port', () {
       expect(originOf('https://Hub.Example.TEST/sync'), 'https://hub.example.test:443');

@@ -39,8 +39,8 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::Message;
 use url::Url;
-use vault_agent::bubblepaw_core::ToolCall;
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::tools::ToolCall;
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
 use vault_agent::TestHooks;
 use vault_core::{new_id, Vault};
 use vault_sync::SyncClient;
@@ -322,8 +322,9 @@ async fn start_hub() -> Hub {
             scopes: None,
         },
         agent: AgentSection {
-            execution_mode: vault_agent::bubblepaw_core::ExecutionMode::Js,
+            execution_mode: vault_agent::bubblepaw_sdk::harness::ExecutionMode::Js,
             default_model: "scripted/scripted".into(),
+            models: vec!["scripted/scripted".into()],
             ..AgentSection::default()
         },
         ..Config::default()
@@ -555,7 +556,19 @@ async fn a_device_note_is_searched_read_and_edited_by_the_hub_agent() {
         .contains("Rice"));
 
     // A chat over /agent/ws; the scripted model runs search, read and edit.
-    let mut c = connect(&hub.url, &token, &device_id).await;
+    // The sync above bound the token to the device's key: send its session.
+    let bearer = tokio::task::spawn_blocking({
+        let (root, url, token) = (device.root(), hub.url.clone(), token.clone());
+        let id = device_id.clone();
+        move || {
+            vault_sync::DeviceSession::shared(&root, &id, &url, &token, None)
+                .and_then(|s| s.bearer())
+        }
+    })
+    .await
+    .unwrap()
+    .unwrap();
+    let mut c = connect(&hub.url, &bearer, &device_id).await;
     let s: w::AgentSession = typed(
         c.call("create_session", json!({"title": "Pantry"}))
             .await

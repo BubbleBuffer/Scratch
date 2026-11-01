@@ -31,8 +31,15 @@ void main() {
         await createRichPage(tester, tv);
         await openByTitle(tester, richTitle);
         await shot('$tag-rich-page');
-        // Further down: toggles open, columns, media and links.
-        await tester.tap(find.byKey(const ValueKey('toggle-r06')));
+        // Further down: toggles open, columns, media and links. On a phone
+        // the toggle sits just below the visible area: scroll it in first.
+        final toggle = find.byKey(const ValueKey('toggle-r06'), skipOffstage: false);
+        await Scrollable.ensureVisible(
+          tester.element(toggle),
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        );
+        await settle(tester);
+        await tester.tap(toggle);
         await settle(tester);
         await tester.drag(find.byType(CustomScrollView).last, Offset(0, mobile ? -560 : -420));
         // Finish the scrollbar's delayed fade on Flutter's fake clock.

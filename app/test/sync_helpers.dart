@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/models.dart';
 import 'package:notes_app/core/vault.dart';
+import 'package:notes_app/src/rust/api/sync.dart' show redeemPairingCode;
 
 import 'harness.dart';
 
@@ -56,8 +57,12 @@ Future<T> real<T>(WidgetTester tester, Future<T> Function() f) async => (await t
 Future<String> pairOther(WidgetTester tester, OtherDevice other) async {
   final sync = current.app.sync;
   final bound = await real(tester, () => sync.startHub('127.0.0.1:0'));
-  final token = await real(tester, () => sync.pair('Phone'));
+  final code = await real(tester, () => sync.pair('Phone'));
   final url = 'http://$bound';
+  final token = await real(
+    tester,
+    () => redeemPairingCode(vault: other.vault.raw, hubUrl: url, code: code, trusted: const []),
+  );
   other.client = NotesSync(vault: other.vault.raw, url: url, token: token);
   await real(tester, () => other.client!.syncOnce());
   await settle(tester);
@@ -81,6 +86,12 @@ Future<String> makeConflict(WidgetTester tester, OtherDevice other, String title
     await real(tester, () => other.client!.syncOnce());
   }
   await core(tester, (v) => v.apply(page, [setText(here)]));
+  // Loro stamps each change in whole seconds. When both edits share a second,
+  // the shown text falls to the device-id tie-break, and the device id is
+  // random per vault, so the text would differ between runs. Flushing the
+  // first edit and waiting past a second boundary makes the later edit win.
+  await real(tester, () => current.vault.flush());
+  await real(tester, () => Future<void>.delayed(const Duration(milliseconds: 1100)));
   await real(tester, () => other.vault.apply(page, [setText(there)]));
   await real(tester, () => current.vault.flush());
   await real(tester, () => other.vault.flush());

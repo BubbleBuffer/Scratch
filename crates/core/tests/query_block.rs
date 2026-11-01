@@ -385,7 +385,7 @@ fn opening_a_previous_index_rebuilds_stale_query_spec_search_text() {
         .unwrap()
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(rebuilt_version, 13);
+    assert_eq!(rebuilt_version, 14);
 }
 
 #[test]

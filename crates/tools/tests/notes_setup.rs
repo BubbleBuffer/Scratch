@@ -64,7 +64,7 @@ impl Env {
         }
         let server = notes_hub::start_on(listener, config).await.unwrap();
         let hub = server.hub().clone();
-        let device_token = tokio::task::spawn_blocking(move || hub.pair("setup-test"))
+        let device_token = tokio::task::spawn_blocking(move || hub.pair_legacy_token("setup-test"))
             .await
             .unwrap()
             .unwrap();

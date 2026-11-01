@@ -1,6 +1,6 @@
 // The page's "•••" menu:
-// small text and full width switches, lock, favourites, copy link,
-// duplicate, move to, Ask AI (about the page), undo, page history, deleted pages, delete, import
+// small text and full width switches, lock, favourites, copy link, share (with a hub
+// sign-in), duplicate, move to, Ask AI (about the page), undo, page history, deleted pages, delete, import
 // and export, then Send feedback. The switches apply in place; the other rows close the menu
 // and hand their action to the editor. A popover on desktop, a sheet on
 // mobile.
@@ -13,16 +13,24 @@ import '../../ui/icon_x.dart';
 import '../../ui/ui.dart';
 import '../ai/ask_ai.dart' show AiMark;
 import '../settings/controls.dart' show Toggle;
+import '../share/share_popup.dart' show shareClientOf;
 
-enum PageMenuAction { favorite, copyLink, duplicate, moveTo, askAi, undo, history, trash, delete, import, export, feedback }
+/// The Share item's label: "Share · 1 link", "Share · 2 links". Plain "Share"
+/// while the count is unknown (loading or failed) and with no links.
+String shareMenuLabel(int? links) => (links == null || links == 0)
+    ? 'Share'
+    : 'Share · $links ${links == 1 ? 'link' : 'links'}';
+
+enum PageMenuAction { favorite, copyLink, share, duplicate, moveTo, askAi, triage, proposals, undo, history, trash, delete, import, export, feedback }
 
 Future<PageMenuAction?> showPageMenu(BuildContext context, Rect? anchor,
-    {required String pageId, required bool favorite, required bool canUndo, bool canAskAi = false}) {
+    {required String pageId, required bool favorite, required bool canUndo, bool canAskAi = false, bool canShare = false}) {
   Widget body(BuildContext ctx) => PageMenu(
         pageId: pageId,
         favorite: favorite,
         canUndo: canUndo,
         canAskAi: canAskAi,
+        canShare: canShare,
         sheet: context.mobile,
         onAction: (a) => Navigator.of(ctx).pop(a),
       );
@@ -42,9 +50,13 @@ class PageMenu extends StatefulWidget {
     required this.onAction,
     this.sheet = false,
     this.canAskAi = false,
+    this.canShare = false,
   });
   final String pageId;
   final bool favorite, canUndo, sheet;
+
+  /// Shows "Share" (the share popup; only with a hub sign-in, not for databases).
+  final bool canShare;
 
   /// Shows "Ask AI" (an answer about the page, written at its end).
   final bool canAskAi;
@@ -58,6 +70,30 @@ class _PageMenuState extends State<PageMenu> {
   bool _colour = false;
   bool _saving = false;
   String? _error;
+
+  /// The page's share links on the hub; null while loading or on error.
+  int? _shareCount;
+  bool _counted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_counted || !widget.canShare) return;
+    _counted = true;
+    _countLinks();
+  }
+
+  /// One GET when the menu opens: the Share item then says how many links.
+  Future<void> _countLinks() async {
+    final client = shareClientOf(context);
+    if (client == null) return;
+    try {
+      final links = await client.list(widget.pageId);
+      if (mounted) setState(() => _shareCount = links.length);
+    } catch (_) {
+      // The item keeps its plain label.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -165,12 +201,17 @@ class _PageMenuState extends State<PageMenu> {
             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
               SpaceDot(meta.color), const SizedBox(width: 6), ico(Ico.chevronRight),
             ])),
-      row('copy-link', ico(Ico.link), 'Copy link', () => onAction(PageMenuAction.copyLink), shortcut: 'Ctrl+L'),
-      row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: 'Ctrl+D'),
-      row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo), shortcut: 'Ctrl+Shift+P'),
+      row('copy-link', ico(Ico.link), 'Copy link', () => onAction(PageMenuAction.copyLink), shortcut: shortcutHint('Ctrl+L')),
+      if (widget.canShare) row('share', icx(Ix.linkPage), shareMenuLabel(_shareCount), () => onAction(PageMenuAction.share)),
+      row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: shortcutHint('Ctrl+D')),
+      row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo)),
       if (widget.canAskAi) row('ask-ai', AiMark(size: iconSize), 'Ask AI', () => onAction(PageMenuAction.askAi)),
+      if (meta != null && !meta.missing && meta.parent == null) ...[
+        row('triage', AiMark(size: iconSize), 'Triage', () => onAction(PageMenuAction.triage)),
+        row('proposals', ico(Ico.duplicate), 'Merge proposals', () => onAction(PageMenuAction.proposals)),
+      ],
       sep(),
-      row('undo', ico(Ico.undo), 'Undo', canUndo ? () => onAction(PageMenuAction.undo) : null, shortcut: 'Ctrl+Z'),
+      row('undo', ico(Ico.undo), 'Undo', canUndo ? () => onAction(PageMenuAction.undo) : null, shortcut: shortcutHint('Ctrl+Z')),
       row('history', icx(Ix.history), 'Page history', () => onAction(PageMenuAction.history)),
       row('trash', icx(Ix.restore), 'Show deleted pages', () => onAction(PageMenuAction.trash)),
       row('delete', ico(Ico.trash, danger: true), 'Delete', () => onAction(PageMenuAction.delete), danger: true),
@@ -178,7 +219,7 @@ class _PageMenuState extends State<PageMenu> {
       row('import', icx(Ix.import), 'Import', () => onAction(PageMenuAction.import)),
       row('export', icx(Ix.export), 'Export', () => onAction(PageMenuAction.export)),
       sep(),
-      row('feedback', icx(Ix.feedback), 'Send feedback', () => onAction(PageMenuAction.feedback), shortcut: 'Ctrl+Shift+F'),
+      row('feedback', icx(Ix.feedback), 'Send feedback', () => onAction(PageMenuAction.feedback), shortcut: shortcutHint('Ctrl+Shift+F')),
     ]);
   }
 }

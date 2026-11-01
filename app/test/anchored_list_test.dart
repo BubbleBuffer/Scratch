@@ -1,6 +1,7 @@
+import 'package:agent_kit/agent_kit.dart'
+    show AnchoredList, AnchoredListController;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:notes_app/ui/anchored_list.dart';
 
 void main() {
   testWidgets('jumps to an unbuilt variable-height row and scrolls both ways', (

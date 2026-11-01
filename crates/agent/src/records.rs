@@ -1,6 +1,7 @@
 //! Agent-owned durable presentation records. Undo remains a UI API, never a tool.
 use anyhow::{ensure, Context, Result};
-use bubblepaw_core::{Store, ToolContext};
+use bubblepaw_sdk::store::Store;
+use bubblepaw_sdk::tools::ToolContext;
 use notes_agent_wire::{AgentEdit, DiffHunk, DiffLine, ToolActivity};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde_json::Value;

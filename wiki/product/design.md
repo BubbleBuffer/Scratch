@@ -63,6 +63,10 @@ status: current
 - **Shipped.** The Pawth icon pack (`design/icon/notes-icon-icons/`) supplies the Android mipmaps, the round and adaptive icons (with a monochrome layer) and the Windows `app_icon.ico`. The glyph is scaled to 80% of the canvas height by the group transform in `rebuild.sh` and in `notes-icon.svg`; change both together. To re-export the pack and copy it over these files, run `python design/icon/export_icons.py --install`.
 - **Style check.** No errors. It gives safe-zone warnings only; the circle mask grazes the ear tips.
 
+## Settings (2026-10-30)
+
+The Settings screen follows the approved reference in [design/settings-redesign](../../design/settings-redesign/README.md). The pages and their options are in [Settings](settings.md).
+
 ## Decisions
 
 - 2026-10-07: the Stacks direction (C) is chosen, with Patchwork's space colours used quietly.

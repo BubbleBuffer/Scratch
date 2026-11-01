@@ -7,6 +7,7 @@ use crate::api::agent::*;
 use crate::api::types::FlatBlock;
 use crate::api::vault::NotesVault;
 use crate::frb_generated::StreamSink;
+use vault_sync::tls::TrustedCertificate;
 
 /// Markdown as display blocks (see `api::agent::agent_markdown_blocks`).
 pub(crate) fn markdown_blocks(vault: &vault_core::Vault, text: &str) -> Vec<FlatBlock> {
@@ -106,8 +107,15 @@ impl Inner {
         }
     }
 
-    pub(crate) fn connect(url: String, device: String, token: String) -> Result<Inner, String> {
-        crate::agent_remote::Remote::connect(url, device, token).map(Inner::Remote)
+    pub(crate) fn connect(
+        url: String,
+        device: String,
+        token: String,
+        trusted: Vec<TrustedCertificate>,
+        vault_root: String,
+    ) -> Result<Inner, String> {
+        crate::agent_remote::Remote::connect(url, device, token, trusted, vault_root)
+            .map(Inner::Remote)
     }
 
     /// Lets the hub at `url` use this computer (`/host/ws`). Only the agent
@@ -117,13 +125,26 @@ impl Inner {
         url: String,
         device: String,
         token: String,
+        trusted: Vec<TrustedCertificate>,
+        vault_root: String,
     ) -> Result<(), String> {
         match self {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
-            Inner::Local(l) => l.host_relay_start(url, device, token),
+            Inner::Local(l) => l.host_relay_start(url, device, token, trusted, vault_root),
             Inner::Remote(_) => {
-                let _ = (url, device, token);
+                let _ = (url, device, token, trusted, vault_root);
                 Err(RELAY_LOCAL_ONLY.into())
+            }
+        }
+    }
+
+    /// Gives a running host relay the device's new trusted certificates.
+    pub(crate) fn host_relay_set_trust(&self, trusted: Vec<TrustedCertificate>) {
+        match self {
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            Inner::Local(l) => l.host_relay_set_trust(trusted),
+            Inner::Remote(_) => {
+                let _ = trusted;
             }
         }
     }
@@ -213,6 +234,7 @@ impl Inner {
             Inner::Remote(_) => AgentClaudeDetection {
                 bun_path: None,
                 claude_code_dir: None,
+                ignored_bun_override: None,
             },
         }
     }
@@ -367,6 +389,7 @@ mod desktop {
     use crate::agent_remote::EventSink;
     use crate::api::agent::*;
     use crate::api::vault::NotesVault;
+    use vault_sync::tls::TrustedCertificate;
 
     /// The agent on this computer. Commands name the client `desktop`. Schedules are
     /// not run here: the vault's local runner runs them, whether or not this agent is open.
@@ -437,6 +460,8 @@ mod desktop {
             url: String,
             device: String,
             token: String,
+            trusted: Vec<TrustedCertificate>,
+            vault_root: String,
         ) -> Result<(), String> {
             let mut relay = self.1.lock().unwrap();
             if let Some(mut old) = relay.take() {
@@ -444,9 +469,15 @@ mod desktop {
             }
             let host: Arc<dyn crate::host_relay::RelayHost> = self.0.clone();
             *relay = Some(crate::host_relay::HostRelay::start(
-                host, &url, &device, &token,
+                host, &url, &device, &token, trusted, &vault_root,
             )?);
             Ok(())
+        }
+
+        pub(crate) fn host_relay_set_trust(&self, trusted: Vec<TrustedCertificate>) {
+            if let Some(relay) = self.1.lock().unwrap().as_ref() {
+                relay.set_trust(trusted);
+            }
         }
 
         pub(crate) fn host_relay_stop(&self) -> Result<(), String> {
@@ -506,6 +537,10 @@ mod desktop {
                     .map(|p| p.to_string_lossy().into_owned()),
                 claude_code_dir: found
                     .claude_code_dir
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().into_owned()),
+                ignored_bun_override: found
+                    .ignored_bun_override
                     .as_ref()
                     .map(|p| p.to_string_lossy().into_owned()),
             }
@@ -782,7 +817,7 @@ mod desktop {
                     "write",
                     serde_json::json!({"path": "from-hub.txt", "content": "hello"}),
                     notes_agent_wire::host::Caller { id: "oauth:test".into(), name: None },
-                    vault_agent::bubblepaw_core::CancellationToken::new(),
+                    vault_agent::bubblepaw_sdk::harness::CancellationToken::new(),
                 )
                 .unwrap();
             assert!(!result.is_error && !result.pending, "{}", result.content);

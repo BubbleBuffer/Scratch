@@ -28,8 +28,9 @@ void main() {
     });
     final file = File('${folder.path}${Platform.pathSeparator}Ideas.md')..writeAsStringSync('Grow tomatoes.\n');
 
-    showSettings(tester.element(find.byType(HomeScreen)), section: SettingsSection.vault);
+    showSettings(tester.element(find.byType(HomeScreen)), section: SettingsSection.storage);
     await settle(tester);
+    await tapKey(tester, 'mount-open');
     await typeInto(tester, 'mount-path-field', 'not/absolute');
     await tapKey(tester, 'mount-add');
     expect(byKey('mount-error'), findsOneWidget);

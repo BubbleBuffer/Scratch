@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>View blocks sketch</title>
+<style>
+  :root {
+    --bg: #FFFFFF; --bg2: #F9F8F7; --bg3: #F0EFED; --hover: rgba(33,27,23,0.05);
+    --text: #2C2C2B; --text2: #7D7A75; --text3: #A19E99;
+    --border: #E6E5E3; --accent: #2383E2; --overlay: rgba(15,15,15,0.45);
+    --shadow: 0px 20px 24px 0px rgba(25,25,25,0.05), 0px 5px 8px 0px rgba(25,25,25,0.027), 0px 0px 0px 1px rgba(42,28,0,0.07);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg2); color: var(--text);
+    font: 16px/24px ui-sans-serif, -apple-system, "Segoe UI Variable Display", "Segoe UI", Helvetica, Arial, sans-serif; }
+  header.sketch { max-width: 1180px; margin: 0 auto; padding: 24px 16px 8px; }
+  header.sketch h1 { font-size: 20px; margin: 0 0 4px; }
+  header.sketch p { margin: 0; color: var(--text2); font-size: 14px; }
+  .frames { max-width: 1180px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+  .frame { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; position: relative; }
+  .cap { font: 500 12px/16px inherit; color: var(--text2); padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .page { padding: 28px 28px 32px; }
+  .crumb { font-size: 12px; color: var(--text3); margin-bottom: 6px; }
+  .title { font-size: 30px; line-height: 38px; font-weight: 700; margin: 0 0 8px; }
+  .body p { margin: 4px 0; }
+  .props { margin: 4px 0 14px; font-size: 14px; }
+  .prop { display: flex; gap: 12px; padding: 3px 0; }
+  .prop .k { width: 96px; color: var(--text2); }
+  .prop .add { color: var(--text3); }
+  .chip { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 13px; line-height: 20px; }
+  .c-g { background: #DBEDDB; } .c-y { background: #FDECC8; } .c-b { background: #D3E5EF; } .c-gr { background: #E3E2E0; }
+  .view { margin-top: 18px; border-top: 1px solid var(--border); }
+  .tabs { display: flex; align-items: center; gap: 2px; font: 500 14px/20px inherit; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .tab { padding: 4px 8px; border-radius: 6px; color: var(--text2); cursor: pointer; }
+  .tab.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--text); border-radius: 0; }
+  .tab:hover { background: var(--hover); }
+  .tabs .sp { flex: 1; }
+  .tabs .tool { color: var(--text3); font-size: 13px; padding: 4px 6px; }
+  .list .row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--bg3); font-size: 15px; }
+  .list .row .ic { color: var(--text3); }
+  .list .row .meta { margin-left: auto; display: flex; gap: 6px; }
+  .newrow { color: var(--text3); font-size: 14px; padding: 6px 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-weight: 500; color: var(--text2); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--bg3); }
+  td:first-child, th:first-child { padding-left: 2px; }
+  .board { display: flex; gap: 10px; padding-top: 10px; }
+  .col { flex: 1; background: var(--bg2); border-radius: 6px; padding: 8px; font-size: 13px; }
+  .card { background: var(--bg); box-shadow: var(--shadow); border-radius: 6px; padding: 6px 8px; margin-top: 6px; font-size: 14px; }
+  .scrim { position: absolute; inset: 33px 0 0 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .dialog { background: var(--bg); border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px; max-width: 320px; }
+  .dialog h3 { margin: 0 0 6px; font-size: 16px; line-height: 22px; }
+  .dialog p { margin: 0 0 14px; font-size: 14px; line-height: 20px; color: var(--text2); }
+  .btns { display: flex; justify-content: flex-end; gap: 8px; }
+  .btn { font: 500 14px/20px inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); }
+  .btn.pri { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .menu { position: absolute; right: 20px; top: 210px; background: var(--bg); border-radius: 6px; box-shadow: var(--shadow); padding: 4px; font-size: 14px; width: 170px; }
+  .menu div { padding: 5px 8px; border-radius: 4px; }
+  .menu div:hover { background: var(--hover); }
+  .menu .h { color: var(--text3); font-size: 12px; }
+  .notes { max-width: 1180px; margin: 0 auto; padding: 0 16px 32px; font-size: 14px; color: var(--text2); }
+  .notes li { margin: 2px 0; }
+</style>
+</head>
+<body>
+<header class="sketch">
+  <h1>Pages with view blocks</h1>
+  <p>Sketch for decisions 0020/0021. Throwaway HTML; the real UI is settled in the Flutter app.</p>
+</header>
+
+<div class="frames">
+
+  <!-- 1. A plain page: body, then a view block listing its children -->
+  <section class="frame">
+    <div class="cap">1 · A page with child pages. "Projects" after migration.</div>
+    <div class="page">
+      <div class="title">Projects</div>
+      <div class="body"><p>Everything I'm building, one page each.</p></div>
+      <div class="view">
+        <div class="tabs">
+          <span class="tab on">List</span>
+          <span class="tab">+ Add view</span>
+          <span class="sp"></span>
+          <span class="tool">Filter</span><span class="tool">Sort</span><span class="tool">···</span>
+        </div>
+        <div class="list">
+          <div class="row"><span class="ic">▤</span>notes-app</div>
+          <div class="row"><span class="ic">▤</span>BubblePaw</div>
+          <div class="row"><span class="ic">▤</span>BubblePlay</div>
+          <div class="row"><span class="ic">▤</span>claude-codemode</div>
+          <div class="row"><span class="ic">▤</span>Home server</div>
+        </div>
+        <div class="newrow">+ New page</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Adding a property to a child offers it to the siblings -->
+  <section class="frame">
+    <div class="cap">2 · Adding a property to one child page.</div>
+    <div class="page">
+      <div class="crumb">Projects /</div>
+      <div class="title">notes-app</div>
+      <div class="props">
+        <div class="prop"><span class="k">Status</span><span class="chip c-y">Doing</span></div>
+        <div class="prop"><span class="add">+ Add a property</span></div>
+      </div>
+      <div class="body"><p>Scratch: notes, plans and a calendar.</p></div>
+    </div>
+    <div class="scrim">
+      <div class="dialog">
+        <h3>Add Status to all 5 pages under Projects?</h3>
+        <p>They get an empty Status, and new pages under Projects start with it.</p>
+        <div class="btns"><button class="btn">Cancel</button><button class="btn pri">Add</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. After Add: the parent's view shows the property; switch layout -->
+  <section class="frame">
+    <div class="cap">3 · After Add: the list shows Status; more layouts one click away.</div>
+    <div class="page">
+      <div class="title">Projects</div>
+      <div class="body"><p>Everything I'm building, one page each.</p></div>
+      <div class="view">
+        <div class="tabs">
+          <span class="tab on">List</span>
+          <span class="tab">+ Add view</span>
+          <span class="sp"></span>
+          <span class="tool">Filter</span><span class="tool">Sort</span><span class="tool">···</span>
+        </div>
+        <div class="list">
+          <div class="row"><span class="ic">▤</span>notes-app<span class="meta"><span class="chip c-y">Doing</span></span></div>
+          <div class="row"><span class="ic">▤</span>BubblePaw<span class="meta"><span class="chip c-g">Done</span></span></div>
+          <div class="row"><span class="ic">▤</span>BubblePlay<span class="meta"></span></div>
+          <div class="row"><span class="ic">▤</span>claude-codemode<span class="meta"></span></div>
+          <div class="row"><span class="ic">▤</span>Home server<span class="meta"></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="menu">
+      <div class="h">Layout</div>
+      <div>✓ List</div><div>Table</div><div>Board</div><div>Calendar</div><div>Gallery</div><div>Timeline</div>
+    </div>
+  </section>
+
+  <!-- 4. A page with several view blocks: they show as tabs -->
+  <section class="frame">
+    <div class="cap">4 · Tasks: body, then its view blocks as tabs (was a full-page table).</div>
+    <div class="page">
+      <div class="title">Tasks</div>
+      <div class="body"><p>Every task is a page here. Due dates show on Today and the calendar.</p></div>
+      <div class="view">
+        <div class="tabs">
+          <span class="tab">Table</span>
+          <span class="tab on">Board</span>
+          <span class="tab">+ Add view</span>
+          <span class="sp"></span>
+          <span class="tool">Filter</span><span class="tool">Sort</span><span class="tool">···</span>
+        </div>
+        <div class="board">
+          <div class="col">To do
+            <div class="card">Renew passport</div>
+            <div class="card">Book dentist</div>
+          </div>
+          <div class="col">Doing
+            <div class="card">Tax return</div>
+          </div>
+          <div class="col">Done
+            <div class="card">Pay rent</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Same page, table tab -->
+  <section class="frame">
+    <div class="cap">5 · Same page, Table tab. Columns are the parent's default properties.</div>
+    <div class="page">
+      <div class="title">Tasks</div>
+      <div class="body"><p>Every task is a page here. Due dates show on Today and the calendar.</p></div>
+      <div class="view">
+        <div class="tabs">
+          <span class="tab on">Table</span>
+          <span class="tab">Board</span>
+          <span class="tab">+ Add view</span>
+          <span class="sp"></span>
+          <span class="tool">Filter</span><span class="tool">Sort</span><span class="tool">···</span>
+        </div>
+        <table>
+          <tr><th>Name</th><th>Status</th><th>Due</th><th>+</th></tr>
+          <tr><td>Renew passport</td><td><span class="chip c-gr">To do</span></td><td>Nov 3</td><td></td></tr>
+          <tr><td>Book dentist</td><td><span class="chip c-gr">To do</span></td><td></td><td></td></tr>
+          <tr><td>Tax return</td><td><span class="chip c-y">Doing</span></td><td>Nov 15</td><td></td></tr>
+          <tr><td>Pay rent</td><td><span class="chip c-g">Done</span></td><td>Oct 28</td><td></td></tr>
+        </table>
+        <div class="newrow">+ New page</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Slash menu: no Database, a View item instead -->
+  <section class="frame">
+    <div class="cap">6 · The / menu: "Database" is gone; "View" lists this page's child pages.</div>
+    <div class="page">
+      <div class="title">Reading list</div>
+      <div class="body"><p>/vi</p></div>
+      <div class="menu" style="position:static; width:230px; margin-top:4px;">
+        <div class="h">Basic blocks</div>
+        <div>▦ View <span style="color:var(--text3)">· list of child pages</span></div>
+        <div>☰ Bulleted list</div>
+        <div>▭ Divider</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<ul class="notes">
+  <li>A view block's tabs are the view blocks in a row on the page; one block alone shows one tab plus "+ Add view".</li>
+  <li>An old database whose pages have only a title (Projects) becomes a plain page with one list view block on first open (frame 1). Other pages get a view only when you add one.</li>
+  <li>Old full-page tables (Tasks, Calendar) are converted once: each saved view becomes a view block in its page, in tab order.</li>
+  <li>New-page menu: the "Database" starter chip is removed. "Turn into database" is removed from the command palette.</li>
+</ul>
+</body>
+</html>

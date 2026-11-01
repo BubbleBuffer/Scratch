@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
-use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, KeyPair};
+use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, Issuer, KeyPair};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use support::*;
@@ -84,8 +84,9 @@ fn private_ca(cn: &str) -> Identity {
         .push(DnType::CommonName, "Scratch Test CA");
     ca.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
     let ca_cert = ca.self_signed(&ca_key).unwrap();
+    let issuer = Issuer::new(ca, ca_key);
     let key = KeyPair::generate().unwrap();
-    let leaf = leaf_params(cn).signed_by(&key, &ca_cert, &ca_key).unwrap();
+    let leaf = leaf_params(cn).signed_by(&key, &issuer).unwrap();
     Identity {
         chain: vec![leaf.der().to_vec(), ca_cert.der().to_vec()],
         key: key.serialize_der(),
@@ -203,7 +204,7 @@ impl TlsHub {
 
     fn client(&self, label: &str, trusted: Vec<String>) -> (TempDir, SyncClient) {
         let dir = TempDir::new(label);
-        let token = self.hub.pair(label).unwrap();
+        let token = self.hub.pair_legacy_token(label).unwrap();
         let client = SyncClient::with_trusted(dir.open(), &self.front.url, &token, trusted);
         (dir, client)
     }
@@ -241,7 +242,7 @@ fn self_signed_hub_without_pins_is_untrusted() {
     let plain = SyncClient::new(
         TempDir::new("plain").open(),
         &hub.front.url,
-        &hub.hub.pair("plain").unwrap(),
+        &hub.hub.pair_legacy_token("plain").unwrap(),
     );
     assert_eq!(untrusted(&plain), id.leaf_fingerprint());
 }

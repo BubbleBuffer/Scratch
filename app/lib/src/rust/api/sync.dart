@@ -10,11 +10,62 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'types.dart';
 import 'vault.dart';
 
-// These functions are ignored because they are not marked as `pub`: `lock`
+// These functions are ignored because they are not marked as `pub`: `device_session`, `lock`
 
 /// Default background-loop timings (vault_sync's defaults).
 SyncOptions defaultSyncOptions() =>
     RustLib.instance.api.crateApiSyncDefaultSyncOptions();
+
+/// The key id of this vault's device key (like `K7MQ-2X9F-D4RT-8WHN`),
+/// creating the key on first use (`.vault/device-key.json`).
+Future<String> deviceKeyId({required NotesVault vault}) =>
+    RustLib.instance.api.crateApiSyncDeviceKeyId(vault: vault);
+
+/// The bearer for an HTTP call to the hub at `hub_url` with the device
+/// `token`: a short-lived session proved with this vault's device key
+/// (upgrading the token on first use), or the bare token for a hub without
+/// device keys. Shared with the sync client. Blocking: may handshake.
+/// `trusted`: the device's trusted hub certificates, as for
+/// `NotesSync::with_trusted_certificates` (a self-signed hub needs its pin).
+Future<String> hubBearer({
+  required NotesVault vault,
+  required String hubUrl,
+  required String token,
+  required List<TrustedHubCertificate> trusted,
+}) => RustLib.instance.api.crateApiSyncHubBearer(
+  vault: vault,
+  hubUrl: hubUrl,
+  token: token,
+  trusted: trusted,
+);
+
+/// Forgets `bearer` after the hub answered 401 to it, so the next
+/// [`hub_bearer`] proves the key for a new session.
+Future<void> hubBearerInvalidate({
+  required NotesVault vault,
+  required String hubUrl,
+  required String token,
+  required String bearer,
+}) => RustLib.instance.api.crateApiSyncHubBearerInvalidate(
+  vault: vault,
+  hubUrl: hubUrl,
+  token: token,
+  bearer: bearer,
+);
+
+/// Redeems a one-time pairing `code` at the hub at `hub_url` with this
+/// vault's device key; returns the device token (key-bound) to store.
+Future<String> redeemPairingCode({
+  required NotesVault vault,
+  required String hubUrl,
+  required String code,
+  required List<TrustedHubCertificate> trusted,
+}) => RustLib.instance.api.crateApiSyncRedeemPairingCode(
+  vault: vault,
+  hubUrl: hubUrl,
+  code: code,
+  trusted: trusted,
+);
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesHub>>
 abstract class NotesHub implements RustOpaqueInterface {
@@ -28,8 +79,13 @@ abstract class NotesHub implements RustOpaqueInterface {
   static Future<NotesHub> newInstance({required NotesVault vault}) =>
       RustLib.instance.api.crateApiSyncNotesHubNew(vault: vault);
 
-  /// A new pairing token for a device named `label` (shown once).
+  /// A one-time pairing code for a device named `label` (shown once;
+  /// redeemable for 10 minutes). The link is `notes://pair?hub=…&code=…`;
+  /// the device redeems it with [`redeem_pairing_code`].
   Future<String> pair({required String label});
+
+  /// Refuse device tokens not bound to a device key yet (off by default).
+  void setRequireDeviceKeys({required bool required_});
 
   /// Serves on `addr` (for example `0.0.0.0:8787`, or `127.0.0.1:0` for a
   /// free port) and returns the bound address. Restarts if running.
@@ -75,6 +131,10 @@ abstract class NotesSync implements RustOpaqueInterface {
   /// untrusted certificate; cleared by the next successful request.
   List<CertificateInfo>? untrustedCertificate();
 
+  /// The same chain as `untrusted_certificate`, as DER (leaf first), so
+  /// the issuer can be kept when the user trusts it.
+  List<Uint8List>? untrustedCertificateDer();
+
   /// Like `new`, also accepting a hub whose certificate has an unknown
   /// issuer (self-signed or a private CA) when its SHA-256 fingerprint is
   /// in `trusted` (hex in any case, with or without `:`). A sync against an
@@ -86,6 +146,22 @@ abstract class NotesSync implements RustOpaqueInterface {
     required String token,
     required List<String> trusted,
   }) => RustLib.instance.api.crateApiSyncNotesSyncWithTrusted(
+    vault: vault,
+    url: url,
+    token: token,
+    trusted: trusted,
+  );
+
+  /// Like `with_trusted`, with the device's trusted certificates: the
+  /// issuer stored for this hub's origin is a trust anchor for it (a
+  /// re-minted leaf from the same CA is accepted), and each leaf
+  /// fingerprint is accepted as with `with_trusted`.
+  static NotesSync withTrustedCertificates({
+    required NotesVault vault,
+    required String url,
+    required String token,
+    required List<TrustedHubCertificate> trusted,
+  }) => RustLib.instance.api.crateApiSyncNotesSyncWithTrustedCertificates(
     vault: vault,
     url: url,
     token: token,

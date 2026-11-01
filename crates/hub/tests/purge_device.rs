@@ -59,7 +59,13 @@ fn config(data: &TempDir) -> Config {
 
 async fn start(config: &Config) -> Server {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    start_on(listener, config.clone()).await.unwrap()
+    let server = start_on(listener, config.clone()).await.unwrap();
+    // The config's public_url is a fake, so proofs name the Host instead.
+    server.hub().set_key_policy(vault_sync::KeyPolicy {
+        public_url: None,
+        require_device_keys: false,
+    });
+    server
 }
 
 /// Runs blocking work off the async runtime.
@@ -105,7 +111,7 @@ async fn a_purging_device_id_is_kept_and_forwarded_by_the_hub() {
 
     let (laptop_token, phone_token) = {
         let hub = hub.clone();
-        blocking(move || (hub.pair("laptop").unwrap(), hub.pair("phone").unwrap())).await
+        blocking(move || (hub.pair_legacy_token("laptop").unwrap(), hub.pair_legacy_token("phone").unwrap())).await
     };
     let laptop = TempDir::new("laptop");
     let phone = TempDir::new("phone");
@@ -145,7 +151,7 @@ async fn a_malformed_device_flag_is_refused_over_http() {
 
     let token = {
         let hub = hub.clone();
-        blocking(move || hub.pair("probe").unwrap()).await
+        blocking(move || hub.pair_legacy_token("probe").unwrap()).await
     };
     let probe = TempDir::new("probe");
     let device = probe.open().device_id();

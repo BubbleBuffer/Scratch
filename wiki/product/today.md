@@ -14,7 +14,7 @@ The Journal core and bridge are merged, including Tasks + Log sections and idemp
 
 ## What counts as a task or an event
 
-Tasks and events stay ordinary pages and blocks ([data model](../architecture/data-model.md)). The *agenda* is everything with a date that belongs on a day:
+Tasks and events stay ordinary pages and blocks ([data model](../core/data-model.md)). The *agenda* is everything with a date that belongs on a day:
 
 - **Task notes.** The `tasks` add-on stores status, date, optional time/duration, optional checkbox presentation, calendar and assignee in core type data. Status controls completion. Category switches control Calendar and Today independently.
 - **Database rows.** Each database has an agenda role:
@@ -32,7 +32,7 @@ Tasks and events stay ordinary pages and blocks ([data model](../architecture/da
 
 Today stays a top-level shell destination. Its date strip scrolls continuously in both directions, shows weekday and date, marks days with Today-visible agenda items and Journal notes, and shares the selected date with Calendar. Today returns to the current day; the month label opens the jump picker. Left/right select adjacent days while the strip has focus; T returns to today and G opens the picker.
 
-The selected day uses the tasks add-on's compact short cards for timed items, tasks and dated to-dos. Plain `@date` mentions remain excluded by the shared agenda query. Overdue appears only on today. The mockup's initial five-card limit has Show more; overdue and larger done groups have disclosures, while one or two done items are shown directly. Completion and source-page opening use the existing agenda actions.
+The selected day uses the tasks add-on's compact short cards for timed items, tasks and dated to-dos. Plain `@date` mentions remain excluded by the shared agenda query. Overdue appears only on today and is expanded by default (re-expanded on each day change). It has its own budget of five rows with a "Show N more" button, so it never takes rows from today's list; today's rows have a separate five-card limit with Show more. Larger done groups have disclosures, while one or two done items are shown directly. Completion and source-page opening use the existing agenda actions.
 
 The day note embeds the ordinary page editor, editable on past and future dates and created only on first edit. Open as page opens the same document; returning restores inline editing. Embedded mobile editing keeps the existing keyboard toolbar and block menus above the keyboard, including on long notes. Quick capture remains available and writes Task/Note blocks into today's Journal note above Log, leaving Log last. The searchable All pages disclosure and shell navigation remain available; the old greeting, timeline, In motion and recent-card body is removed.
 
@@ -41,6 +41,7 @@ The day note embeds the ordinary page editor, editable on past and future dates 
 - **Journal:** the first daily note creates a top-level database "Journal" with a Date property and agenda role Off. New day notes start with an empty Tasks section and a collapsible Log last, both using the editor's existing toggle blocks; existing notes and Journal templates stay unchanged.
 - **Task links:** the core and bridge expose `link_task_to_day` to add a task page link under Tasks once per day, creating the note or missing Tasks section when needed. The tasks add-on links dated task saves and Calendar rescheduling; undated tasks do not link. Link failures are logged and do not fail a successful task save. Agent tools and database-row date edits are not wired in this round. Linking on a new day keeps the old day's link. `append_log` appends timestamped lines under Log.
 - **One page per day:** each note is titled in the app's long date format and dated with that day.
+- **To-dos in a day note:** an undated to-do in a day note counts as dated to that note's day, so an undone one stays in Overdue on later days until it is done. To-dos outside day notes stay undated and out of the agenda.
 - **Finding the note:** the Journal is found by a page role `journal`, not by its title. If the user renames it, it still works.
 
 ## Spaces and colours
@@ -69,18 +70,19 @@ The day note embeds the ordinary page editor, editable on past and future dates 
 ## First run and demo
 
 - **A fresh vault** starts with:
-  - Getting started, which explains Today, capture and dates, linking pages (@ or [[, backlinks, the page stack) and databases (views, properties, /database);
-  - a Tasks database (status To do / Doing / Done, a Due date);
-  - a Calendar database (a Date with time, which makes it Events);
+  - Getting started, which explains Today, capture and dates, linking pages (@ or [[, backlinks, the page stack) and nesting pages with views (/View, properties);
+  - a Tasks page (status To do / Doing / Done, a Due date; Table and Board views);
+  - a Calendar page (a Date with time, which makes it Events; Calendar and Table views);
   - the Journal on first use.
+- **With sync configured** nothing is created at boot. The starter pages are created after the first successful sync pull, and only if the vault still has no pages, so a new device does not add its own copy to a synced vault. If the pull fails, nothing is created this launch and the next launch decides again.
 - **A demo vault** (`--dart-define=SEED_DEMO=true`) holds the [direction brief's](../../design/directions/BRIEF.md#same-content-in-every-direction) content with dates relative to today, so every feature has something real on it.
 
 
 ## Build
 
-1. **Core and bridge — built 2026-10-06:** status groups, the agenda index and queries, bounded overdue and overdue count, to-do progress, daily notes, space colours and roles, set done. ([Core state](../architecture/core-state.md).)
-2. **App, Today — built 2026-10-06:** home sections, week strip, capture, In motion, to-do dates in the editor, "Show in Today" in database settings, colours in the sidebar and page menu, first-run and demo seeds. ([App state](../architecture/app-state.md).)
-3. **App, reminders — built 2026-10-07:** notifications on Android and desktop, plus the settings. Android schedules absolute UTC instants with inexact delivery; Windows, Linux and macOS deliver only while the app runs. Settings hold the switch, event lead and morning time on this device. ([App state](../architecture/app-state.md#reminders).)
+1. **Core and bridge — built 2026-10-06:** status groups, the agenda index and queries, bounded overdue and overdue count, to-do progress, daily notes, space colours and roles, set done. ([Core state](../core/core-state.md).)
+2. **App, Today — built 2026-10-06:** home sections, week strip, capture, In motion, to-do dates in the editor, "Show in Today" in database settings, colours in the sidebar and page menu, first-run and demo seeds. ([App state](../app/app-state.md).)
+3. **App, reminders — built 2026-10-07:** notifications on Android and desktop, plus the settings. Android schedules absolute UTC instants with inexact delivery; Windows, Linux and macOS deliver only while the app runs. Settings hold the switch, event lead and morning time on this device. ([App state](../app/app-state.md#reminders).)
 
 Build deviations: a focused to-do shows its canonical date mention while resting to-dos show the compact chip, preserving editing offsets and IME behaviour. New top-level pages and Colour > None store explicit `none`, which the boot backfill leaves uncoloured across restarts. The demo leaves Lisbon's editable Dates/Status/Budget/Tags out: ordinary pages need a parent database schema for these, and making Trips a database would change the settled hierarchy. No such hierarchy change was made. The assignment's capture → week → day order and dots after sidebar titles take precedence over the earlier ordering above. Reminders keep the agreed behaviour: because agenda items carry source ids only, the app loads source titles before pure planning; no core changes were needed. The seven-day upper edge is inclusive. Validation is headless; notification delivery on a real Android device and on Windows remains unverified.
 ## Decisions

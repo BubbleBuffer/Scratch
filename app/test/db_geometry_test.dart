@@ -107,21 +107,23 @@ void main() {
       );
     });
 
-    dbTest('$device: full-page title equals the table header left', (
+    // A former database opens as a page: its title sits over the table of
+    // its view block.
+    dbTest('$device: page title equals the view block table header left', (
       tester,
     ) async {
       await pumpDb(tester, mobile: mobile);
       await openView(tester, 'Table');
       _expectX(
         tester,
-        byKey('db-title'),
+        byKey('page-title'),
         tester.getTopLeft(_header('Name')).dx,
-        'full-page title vs header',
+        'page title vs header',
       );
     });
   }
 
-  dbTest('phone: inline and full-page titles both sit at x=18', (tester) async {
+  dbTest('phone: inline and page titles both sit at x=18', (tester) async {
     await pumpDb(tester, mobile: true);
     await openPage(tester, 'Planning');
     _expectX(tester, byKey('db-inline-title'), 18, 'inline title');
@@ -133,7 +135,8 @@ void main() {
       'inline body',
     );
     await openView(tester, 'Table');
-    _expectX(tester, byKey('db-title'), 18, 'full-page title');
+    _expectX(tester, byKey('page-title').last, 18, 'page title');
+    _expectX(tester, _header('Name'), 18, 'view block table header');
   });
 
   // ------------------------------------------------- row vs header border

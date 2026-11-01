@@ -1,5 +1,5 @@
 // The flow from the UX review, as a person would do it on desktop: a new
-// page, made a database; a new row, opened; a sub-page block in the row,
+// page, given a table view of its pages; a new row, opened; a sub-page block in the row,
 // opened; a link in it, opened with a pointer tap. Every page lands on top
 // at full width and nothing below is squeezed. [step] runs after each step
 // (a screenshot in the golden test).
@@ -7,6 +7,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notes_app/core/models.dart';
 import 'package:notes_app/editor/page_screen.dart';
 import 'package:notes_app/shell/home.dart';
 import 'package:notes_app/shell/navigation.dart' as nav;
@@ -28,6 +29,19 @@ PageEditorState editorOf(WidgetTester tester, String id) =>
         (w) => w is PageScreen && w.pageId == id && w.snapshot == null,
       ),
     );
+
+/// Appends a view block of [kind] to the open page [id] (what "/View"
+/// inserts, with a layout picked).
+Future<void> addViewBlock(WidgetTester tester, String id, {ViewKind kind = ViewKind.table}) async {
+  final text = await core(
+    tester,
+    (v) => v.run((x) => x.viewBlockText(
+          view: ViewDef(id: '', name: 'Table', kind: kind, sorts: const [], visibleProps: const [], config: ''),
+        )),
+  );
+  editorOf(tester, id).appendBlock('view', text);
+  await settle(tester);
+}
 
 void expectOnTop(WidgetTester tester, List<String> ids) {
   final stack = stackOf(tester);
@@ -56,8 +70,8 @@ Future<void> runStackFlow(
   expect(byKey('page-starters'), findsOneWidget);
   await step('1-page');
 
-  // 2. Made a database from its starters.
-  await tapKey(tester, 'start-database');
+  // 2. Given a table of its pages.
+  await addViewBlock(tester, page);
   await settleUntil(tester, () => byKey('db-new').evaluate().isNotEmpty);
   expectOnTop(tester, [page]);
   await step('2-database');

@@ -4,9 +4,31 @@
 // the card to the one chosen. Open and Remove work on both; Remove keeps the
 // note itself.
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notes_app/addons/kanban/api.dart';
 
 import 'kanban_fixture.dart';
+
+Future<String> _boardWithGarden(WidgetTester tester) async {
+  final f = await pumpApp(
+    tester,
+    mobile: false,
+    runners: RunnerAssignments(FakeRunnerBackend.demo()),
+  );
+  final garden = f.pages['Garden plan']!;
+  final board = await seedKanban(
+    tester,
+    title: 'Launch board',
+    columns: {
+      'To do': [garden],
+      'Doing': [],
+      'Done': [],
+    },
+  );
+  await openNote(tester, board, 'Launch board');
+  return garden;
+}
 
 /// Waits until [column] stores exactly [expected] (the write is asynchronous
 /// behind the widget), then lets the screen settle.
@@ -240,6 +262,135 @@ void main() {
       ], reason: 'appended at the end');
       final note = await core(tester, (v) => v.loadPage(garden));
       expect(note.title, 'Garden plan');
+    },
+  );
+
+  appTest(
+    'desktop keyboard: the context-menu key opens the card menu, arrows move between items, Esc closes it and focus returns to the card',
+    (tester) async {
+      final garden = await _boardWithGarden(tester);
+
+      cardFocus(tester).requestFocus();
+      await settle(tester);
+      expect(menuOpacity(tester, garden), 1, reason: 'shown while focused');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
+      await settle(tester);
+      expect(menuItem('Open'), findsOneWidget);
+      expect(focusIsIn(menuItem('Open')), isTrue, reason: 'first item');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await settle(tester);
+      expect(focusIsIn(menuItem('Assign to Agent')), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await settle(tester);
+      expect(focusIsIn(menuItem(removeFromBoardLabel)), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await settle(tester);
+      expect(focusIsIn(menuItem('Assign to Agent')), isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(menuItem('Open'), findsNothing, reason: 'Esc closes the menu');
+      expect(cardFocus(tester).hasPrimaryFocus, isTrue);
+    },
+  );
+
+  appTest('desktop keyboard: Shift+F10 opens the menu and Enter runs the focused item', (
+    tester,
+  ) async {
+    await _boardWithGarden(tester);
+
+    cardFocus(tester).requestFocus();
+    await settle(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.f10);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await settle(tester);
+    expect(menuItem('Open'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await settle(tester);
+    expect(editableWith('Some text about garden plan.'), findsOneWidget);
+  });
+
+  appTest(
+    'desktop keyboard: after the board scrolls to the focused card, the menu opens at the card',
+    (tester) async {
+      final f = await pumpApp(
+        tester,
+        mobile: false,
+        runners: RunnerAssignments(FakeRunnerBackend.demo()),
+      );
+      tester.view.physicalSize = const Size(1000, 800);
+      final garden = f.pages['Garden plan']!;
+      final reading = f.pages['Reading notes']!;
+      final board = await seedKanban(
+        tester,
+        title: 'Launch board',
+        columns: {
+          'To do': [garden],
+          'Doing': [],
+          'Done': [reading],
+        },
+      );
+      await openNote(tester, board, 'Launch board');
+
+      cardFocus(tester, 1).requestFocus();
+      await settle(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
+      await settle(tester);
+
+      final card = tester.getRect(allCardSurfaces().at(1));
+      final menu = tester.getRect(menuItem('Open'));
+      expect(menu.left, lessThanOrEqualTo(card.right), reason: 'starts within the card');
+      expect(menu.left, greaterThanOrEqualTo(card.left));
+      expect(menu.top, lessThanOrEqualTo(card.bottom + 24));
+    },
+  );
+
+  appTest(
+    'desktop keyboard: the board is one Tab stop and the arrow keys move between cards',
+    (tester) async {
+      final f = await pumpApp(tester, mobile: false);
+      final garden = f.pages['Garden plan']!;
+      final recipes = f.pages['Recipes']!;
+      final reading = f.pages['Reading notes']!;
+      final board = await seedKanban(
+        tester,
+        title: 'Launch board',
+        columns: {
+          'To do': [garden, recipes],
+          'Doing': [reading],
+          'Done': [],
+        },
+      );
+      await openNote(tester, board, 'Launch board');
+      await settle(tester);
+
+      expect(cardFocus(tester, 0).skipTraversal, isFalse, reason: 'the first card is the stop');
+      expect(cardFocus(tester, 1).skipTraversal, isTrue);
+      expect(cardFocus(tester, 2).skipTraversal, isTrue);
+
+      cardFocus(tester, 0).requestFocus();
+      await settle(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await settle(tester);
+      expect(cardFocus(tester, 1).hasPrimaryFocus, isTrue, reason: 'down: next card in the column');
+      expect(cardFocus(tester, 1).skipTraversal, isFalse, reason: 'the stop follows focus');
+      expect(cardFocus(tester, 0).skipTraversal, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await settle(tester);
+      expect(cardFocus(tester, 2).hasPrimaryFocus, isTrue, reason: 'right: next column');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await settle(tester);
+      expect(cardFocus(tester, 0).hasPrimaryFocus, isTrue, reason: 'left: back, row kept within the shorter column');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await settle(tester);
+      expect(cardFocus(tester, 0).hasPrimaryFocus, isTrue, reason: 'up: previous card');
     },
   );
 }

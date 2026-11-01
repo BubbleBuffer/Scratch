@@ -4,7 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:notes_app/addons/database/api.dart';
+import 'package:notes_app/addons/database/create.dart' show makeDatabase;
 import 'package:notes_app/addons/document/api.dart';
 import 'package:notes_app/core/models.dart';
 import 'package:notes_app/editor/model.dart';

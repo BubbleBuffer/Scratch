@@ -61,8 +61,11 @@ class ShortItemCard extends StatelessWidget {
         ) ??
         c.threadStrong;
     final titleColor = item.done ? c.textTertiary : c.textPrimary;
+    // An untitled page carries an empty title; show its first line (passed in
+    // as sourceTitle) the way the calendar and table do.
+    final name = item.block == null && item.title.trim().isEmpty ? sourceTitle ?? '' : item.title;
     final title = Text(
-      displayTitle(item.title),
+      displayTitle(name),
       key: const ValueKey('short-item-title'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,

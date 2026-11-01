@@ -327,7 +327,7 @@ impl Net {
 
     pub fn device(&self, label: &str) -> Device {
         let dir = TempDir::new(label);
-        let token = self.hub.pair(label).unwrap();
+        let token = self.hub.pair_legacy_token(label).unwrap();
         let client = SyncClient::new(dir.open(), &self.proxy.url, &token);
         Device { dir, token, client }
     }
@@ -380,12 +380,16 @@ pub fn header<'a>(h: &'a [(String, String)], name: &str) -> Option<&'a str> {
 /// The sync exchanges: every exchange but the health probe, whose body is
 /// not a protocol message.
 pub fn syncs(ex: &[Exchange]) -> Vec<&Exchange> {
-    ex.iter().filter(|e| e.path != "/health").collect()
+    // The health probe and the device-key handshake are not sync exchanges.
+    ex.iter()
+        .filter(|e| e.path != "/health" && !e.path.starts_with("/auth/"))
+        .collect()
 }
 
 /// Wire bytes (request, answer) of some exchanges.
+/// The device-key handshake (`/auth/*`) is not counted in sync reports.
 pub fn wire_totals(ex: &[Exchange]) -> (u64, u64) {
-    ex.iter().fold((0, 0), |(up, down), e| {
+    ex.iter().filter(|e| !e.path.starts_with("/auth/")).fold((0, 0), |(up, down), e| {
         (
             up + e.req_body.len() as u64,
             down + e.resp_body.len() as u64,

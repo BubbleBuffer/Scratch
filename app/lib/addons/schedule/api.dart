@@ -24,6 +24,8 @@ import 'view.dart';
 export 'create.dart' show createSchedule, createWeeklySchedule;
 export 'embed.dart' show ScheduleEmbedCard;
 export 'view.dart' show SchedulePage;
+export 'local_runner.dart' show setLocalRunner;
+export 'settings.dart' show ScheduleRunnerSwitch, scheduleRunnerSetting;
 
 String? _zone;
 
@@ -117,8 +119,8 @@ class ScheduleAddon extends Addon {
       ),
     );
 
-    // The runner setting exists on desktop only. The Add-ons panel does not
-    // honour a section's isVisible, so Android never registers it.
+    // The runner setting exists on desktop only; Android never registers it.
+    // Its section is placed by the settings screen, not an Add-ons panel.
     if (localRunnerPlatform) {
       ctx.settingsSections.register(scheduleRunnerSetting(ctx.services));
     }

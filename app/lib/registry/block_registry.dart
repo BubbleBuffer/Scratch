@@ -86,6 +86,20 @@ abstract interface class BlockHost {
   String get pageId;
 }
 
+/// An editor that lets a block's widgets add and remove whole blocks (view
+/// blocks add and delete their sibling views). Read-only hosts are not.
+abstract interface class BlockEditingHost implements BlockHost {
+  /// The blocks at [n]'s level, [n] among them, in order.
+  List<Node> siblingsOf(Node n);
+
+  /// Inserts a [kind] block holding [text] (and [target]) right after
+  /// [after] and returns its id. One undo step.
+  String insertBlock(Node after, String kind, String text, {String? target});
+
+  /// Deletes [n] and its children. One undo step.
+  void deleteBlock(Node n);
+}
+
 /// A host rendering a document preview without storage mutations.
 abstract interface class ReadOnlyBlockHost implements BlockHost {}
 

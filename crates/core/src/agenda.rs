@@ -443,6 +443,53 @@ impl Index {
             .and_then(|j| serde_json::from_str(&j).ok())
             .unwrap_or(PropValue::Empty))
     }
+    /// The all-day date of a Journal day note, or None for any other page.
+    /// Its undated to-dos count as dated to that day.
+    fn day_note_day(&self, rowid: i64, parent: Option<&str>) -> Result<Option<i64>> {
+        let Some(parent) = parent else {
+            return Ok(None);
+        };
+        let journal: Option<Option<String>> = self
+            .conn
+            .prepare_cached("SELECT schema FROM pages WHERE id = ?1 AND role = 'journal'")?
+            .query_row([parent], |r| r.get::<_, Option<String>>(0))
+            .optional()?;
+        let Some(schema) = journal else {
+            return Ok(None);
+        };
+        let template: i64 = self
+            .conn
+            .prepare_cached("SELECT is_template FROM pages WHERE rowid = ?1")?
+            .query_row([rowid], |r| r.get(0))?;
+        if template != 0 {
+            return Ok(None);
+        }
+        let schema: Vec<PropDef> =
+            serde_json::from_str(schema.as_deref().unwrap_or("[]")).unwrap_or_default();
+        let Some(date) = schema.iter().find(|d| d.kind == PropKind::Date) else {
+            return Ok(None);
+        };
+        Ok(match self.agenda_prop(rowid, &date.key)? {
+            PropValue::Date {
+                start_ms,
+                has_time: false,
+                ..
+            } => Some(start_ms),
+            _ => None,
+        })
+    }
+    /// Day-note date for a page id, for validating writes against its rows.
+    fn page_day_note(&self, id: &str) -> Result<Option<i64>> {
+        let row: Option<(i64, Option<String>)> = self
+            .conn
+            .prepare_cached("SELECT rowid,parent FROM pages WHERE id = ?1")?
+            .query_row([id], |r| Ok((r.get(0)?, r.get(1)?)))
+            .optional()?;
+        match row {
+            Some((rowid, parent)) => self.day_note_day(rowid, parent.as_deref()),
+            None => Ok(None),
+        }
+    }
     /// The one derivation path used by incremental indexing and bulk rebuilds.
     pub(crate) fn refresh_agenda(&self, id: &str, blocks: Option<&BlockAgenda>) -> Result<()> {
         // DELETE + INSERT must be indivisible across the foreground and writer
@@ -468,6 +515,7 @@ impl Index {
         let Some((rowid, title, parent, page_type)) = row else {
             return Ok(());
         };
+        let day_note = self.day_note_day(rowid, parent.as_deref())?;
         if let Some(blocks) = blocks {
             self.conn
                 .prepare_cached(
@@ -481,11 +529,13 @@ impl Index {
                 .execute([rowid])?;
             let mut st = self.conn.prepare_cached("INSERT INTO agenda(page,block,kind,d0,d1,has_time,done,title) VALUES (?1,?2,?3,?4,NULL,?5,?6,?7)")?;
             for b in &blocks.rows {
+                // An undated to-do in a day note is dated to that note's day.
+                let date = b.date.or(day_note.filter(|_| b.kind == AgendaKind::Task));
                 st.execute(params![
                     rowid,
                     b.block,
                     if b.kind == AgendaKind::Task { 0 } else { 2 },
-                    b.date,
+                    date,
                     b.has_time,
                     b.done,
                     b.title
@@ -506,6 +556,13 @@ impl Index {
         self.conn
             .prepare_cached("UPDATE agenda SET title = ?2 WHERE page = ?1 AND source = 1")?
             .execute(params![rowid, title])?;
+        // A day note indexed before its Journal keeps undated block rows until
+        // this metadata pass learns its day.
+        if let (None, Some(day)) = (blocks, day_note) {
+            self.conn
+                .prepare_cached("UPDATE agenda SET d0 = ?2 WHERE page = ?1 AND block != '' AND kind = 0 AND d0 IS NULL")?
+                .execute(params![rowid, day])?;
+        }
         // In bulk mode parents may not be present yet; the final pass derives rows.
         if self.defer.get() {
             return Ok(());
@@ -1098,6 +1155,8 @@ impl Vault {
         source: Option<&str>,
     ) -> Result<()> {
         if let Some(block) = block {
+            // An undated to-do in a day note counts as dated to that day.
+            let day_note = lock(&self.inner.db).page_day_note(&page)?.is_some();
             let valid = self.inner.read(&page, |d| {
                 block_agenda(&d.blocks())
                     .rows
@@ -1105,7 +1164,7 @@ impl Vault {
                     .any(|b| {
                         b.block == block
                             && b.kind == AgendaKind::Task
-                            && (source.is_some() || b.date.is_some())
+                            && (source.is_some() || b.date.is_some() || day_note)
                     })
             })?;
             if !valid {

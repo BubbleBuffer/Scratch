@@ -3,18 +3,18 @@
 
 use anyhow::{ensure, Context, Result};
 use async_trait::async_trait;
-use bubblepaw_core::{
-    ApprovalMode, ApprovalPolicy, CancellationToken, ClientInfo, ExecutionMode, Harness,
-    HarnessConfig, RunOptions, SessionBusy, Store, Tool, ToolContext, ToolDefinition, ToolRegistry,
-    ToolResult,
+use bubblepaw_sdk::approvals::{ApprovalMode, ApprovalPolicy};
+use bubblepaw_sdk::harness::{
+    CancellationToken, ClientInfo, ExecutionMode, Harness, HarnessConfig, RunOptions, SessionBusy,
 };
+use bubblepaw_sdk::store::Store;
+use bubblepaw_sdk::tools::{Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult};
 use serde_json::{json, Value};
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
 pub(crate) struct GatewayRuntime {
     source: ToolRegistry,
     execution_mode: ExecutionMode,
-    enable_js: bool,
     vault_adapters: BTreeSet<String>,
 }
 
@@ -49,11 +49,7 @@ fn allowed_surface(name: &str) -> bool {
 }
 
 impl GatewayRuntime {
-    pub(crate) fn new(
-        source: &ToolRegistry,
-        execution_mode: ExecutionMode,
-        enable_js: bool,
-    ) -> Result<Self> {
+    pub(crate) fn new(source: &ToolRegistry, execution_mode: ExecutionMode) -> Result<Self> {
         for name in ["hosts", "js_help"] {
             ensure!(
                 source.get(name).is_none(),
@@ -90,7 +86,6 @@ impl GatewayRuntime {
         Ok(Self {
             source,
             execution_mode,
-            enable_js,
             vault_adapters,
         })
     }
@@ -114,7 +109,6 @@ impl GatewayRuntime {
             self.registry(&noninteractive(policy.clone())),
             HarnessConfig {
                 execution_mode: self.execution_mode,
-                enable_js: self.enable_js,
                 approval: noninteractive(policy),
                 max_tool_result_bytes: 256 * 1024,
                 ..HarnessConfig::default()
@@ -360,12 +354,26 @@ impl crate::Agent {
             self.records
                 .bind_session_actor(session, &client.id, format!("oauth:{author}"))?;
         }
-        let harness = gateway.harness(self.store.clone(), policy)?;
-        let tool_names = gateway
+        let harness = gateway.harness(self.store.clone(), policy.clone())?;
+        // The run gate also covers the tools a js call composes. A direct call
+        // may name only the advertised surface. A js call may also name any tool
+        // the gateway registry runs: that registry already leaves out the
+        // history_, web_, ui_ and reserved tools and every tool the policy does
+        // not allow, so excluded tools stay refused on both paths.
+        let mut tool_names = gateway
             .definitions(&harness, session)?
             .into_iter()
             .map(|tool| tool.name)
-            .collect();
+            .collect::<Vec<String>>();
+        if name == "js" {
+            tool_names.extend(
+                gateway
+                    .registry(&noninteractive(policy))
+                    .capabilities()
+                    .into_iter()
+                    .map(|tool| tool.name),
+            );
+        }
         self.runtime.block_on(harness.call_tool(
             session,
             name,

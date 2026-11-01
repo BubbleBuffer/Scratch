@@ -1,5 +1,5 @@
-// Settings > AI > Agent: the model and tool set of the runner chosen under
-// "Run AI on" (the vault's, synced). The computer's model is read from this
+// Settings > Agent: the model and tool set of the runner chosen under
+// "Where it runs" (the vault's, synced). The computer's model is read from this
 // computer while the tab is on the hub; the hub is a closed loopback port, so
 // the tab's hub agent never opens. Each runner has a tool set (integration
 // spec phase 5), a vault setting, and only the chosen runner's set is shown.
@@ -10,7 +10,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/features/ai/ai_settings.dart';
-import 'package:notes_app/features/settings/controls.dart';
+import 'package:notes_app/features/settings/settings_kit.dart';
 
 import 'agent_test.dart' show fakeAgentSettings;
 import 'ai_test.dart' show aiStore, closeAi;
@@ -24,6 +24,21 @@ const _local = [
   AgentModel(id: 'codex/local-b', name: 'Local B'),
 ];
 const _hub = [AgentModel(id: 'codex/hub-x', name: 'Hub X')];
+
+/// The tool set whose card is selected for [runner] ('this_device' or 'hub').
+/// A choice card's Semantics carries its selected flag.
+String? _pickedSet(WidgetTester t, String runner) {
+  for (final s in const ['read', 'write', 'everything']) {
+    final cards = t.widgetList<Semantics>(
+      find.ancestor(
+        of: key('agent-tool-set-$runner-$s'),
+        matching: find.byType(Semantics),
+      ),
+    );
+    if (cards.any((w) => w.properties.selected == true)) return s;
+  }
+  return null;
+}
 
 void main() {
   setUpAll(initCore);
@@ -62,7 +77,7 @@ void main() {
 
   Future<void> openAiSettings(WidgetTester t) async {
     await tapAndSettle(t, key('sidebar-settings'));
-    await tapAndSettle(t, key('settings-nav-ai'));
+    await tapAndSettle(t, key('settings-nav-agent'));
     await real(t, () => Future<void>.delayed(const Duration(milliseconds: 50)));
     await settle(t);
   }
@@ -83,7 +98,7 @@ void main() {
       await openAiSettings(t);
       expect(asked, [AgentHost.local], reason: 'the chosen runner\'s list');
       await t.ensureVisible(key('agent-computer-model'));
-      final picker = t.widget<SelectButton<String>>(key('agent-computer-model'));
+      final picker = t.widget<SSelect<String>>(key('agent-computer-model'));
       expect(picker.options, ['codex/local-a', 'codex/local-b']);
       expect(picker.value, 'codex/local-a');
       expect(store.modelLabel('codex/local-b'), 'Local B');
@@ -100,7 +115,7 @@ void main() {
       expect(AiSettings.load(file).agentModelOverrides, isEmpty,
           reason: 'the row writes the vault, not this device');
       expect(
-        t.widget<SelectButton<String>>(key('agent-computer-model')).value,
+        t.widget<SSelect<String>>(key('agent-computer-model')).value,
         'codex/local-b',
       );
       expect(asked, [AgentHost.local], reason: 'the list is kept');
@@ -151,17 +166,20 @@ void main() {
     final ai = await aiStore(t, settings: settings);
     try {
       await openAiSettings(t);
-      // This computer is chosen: its set shows, the hub's does not.
+      // This computer is chosen: its set shows, the hub's does not. The sets
+      // are three cards; tapping one picks it.
       await t.ensureVisible(key('agent-tool-set-this_device'));
-      var picker =
-          t.widget<SelectButton<String>>(key('agent-tool-set-this_device'));
-      expect(picker.options, ['read', 'write', 'everything']);
-      expect(picker.value, 'everything', reason: 'the default');
+      expect(key('agent-tool-set-this_device-read'), findsOneWidget);
+      expect(key('agent-tool-set-this_device-write'), findsOneWidget);
+      expect(key('agent-tool-set-this_device-everything'), findsOneWidget);
+      expect(_pickedSet(t, 'this_device'), 'everything', reason: 'the default');
       expect(key('agent-tool-set-hub'), findsNothing);
-      expect(find.textContaining('The vault, plus files'), findsOneWidget);
+      expect(
+        find.textContaining('Every vault tool, plus computer access'),
+        findsOneWidget,
+      );
 
-      picker.onChanged!('read');
-      await settle(t);
+      await tapAndSettle(t, key('agent-tool-set-this_device-read'));
       await settleUntil(
           t, () => store.vaultDefaults.toolSetFor(AgentHost.local) == 'read');
       expect(
@@ -170,10 +188,7 @@ void main() {
       );
       expect(store.vaultDefaults.toolSetFor(AgentHost.hub), 'everything',
           reason: 'each runner has its own set');
-      expect(
-        t.widget<SelectButton<String>>(key('agent-tool-set-this_device')).value,
-        'read',
-      );
+      expect(_pickedSet(t, 'this_device'), 'read');
 
       // The hub is chosen: its set shows, with the restart note.
       await real(t, () => store.setVaultDefaultHost(AgentHost.hub));
@@ -181,13 +196,11 @@ void main() {
       await settleUntil(t, () => key('agent-tool-set-hub').evaluate().isNotEmpty);
       expect(key('agent-tool-set-this_device'), findsNothing);
       await t.ensureVisible(key('agent-tool-set-hub'));
-      picker = t.widget<SelectButton<String>>(key('agent-tool-set-hub'));
-      expect(picker.value, 'everything', reason: 'the default');
+      expect(_pickedSet(t, 'hub'), 'everything', reason: 'the default');
       expect(find.textContaining('hub chats after the hub restarts'),
           findsOneWidget);
 
-      picker.onChanged!('write');
-      await settle(t);
+      await tapAndSettle(t, key('agent-tool-set-hub-write'));
       await settleUntil(
           t, () => store.vaultDefaults.toolSetFor(AgentHost.hub) == 'write');
       expect(

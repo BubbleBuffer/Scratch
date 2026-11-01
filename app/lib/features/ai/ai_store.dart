@@ -1,4 +1,4 @@
-// AI on this device: the vault's MCP endpoint and AI tasks.
+// AI on this device: AI tasks.
 //
 // - Tasks are rows of the synced "AI tasks" collection (vault_mcp::tasks).
 //   "Ask AI" (the `/` menu, the selection toolbar, the block menu and the
@@ -15,10 +15,8 @@
 //   the task in an agent session of its own and writes the answer itself.
 //   Rows that name a runner removed on 2026-10-22 (`claude`, `codex`,
 //   `deepseek`) are answered by the agent too. Claude Code, Codex and
-//   other apps reach the vault from outside, through the MCP endpoint or
-//   agent tokens; the app never starts them.
-// - The MCP endpoint is served on the configured address when enabled in
-//   settings.
+//   other apps reach the vault from outside, through the hub and agent
+//   tokens; the app never starts them.
 //
 // One store per open vault ([AiStore.of]); boot attaches the device's
 // settings and starts it.
@@ -28,6 +26,7 @@ import '../../core/debounce.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show BuildContext;
 
 import '../../core/change_feed.dart';
 import '../../core/models.dart';
@@ -37,22 +36,58 @@ import '../../src/rust/api/ai.dart';
 import '../../src/rust/api/agent.dart' show aiRunTaskWithAgent;
 import '../../state/app_state.dart';
 import '../../addons/agent/api.dart';
+import 'ai_runners.dart';
 import 'ai_settings.dart';
 import 'hub_jobs_client.dart';
 
 export '../../src/rust/api/ai.dart' show AiTask;
+export 'ai_runners.dart' show AiRunnerBridge;
 
 /// Task statuses (the "Status" select of the AI tasks collection).
 abstract final class AiStatus {
   static const queued = 'queued';
   static const running = 'running';
   static const done = 'done';
+  static const review = 'review';
   static const failed = 'failed';
   static const cancelled = 'cancelled';
   static const interrupted = 'interrupted';
 
   /// Whether a run with [status] has not ended yet.
   static bool active(String status) => status == queued || status == running;
+}
+
+/// What the kanban runner picker reads: the task rows (newest first), whether
+/// a hub can take runs, the runner calls, and a refresh after a write. It
+/// listens to the store, so a change in the rows redraws the chips.
+abstract interface class AiTaskSource implements Listenable {
+  List<AiTask> get tasks;
+  bool get hubUsable;
+  AiRunnerBridge get runnerBridge;
+  Future<void> refresh();
+
+  /// Called when the user delegates a task to a runner from this device (the
+  /// run notices ask for the notification permission then).
+  void Function()? onDelegated;
+
+  /// Asks the runner of task [id] to stop it; it stays running until the
+  /// runner acknowledges.
+  Future<void> cancel(String id);
+
+  /// Asks the runner to send task [id]'s worker the note's current version.
+  Future<void> sendUpdate(String id);
+
+  /// The user accepts a reviewed result: the task goes from review to done.
+  Future<void> accept(String id);
+
+  /// Fails a task whose runner stalled (no contact for over ten minutes).
+  Future<void> markFailed(String id);
+
+  /// Adds a to-do under the running task; the runner gives it to the worker.
+  Future<void> addStep(String id, String text);
+
+  /// Answers the worker's open question; the worker goes on with the reply.
+  Future<void> reply(String id, String text);
 }
 
 /// Starts and stops the agent's runs for add-ons (a task assigned to the
@@ -69,7 +104,7 @@ abstract interface class AgentRuns {
   Future<AiTask?> run(String id);
 }
 
-class AiStore extends ChangeNotifier implements AgentRuns {
+class AiStore extends ChangeNotifier implements AgentRuns, AiTaskSource {
   AiStore._(this.vault, this.feed, this._settings) {
     _settings.addListener(notifyListeners);
     feed?.addListener(_onChanges);
@@ -117,26 +152,26 @@ class AiStore extends ChangeNotifier implements AgentRuns {
   /// (boot sets it).
   Future<void> Function()? syncBeforeHubJob;
 
-  NotesMcp? _mcp;
-  String? mcpUrl;
-  String? mcpError;
   bool _started = false, _disposed = false, _pumping = false;
   Timer? _debounce;
 
+  @override
+  void Function()? onDelegated;
+
   /// The newest tasks first (loaded by [refresh]).
+  @override
   List<AiTask> tasks = const [];
 
   /// The task this device is running.
   String? runningId;
   String? _collection;
 
-  /// Starts the endpoint (if enabled), fails tasks this device left
-  /// running, loads the task list and runs queued tasks.
+  /// Fails tasks this device left running, loads the task list and runs
+  /// queued tasks.
   Future<void> start() async {
     if (_started) return;
     _started = true;
     if (canRun) {
-      if (settings.mcpEnabled) await _startMcp();
       try {
         await vault.run((v) => aiRecoverTasks(vault: v), writes: true);
       } catch (_) {}
@@ -145,61 +180,12 @@ class AiStore extends ChangeNotifier implements AgentRuns {
     unawaited(pump());
   }
 
-  bool get mcpRunning => mcpUrl != null;
-
   /// Whether this device runs tasks: its agent is on and can run them.
   bool get canAnswer => canRun && settings.answersAskAi && _agents.canRunTasks;
 
   void _onAgentChanged() {
     _notify();
     if (_started && _agents.canRunTasks) unawaited(pump());
-  }
-
-  // ---------------------------------------------------------------- MCP
-
-  Future<String?> _startMcp() async {
-    final addr = settings.mcpEnabled ? settings.mcpAddress : '127.0.0.1:0';
-    try {
-      final m = _mcp ??= NotesMcp(vault: vault.raw);
-      mcpUrl = await m.start(addr: addr);
-      mcpError = null;
-    } catch (e) {
-      mcpUrl = null;
-      mcpError = '$e';
-    }
-    _notify();
-    return mcpUrl;
-  }
-
-  Future<void> _stopMcp() async {
-    await _mcp?.stop();
-    mcpUrl = null;
-    _notify();
-  }
-
-  /// Turns the endpoint on [settings.mcpAddress] on or off.
-  Future<void> setMcpEnabled(bool on) async {
-    settings.update((s) => s.mcpEnabled = on);
-    await _stopMcp();
-    if (on) await _startMcp();
-  }
-
-  Future<void> setMcpAddress(String addr) async {
-    settings.update((s) => s.mcpAddress = addr);
-    if (settings.mcpEnabled) {
-      await _stopMcp();
-      await _startMcp();
-    }
-  }
-
-  /// The endpoint's bearer token.
-  Future<String> token() => (_mcp ??= NotesMcp(vault: vault.raw)).token();
-
-  /// A new token; AI apps set up with the old one must be updated.
-  Future<String> rotateToken() async {
-    final t = await (_mcp ??= NotesMcp(vault: vault.raw)).rotateToken();
-    _notify();
-    return t;
   }
 
   // -------------------------------------------------------------- tasks
@@ -211,6 +197,22 @@ class AiStore extends ChangeNotifier implements AgentRuns {
 
   /// The hub, when this device can create hub jobs.
   HubLink? get hubLink => _agents.hubLink;
+
+  /// Whether the hub can be picked as a runner: the Hub is the only host on
+  /// phones, and elsewhere a signed-in hub link is needed.
+  @override
+  bool get hubUsable => hubAgentPlatform || hubLink != null;
+
+  /// Makes the runner calls for [vault] (tests use a fake bridge).
+  @visibleForTesting
+  static AiRunnerBridge Function(Vault vault)? runnerBridgeOverride;
+
+  AiRunnerBridge? _runnerBridge;
+
+  @override
+  AiRunnerBridge get runnerBridge =>
+      _runnerBridge ??=
+          (runnerBridgeOverride ?? VaultAiRunnerBridge.new)(vault);
 
   /// Starts [prompt] about [page] on [runsOn]; its placeholder goes after
   /// block [after] (an empty paragraph there becomes it) or at the page's
@@ -226,12 +228,11 @@ class AiStore extends ChangeNotifier implements AgentRuns {
       unawaited(refresh());
       return job.id;
     }
-    // This computer runs it. A device without agents (not a desktop)
-    // leaves it to any desktop, as before.
+    // Resolve once at creation: new desktop rows always name this device.
+    // A device without a local runner must use its hub instead.
+    if (!canRun) throw 'This device needs a hub to run AI tasks.';
     final t = await vault.run(
-        (v) => canRun
-            ? aiCreateTaskHere(vault: v, prompt: prompt, page: page, after: after)
-            : aiCreateTask(vault: v, prompt: prompt, page: page, after: after, runner: ''),
+        (v) => aiCreateTaskHere(vault: v, prompt: prompt, page: page, after: after),
         writes: true);
     await refresh();
     unawaited(pump());
@@ -239,7 +240,14 @@ class AiStore extends ChangeNotifier implements AgentRuns {
   }
 
   HubJobs _jobs(HubLink hub) =>
-      (hubJobsOverride ?? (h, d) => HubJobsClient(hubUrl: h.url, token: h.token, deviceId: d))(hub, vault.deviceId);
+      (hubJobsOverride ??
+          (h, d) => HubJobsClient(
+                hubUrl: h.url,
+                token: h.token,
+                deviceId: d,
+                vault: vault.raw,
+                trusted: _agents.hubTrust(h.url),
+              ))(hub, vault.deviceId);
 
   Future<HubJob> _hubJob(String prompt, String page, String? after) async {
     final hub = hubLink;
@@ -266,7 +274,7 @@ class AiStore extends ChangeNotifier implements AgentRuns {
   }
 
   /// Stops run [id]: a hub job on the hub, a task on this device here
-  /// (marked cancelled; a late answer is dropped).
+  /// (the runner stops its engine session; a late answer is dropped).
   @override
   Future<void> cancel(String id) async {
     final t = await run(id);
@@ -281,12 +289,55 @@ class AiStore extends ChangeNotifier implements AgentRuns {
     await refresh();
   }
 
+  @override
+  Future<void> sendUpdate(String id) async {
+    await vault.run((v) => aiSendUpdate(vault: v, id: id), writes: true);
+    await refresh();
+  }
+
+  @override
+  Future<void> accept(String id) async {
+    await vault.run((v) => aiAcceptTask(vault: v, id: id), writes: true);
+    await refresh();
+  }
+
+  @override
+  Future<void> markFailed(String id) async {
+    await vault.run((v) => aiMarkTaskFailed(vault: v, id: id), writes: true);
+    await refresh();
+  }
+
+  @override
+  Future<void> addStep(String id, String text) async {
+    await vault.run((v) => aiAddStep(vault: v, id: id, text: text), writes: true);
+    await refresh();
+  }
+
+  /// Opens the agent chat of a run's session (the Agent screen).
+  static Future<void> openSession(BuildContext context, String sessionId) async {
+    await AgentStore.of(context.app).openSession(sessionId);
+    if (!context.mounted) return;
+    await openAgent(context);
+  }
+
+  @override
+  Future<void> reply(String id, String text) async {
+    final taken = await vault.run(
+      (v) => aiReplyTask(vault: v, id: id, text: text),
+      writes: true,
+    );
+    await refresh();
+    if (!taken) throw 'The worker is no longer waiting for a reply.';
+    unawaited(pump());
+  }
+
   Future<void> retry(String id) async {
     await vault.run((v) => aiRetryTask(vault: v, id: id), writes: true);
     await refresh();
     unawaited(pump());
   }
 
+  @override
   Future<void> refresh() async {
     try {
       tasks = await vault.run((v) => aiListTasks(vault: v, limit: 50));
@@ -360,14 +411,8 @@ class AiStore extends ChangeNotifier implements AgentRuns {
     if (!_disposed) notifyListeners();
   }
 
-  /// Stops the endpoint, then disposes the store.
-  Future<void> close() async {
-    final m = _mcp;
-    _mcp = null;
-    await m?.stop();
-    m?.dispose();
-    dispose();
-  }
+  /// Disposes the store.
+  Future<void> close() async => dispose();
 
   @override
   void dispose() {
@@ -376,9 +421,6 @@ class AiStore extends ChangeNotifier implements AgentRuns {
     feed?.removeListener(_onChanges);
     _settings.removeListener(notifyListeners);
     _agents.removeListener(_onAgentChanged);
-    final m = _mcp;
-    _mcp = null;
-    if (m != null) m.stop().whenComplete(m.dispose);
     _stores[vault] = null;
     super.dispose();
   }

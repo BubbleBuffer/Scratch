@@ -1,20 +1,31 @@
 // Hub addresses and pairing strings.
 //
-// - A pairing string carries the hub URL and a token in one line (also the
-//   QR code's content): `notes://pair?hub=http://100.101.102.103:47100&token=...`.
+// - A pairing string carries the hub URL and a one-time pairing code in one
+//   line (also the QR code's content):
+//   `notes://pair?hub=http://100.101.102.103:47100&code=...`. The device
+//   redeems the code with its device key (`redeemPairingCode`) for its token.
+//   Older links carry the token itself (`&token=...`); they still parse, and
+//   the first sync binds the device key to that token.
 // - [hubAddresses] lists this machine's IPv4 addresses that other devices
 //   can use: Tailscale (100.64.0.0/10) first, then private LAN ranges.
 
 import 'dart:io';
 
-/// A hub URL paired with a token.
+/// A hub URL paired with a one-time code, or (older links) a token.
 class Pairing {
-  const Pairing(this.url, this.token);
+  const Pairing(this.url, this.token) : code = null;
+  const Pairing.code(this.url, String this.code) : token = '';
   final String url;
+
+  /// The device token of an older link; empty for a code link.
   final String token;
 
+  /// The one-time pairing code, redeemed for the token; null for an older
+  /// token link.
+  final String? code;
+
   /// The one-line form (QR code content).
-  String encode() => 'notes://pair?hub=$url&token=$token';
+  String encode() => code != null ? 'notes://pair?hub=$url&code=$code' : 'notes://pair?hub=$url&token=$token';
 
   /// Reads a pairing string, or "url token" separated by whitespace.
   /// Returns null if [text] is neither.
@@ -23,7 +34,7 @@ class Pairing {
     if (t.startsWith('notes://pair')) {
       final q = t.indexOf('?');
       if (q < 0) return null;
-      String? hub, token;
+      String? hub, token, code;
       for (final part in t.substring(q + 1).split('&')) {
         final eq = part.indexOf('=');
         if (eq < 0) continue;
@@ -31,8 +42,11 @@ class Pairing {
         final v = Uri.decodeQueryComponent(part.substring(eq + 1));
         if (k == 'hub') hub = v;
         if (k == 'token') token = v;
+        if (k == 'code') code = v;
       }
-      if (hub == null || token == null || hub.isEmpty || token.isEmpty) return null;
+      if (hub == null || hub.isEmpty) return null;
+      if (code != null && code.isNotEmpty) return Pairing.code(normalizeHubUrl(hub), code);
+      if (token == null || token.isEmpty) return null;
       return Pairing(normalizeHubUrl(hub), token);
     }
     final parts = t.split(RegExp(r'\s+'));
@@ -111,14 +125,25 @@ String hostOf(String addr) => addr.substring(0, addr.lastIndexOf(':').clamp(0, a
 
 /// URLs other devices can use for a hub bound to [bound]: one per
 /// reachable address when it listens on every interface, else its own.
+/// Empty means no address is available for pairing another device. Loopback
+/// addresses are never offered, since they refer to the receiving device.
 Future<List<(String url, String label)>> hubUrls(String bound) async {
   final host = hostOf(bound);
   final port = portOf(bound);
   if (host == '0.0.0.0' || host == '[::]' || host == '::') {
     final list = await hubAddresses();
-    if (list.isEmpty) return [('http://127.0.0.1:$port', 'This computer')];
-    return [for (final a in list) (a.url(port), a.kindLabel)];
+    return [
+      for (final a in list)
+        if (a.kind != AddressKind.loopback && !_loopback(a.ip))
+          (a.url(port), a.kindLabel),
+    ];
   }
-  final ip = host == '127.0.0.1' || host == 'localhost' ? 'This computer' : 'Hub address';
-  return [('http://$host:$port', ip)];
+  if (_loopback(host)) return [];
+  return [('http://$host:$port', 'Hub address')];
+}
+
+bool _loopback(String host) {
+  final bare = host.replaceAll('[', '').replaceAll(']', '').toLowerCase();
+  return bare == 'localhost' || bare == 'localhost.' ||
+      (InternetAddress.tryParse(bare)?.isLoopback ?? false);
 }

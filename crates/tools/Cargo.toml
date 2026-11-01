@@ -19,21 +19,25 @@ path = "src/bin/notes.rs"
 
 [dependencies]
 vault_core = { path = "../core" }
+# notes setup: the device-key session bearer for POST /agent-tokens.
+vault_sync = { path = "../sync" }
 serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 anyhow = "1"
-toml = "0.8"
+toml = "1.1"
 serde_yaml = "0.9"
-ureq = { version = "3", default-features = false, features = ["rustls"] }
+# Pinned: attach_file uses ureq's unversioned resolver API (no semver guarantee).
+ureq = { version = "=3.5.0", default-features = false, features = ["rustls"] }
 url = "2"
-base64 = "0.22"
+base64 = "0.23"
 tar = "0.4"
 tempfile = "3"
-# Interim path dependency into the BubblePaw worktree (branch agent-integration),
-# as in crates/agent; the import CLI creates sessions through its Store.
-bubblepaw-core = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", rev = "2cddf0cd165043d2984a975b2e94932b5a9d325f" }
+# BubblePaw's core crate at tag v0.3.1 (the same tag as crates/agent); the
+# import CLI creates sessions through its Store. Not the SDK: that pulls in the
+# runner and QuickJS, which don't build for Android, and this crate builds there.
+bubblepaw-core = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.3.1" }
 
 [dev-dependencies]
 notes_hub = { path = "../hub" }

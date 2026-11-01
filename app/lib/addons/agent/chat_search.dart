@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
@@ -11,6 +10,7 @@ import '../../ui/toast.dart';
 import '../../ui/ui.dart';
 import 'agent_store.dart';
 import 'chat_reference.dart';
+import 'chat_search_target.dart';
 import 'navigation.dart';
 
 class AgentChatSearchSource extends AddonSearchSource {
@@ -34,83 +34,37 @@ class AgentChatSearchSource extends AddonSearchSource {
       openChatHit(context, result.toHit(id));
 }
 
-/// Where a chat hit opens: the session and the message range, read from the
-/// hit's `target` JSON. Titles are never used to find the chat.
-class ChatSearchTarget {
-  const ChatSearchTarget({
-    required this.sessionId,
-    required this.firstMessageId,
-    required this.lastMessageId,
-    required this.level,
-    this.chapterTitle,
-    this.sectionTitle,
-  });
+const _chatOpenFailed = 'Could not open this chat';
 
-  final String sessionId;
-
-  /// Empty for a title-only chat row, which has no message range.
-  final String firstMessageId;
-  final String lastMessageId;
-
-  /// `chat`, `chapter` or `section`, as the core writes it.
-  final String level;
-  final String? chapterTitle;
-  final String? sectionTitle;
-
-  /// Whether the target has a message range to show (a title-only row does
-  /// not, and opens its chat as an ordinary session).
-  bool get anchored => firstMessageId.isNotEmpty && lastMessageId.isNotEmpty;
-
-  /// The reference level the chat opens at: a section, else a chapter (a
-  /// whole-chat hit opens the chat at its range like a chapter does).
-  ChatRefLevel get refLevel =>
-      level == 'section' ? ChatRefLevel.section : ChatRefLevel.chapter;
-
-  /// Reads a hit's target; null when it is missing, has no session, or is not
-  /// a chat target.
-  static ChatSearchTarget? parse(String? target) {
-    if (target == null || target.isEmpty) return null;
-    try {
-      final j = jsonDecode(target) as Map<String, Object?>;
-      final sessionId = j['sessionId'];
-      final first = j['firstMessageId'];
-      final last = j['lastMessageId'];
-      final level = j['level'];
-      if (sessionId is! String ||
-          sessionId.isEmpty ||
-          first is! String ||
-          last is! String ||
-          level is! String) {
-        return null;
-      }
-      return ChatSearchTarget(
-        sessionId: sessionId,
-        firstMessageId: first,
-        lastMessageId: last,
-        level: level,
-        chapterTitle: j['chapterTitle'] as String?,
-        sectionTitle: j['sectionTitle'] as String?,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
+/// The chat reference level a search target opens at: a section, else a
+/// chapter (a whole-chat hit opens the chat at its range like a chapter does).
+extension ChatSearchTargetNavigation on ChatSearchTarget {
+  ChatRefLevel get refLevel => level == chatSearchLevelSection
+      ? ChatRefLevel.section
+      : ChatRefLevel.chapter;
 }
 
-const _chatOpenFailed = 'Could not open this chat';
+/// Opens a chat reference card's range. [openChatReference] by default; a test
+/// passes its own to see what an anchored hit asks for.
+typedef ChatReferenceOpener =
+    Future<void> Function(BuildContext context, ChatReference reference);
 
 /// Opens the chat behind a chat [hit]. A row with a message range opens the
 /// chat at that range, through the same path as a chat reference card. A
 /// title-only row has no range and opens the chat as an ordinary session.
 /// A malformed target, or a chat the agent cannot open, says why in a toast.
-Future<void> openChatHit(BuildContext context, Hit hit) async {
+Future<void> openChatHit(
+  BuildContext context,
+  Hit hit, {
+  ChatReferenceOpener openReference = openChatReference,
+}) async {
   final target = ChatSearchTarget.parse(hit.target);
   if (target == null) {
     showErrorToast(context, _chatOpenFailed);
     return;
   }
   if (target.anchored) {
-    await openChatReference(
+    await openReference(
       context,
       ChatReference(
         level: target.refLevel,

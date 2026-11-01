@@ -366,8 +366,9 @@ class _TaskFieldsState extends State<TaskFields> {
     }
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.enter, control: true): () =>
-            _save(),
+        platformActivator(
+          const SingleActivator(LogicalKeyboardKey.enter, control: true),
+        ): () => _save(),
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,

@@ -7,6 +7,7 @@
 
 import 'dart:io';
 
+import 'package:agent_kit_core/agent_kit_core.dart' show KitChoice;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/agent_chat_prefs.dart';
@@ -140,6 +141,75 @@ void main() {
       broken.created('x', AgentHost.hub);
       expect(AgentChatPrefs.load(file)['x']?.host, AgentHost.hub,
           reason: 'a broken file is replaced on the next save');
+    });
+
+    test('a file saved by earlier versions loads and saves unchanged', () {
+      final file = fileNamed('agent_chats.json');
+      const saved = '{\n'
+          '  "a": {\n'
+          '    "host": "hub",\n'
+          '    "model": "codex/m1"\n'
+          '  },\n'
+          '  "b": {\n'
+          '    "host": "local"\n'
+          '  }\n'
+          '}';
+      file.writeAsStringSync(saved);
+      final prefs = AgentChatPrefs.load(file);
+      expect(prefs['a']?.host, AgentHost.hub);
+      expect(prefs['a']?.model, 'codex/m1');
+      expect(prefs['b']?.host, AgentHost.local);
+      expect(prefs['b']?.model, isNull);
+      prefs.pickModel('a', AgentHost.local, 'codex/m1');
+      expect(file.readAsStringSync(), saved,
+          reason: 'same choices, same file: the format is unchanged');
+    });
+
+    // The persistence boundary: a save that fails is dropped. The choice
+    // stays in memory, the old file is left as it was (the new one is
+    // written beside it and renamed over it), and the next save that works
+    // writes everything.
+    test('a failed save keeps the choice and leaves the file intact', () {
+      final file = fileNamed('agent_chats.json');
+      final prefs = AgentChatPrefs.load(file);
+      prefs.created('a', AgentHost.hub, model: 'codex/m1');
+      final before = file.readAsStringSync();
+
+      // A folder where the temporary file goes makes the write fail.
+      final tmp = Directory('${file.path}.tmp')..createSync();
+      prefs.pickModel('a', AgentHost.local, 'codex/m2');
+      expect(prefs['a']?.host, AgentHost.hub);
+      expect(prefs['a']?.model, 'codex/m2', reason: 'kept in memory');
+      expect(file.readAsStringSync(), before, reason: 'old file untouched');
+      expect(AgentChatPrefs.load(file)['a']?.model, 'codex/m1');
+
+      tmp.deleteSync();
+      prefs.created('b', AgentHost.local);
+      final loaded = AgentChatPrefs.load(file);
+      expect(loaded['a']?.model, 'codex/m2', reason: 'saved by the next write');
+      expect(loaded['b']?.host, AgentHost.local);
+    });
+
+    test('the choices go through their storage, which may fail', () {
+      final storage = _FlakyStorage({
+        'a': const AgentChatPref(host: AgentHost.hub, model: 'm1'),
+      });
+      final prefs = AgentChatPrefs(storage: storage);
+      expect(prefs['a']?.model, 'm1', reason: 'read from the storage');
+
+      storage.fail = true;
+      prefs.pickModel('a', AgentHost.local, 'm2');
+      expect(prefs['a']?.model, 'm2', reason: 'a throwing write is dropped');
+      expect(storage.saved['a']?.model, 'm1');
+
+      storage.fail = false;
+      prefs.remove('a');
+      expect(prefs['a'], isNull);
+      expect(storage.saved, isEmpty);
+
+      final memory = AgentChatPrefs();
+      memory.created('x', AgentHost.local);
+      expect(memory['x']?.host, AgentHost.local, reason: 'no storage: memory only');
     });
 
     appTest('the store saves the model pick with the chat host', (t) async {
@@ -306,16 +376,16 @@ void main() {
     expect(store.canPickHost, isTrue);
     expect(store.host, AgentHost.local);
     expect(key('agent-runner'), findsOneWidget);
-    final picker = t.widget<SelectButton<AgentHost>>(key('agent-runner'));
-    expect(picker.options, AgentHost.values);
-    expect(picker.value, AgentHost.local);
+    final picker = t.widget<SelectButton<KitChoice>>(key('agent-runner'));
+    expect(picker.options.map((c) => c.id), [for (final h in AgentHost.values) h.name]);
+    expect(picker.value.id, AgentHost.local.name);
     expect(picker.onChanged, isNotNull, reason: 'a draft can switch');
 
     final s = await real(t, () => store.createSession(title: 'Runner'));
     await settle(t);
     expect(store.hostOf(s!.id), AgentHost.local, reason: 'saved with the chat');
     expect(
-      t.widget<SelectButton<AgentHost>>(key('agent-runner')).onChanged,
+      t.widget<SelectButton<KitChoice>>(key('agent-runner')).onChanged,
       isNotNull,
       reason: 'an empty chat can still switch',
     );
@@ -324,9 +394,9 @@ void main() {
     expect(run?.status, 'completed');
     await settle(t);
     expect(store.state!.messages, isNotEmpty);
-    final locked = t.widget<SelectButton<AgentHost>>(key('agent-runner'));
+    final locked = t.widget<SelectButton<KitChoice>>(key('agent-runner'));
     expect(locked.onChanged, isNull, reason: 'a chat with messages is fixed');
-    expect(locked.value, AgentHost.local, reason: 'it shows its runner');
+    expect(locked.value.id, AgentHost.local.name, reason: 'it shows its runner');
   });
 
   appTest('the runner picker is disabled while a reply runs', (t) async {
@@ -344,7 +414,7 @@ void main() {
     final s = await real(t, () => store.createSession(title: 'Busy'));
     await settle(t);
     expect(
-      t.widget<SelectButton<AgentHost>>(key('agent-runner')).onChanged,
+      t.widget<SelectButton<KitChoice>>(key('agent-runner')).onChanged,
       isNotNull,
       reason: 'an empty chat can switch',
     );
@@ -355,7 +425,7 @@ void main() {
     expect(store.running, isTrue);
     expect(store.hostLocked, isFalse);
     expect(
-      t.widget<SelectButton<AgentHost>>(key('agent-runner')).onChanged,
+      t.widget<SelectButton<KitChoice>>(key('agent-runner')).onChanged,
       isNull,
       reason: 'a running reply fixes the runner',
     );
@@ -414,4 +484,21 @@ void main() {
     await tapAndSettle(t, key('confirm-cancel'));
     expect(await answer, isFalse);
   });
+}
+
+/// Storage in memory whose writes throw while [fail] is set.
+class _FlakyStorage implements AgentChatPrefsStorage {
+  _FlakyStorage(Map<String, AgentChatPref> initial) : saved = Map.of(initial);
+
+  Map<String, AgentChatPref> saved;
+  bool fail = false;
+
+  @override
+  Map<String, AgentChatPref> read() => Map.of(saved);
+
+  @override
+  void write(Map<String, AgentChatPref> choices) {
+    if (fail) throw const FileSystemException('write failed');
+    saved = Map.of(choices);
+  }
 }

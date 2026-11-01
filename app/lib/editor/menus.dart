@@ -485,13 +485,13 @@ class _BlockMenuState extends State<BlockMenu> {
           icon: Ico.link,
           label: 'Copy',
           onTap: () => widget.onAction(BlockAction.copy),
-          trailing: Text('Ctrl+C', style: ts(context.type.uiSmall, c.textTertiary, weight: 400))),
+          trailing: Text(shortcutHint('Ctrl+C'), style: ts(context.type.uiSmall, c.textTertiary, weight: 400))),
       MenuItem(
           key: const ValueKey('menu-duplicate'),
           icon: Ico.duplicate,
           label: 'Duplicate',
           onTap: () => widget.onAction(BlockAction.duplicate),
-          trailing: Text('Ctrl+D', style: ts(context.type.uiSmall, c.textTertiary, weight: 400))),
+          trailing: Text(shortcutHint('Ctrl+D'), style: ts(context.type.uiSmall, c.textTertiary, weight: 400))),
       MenuItem(
           key: const ValueKey('menu-up'),
           icon: Ico.arrowUp,

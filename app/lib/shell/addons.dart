@@ -11,29 +11,21 @@ import '../addons/tasks/api.dart';
 import '../registry/addon_registry.dart';
 
 class AddonEntry {
-  const AddonEntry(this.addon, this.label, {this.optional = false});
+  const AddonEntry(this.addon, this.label);
   final Addon addon;
   final String label;
-  final bool optional;
 }
 
 const addonList = [
   AddonEntry(LegacyAddon(), 'Built-ins'),
-  AddonEntry(AgentAddon(), 'Agent', optional: true),
+  AddonEntry(AgentAddon(), 'Agent'),
   AddonEntry(DocumentAddon(), 'Document'),
   AddonEntry(DatabaseAddon(), 'Database'),
-  AddonEntry(BoardAddon(), 'Board', optional: true),
-  AddonEntry(KanbanAddon(), 'Kanban', optional: true),
-  AddonEntry(ScheduleAddon(), 'Schedules', optional: true),
-  AddonEntry(TasksAddon(), 'Tasks', optional: true),
-  AddonEntry(SearchCardAddon(), 'Search card', optional: true),
-];
-
-/// Ignore stale disabled ids and protect required add-ons. Reject an enabled
-/// dependent whose dependency was disabled instead of silently booting it.
-List<Addon> enabledAddons(Set<String> disabled) => [
-  for (final entry in addonList)
-    if (!entry.optional || !disabled.contains(entry.addon.id)) entry.addon,
+  AddonEntry(BoardAddon(), 'Board'),
+  AddonEntry(KanbanAddon(), 'Kanban'),
+  AddonEntry(ScheduleAddon(), 'Schedules'),
+  AddonEntry(TasksAddon(), 'Tasks'),
+  AddonEntry(SearchCardAddon(), 'Search card'),
 ];
 
 AddonContext? _context;
@@ -42,12 +34,11 @@ AddonContext get appAddonContext {
   return _context!;
 }
 
-/// Compatibility name used by existing boot harnesses. Registration is once
-/// per process; optional settings take effect at the next application start.
-void registerBuiltins({Set<String> disabledAddons = const {}}) {
+/// Register every compiled-in add-on once per process.
+void registerBuiltins() {
   if (_context != null) return;
   final ctx = AddonContext.global();
-  bootAddons(enabledAddons(disabledAddons), ctx);
+  bootAddons(addonList.map((entry) => entry.addon), ctx);
   _context = ctx;
   activeAddonContext = ctx;
 }

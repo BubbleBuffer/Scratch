@@ -71,7 +71,7 @@ void main() {
         ),
       ];
       await tapAndSettle(tester, key('sidebar-settings'));
-      await tapAndSettle(tester, key('settings-nav-ai'));
+      await tapAndSettle(tester, key('settings-nav-agent'));
       await Scrollable.ensureVisible(
         tester.element(key('agent-enabled-toggle')),
         alignment: 0.13,

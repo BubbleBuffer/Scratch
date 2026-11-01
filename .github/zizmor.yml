@@ -1,0 +1,6 @@
+rules:
+  cache-poisoning:
+    ignore:
+      # The Rust caches here are restore-only (save-if: false), so a release
+      # run never writes a cache entry.
+      - release.yml

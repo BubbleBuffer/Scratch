@@ -13,12 +13,11 @@ use jiff::Timestamp;
 use notes_agent_wire::{SchedulePreview, ScheduleRun, ScheduleState};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use vault_core::{MarkKind, Vault};
+use vault_core::{MarkKind, Vault, DEVICE_ACTIVITY_INTERVAL_MS};
 
 use format::{definition_hash, Schedule};
 
 pub const TICK_SECONDS: u64 = 30;
-const RECORD_REFRESH_SECONDS: i64 = 6 * 60 * 60;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 struct SavedSchedule {
@@ -166,16 +165,15 @@ impl Scheduler {
     }
 
     fn write_record(&self, available: bool, now: Timestamp) -> Result<()> {
-        // An off desktop may update its existing record, but must not publish
-        // itself (or create the hidden Nodes collection) until opted in.
-        if self.kind == "desktop" && !available {
-            match self.vault.load_page(self.node_id.clone()) {
-                Err(vault_core::VaultError::NotFound(_)) => return Ok(()),
-                Err(error) => return Err(error.into()),
-                Ok(_) => {}
-            }
+        // An off desktop may update its existing registration, but must not
+        // register itself (or create the hidden Nodes collection) until opted
+        // in. A device presence record is not a registration.
+        if self.kind == "desktop" && !available && !is_registered(&self.vault, &self.node_id)? {
+            return Ok(());
         }
-        self.vault.write_node_record(
+        // Merging keeps the name a Settings rename gave the record, and keeps
+        // fields this scheduler does not write.
+        self.vault.merge_node_record(
             self.vault.device_id(),
             json!({
                 "device_id": self.vault.device_id(), "name": self.name,
@@ -499,7 +497,9 @@ impl Scheduler {
     }
 
     fn tick_locked(&self, local: &mut Local, now: Timestamp) -> Result<()> {
-        if now.as_second() - local.record_at.as_second() >= RECORD_REFRESH_SECONDS {
+        // Refreshing `last_seen` at the activity interval keeps the device
+        // inside the hub's online window.
+        if now.as_millisecond() - local.record_at.as_millisecond() >= DEVICE_ACTIVITY_INTERVAL_MS {
             self.write_record(local.available, now)?;
             local.record_at = now;
         }
@@ -564,6 +564,20 @@ impl Scheduler {
         }
         self.write_status(page, &self.view(page, &raw, local, now))
     }
+}
+
+/// Whether `node_id` is a schedule registration: a node record the scheduler has
+/// written, which carries its `schedule_format`. A device presence record (name,
+/// kind and heartbeat only) is not one.
+pub fn is_registered(vault: &Vault, node_id: &str) -> Result<bool> {
+    match vault.load_page(node_id.into()) {
+        Err(vault_core::VaultError::NotFound(_)) => return Ok(false),
+        Err(error) => return Err(error.into()),
+        Ok(page) if page.page_type != "node" => return Ok(false),
+        Ok(_) => {}
+    }
+    let data: Value = serde_json::from_str(&vault.type_data(node_id.into(), "node".into())?)?;
+    Ok(data.get("schedule_format").is_some())
 }
 
 fn record(saved: &mut SavedSchedule, run: ScheduleRun) {

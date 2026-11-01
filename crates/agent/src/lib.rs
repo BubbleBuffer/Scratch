@@ -4,16 +4,19 @@
 //!   outside the vault (`agent/agent.sqlite` is the legacy store file).
 //! - The default model surface is BubblePaw's `js` tool. Hosts can opt into
 //!   native entrypoints; vault and history tools remain composable inside JS.
-//! - Providers: `codex` (Codex sign-in), `claude-code` (the Bun extension, when
-//!   configured) and, for tests only, `scripted`.
+//! - Providers: desktop `codex`, `claude-code` (the Bun extension), `opencode`
+//!   (when `OPENCODE_API_KEY` is set) and, for tests only, `scripted`.
 //! - The agent owns its own Tokio runtime, so callers can stay on plain threads.
 //!
 //! See wiki/integrations/agent.md, build step 3.
 
 pub mod claude;
+pub mod compacted_history;
 mod context;
+mod episode_actions;
 mod gateway;
 pub mod mcp;
+mod outline_lcm;
 mod outline_titles;
 /// Explicitly renamed sessions retain their complete display name.
 pub fn session_user_named_ids_at(data_dir: &std::path::Path) -> anyhow::Result<Vec<String>> {
@@ -31,37 +34,40 @@ mod ui;
 pub mod wire;
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::Duration;
 
 use anyhow::{ensure, Context, Result};
 use async_trait::async_trait;
-use bubblepaw_core::{
-    ApprovalMode, ApprovalPolicy, ApprovalRecord, CancellationToken, ClientInfo, Decision, Harness,
-    HarnessConfig, HarnessEvent, LogPosition, Message, ModelInfo, ModelRequest, ModelResponse,
-    Provider, ProviderError, ProviderErrorKind, QueuedInput, Run, RunOptions, Session, SessionBusy,
-    Store, TextCallback, Tool, ToolRegistry, EVENTS_AFTER_LIMIT,
+use bubblepaw_sdk::approvals::{ApprovalMode, ApprovalPolicy, ApprovalRecord, Decision};
+use bubblepaw_sdk::context::{
+    cached_context_window, ContextPreparation, PrepareCall, PrepareMode, PreparedContext,
+    SummarizingContext, SummaryConfig,
 };
-use bubblepaw_runner::artifacts::ArtifactStore;
-use bubblepaw_runner::codemode::CodeMode;
-use bubblepaw_runner::provider::{
-    ExtensionConfig, ExtensionProvider, ProviderRegistry, ResponsesProvider, ScriptedProvider,
-    ScriptedStep,
+use bubblepaw_sdk::core::{ModelInfo, Run};
+use bubblepaw_sdk::events::HarnessEvent;
+use bubblepaw_sdk::harness::{
+    CancellationToken, ClientInfo, Harness, HarnessConfig, RunOptions, SessionBusy,
 };
-use bubblepaw_runner::runtime_note::RuntimeNotes;
-use bubblepaw_runner::summarization::{cached_context_window, SummarizingContext, SummaryConfig};
-use bubblepaw_runner::tools::register_history_tools;
+use bubblepaw_sdk::providers::{
+    ExtensionProvider, ModelRequest, ModelResponse, Provider, ProviderError, ProviderErrorKind,
+    ProviderRegistry, ResponsesProvider, ScriptedProvider, ScriptedStep, TextCallback,
+};
+use bubblepaw_sdk::runner::provider::ChatCompletionsProvider;
+use bubblepaw_sdk::store::{LogPosition, Message, QueuedInput, Session, Store, EVENTS_AFTER_LIMIT};
+use bubblepaw_sdk::tools::{CodeMode, Tool, ToolRegistry};
+use bubblepaw_sdk::HostBuilder;
 use vault_core::Vault;
 
-pub use bubblepaw_core;
-pub use bubblepaw_runner;
+pub use bubblepaw_sdk;
 pub use notes_agent_wire::{HostInfo, PermissionMode, Project};
 pub use vault_tools::outline;
 
 /// The default model when the device setting is empty: Codex with the
 /// BubblePaw runner's default model.
 pub const DEFAULT_MODEL: &str = "codex/gpt-6-luna";
+pub const HUB_DEFAULT_MODEL: &str = "claude-code/claude-sonnet-5-5";
 const CODEX_URL: &str = "https://chatgpt.com/backend-api/codex";
 
 /// Which application hosts the agent; clients discover this through host_info.
@@ -199,8 +205,8 @@ pub enum Forwarded {
 
 /// The outline of `session` in `store`, with its notes-owned file at `outline_path`.
 /// The notes-owned outline wins whenever one was saved for the session, even an
-/// empty one. Otherwise BubblePaw's context chapters are returned without sections,
-/// each ending at its last message. Empty when neither exists.
+/// empty one. Otherwise LCM subject chapters with episode sections take precedence
+/// over legacy context chapters without sections. Empty when none exist.
 pub fn read_session_outline(
     store: &Store,
     outline_path: &Path,
@@ -210,6 +216,9 @@ pub fn read_session_outline(
     if let Some(chapters) = vault_tools::outline::OutlineStore::read_session(outline_path, session)?
     {
         return Ok(vault_tools::outline::ChatOutline { chapters });
+    }
+    if let Some(outline) = outline_lcm::read(store, session)? {
+        return Ok(outline);
     }
     let chapters = store.context_chapters(session)?;
     if chapters.is_empty() {
@@ -258,6 +267,24 @@ pub fn session_outline_at(
     let (store, outline_path) = agent_store_at(data_dir)?;
     outline_titles::refresh(&store, &outline_path, session)?;
     read_session_outline(&store, &outline_path, session)
+}
+
+/// Read durable context cards and canonical message gaps without changing the
+/// notes-owned outline, automatic titles, or serving view.
+pub fn session_compacted_history_at(
+    data_dir: &Path,
+    session: &str,
+) -> Result<compacted_history::CompactedHistory> {
+    let (store, _) = agent_store_at(data_dir)?;
+    read_session_compacted_history(&store, session)
+}
+
+/// See [`compacted_history`] for range and overlap semantics.
+pub fn read_session_compacted_history(
+    store: &Store,
+    session: &str,
+) -> Result<compacted_history::CompactedHistory> {
+    compacted_history::read(store, session)
 }
 
 /// The agent store in `data_dir` and the outline file beside it. Errors, instead of
@@ -367,15 +394,13 @@ struct Surfaces {
 impl Surfaces {
     fn new(
         tools: &ToolRegistry,
-        execution_mode: bubblepaw_core::ExecutionMode,
-        enable_js: bool,
+        execution_mode: bubblepaw_sdk::harness::ExecutionMode,
     ) -> Result<Surfaces> {
         Ok(Surfaces {
-            gateway: gateway::GatewayRuntime::new(tools, execution_mode, enable_js)?,
+            gateway: gateway::GatewayRuntime::new(tools, execution_mode)?,
             relay: gateway::GatewayRuntime::new(
                 tools,
-                bubblepaw_core::ExecutionMode::Native,
-                false,
+                bubblepaw_sdk::harness::ExecutionMode::Native,
             )?,
         })
     }
@@ -388,8 +413,7 @@ pub struct Agent {
     /// The tools without MCP's, which [`Agent::set_mcp`] rebuilds the
     /// surfaces over.
     base_tools: ToolRegistry,
-    execution_mode: bubblepaw_core::ExecutionMode,
-    enable_js: bool,
+    execution_mode: bubblepaw_sdk::harness::ExecutionMode,
     /// Swapped whole by [`Agent::set_mcp`]; a call keeps the surfaces it
     /// started with.
     surfaces: RwLock<Arc<Surfaces>>,
@@ -402,6 +426,8 @@ pub struct Agent {
     permission_mode: Mutex<PermissionMode>,
     permission_file: PathBuf,
     harness: Arc<Harness>,
+    /// Template for delegated runs, whose registry adds a task-bound tool.
+    task_harness_config: HarnessConfig,
     store: Store,
     /// `<data_dir>/agent/chat_outline.sqlite`, the notes-owned chapters and sections.
     outline_path: PathBuf,
@@ -413,6 +439,8 @@ pub struct Agent {
     /// The configured default (`AgentConfig::default_model`, else
     /// [`DEFAULT_MODEL`]); a hub host prefers the vault's default for `hub`.
     default_model: String,
+    /// Hub policy, shared by model discovery, chats, tasks and jobs.
+    model_allowlist: Option<Vec<String>>,
     /// The runner whose vault default model applies to runs without one:
     /// `hub` on a hub host. Desktop hosts get the model from the app, which
     /// resolves the device override and the vault value itself.
@@ -420,13 +448,16 @@ pub struct Agent {
     system_prompt: String,
     /// Stops each running [`Agent::forward_events`] task.
     forwarders: Mutex<Vec<CancellationToken>>,
+    /// Set once this device's old task sessions were expired (the first task
+    /// run after the app starts does it).
+    sessions_expired: AtomicBool,
     runtime: tokio::runtime::Runtime,
 }
 
 impl Agent {
     /// Opens the store and assembles the harness over `vault`.
     pub fn open(vault: Arc<Vault>, config: AgentConfig) -> Result<Agent> {
-        Self::open_with_execution(vault, config, bubblepaw_core::ExecutionMode::Js, false)
+        Self::open_with_execution(vault, config, bubblepaw_sdk::harness::ExecutionMode::Js)
     }
 
     /// Opens with an explicit BubblePaw entrypoint surface. Ordinary app callers
@@ -434,8 +465,7 @@ impl Agent {
     pub fn open_with_execution(
         vault: Arc<Vault>,
         config: AgentConfig,
-        execution_mode: bubblepaw_core::ExecutionMode,
-        enable_js: bool,
+        execution_mode: bubblepaw_sdk::harness::ExecutionMode,
     ) -> Result<Agent> {
         let counter = AtomicUsize::new(0);
         let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -455,10 +485,6 @@ impl Agent {
             store.clone(),
         )?);
         let ui = Arc::new(ui::Ui::new());
-        store.bind_workspace(&workspace)?;
-
-        let artifacts = Arc::new(ArtifactStore::new(&workspace, dir.join("artifacts"))?);
-        let repl = Arc::new(CodeMode::new(workspace.clone(), artifacts)?);
 
         // This runner's tool set, from the vault, read once per engine start.
         // The conversation tools (js, history_*, chat_read, ui_*) are in every
@@ -478,19 +504,23 @@ impl Agent {
         let mut projects = None;
 
         let mut pack_names = Vec::new();
-        let mut system_prompt = execution_prompt(execution_mode, enable_js);
+        let mut system_prompt = execution_prompt(execution_mode);
         for pack in &config.packs {
             match pack {
                 ToolPack::Desktop { .. } if tool_set != vault_tools::ToolSet::Everything => {}
                 ToolPack::Desktop { root } => {
-                    let project_store =
-                        Arc::new(projects::Projects::open(dir.join("projects.json"), root)?);
+                    let project_store = Arc::new(projects::Projects::open_for_device(
+                        dir.join("projects.json"),
+                        root,
+                        vault.clone(),
+                    )?);
 
                     let runtime = tools::register_desktop_tools_recorded(
                         &mut tools,
                         project_store.clone(),
                         &workspace,
                         Some((records.clone(), vault.clone())),
+                        Some(store.clone()),
                     )?;
                     desktop = Some(runtime);
 
@@ -524,29 +554,6 @@ impl Agent {
                 false,
             )))?;
         }
-        let mut support_tools = ToolRegistry::new();
-        register_history_tools(&mut support_tools, store.clone())?;
-        repl.register(&mut support_tools)?;
-        for definition in support_tools.capabilities() {
-            let name = definition.name;
-            if support_tools.is_shown_always(&name) {
-                tools.show_always([name.clone()]);
-            }
-            let tool = support_tools.get_host(&name).expect("support host tool");
-            tools.register_host(Arc::new(tools::RecordedTool::new(
-                tool,
-                records.clone(),
-                vault.clone(),
-                false,
-            )))?;
-        }
-        for definition in support_tools.definitions() {
-            tools.register(
-                support_tools
-                    .get_model(&definition.name)
-                    .expect("support model tool"),
-            )?;
-        }
         // MCP servers (desktop hosts with the Everything set; see `mcp`).
         // The host exists even without servers, so `set_mcp` can add some.
         // A server that fails is left out and reported by `mcp_status`.
@@ -575,34 +582,21 @@ impl Agent {
         } else {
             None
         };
-        let base_tools = tools.clone();
-        if let Some(state) = &mcp_state {
-            for skipped in mcp::register(&mut tools, &state.host, &records, &vault) {
-                eprintln!("agent: {skipped}");
-            }
-        }
-        let model_tools = tools
-            .with_execution_mode(execution_mode, enable_js)
-            .definitions();
-        ensure!(
-            !model_tools.is_empty(),
-            "The agent must expose at least one tool"
-        );
-        let surfaces = Surfaces::new(&tools, execution_mode, enable_js)?;
-
         let default_model = if config.default_model.trim().is_empty() {
-            DEFAULT_MODEL.to_string()
+            match config.host_kind {
+                HostKind::Desktop => DEFAULT_MODEL,
+                HostKind::Hub => HUB_DEFAULT_MODEL,
+            }
+            .to_string()
         } else {
             config.default_model.trim().to_string()
         };
-        let codex_home = codex_home();
+        let codex_home = (config.host_kind == HostKind::Desktop)
+            .then(codex_home)
+            .flatten();
         let models_cache = codex_home
             .as_ref()
             .map(|home| home.join("models_cache.json"));
-        let mut registry = ProviderRegistry::new(
-            "codex",
-            codex_provider(codex_home.as_deref(), models_cache.as_deref()),
-        );
         let claude_detection = claude::detect(
             config.bun_path.as_deref(),
             config.claude_code_dir.as_deref(),
@@ -612,24 +606,40 @@ impl Agent {
             &claude_detection.claude_code_dir,
         ) {
             (Some(bun), Some(dir)) if bun.is_file() && dir.is_dir() => {
-                let extension = Arc::new(ExtensionProvider::new(ExtensionConfig {
-                    id: "claude-code".into(),
-                    command: bun.to_string_lossy().into_owned(),
-                    args: vec![
-                        "run".into(),
-                        dir.join("src")
-                            .join("main.ts")
-                            .to_string_lossy()
-                            .into_owned(),
-                    ],
-                    cwd: Some(dir.clone()),
-                    env: Default::default(),
-                }));
-                registry.insert("claude-code", extension.clone())?;
+                let extension = Arc::new(ExtensionProvider::new(
+                    bubblepaw_sdk::claude_code::extension_config("claude-code", bun, dir),
+                ));
                 Some(extension)
             }
             _ => None,
         };
+        let claude_provider: Arc<dyn Provider> = match &extension {
+            Some(extension) => extension.clone(),
+            None => Arc::new(Unavailable(
+                "Claude Code unavailable: configure NOTES_HUB_AGENT_BUN and \
+                 NOTES_HUB_AGENT_CLAUDE_CODE_EXTENSION, and supply CLAUDE_CONFIG_DIR \
+                 (mounted Claude Code login) or CLAUDE_CODE_OAUTH_TOKEN"
+                    .into(),
+            )),
+        };
+        let mut registry = if config.host_kind == HostKind::Hub {
+            let provider = if claude_credentials_available(|key| std::env::var_os(key)) {
+                claude_provider
+            } else {
+                Arc::new(Unavailable(CLAUDE_CREDENTIAL_ERROR.into()))
+            };
+            ProviderRegistry::new("claude-code", provider).with_strict_routes()
+        } else {
+            let mut registry = ProviderRegistry::new(
+                "codex",
+                codex_provider(codex_home.as_deref(), models_cache.as_deref()),
+            );
+            if extension.is_some() {
+                registry.insert("claude-code", claude_provider)?;
+            }
+            registry
+        };
+        register_opencode(&mut registry, std::env::var("OPENCODE_API_KEY").ok())?;
         if let Some((steps, final_text)) = config.test.scripted {
             registry.insert(
                 "scripted",
@@ -639,7 +649,113 @@ impl Agent {
         if replay::enabled() {
             registry.insert(replay::PROVIDER_ID, Arc::new(replay::ReplayProvider))?;
         }
-        let providers = Arc::new(registry);
+        let mut harness_config = HarnessConfig {
+            execution_mode,
+            model: default_model.clone(),
+            system_prompt: system_prompt.clone(),
+            approval: permission_policy(permission_mode),
+            // Preserve the embedded agent's previous finite default. BubblePaw
+            // now defaults to an unlimited number of model/tool rounds.
+            max_rounds: Some(32),
+            // chat_read pages contain up to 20,000 Unicode characters.
+            // Allow their UTF-8 / JSON representation before js applies its
+            // separate output budget (the full value stays available in JS).
+            max_tool_result_bytes: 256 * 1024,
+            ..HarnessConfig::default()
+        };
+        if replay::enabled() {
+            // A recorded turn can hold ~190 assistant records; see replay::MAX_ROUNDS.
+            harness_config.max_rounds = Some(replay::MAX_ROUNDS);
+        }
+        // The Codex window is known from Codex's model cache; other models
+        // compact at the default cap.
+        let window = match (default_model.strip_prefix("codex/"), &models_cache) {
+            (Some(model), Some(cache)) => cached_context_window(cache, model),
+            _ => None,
+        };
+        let summary_config = SummaryConfig {
+            context_window: window,
+            max_request_bytes: harness_config.max_request_bytes,
+            ..SummaryConfig::default()
+        };
+        // A run with another model drops the default model's window.
+        let model_metadata = models_cache.map(|cache| (default_model.clone(), cache));
+        let desktop_context = match (&desktop, &projects) {
+            (Some(desktop), Some(_)) => Some(desktop.clone()),
+            _ => None,
+        };
+
+        // The host builds its registry before MCP is added, and the context
+        // is wrapped inside the host. These slots carry both back out.
+        let base_slot: Arc<OnceLock<ToolRegistry>> = Arc::new(OnceLock::new());
+        let context_slot: Arc<OnceLock<Arc<dyn ContextPreparation>>> = Arc::new(OnceLock::new());
+        if let Some(state) = &mcp_state {
+            // Each turn sees the servers' current tools: the resolver asks
+            // them to refresh (for `tools/list_changed`) and registers what
+            // they list now over the other tools.
+            let (host, handle) = (state.host.clone(), runtime.handle().clone());
+            let (records, vault) = (records.clone(), vault.clone());
+            let base_slot = base_slot.clone();
+            harness_config.registry_resolver = Some(Arc::new(move || {
+                let refresh = host.clone();
+                handle.spawn(async move {
+                    refresh.refresh_tools().await;
+                });
+                let mut registry = base_slot.get().cloned().unwrap_or_else(ToolRegistry::new);
+                mcp::register(&mut registry, &host, &records, &vault);
+                registry
+            }));
+        }
+
+        let support_records = records.clone();
+        let support_vault = vault.clone();
+        let wrapped_context = context_slot.clone();
+        let host = HostBuilder::new(store.clone(), registry)
+            .workspace(workspace.clone())
+            .tools(tools)
+            .history_tools(true)
+            .code_mode(dir.join("artifacts"))
+            .wrap_support_tools(move |tool: Arc<dyn Tool>| -> Arc<dyn Tool> {
+                Arc::new(tools::RecordedTool::new(
+                    tool,
+                    support_records.clone(),
+                    support_vault.clone(),
+                    false,
+                ))
+            })
+            .summarize(summary_config)
+            .context(
+                move |mut summary: SummarizingContext| -> Arc<dyn ContextPreparation> {
+                    if let Some((model, cache)) = &model_metadata {
+                        summary = summary.with_model_metadata(model.clone(), cache.clone());
+                    }
+                    let context: Arc<dyn ContextPreparation> = match &desktop_context {
+                        Some(desktop) => Arc::new(DesktopContext {
+                            inner: summary,
+                            desktop: desktop.clone(),
+                        }),
+                        None => Arc::new(summary),
+                    };
+                    let _ = wrapped_context.set(context.clone());
+                    context
+                },
+            )
+            .config(harness_config.clone())
+            .build()?;
+        let _ = base_slot.set(host.tools.clone());
+        let repl = host
+            .code_mode
+            .clone()
+            .context("the agent host has no JavaScript adapter")?;
+
+        // The tools as this engine offers them: the host's, with MCP's.
+        let mut tools = host.tools.clone();
+        if let Some(state) = &mcp_state {
+            for skipped in mcp::register(&mut tools, &state.host, &records, &vault) {
+                eprintln!("agent: {skipped}");
+            }
+        }
+        let surfaces = Surfaces::new(&tools, execution_mode)?;
 
         let mut tool_names: Vec<_> = tools
             .definitions()
@@ -658,108 +774,45 @@ impl Agent {
             .into(),
             packs: pack_names,
             tools: tool_names,
-            providers: providers.ids(),
+            providers: host.providers.ids(),
             can_run_tasks: config.host_kind == HostKind::Desktop,
             version: env!("CARGO_PKG_VERSION").into(),
             default_model: Some(default_model.clone()),
         };
 
-        let notes = Arc::new(RuntimeNotes::without_processes(repl.clone()));
-        let mut harness_config = HarnessConfig {
-            execution_mode,
-            enable_js,
-            model: default_model.clone(),
-            system_prompt: system_prompt.clone(),
-            approval: permission_policy(permission_mode),
-            // Preserve the embedded agent's previous finite default. BubblePaw
-            // now defaults to an unlimited number of model/tool rounds.
-            max_rounds: Some(32),
-            // chat_read pages contain up to 20,000 Unicode characters.
-            // Allow their UTF-8 / JSON representation before js applies its
-            // separate output budget (the full value stays available in JS).
-            max_tool_result_bytes: 256 * 1024,
-            ..HarnessConfig::default()
-        };
-        // The Codex window is known from Codex's model cache; other models
-        // compact at the default cap.
-        let window = match (default_model.strip_prefix("codex/"), &models_cache) {
-            (Some(model), Some(cache)) => cached_context_window(cache, model),
-            _ => None,
-        };
-        let mut summary = SummarizingContext::new(
-            store.clone(),
-            providers.clone(),
-            SummaryConfig {
-                context_window: window,
-                max_request_bytes: harness_config.max_request_bytes,
-                ..SummaryConfig::default()
-            },
-            Some(notes),
-        )?;
-        if let Some(cache) = models_cache {
-            // A run with another model drops the default model's window.
-            summary = summary.with_model_metadata(default_model.clone(), cache);
-        }
-        harness_config.context = match (&desktop, &projects) {
-            (Some(desktop), Some(projects)) => Arc::new(DesktopContext {
-                inner: summary,
-                desktop: desktop.clone(),
-                projects: projects.clone(),
-            }),
-            _ => Arc::new(summary),
-        };
-
-        if replay::enabled() {
-            // A recorded turn can hold ~190 assistant records; see replay::MAX_ROUNDS.
-            harness_config.max_rounds = Some(replay::MAX_ROUNDS);
-        }
-        if let Some(state) = &mcp_state {
-            // Each turn sees the servers' current tools: the resolver asks
-            // them to refresh (for `tools/list_changed`) and registers what
-            // they list now over the other tools.
-            let (host, handle) = (state.host.clone(), runtime.handle().clone());
-            let (records, vault) = (records.clone(), vault.clone());
-            let base_tools = base_tools.clone();
-            harness_config.registry_resolver = Some(Arc::new(move || {
-                let refresh = host.clone();
-                handle.spawn(async move {
-                    refresh.refresh_tools().await;
-                });
-                let mut registry = base_tools.clone();
-                mcp::register(&mut registry, &host, &records, &vault);
-                registry
-            }));
-        }
-        let harness = Arc::new(Harness::new(
-            store.clone(),
-            providers.clone(),
-            tools,
-            harness_config,
-        ));
+        // Task harnesses take the same configuration, with the context the
+        // host built.
+        let mut task_harness_config = harness_config;
+        task_harness_config.context = context_slot
+            .get()
+            .cloned()
+            .context("the agent host did not build a context")?;
         drop(_context);
         Ok(Agent {
             mcp: mcp_state,
-            base_tools,
+            base_tools: host.tools,
             execution_mode,
-            enable_js,
             surfaces: RwLock::new(Arc::new(surfaces)),
             scheduler: Mutex::new(Ok(None)),
             records,
+            sessions_expired: AtomicBool::new(false),
             ui,
             host_info,
             desktop,
             projects,
             permission_mode: Mutex::new(permission_mode),
             permission_file,
-            harness,
+            harness: host.harness,
+            task_harness_config,
             store,
             outline_path: dir.join(vault_tools::outline::FILE_NAME),
             repl,
-            providers,
+            providers: host.providers,
             extension,
             claude_detection,
             vault,
             default_model,
+            model_allowlist: None,
             vault_default_runner: (config.host_kind == HostKind::Hub)
                 .then_some(vault_core::AGENT_RUNNER_HUB),
             system_prompt,
@@ -790,7 +843,7 @@ impl Agent {
         for skipped in mcp::register(&mut tools, &state.host, &self.records, &self.vault) {
             eprintln!("agent: {skipped}");
         }
-        let surfaces = Surfaces::new(&tools, self.execution_mode, self.enable_js)?;
+        let surfaces = Surfaces::new(&tools, self.execution_mode)?;
         *self.surfaces.write().unwrap() = Arc::new(surfaces);
         Ok(())
     }
@@ -842,17 +895,57 @@ impl Agent {
     }
 
     /// The model of runs that name none. On a hub: the vault's default
-    /// model for `hub`, else the configured `[agent] default_model`, else
-    /// [`DEFAULT_MODEL`]. On a desktop host: the configured default.
+    /// model for `hub` if allowed, else the configured `[agent] default_model`,
+    /// else [`HUB_DEFAULT_MODEL`]. On a desktop host: the configured default.
     pub fn default_model(&self) -> String {
         self.vault_default_model()
             .unwrap_or_else(|| self.default_model.clone())
     }
 
+    /// Applies the hub's configured model policy before exposing the engine.
+    pub fn with_model_allowlist(mut self, models: Vec<String>) -> Result<Self> {
+        ensure!(
+            self.vault_default_runner.is_some(),
+            "model allowlist requires a hub host"
+        );
+        ensure!(
+            models.contains(&self.default_model),
+            "agent.default_model {:?} must be in agent.models",
+            self.default_model
+        );
+        self.model_allowlist = Some(models);
+        Ok(self)
+    }
+
+    fn model_allowed(&self, model: &str) -> bool {
+        self.model_allowlist
+            .as_ref()
+            .is_none_or(|models| models.iter().any(|m| m == model))
+    }
+
+    fn check_model(&self, model: &str) -> Result<()> {
+        ensure!(
+            self.model_allowed(model),
+            "model {model:?} is not allowed by agent.models"
+        );
+        // The registry hands a model whose prefix names no registered
+        // provider to the default provider (Codex on a desktop host) with
+        // the prefix still on. Fail here instead, before any request.
+        if let Some((prefix, _)) = model.split_once('/') {
+            if self.providers.get(prefix).is_none() {
+                anyhow::bail!(provider_unavailable(prefix, &self.claude_detection));
+            }
+        }
+        Ok(())
+    }
+
     fn vault_default_model(&self) -> Option<String> {
         let runner = self.vault_default_runner?;
         match self.vault.agent_defaults() {
-            Ok(defaults) => defaults.model_for(runner).map(str::to_owned),
+            Ok(defaults) => defaults
+                .model_for(runner)
+                .filter(|m| self.model_allowed(m))
+                .map(str::to_owned),
             Err(error) => {
                 eprintln!("agent defaults unreadable: {error}");
                 None
@@ -864,9 +957,21 @@ impl Agent {
         &self.claude_detection
     }
 
-    /// Every provider's models as `provider/model`, the default model first.
-    /// Starts the Claude Code extension on first call so its models are known.
+    /// The hub's allowlist, or every desktop provider's models as `provider/model`.
+    /// The default comes first. Desktop discovery starts the Claude Code extension.
     pub fn models(&self) -> Vec<ModelInfo> {
+        if let Some(allowed) = &self.model_allowlist {
+            let default_model = self.default_model();
+            let mut models = allowed.clone();
+            models.sort_by_key(|id| id != &default_model);
+            return models
+                .into_iter()
+                .map(|id| ModelInfo {
+                    name: id.clone(),
+                    id,
+                })
+                .collect();
+        }
         if let Some(extension) = &self.extension {
             if extension.models().is_empty() {
                 let _ = self.runtime.block_on(async {
@@ -875,6 +980,13 @@ impl Agent {
             }
         }
         let mut models = self.providers.models();
+        if self.providers.get("opencode").is_some() {
+            // The chat-completions transport does not report a model catalog.
+            models.push(ModelInfo {
+                id: "opencode/deepseek-v4.1-flash".into(),
+                name: "DeepSeek V4.1 Flash".into(),
+            });
+        }
         let default_model = self.default_model();
         if !models.iter().any(|m| m.id == default_model) {
             models.insert(
@@ -891,7 +1003,12 @@ impl Agent {
     fn run_prompt(&self, session: &str) -> Result<String> {
         let mut prompt = self.system_prompt.clone();
         if let Some(projects) = &self.projects {
-            let current = projects.ensure_session(session)?;
+            projects.ensure_session(session)?;
+            let current = self
+                .desktop
+                .as_ref()
+                .expect("desktop projects")
+                .current_project(session)?;
             prompt.push_str(&format!(
                 " Current session project: {}. Folder / cwd: {}.",
                 serde_json::to_string(&current.name)?,
@@ -963,11 +1080,21 @@ impl Agent {
         self.store.list_sessions()
     }
 
-    /// The session's outline: the notes-owned one when saved, else BubblePaw's context
-    /// chapters. See [`read_session_outline`]. Errors for an unknown session.
+    /// The session's outline: notes-owned when saved, then LCM subject chapters,
+    /// then legacy context chapters. See [`read_session_outline`]. Errors for an
+    /// unknown session.
     pub fn session_outline(&self, session: &str) -> Result<vault_tools::outline::ChatOutline> {
         outline_titles::refresh(&self.store, &self.outline_path, session)?;
         read_session_outline(&self.store, &self.outline_path, session)
+    }
+
+    /// Read durable summaries with raw canonical message gaps. This does not
+    /// consult or refresh the notes-owned outline or automatic session title.
+    pub fn session_compacted_history(
+        &self,
+        session: &str,
+    ) -> Result<compacted_history::CompactedHistory> {
+        read_session_compacted_history(&self.store, session)
     }
 
     pub fn create_session(&self, title: &str) -> Result<Session> {
@@ -980,6 +1107,25 @@ impl Agent {
 
     pub fn rename_session(&self, id: &str, title: &str) -> Result<Session> {
         outline_titles::rename_user(&self.store, &self.outline_path, id, title)
+    }
+
+    /// Deletes the sessions (transcripts and logs) of this device's ended
+    /// tasks that finished more than `keep_ms` ago, and clears each task's
+    /// `session`. The task row, its outcome and its attempt history stay.
+    /// Returns how many sessions went.
+    pub fn expire_task_sessions(&self, keep_ms: i64) -> Result<u32> {
+        let now = vault_mcp::jobs::now_ms();
+        let device = self.vault.device_id();
+        let mut n = 0;
+        for (t, session) in vault_mcp::tasks::expired_sessions(&self.vault, &device, keep_ms, now)
+            .map_err(anyhow::Error::msg)?
+        {
+            // A session that is already gone counts as expired.
+            let _ = self.delete_session(&session);
+            vault_mcp::tasks::session_expired(&self.vault, &t.id).map_err(anyhow::Error::msg)?;
+            n += 1;
+        }
+        Ok(n)
     }
 
     /// Deletes the session's history and drops the providers' mirrors of it.
@@ -1053,6 +1199,12 @@ impl Agent {
             .filter(|m| !m.trim().is_empty())
             .or_else(|| self.vault_default_model());
         let model = self.replay_model(session, model)?;
+        let model = if self.model_allowlist.is_some() {
+            Some(model.unwrap_or_else(|| self.default_model()))
+        } else {
+            model
+        };
+        self.check_model(model.as_deref().unwrap_or(&self.default_model))?;
         let _context = self.runtime.enter();
         let options = RunOptions {
             approval: Some(self.current_policy()),
@@ -1324,15 +1476,15 @@ pub(crate) fn app_messages(mut messages: Vec<Message>) -> Vec<Message> {
 }
 
 pub(crate) fn is_runtime_notice(message: &Message) -> bool {
-    message.role == bubblepaw_core::Role::User
-        && message.origin == Some(bubblepaw_core::MessageOrigin::Generated)
+    message.role == bubblepaw_sdk::store::Role::User
+        && message.origin == Some(bubblepaw_sdk::store::MessageOrigin::Generated)
 }
 
-fn execution_prompt(mode: bubblepaw_core::ExecutionMode, enable_js: bool) -> String {
-    if mode == bubblepaw_core::ExecutionMode::Js {
+fn execution_prompt(mode: bubblepaw_sdk::harness::ExecutionMode) -> String {
+    if mode == bubblepaw_sdk::harness::ExecutionMode::Js {
         return SYSTEM_PROMPT.to_owned();
     }
-    let mut prompt = SYSTEM_PROMPT
+    SYSTEM_PROMPT
         .replace(
             "through the js tool: vault actions are async tools.* functions there.",
             "through the advertised native tools, using their declared argument schemas.",
@@ -1350,11 +1502,80 @@ fn execution_prompt(mode: bubblepaw_core::ExecutionMode, enable_js: bool) -> Str
         .replace(
             "The js tool description defines the API, state lifecycle and limits.",
             "The advertised tool descriptions define the API and limits.",
-        );
-    if enable_js {
-        prompt.push_str(" The optional js tool composes async tools.* calls; its description defines its API, state lifecycle and limits.");
+        )
+}
+
+const CLAUDE_CREDENTIAL_ERROR: &str = "Claude Code sign-in unavailable: set CLAUDE_CONFIG_DIR \
+    to a mounted Claude Code login directory, or set CLAUDE_CODE_OAUTH_TOKEN";
+
+fn claude_credentials_available(get: impl Fn(&str) -> Option<std::ffi::OsString>) -> bool {
+    if get("CLAUDE_CODE_OAUTH_TOKEN")
+        .is_some_and(|token| !token.to_string_lossy().trim().is_empty())
+    {
+        return true;
     }
-    prompt
+    let dir = get("CLAUDE_CONFIG_DIR")
+        .map(PathBuf::from)
+        .or_else(|| get("HOME").map(|home| PathBuf::from(home).join(".claude")));
+    dir.is_some_and(|dir| dir.join(".credentials.json").is_file())
+}
+
+/// Why a run's provider prefix has no provider on this host, naming what is missing.
+fn provider_unavailable(id: &str, claude: &claude::ClaudeDetection) -> String {
+    let missing = match id {
+        "opencode" => "OPENCODE_API_KEY is not set".to_owned(),
+        "claude-code" => {
+            let mut missing = Vec::new();
+            if claude.bun_path.is_none() {
+                missing.push("Bun was not found (on PATH or in ~/.bun/bin)");
+            }
+            if claude.claude_code_dir.is_none() {
+                missing.push(
+                    "the Claude Code extension folder was not found; set NOTES_CLAUDE_CODE_DIR",
+                );
+            }
+            if missing.is_empty() {
+                missing.push("the Claude Code extension could not be loaded");
+            }
+            missing.join(", and ")
+        }
+        "codex" => "the Codex provider is not offered on this host".to_owned(),
+        _ => format!("no provider named {id:?} is registered"),
+    };
+    format!("{id} is unavailable: {missing}")
+}
+
+/// BubblePaw's built-in OpenCode transport at the workspace's pinned revision.
+/// Taking the key as an argument keeps credential-presence tests process-local.
+fn register_opencode(registry: &mut ProviderRegistry, key: Option<String>) -> Result<()> {
+    if let Some(key) = key.filter(|key| !key.trim().is_empty()) {
+        let provider = ChatCompletionsProvider::api_key(key, "https://opencode.ai/zen/go/v1")?
+            .with_reasoning_fields(serde_json::json!({
+                "thinking": { "type": "enabled" }, "reasoning_effort": "low"
+            }))?
+            .with_opencode_route();
+        registry.insert("opencode", Arc::new(provider))?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod hub_credential_tests {
+    use super::*;
+
+    #[test]
+    fn claude_accepts_a_token_or_a_mounted_login_directory() {
+        assert!(!claude_credentials_available(|_| None));
+        assert!(claude_credentials_available(|key| {
+            (key == "CLAUDE_CODE_OAUTH_TOKEN").then(|| "synthetic-token".into())
+        }));
+        let root = tempfile::tempdir().unwrap();
+        let get =
+            |key: &str| (key == "CLAUDE_CONFIG_DIR").then(|| root.path().as_os_str().to_owned());
+        assert!(!claude_credentials_available(get));
+        std::fs::write(root.path().join(".credentials.json"), "{}").unwrap();
+        assert!(claude_credentials_available(get));
+    }
 }
 
 fn codex_home() -> Option<PathBuf> {
@@ -1435,28 +1656,54 @@ fn permission_policy(mode: PermissionMode) -> ApprovalPolicy {
 struct DesktopContext {
     inner: SummarizingContext,
     desktop: Arc<tools::DesktopRuntime>,
-    projects: Arc<projects::Projects>,
 }
 #[async_trait]
-impl bubblepaw_core::ContextPreparation for DesktopContext {
-    fn prepare(&self, history: &[Message]) -> Result<Vec<Message>> {
-        self.inner.prepare(history)
+impl ContextPreparation for DesktopContext {
+    fn project_history(&self, history: &[Message]) -> Result<Vec<Message>> {
+        self.inner.project_history(history)
     }
-    async fn prepare_request(
-        &self,
-        session: &str,
-        request: ModelRequest,
-        cancellation: CancellationToken,
-    ) -> Result<bubblepaw_core::PreparedContext> {
-        let mut prepared = self
-            .inner
-            .prepare_request(session, request, cancellation)
-            .await?;
-        let current = self.projects.current(session)?;
-        prepared.request.system_prompt.push_str(&format!("\nCurrent project (quoted values are data): {}.\nProcesses across projects owned by this session: {}", serde_json::to_string(&current)?, self.desktop.continuation_status(session)));
+    fn history_frontier(&self, session_id: &str) -> Result<Option<i64>> {
+        self.inner.history_frontier(session_id)
+    }
+    async fn prepare(&self, call: PrepareCall<'_>) -> Result<PreparedContext> {
+        // The project line goes on ordinary and pressure requests, as the old
+        // prepare_request did. Manual compaction gets the inner view unchanged.
+        let session = call.session_id.to_owned();
+        let add_project_context = !matches!(call.mode, PrepareMode::Compact { .. });
+        let mut prepared = self.inner.prepare(call).await?;
+        if add_project_context {
+            let current = self.desktop.current_project(&session)?;
+            prepared.request.system_prompt.push_str(&format!("\nCurrent project (quoted values are data): {}.\nProcesses across projects owned by this session: {}", serde_json::to_string(&current)?, self.desktop.continuation_status(&session)));
+        }
         Ok(prepared)
     }
-    fn observe_response(&self, session: &str, response: &ModelResponse) {
-        self.inner.observe_response(session, response);
+    fn validate_prepared_request(
+        &self,
+        session_id: &str,
+        request: &ModelRequest,
+        provider: Arc<dyn Provider>,
+    ) -> Result<()> {
+        self.inner
+            .validate_prepared_request(session_id, request, provider)
+    }
+    fn observe_request(
+        &self,
+        session_id: &str,
+        request: &ModelRequest,
+        provider: Arc<dyn Provider>,
+    ) {
+        self.inner.observe_request(session_id, request, provider);
+    }
+    fn cold_message_indexes(&self, session_id: &str, request: &ModelRequest) -> Result<Vec<usize>> {
+        self.inner.cold_message_indexes(session_id, request)
+    }
+    fn release_session(&self, session_id: &str) {
+        self.inner.release_session(session_id);
+    }
+    fn observe_response(&self, session_id: &str, response: &ModelResponse) {
+        self.inner.observe_response(session_id, response);
+    }
+    fn take_prefix_change(&self, session_id: &str) -> Option<String> {
+        self.inner.take_prefix_change(session_id)
     }
 }

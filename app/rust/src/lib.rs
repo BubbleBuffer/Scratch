@@ -8,3 +8,4 @@ mod frb_generated;
 mod host_relay;
 mod local_runner;
 mod schedule_format;
+mod updater;

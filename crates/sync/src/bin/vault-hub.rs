@@ -1,5 +1,6 @@
 //! `vault-hub <vault-dir> --listen <addr>`: serves a vault to paired
-//! devices. `--pair <label>` prints a new device token; `--unpair <label>`
+//! devices. `--pair <label>` prints a one-time pairing code (10 minutes) for a
+//! device, redeemed at `POST /auth/pair`; `--unpair <label>`
 //! revokes it; `--devices` lists paired devices.
 
 use std::sync::Arc;
@@ -9,7 +10,7 @@ use vault_sync::Hub;
 
 const USAGE: &str = "usage:
   vault-hub <vault-dir> --listen <addr>     serve the vault (for example --listen 100.101.102.103:8787)
-  vault-hub <vault-dir> --pair <label>      create a token for a device
+  vault-hub <vault-dir> --pair <label>      create a pairing code for a device
   vault-hub <vault-dir> --unpair <label>    revoke a device's token
   vault-hub <vault-dir> --devices           list paired devices";
 
@@ -38,8 +39,8 @@ fn run() -> Result<(), String> {
             }
         }
         ("--pair", Some(label)) => {
-            let token = hub.pair(label).map_err(|e| e.to_string())?;
-            println!("{token}");
+            let code = hub.pair(label).map_err(|e| e.to_string())?;
+            println!("{code}");
             Ok(())
         }
         ("--unpair", Some(label)) => {

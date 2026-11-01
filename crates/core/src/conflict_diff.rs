@@ -114,6 +114,7 @@ fn index<'a>(blocks: &'a [Block], out: &mut HashMap<&'a str, &'a Block>) {
 fn own_content_equal(a: &Block, b: &Block) -> bool {
     a.kind == b.kind && a.text == b.text && a.marks == b.marks && a.checked == b.checked
         && a.target == b.target && a.color == b.color && a.width == b.width
+        && a.numbered_start == b.numbered_start
 }
 
 fn annotated(blocks: &[Block], opposite: &HashMap<&str, &Block>, local: bool) -> Vec<ConflictDiffBlock> {
@@ -328,7 +329,7 @@ mod wrapper_tests {
     fn conflict_diff_api_legacy_record_without_frontiers_uses_saved_content() {
         let (_dir, vault, page, _) = setup();
         let saved = Block { id: "legacy".into(), kind: BlockKind::Paragraph, text: "Saved 🐈 text".into(),
-            marks: vec![], checked: false, children: vec![], target: None, color: None, width: None };
+            marks: vec![], checked: false, children: vec![], target: None, color: None, width: None, numbered_start: None };
         let json = serde_json::json!({"block": "legacy", "time_ms": 7, "sides": [
             {"device": "cloud-device", "block": saved}, {"device": vault.device_id(), "block": null}
         ]}).to_string();
@@ -371,7 +372,7 @@ mod tests {
     use crate::types::BlockKind;
     fn block(id: &str, text: &str, children: Vec<Block>) -> Block {
         Block { id: id.into(), kind: BlockKind::Paragraph, text: text.into(), marks: vec![],
-            checked: false, children, target: None, color: None, width: None }
+            checked: false, children, target: None, color: None, width: None, numbered_start: None }
     }
     #[test]
     fn conflict_diff_text_marks_added_removed_and_unicode_offsets() {

@@ -1,13 +1,13 @@
 // Native replay provider -> normal send/run/events -> outline polling -> chat.
 import 'dart:io';
 
+import 'package:agent_kit/agent_kit.dart' show AnchoredList, OutlineChapterCard;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/core/file_dialogs.dart';
 import 'package:notes_app/registry/command_registry.dart';
 import 'package:notes_app/shell/commands.dart';
-import 'package:notes_app/ui/anchored_list.dart';
 
 import 'agent_test.dart' show openAgentStore, openAgentScreen, pumpUntil;
 import 'harness.dart';
@@ -45,7 +45,10 @@ void main() {
     final registry = CommandRegistry();
     registerShellCommands(registry);
     expect(
-      registry.run('agent.replay.live', tester.element(find.byType(AgentChat))),
+      registry.run(
+        'agent.replay.live',
+        tester.element(find.byType(ScratchChatPane)),
+      ),
       isTrue,
     );
     await settle(tester);

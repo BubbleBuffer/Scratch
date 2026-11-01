@@ -1,28 +1,35 @@
 // Starting the app: open (or create) the vault, build the stores, show home.
 //
 // - A new vault (its folder missing or empty) gets a "Getting started" page.
+//   With sync configured, those starter pages wait for the first successful
+//   pull and are created only if the vault still has no pages then.
 // - Built with `--dart-define=SEED_BENCH=true`, a new vault is instead the
 //   bench vault: 10,000 generated pages, a 2,000-block "Big page" and the
 //   showcase page (for measure.ps1).
 // - Built with `--dart-define=SEED_TASKS=<rows>`, a new vault also gets the
 //   "Tasks" database with that many rows (seed_tasks).
 // - The core's writer is flushed whenever the app may be killed.
+// - On Windows, the update checker starts (features/updates).
 
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/widgets.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../core/link_previews.dart';
 import '../core/models.dart';
 import '../core/paths.dart';
 import '../core/vault.dart';
 import '../features/bakeoff.dart';
+import '../features/settings/settings_screen.dart' show appVersion;
 import '../features/settings/settings_store.dart';
 import '../features/sync/sync_control.dart';
+import '../features/updates/update_controller.dart';
 import '../features/getting_started.dart';
 import '../features/showcase.dart';
+import '../remote/app_remote.dart';
 import '../features/demo.dart';
 import '../state/app_state.dart';
 import '../state/ui_state.dart';
@@ -50,6 +57,7 @@ class _NotesAppState extends State<NotesApp> {
   late final AppLifecycleListener _lifecycle;
   late final AppSettings _settings = AppSettings.load(File('${widget.dataDir}${Platform.pathSeparator}settings.json'));
   AppState? _app;
+  AppRemote? _remote;
   bool _seeding = false;
   int _seeded = 0;
   String? _error;
@@ -57,7 +65,14 @@ class _NotesAppState extends State<NotesApp> {
   @override
   void initState() {
     super.initState();
-    registerBuiltins(disabledAddons: _settings.disabledAddons);
+    registerBuiltins();
+    if (Platform.isWindows) {
+      UpdateController.current = UpdateController(
+        currentTag: effectiveReleaseTag(),
+        updatesDir: '${widget.dataDir}${Platform.pathSeparator}updates',
+        settings: _settings,
+      )..start();
+    }
     _lifecycle = AppLifecycleListener(
       onPause: _flush,
       onHide: _flush,
@@ -87,6 +102,10 @@ class _NotesAppState extends State<NotesApp> {
     final root = _settings.vaultPath ?? vaultRootIn(widget.dataDir);
     try {
       final fresh = _isNew(root);
+      // Sync configured: the hub's pages may be on their way, so starter pages
+      // wait for the first pull. Not gated by [fresh]: Vault.open creates
+      // `.vault/`, so a launch that failed its pull would look non-fresh next time.
+      final syncing = _settings.clientUrl != null && _settings.clientToken != null;
       if (fresh && seedBench && !seedDemo) await _seedBench(root);
       if (fresh && seedTaskRows > 0 && !seedDemo) await NotesVault.seedTasks(root: root, rows: seedTaskRows);
       BootTiming.mark('before Vault.open');
@@ -99,7 +118,7 @@ class _NotesAppState extends State<NotesApp> {
         } else if (seedBench) {
           await createShowcase(vault);
         } else {
-          await createGettingStarted(vault, createTasks: seedTaskRows == 0);
+          await seedStarterPagesAtBoot(vault, syncing: syncing, createTasks: seedTaskRows == 0);
         }
         await vault.flush();
       }
@@ -119,10 +138,45 @@ class _NotesAppState extends State<NotesApp> {
       }
       setState(() => _app = app);
       BootTiming.mark('after setState');
-      unawaited(startSyncAtBoot(app.sync, _settings));
+      unawaited(_startRemote());
+      unawaited(
+        startSyncAtBoot(app.sync, _settings).whenComplete(
+          () => app.runNotices.start().catchError((Object e) {
+            AppLog.info('run notices failed to start: $e');
+          }),
+        ),
+      );
+      if (syncing && !seedDemo && !seedBench) {
+        unawaited(seedStarterPagesAfterPull(vault, app.sync.firstSyncOk(), createTasks: seedTaskRows == 0).catchError((Object e) {
+          AppLog.info('starter pages after pull failed: $e');
+          return false;
+        }));
+      }
     } catch (e) {
       AppLog.info('open failed: $e');
       if (mounted) setState(() => _error = '$e');
+    }
+  }
+
+  /// The app remote-control endpoint (wiki/integrations/app-remote.md): Windows
+  /// and Linux desktop only, off with SCRATCH_REMOTE=0. Never blocks or fails
+  /// the boot.
+  Future<void> _startRemote() async {
+    if (!(Platform.isWindows || Platform.isLinux)) return;
+    if (Platform.environment['SCRATCH_REMOTE'] == '0' || Platform.environment.containsKey('FLUTTER_TEST') || _remote != null) return;
+    try {
+      var version = appVersion;
+      try {
+        version = (await PackageInfo.fromPlatform()).version;
+      } catch (_) {}
+      final remote = await AppRemote.start(dataDir: widget.dataDir, app: () => _app, version: version);
+      if (!mounted) {
+        await remote.stop();
+        return;
+      }
+      _remote = remote;
+    } catch (e) {
+      AppLog.info('remote control failed to start: $e');
     }
   }
 
@@ -144,6 +198,10 @@ class _NotesAppState extends State<NotesApp> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    unawaited(_remote?.stop());
+    _remote = null;
+    UpdateController.current?.dispose();
+    UpdateController.current = null;
     _app?.dispose();
     super.dispose();
   }
@@ -208,7 +266,8 @@ class _Boot extends StatelessWidget {
         ),
       );
     }
-    if (!seeding) return const SizedBox.shrink();
+    // Loading: the theme's desk colour, the same one Home sits on.
+    if (!seeding) return ColoredBox(color: c.desk, child: const SizedBox.expand());
     const total = benchPages + 1;
     final frac = (seeded / total).clamp(0.0, 1.0);
     return Center(

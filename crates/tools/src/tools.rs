@@ -143,6 +143,15 @@ static TOOLS: LazyLock<Vec<ToolDef>> = LazyLock::new(|| vec![
         surfaces: ALL_SURFACES,
     },
     ToolDef {
+        name: "attach_file",
+        description: "Attaches a file or image to a page: stores it in the vault (it syncs like a file added in the app) and adds an image or file block at the end, or after after_block. Give exactly one source: url (https, up to 25 MB), data (base64, up to 10 MB) or path (a file on this computer; not available on the hub). as: image accepts png, jpeg, gif, webp or svg (no script); the default is image for image content, else file. Returns the block id and the attachment link.",
+        schema: crate::attach::schema,
+        read_only: false,
+        destructive_hint: false,
+        approval: Approval::None,
+        surfaces: ALL_SURFACES,
+    },
+    ToolDef {
         name: "trash_page",
         description: "Moves a page and its sub-pages to the trash (restorable in the app).",
         schema: || json!({ "type": "object", "properties": { "page": page_arg() }, "required": ["page"] }),
@@ -575,6 +584,7 @@ fn dispatch(v: &Vault, name: &str, a: &Value) -> Result<String> {
             crate::wiki_import::call(v, a, crate::wiki_import::DEFAULT_SOURCE_LIMIT)
         }
         "edit_page" => edit_page(v, a),
+        "attach_file" => crate::attach::attach_file(v, a),
         "upsert_row" => upsert_row(v, a),
         "trash_page" => trash_page(v, a),
         "move_page" => crate::organize::move_page(v, a),
@@ -830,7 +840,7 @@ pub fn set_link_base(base: Option<&str>) {
 /// The link that opens a page, or one block of it, in the browser: an http
 /// address that bounces to `notes://page/...` (the Claude app only opens
 /// http links from chat).
-fn page_link(page: &str, block: Option<&str>) -> String {
+pub(crate) fn page_link(page: &str, block: Option<&str>) -> String {
     let base = LINK_BASE
         .read()
         .unwrap_or_else(|e| e.into_inner())
@@ -1136,7 +1146,7 @@ fn append_blocks(v: &Vault, a: &Value) -> Result<String> {
     ))
 }
 
-fn parent_in(
+pub(crate) fn parent_in(
     blocks: &[vault_core::Block],
     parent: Option<&str>,
     id: &str,

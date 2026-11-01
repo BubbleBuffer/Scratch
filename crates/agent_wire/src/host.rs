@@ -4,7 +4,7 @@
 //! sends the requests ([`crate::Request`]) and the desktop answers them
 //! ([`crate::Response`]), one text frame per message.
 //!
-//! Protocol reference: `wiki/architecture/hub.md` (`/host/ws`).
+//! Protocol reference: `wiki/sync/hub.md` (`/host/ws`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

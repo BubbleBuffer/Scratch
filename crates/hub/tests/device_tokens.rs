@@ -95,7 +95,13 @@ fn config(data: &TempDir) -> Config {
 
 async fn start(config: &Config) -> Server {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    start_on(listener, config.clone()).await.unwrap()
+    let server = start_on(listener, config.clone()).await.unwrap();
+    // The config's public_url is a fake, so proofs name the Host instead.
+    server.hub().set_key_policy(vault_sync::KeyPolicy {
+        public_url: None,
+        require_device_keys: false,
+    });
+    server
 }
 
 /// Runs blocking work off the async runtime.
@@ -127,7 +133,7 @@ async fn cli_unpair(config: &Config, label: &str) -> usize {
 /// The CLI, as `notes-hub --pair <label>` runs it.
 async fn cli_pair(config: &Config, label: &str) -> String {
     let (config, label) = (config.clone(), label.to_string());
-    blocking(move || open_hub(&config).unwrap().pair(&label).unwrap()).await
+    blocking(move || open_hub(&config).unwrap().pair_legacy_token(&label).unwrap()).await
 }
 
 /// The CLI, as `notes-hub --devices` runs it.
@@ -152,8 +158,8 @@ async fn cli_revoke_reaches_the_running_hub_and_stays_revoked() {
     let url = format!("http://{}", server.addr());
     let served = server.hub().clone();
 
-    let phone_token = on_hub(&served, |h| h.pair("phone")).await.unwrap();
-    let laptop_token = on_hub(&served, |h| h.pair("laptop")).await.unwrap();
+    let phone_token = on_hub(&served, |h| h.pair_legacy_token("phone")).await.unwrap();
+    let laptop_token = on_hub(&served, |h| h.pair_legacy_token("laptop")).await.unwrap();
     let phone_vault = TempDir::new("phone");
     let laptop_vault = TempDir::new("laptop");
     let (phone, laptop) = (phone_vault.open(), laptop_vault.open());
@@ -227,8 +233,8 @@ async fn stale(tag: &str) -> Stale {
     let server = start(&config).await;
     let url = format!("http://{}", server.addr());
     let served = server.hub().clone();
-    let doomed = on_hub(&served, |h| h.pair("doomed")).await.unwrap();
-    let keeper = on_hub(&served, |h| h.pair("keeper")).await.unwrap();
+    let doomed = on_hub(&served, |h| h.pair_legacy_token("doomed")).await.unwrap();
+    let keeper = on_hub(&served, |h| h.pair_legacy_token("keeper")).await.unwrap();
     assert_eq!(cli_unpair(&config, "doomed").await, 1);
     assert_eq!(labels(&data), vec!["keeper"]);
     Stale {
@@ -243,7 +249,7 @@ async fn stale(tag: &str) -> Stale {
 #[tokio::test(flavor = "multi_thread")]
 async fn stale_server_pair_does_not_bring_back_a_removed_token() {
     let s = stale("stale-pair").await;
-    on_hub(s.server.hub(), |h| h.pair("new")).await.unwrap();
+    on_hub(s.server.hub(), |h| h.pair_legacy_token("new")).await.unwrap();
     assert_eq!(labels(&s.data), vec!["keeper", "new"]);
     assert_absent(&s.data, &s.doomed, "doomed");
     assert!(on_disk(&s.data).iter().all(|(_, d)| d.is_none()));

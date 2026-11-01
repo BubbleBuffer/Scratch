@@ -4,6 +4,7 @@
 //! markdown output and versioned edits.
 
 mod agenda;
+pub mod attach;
 pub mod feedback;
 pub mod harness;
 pub mod help;
@@ -19,6 +20,7 @@ mod tools;
 pub mod wiki_import;
 
 pub use agenda::{resolve_agenda_item, resolve_daily_note, AgendaTarget};
+pub use attach::allow_local_paths;
 pub use tool_sets::ToolSet;
 pub use tools::{
     alias, aliases, call, call_on, canonical, definitions, definitions_for, get, hidden,
@@ -115,11 +117,12 @@ mod tests {
         );
     }
 
-    const LISTED: [&str; 16] = [
+    const LISTED: [&str; 17] = [
         "search_notes",
         "read_page",
         "create_page",
         "edit_page",
+        "attach_file",
         "trash_page",
         "move_page",
         "daily_note",
@@ -135,7 +138,7 @@ mod tests {
     ];
 
     #[test]
-    fn listed_names_are_the_sixteen_in_order() {
+    fn listed_names_are_the_seventeen_in_order() {
         let names: Vec<&str> = definitions().iter().map(|t| t.name).collect();
         assert_eq!(names, LISTED);
         let mcp: Vec<&str> = definitions_for(Surface::Mcp).map(|t| t.name).collect();
@@ -144,7 +147,7 @@ mod tests {
         let app: Vec<&str> = definitions_for(Surface::InAppAgent)
             .map(|t| t.name)
             .collect();
-        assert_eq!(app, LISTED[..15]);
+        assert_eq!(app, LISTED[..16]);
     }
 
     #[test]

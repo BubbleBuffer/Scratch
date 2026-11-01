@@ -64,7 +64,7 @@ Future<void> _openPhone(WidgetTester tester, {required bool dark}) async {
   await openMobileSettings(tester);
   await tapAndSettle(
     tester,
-    find.byKey(const ValueKey('settings-nav-preferences')),
+    find.byKey(const ValueKey('settings-nav-general')),
   );
   await tapAndSettle(tester, find.byKey(const ValueKey('send-feedback')));
   await _waitForSheet(tester);

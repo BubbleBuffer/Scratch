@@ -126,7 +126,7 @@ class BlockRowState extends State<BlockRow>
       // As a page mention: Ctrl-click in the focused block places the caret.
       if (ed.focusedId == node.id &&
           !ed.readOnly &&
-          HardwareKeyboard.instance.isControlPressed) {
+          isCommandKeyPressed) {
         return false;
       }
       final boxes = re.getBoxesForSelection(

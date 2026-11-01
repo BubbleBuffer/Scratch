@@ -538,7 +538,7 @@ fn version_11_reopen_rebuilds_task_status_projection_from_unchanged_documents() 
         .index()
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 13);
+    assert_eq!(version, 14);
     for (id, expected) in pages.iter().zip(["todo", "doing", "done"]) {
         assert!(v
             .load_page(id.clone())

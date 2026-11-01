@@ -9,7 +9,7 @@ covers: ["prototypes/tauri/**"]
 
 # Tauri prototype
 
-**Status:** current, 2026-09-30. The Tauri side of the Bake-off (internal wiki). Code: [prototypes/tauri](../../prototypes/tauri/).
+**Status:** current, 2026-09-30. The Tauri side of the Bake-off (internal wiki). Code: [prototypes/tauri](../../prototypes/tauri).
 
 ## How it is built
 

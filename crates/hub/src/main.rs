@@ -1,6 +1,6 @@
 //! `notes-hub [--config <file>]`: serves the vault replica with sync and
 //! OIDC login. `--devices`, `--unpair <label>` and `--pair <label>` (an
-//! emergency path that skips login) manage device tokens. `--agent-token`
+//! emergency path that skips login) manage devices (`--pair` prints a one-time pairing code). `--agent-token`
 //! manages agent tokens; it opens only their file, so it works while the
 //! server holds the vault.
 
@@ -16,7 +16,7 @@ const USAGE: &str = "usage:
   notes-hub [--config <file>]                    serve (keys can be overridden by NOTES_HUB_* variables)
   notes-hub [--config <file>] --devices          list devices
   notes-hub [--config <file>] --unpair <label>   revoke a device's tokens
-  notes-hub [--config <file>] --pair <label>     emergency: create a token without login
+  notes-hub [--config <file>] --pair <label>     emergency: a pairing code that skips login
   notes-hub [--config <file>] --agent-token add <name> --scope read|write|everything
                                                  [--expires 30d|90d|365d|never]
                                                  (default 90d)
@@ -146,12 +146,13 @@ fn run() -> Result<(), String> {
             Ok(())
         }
         Cmd::Pair(label) => {
-            let token = open_hub(&config)?.pair(&label).map_err(|e| e.to_string())?;
+            let code = open_hub(&config)?.pair(&label).map_err(|e| e.to_string())?;
             eprintln!(
-                "notes-hub: warning: this token skips the login. Use it only when login is \
-                 broken, and revoke it (--unpair {label:?}) once it is not needed."
+                "notes-hub: warning: this pairing code skips the login. It works once, for 10 \
+                 minutes (POST /auth/pair). Use it only when login is broken, and revoke the \
+                 device (--unpair {label:?}) once it is not needed."
             );
-            println!("{token}");
+            println!("{code}");
             Ok(())
         }
         Cmd::AgentToken(cmd) => agent_token(&config, cmd),

@@ -3,7 +3,11 @@
 
 import 'dart:convert';
 
+import 'package:bb_ui/search.dart' as bb;
+import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/models.dart';
+import 'package:notes_app/shell/search_groups.dart' show hitRowId;
+import 'package:notes_app/shell/search_widgets.dart';
 
 Hit pageHit(String id, String title, {String snippet = ''}) => Hit(
   id: id,
@@ -42,3 +46,25 @@ Hit chatHit(
     'sectionTitle': 'Chrome live drops pass',
   }),
 );
+
+/// The hits the search UI shows right now, in row order: each shared result
+/// row mapped back to the [Hit] the overlay body or results list was given.
+List<Hit> shownHits(WidgetTester tester) {
+  final known = <String, Hit>{
+    for (final body in tester.widgetList<SearchPanelBody>(
+      find.byType(SearchPanelBody),
+    ))
+      for (final hit in body.hits ?? const <Hit>[]) hitRowId(hit): hit,
+    for (final list in tester.widgetList<SearchResultsList>(
+      find.byType(SearchResultsList),
+    ))
+      for (final section in list.sections)
+        for (final hit in section.hits) hitRowId(hit): hit,
+  };
+  return [
+    for (final row in tester.widgetList<bb.SearchResultRow>(
+      find.byType(bb.SearchResultRow),
+    ))
+      known[row.result.id]!,
+  ];
+}

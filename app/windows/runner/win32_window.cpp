@@ -86,6 +86,19 @@ class WindowClassRegistrar {
 
 WindowClassRegistrar* WindowClassRegistrar::instance_ = nullptr;
 
+// The app's desk colour for the system theme (design tokens: light ECE6DB,
+// dark 222428), so the window never shows an unpainted or grey client area
+// before Flutter's first frame.
+static HBRUSH CreateDeskBrush() {
+  DWORD light_mode = 1;
+  DWORD light_mode_size = sizeof(light_mode);
+  RegGetValue(HKEY_CURRENT_USER, kGetPreferredBrightnessRegKey,
+              kGetPreferredBrightnessRegValue, RRF_RT_REG_DWORD, nullptr,
+              &light_mode, &light_mode_size);
+  return CreateSolidBrush(light_mode == 0 ? RGB(0x22, 0x24, 0x28)
+                                          : RGB(0xEC, 0xE6, 0xDB));
+}
+
 const wchar_t* WindowClassRegistrar::GetWindowClass() {
   if (!class_registered_) {
     WNDCLASS window_class{};
@@ -97,7 +110,7 @@ const wchar_t* WindowClassRegistrar::GetWindowClass() {
     window_class.hInstance = GetModuleHandle(nullptr);
     window_class.hIcon =
         LoadIcon(window_class.hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
-    window_class.hbrBackground = 0;
+    window_class.hbrBackground = CreateDeskBrush();
     window_class.lpszMenuName = nullptr;
     window_class.lpfnWndProc = Win32Window::WndProc;
     RegisterClass(&window_class);

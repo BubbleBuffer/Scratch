@@ -23,12 +23,15 @@ const BUILTIN: &[&str] = &["$title", "$created", "$updated", "$cover"];
 
 /// Turns a document into a database and returns whether it changed. A
 /// database stays one; any other page type (a mod's) is kept and refused,
-/// since its own type decides what it is.
+/// since its own type decides what it is. A page promoted now shows its
+/// children through view blocks: its saved views stay for older clients
+/// and are never migrated into blocks.
 fn make_database(d: &mut PageDoc) -> Result<bool> {
     match d.meta().page_type.as_str() {
         PAGE_TYPE_DATABASE => Ok(false),
         PAGE_TYPE_DOCUMENT => {
             d.set_page_type(PAGE_TYPE_DATABASE)?;
+            d.mark_view_blocks_current()?;
             Ok(true)
         }
         other => Err(invalid(format!("page type {other} is not a database"))),

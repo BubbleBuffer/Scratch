@@ -116,7 +116,7 @@ Future<void> _pumpChat(
         child: SizedBox(
           width: 480,
           height: 650,
-          child: AgentChat(store: store),
+          child: ScratchChatPane(store: store),
         ),
       ),
     ),
@@ -137,7 +137,7 @@ Future<void> _scroll(WidgetTester tester, double dy) async {
 
 Finder _transcript() => find
     .descendant(
-      of: find.byType(AgentChat),
+      of: find.byType(ScratchChatPane),
       matching: find.byWidgetPredicate(
         (w) => w is CustomScrollView || w is ListView,
       ),
@@ -158,7 +158,9 @@ String _nearestToTop(WidgetTester tester) {
   for (var i = 0; i < _chapters * _pairs; i++) {
     for (final text in [_text('Question', i), _text('Answer', i)]) {
       final y = _topOf(tester, text);
-      if (y == null) continue;
+      // A message that starts above the viewport is only partly read; the
+      // contract is about the first message the reader sees from its start.
+      if (y == null || y < top) continue;
       final distance = (y - top).abs();
       if (distance < bestDistance) {
         bestDistance = distance;

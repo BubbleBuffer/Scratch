@@ -9,11 +9,48 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'vault.dart';
 
-// These functions are ignored because they are not marked as `pub`: `lock`, `task`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `task_in`, `task`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
-/// The default listen address of the app's MCP endpoint.
-String mcpDefaultAddr() => RustLib.instance.api.crateApiAiMcpDefaultAddr();
+/// Lists the hub first, then the vault's PCs. Pass whether the app has a
+/// usable hub link, as AgentStore.usableHosts does; online is independently
+/// derived from the synced last-seen timestamp and the five-minute window.
+Future<AiRunnerList> aiListRunners({
+  required NotesVault vault,
+  required bool hubUsable,
+}) => RustLib.instance.api.crateApiAiAiListRunners(
+  vault: vault,
+  hubUsable: hubUsable,
+);
+
+/// Queues a real AI task pinned to the selected runner, including offline
+/// runners. An unknown id or a block outside the page is rejected.
+Future<AiTask> aiAssignTask({
+  required NotesVault vault,
+  required String prompt,
+  required String page,
+  String? block,
+  required String runnerId,
+  String? projectId,
+}) => RustLib.instance.api.crateApiAiAiAssignTask(
+  vault: vault,
+  prompt: prompt,
+  page: page,
+  block: block,
+  runnerId: runnerId,
+  projectId: projectId,
+);
+
+/// Renames a device from any copy of the vault. Only its trimmed name changes.
+Future<void> aiRenameDevice({
+  required NotesVault vault,
+  required String deviceId,
+  required String name,
+}) => RustLib.instance.api.crateApiAiAiRenameDevice(
+  vault: vault,
+  deviceId: deviceId,
+  name: name,
+);
 
 /// Queues a task about `page`; its placeholder goes after block `after`
 /// (an empty paragraph there becomes the placeholder) or at the end.
@@ -23,12 +60,14 @@ Future<AiTask> aiCreateTask({
   required String page,
   String? after,
   required String runner,
+  String? projectId,
 }) => RustLib.instance.api.crateApiAiAiCreateTask(
   vault: vault,
   prompt: prompt,
   page: page,
   after: after,
   runner: runner,
+  projectId: projectId,
 );
 
 /// [`ai_create_task`] pinned to this device: only this device claims it
@@ -38,11 +77,13 @@ Future<AiTask> aiCreateTaskHere({
   required String prompt,
   required String page,
   String? after,
+  String? projectId,
 }) => RustLib.instance.api.crateApiAiAiCreateTaskHere(
   vault: vault,
   prompt: prompt,
   page: page,
   after: after,
+  projectId: projectId,
 );
 
 /// Cancels a desktop task that hasn't ended: it is never claimed, and a
@@ -50,6 +91,44 @@ Future<AiTask> aiCreateTaskHere({
 /// Hub jobs are cancelled on the hub.
 Future<bool> aiCancelTask({required NotesVault vault, required String id}) =>
     RustLib.instance.api.crateApiAiAiCancelTask(vault: vault, id: id);
+
+/// The user accepts a reviewed result: the task goes from review to done.
+/// Returns whether it was in review.
+Future<bool> aiAcceptTask({required NotesVault vault, required String id}) =>
+    RustLib.instance.api.crateApiAiAiAcceptTask(vault: vault, id: id);
+
+/// Answers the worker's open question. The worker gets the reply and the task
+/// is plain running again. Returns false when there was no open question.
+Future<bool> aiReplyTask({
+  required NotesVault vault,
+  required String id,
+  required String text,
+}) => RustLib.instance.api.crateApiAiAiReplyTask(
+  vault: vault,
+  id: id,
+  text: text,
+);
+
+/// Fails a task whose runner has been silent for over ten minutes. Returns
+/// false, and changes nothing, when the task is not stalled.
+Future<bool> aiMarkTaskFailed({
+  required NotesVault vault,
+  required String id,
+}) => RustLib.instance.api.crateApiAiAiMarkTaskFailed(vault: vault, id: id);
+
+/// Asks the runner to send the running worker the note's current version.
+/// Returns whether the task was running and took the request.
+Future<bool> aiSendUpdate({required NotesVault vault, required String id}) =>
+    RustLib.instance.api.crateApiAiAiSendUpdate(vault: vault, id: id);
+
+/// Adds a to-do under the running task; the runner puts it on the worker's
+/// list and sends it as a steering message.
+Future<void> aiAddStep({
+  required NotesVault vault,
+  required String id,
+  required String text,
+}) =>
+    RustLib.instance.api.crateApiAiAiAddStep(vault: vault, id: id, text: text);
 
 /// The newest tasks first.
 Future<List<AiTask>> aiListTasks({
@@ -89,26 +168,90 @@ Future<void> aiFinishTask({
   text: text,
 );
 
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<NotesMcp>>
-abstract class NotesMcp implements RustOpaqueInterface {
-  factory NotesMcp({required NotesVault vault}) =>
-      RustLib.instance.api.crateApiAiNotesMcpNew(vault: vault);
+class AiRunner {
+  /// `hub` or the device id in `.vault/device`, never a node-record page id.
+  final String id;
+  final String name;
+  final AiRunnerKind kind;
+  final bool online;
 
-  /// Replaces the token (and restarts the endpoint if it runs); clients
-  /// configured with the old one stop working.
-  Future<String> rotateToken();
+  /// Unix epoch milliseconds; absent until a timestamp is known.
+  final PlatformInt64? lastSeenMs;
+  final bool isThisDevice;
+  final List<AiRunnerProject> projects;
 
-  /// Starts serving on `addr` (restarts if running) and returns the URL.
-  Future<String> start({required String addr});
+  const AiRunner({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.online,
+    this.lastSeenMs,
+    required this.isThisDevice,
+    required this.projects,
+  });
 
-  /// Stops serving and removes the endpoint file.
-  Future<void> stop();
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      kind.hashCode ^
+      online.hashCode ^
+      lastSeenMs.hashCode ^
+      isThisDevice.hashCode ^
+      projects.hashCode;
 
-  /// The bearer token (created on first use, kept in `.vault/mcp/token`).
-  Future<String> token();
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiRunner &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          kind == other.kind &&
+          online == other.online &&
+          lastSeenMs == other.lastSeenMs &&
+          isThisDevice == other.isThisDevice &&
+          projects == other.projects;
+}
 
-  /// The URL while running.
-  String? url();
+/// The hub or a PC that uses this vault.
+enum AiRunnerKind { hub, pc }
+
+class AiRunnerList {
+  final List<AiRunner> runners;
+  final String defaultRunnerId;
+
+  const AiRunnerList({required this.runners, required this.defaultRunnerId});
+
+  @override
+  int get hashCode => runners.hashCode ^ defaultRunnerId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiRunnerList &&
+          runtimeType == other.runtimeType &&
+          runners == other.runners &&
+          defaultRunnerId == other.defaultRunnerId;
+}
+
+/// A PC's project choice, without its private local repository path.
+class AiRunnerProject {
+  final String id;
+  final String name;
+
+  const AiRunnerProject({required this.id, required this.name});
+
+  @override
+  int get hashCode => id.hashCode ^ name.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiRunnerProject &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name;
 }
 
 /// An AI task (a row of the "AI tasks" collection).
@@ -132,12 +275,42 @@ class AiTask {
   /// The device that ran it.
   final String device;
   final String error;
+
+  /// The latest progress report, empty until one is recorded.
+  final String progress;
+
+  /// Unix epoch milliseconds as stored in the row, empty until reported.
+  final String progressAt;
   final PlatformInt64 createdMs;
   final PlatformInt64 updatedMs;
 
   /// Where it runs: "" (any desktop), a device id (only that device) or
   /// "hub" (a hub job).
   final String node;
+
+  /// An agent project id on the pinned PC; empty for a notes-only task.
+  final String project;
+
+  /// Saved by the runner before the code task starts.
+  final String worktreeBranch;
+  final String worktreePath;
+
+  /// A cancel was requested and the runner has not acknowledged it yet.
+  final bool cancelRequested;
+
+  /// The note changed after the running worker got its brief.
+  final bool stale;
+
+  /// When the runner of a running task was last heard from (ms), set only
+  /// when it has been silent for over ten minutes.
+  final PlatformInt64? stalledSinceMs;
+
+  /// The agent session of the run, empty when it has none or it expired.
+  final String session;
+
+  /// The worker's open question to the user, empty when it has none. A
+  /// running task with a question waits for `ai_reply_task`.
+  final String question;
 
   const AiTask({
     required this.id,
@@ -148,9 +321,19 @@ class AiTask {
     required this.status,
     required this.device,
     required this.error,
+    required this.progress,
+    required this.progressAt,
     required this.createdMs,
     required this.updatedMs,
     required this.node,
+    required this.project,
+    required this.worktreeBranch,
+    required this.worktreePath,
+    required this.cancelRequested,
+    required this.stale,
+    this.stalledSinceMs,
+    required this.session,
+    required this.question,
   });
 
   @override
@@ -163,9 +346,19 @@ class AiTask {
       status.hashCode ^
       device.hashCode ^
       error.hashCode ^
+      progress.hashCode ^
+      progressAt.hashCode ^
       createdMs.hashCode ^
       updatedMs.hashCode ^
-      node.hashCode;
+      node.hashCode ^
+      project.hashCode ^
+      worktreeBranch.hashCode ^
+      worktreePath.hashCode ^
+      cancelRequested.hashCode ^
+      stale.hashCode ^
+      stalledSinceMs.hashCode ^
+      session.hashCode ^
+      question.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -180,7 +373,17 @@ class AiTask {
           status == other.status &&
           device == other.device &&
           error == other.error &&
+          progress == other.progress &&
+          progressAt == other.progressAt &&
           createdMs == other.createdMs &&
           updatedMs == other.updatedMs &&
-          node == other.node;
+          node == other.node &&
+          project == other.project &&
+          worktreeBranch == other.worktreeBranch &&
+          worktreePath == other.worktreePath &&
+          cancelRequested == other.cancelRequested &&
+          stale == other.stale &&
+          stalledSinceMs == other.stalledSinceMs &&
+          session == other.session &&
+          question == other.question;
 }

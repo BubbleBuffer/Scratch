@@ -21,6 +21,15 @@ Future<List<AgendaItem>> _agenda(Vault vault, Day from, Day to) => vault.run(
   ),
 );
 
+/// The settings of [page]'s view blocks, in page order.
+Future<List<ViewDef>> _viewBlocks(Vault vault, String page) async {
+  final p = await vault.run((v) => v.loadPage(id: page));
+  return [
+    for (final b in p.blocks)
+      if (b.kind == 'view') await vault.run((v) => v.viewBlockDef(id: b.id, text: b.text)),
+  ];
+}
+
 void main() {
   setUpAll(initCore);
   tearDown(() => Clock.fixedAt = null);
@@ -47,11 +56,14 @@ void main() {
         status.options[1].id: 'inProgress',
         status.options[2].id: 'complete',
       });
-      final views = await vault.run((v) => v.listViews(collection: tasks));
+      // Seeded as view blocks: no saved views are left to migrate.
+      expect(await vault.run((v) => v.listViews(collection: tasks)), isEmpty);
+      final views = await _viewBlocks(vault, tasks);
       expect(views.map((v) => v.kind), [ViewKind.table, ViewKind.board]);
       expect(views.last.groupBy, status.key);
       final calendar = roots.firstWhere((p) => p.title == 'Calendar').id;
-      final calendarViews = await vault.run((v) => v.listViews(collection: calendar));
+      expect(await vault.run((v) => v.listViews(collection: calendar)), isEmpty);
+      final calendarViews = await _viewBlocks(vault, calendar);
       expect(calendarViews.map((v) => v.kind), [ViewKind.calendar, ViewKind.table]);
       final today = Day.of(clockNow());
       final agenda = await _agenda(vault, today, today.add(2));
@@ -118,11 +130,12 @@ void main() {
       expect(lisbon.cover, isNotNull);
       expect(
         lisbon.blocks.map((b) => b.kind),
-        containsAll([Kinds.callout, Kinds.columnList, Kinds.column, Kinds.toggle, 'database', Kinds.image]),
+        containsAll([Kinds.callout, Kinds.columnList, Kinds.column, Kinds.toggle, 'view', Kinds.image]),
       );
       expect(lisbon.blocks.where((b) => b.kind == Kinds.todo).length, 7);
       expect(lisbon.blocks.where((b) => b.kind == Kinds.todo && b.checked).length, 2);
-      final bookings = await vault.run((v) => v.listViews(collection: ids['Bookings']!));
+      expect(await vault.run((v) => v.listViews(collection: ids['Bookings']!)), isEmpty);
+      final bookings = await _viewBlocks(vault, ids['Bookings']!);
       expect(bookings.single.kind, ViewKind.board);
       final backlinks = await vault.backlinks(ids['Lisbon in May']!);
       expect(backlinks.map((p) => p.title), contains('Weekly review'));

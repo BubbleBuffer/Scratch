@@ -139,6 +139,7 @@ fn generic_markdown_preserves_unknown_and_chat_ref_with_readable_fallback() {
                     target: target.map(Into::into),
                     color: Some("red".into()),
                     width: Some(50),
+                    numbered_start: None,
                     children: vec![],
                 };
                 let md = v.blocks_markdown(vec![source.clone()]);

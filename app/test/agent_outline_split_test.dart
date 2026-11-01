@@ -2,6 +2,8 @@
 // and cells, a tool call's work sits with its call, and no whole turn sticks
 // to one side of a boundary. Pure Dart, no widgets.
 
+import 'package:agent_kit/agent_kit.dart'
+    show Outline, OutlineChapter, OutlineLayout;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
 
@@ -121,14 +123,17 @@ void main() {
       'Third answer',
     ]);
     expect(turn.activity, hasLength(2));
-    expect({for (final e in anchors.entries) e.key: e.value}, {
-      'u1': 'u1',
-      'a1': 'run',
-      't1': 'run',
-      'a2': 'run',
-      'a3': 'run',
-      't3': 'run',
-    });
+    expect(
+      {for (final e in anchors.entries) e.key: e.value},
+      {
+        'u1': 'u1',
+        'a1': 'run',
+        't1': 'run',
+        'a2': 'run',
+        'a3': 'run',
+        't3': 'run',
+      },
+    );
   });
 
   test('a turn crossing segments splits into one piece per segment', () {
@@ -157,10 +162,7 @@ void main() {
     expect(pieces[0].activity.map((a) => a.summary), ['Work one']);
     expect(pieces[1].activity, isEmpty);
     expect(pieces[2].activity.map((a) => a.summary), ['Work three']);
-    expect(
-      pieces.expand((p) => p.activity).length,
-      _session().activity.length,
-    );
+    expect(pieces.expand((p) => p.activity).length, _session().activity.length);
   });
 
   test('a message anchors to the piece that shows it, tool results too', () {
@@ -183,81 +185,43 @@ void main() {
     expect(anchors['t3'], 'run#1.1');
   });
 
-  test('a span across a boundary resolves to the piece of its first message', () {
-    final anchors = <String, String>{};
-    final items = agentTurns(
-      _session(),
-      anchorOf: anchors,
-      segmentOf: const {
-        'a1': '0.0',
-        't1': '0.0',
-        'a2': '1.0',
-        'a3': '1.1',
-        't3': '1.1',
-      },
-    );
-    const outline = OutlineView([
-      ChapterView(id: 'A', title: 'A', first: 'a1', last: 't1'),
-      ChapterView(id: 'B', title: 'B', first: 'a2', last: 't3'),
-    ]);
-    final layout = OutlineLayout.build(
-      outline: outline,
-      items: items,
-      messageIds: const ['u1', 'a1', 't1', 'a2', 'a3', 't3'],
-      anchorOf: anchors,
-      folded: (_) => false,
-    );
-    expect(layout.target('a2', 't3')?.itemId, 'run#1.0');
-    expect(layout.target('a3', 'a3')?.itemId, 'run#1.1');
-    expect(layout.chapterOfItem('run#0.0'), 0);
-    expect(layout.chapterOfItem('run#1.1'), 1);
-  });
-
-  test('segments: chapter and section per message, outside as one segment', () {
-    const outline = OutlineView([
-      ChapterView(
-        id: 'A',
-        title: 'A',
-        first: 'a1',
-        last: 't1',
-        sections: [
-          SectionView(id: 'S1', title: 'S1', first: 'a1', last: 'a1'),
-          SectionView(id: 'S2', title: 'S2', first: 't1', last: 't1'),
-        ],
-      ),
-    ]);
-    final segments = outlineSegments(outline, const ['u1', 'a1', 't1', 'a2']);
-    expect(segments, {'u1': '-', 'a1': '0.0', 't1': '0.1', 'a2': '-'});
-    expect(outlineSegments(OutlineView.empty, const ['u1']), isEmpty);
-  });
-
-  test('gist is the first sentence of the summary, and the decision wins', () {
-    const bare = ChapterView(
-      id: 'A',
-      title: 'A',
-      first: 'a',
-      last: 'b',
-      summary: 'Picked the spring plan. Then we costed it.',
-    );
-    expect(bare.gist, 'Picked the spring plan.');
-    expect(bare.decision, isNull);
-    const decided = ChapterView(
-      id: 'A',
-      title: 'A',
-      first: 'a',
-      last: 'b',
-      decisions: ['  ', 'Use the spring plan'],
-      summary: 'Picked the spring plan.',
-    );
-    expect(decided.decision, 'Use the spring plan');
-    const none = ChapterView(id: 'A', title: 'A', first: 'a', last: 'b');
-    expect(none.gist, isNull);
-  });
+  test(
+    'a span across a boundary resolves to the piece of its first message',
+    () {
+      final anchors = <String, String>{};
+      final items = agentTurns(
+        _session(),
+        anchorOf: anchors,
+        segmentOf: const {
+          'a1': '0.0',
+          't1': '0.0',
+          'a2': '1.0',
+          'a3': '1.1',
+          't3': '1.1',
+        },
+      );
+      final outline = Outline([
+        OutlineChapter(id: 'A', title: 'A', first: 'a1', last: 't1'),
+        OutlineChapter(id: 'B', title: 'B', first: 'a2', last: 't3'),
+      ]);
+      final layout = OutlineLayout.build(
+        outline: outline,
+        itemIds: [for (final item in items) item.id],
+        anchorIds: const ['u1', 'a1', 't1', 'a2', 'a3', 't3'],
+        anchorOf: anchors,
+        folded: (_) => false,
+      );
+      expect(layout.target('a2', 't3')?.itemId, 'run#1.0');
+      expect(layout.target('a3', 'a3')?.itemId, 'run#1.1');
+      expect(layout.chapterOfItem('run#0.0'), 0);
+      expect(layout.chapterOfItem('run#1.1'), 1);
+    },
+  );
 
   test('items placed out of order never revisit a chapter', () {
-    const outline = OutlineView([
-      ChapterView(id: 'A', title: 'A', first: 'a1', last: 't1'),
-      ChapterView(id: 'B', title: 'B', first: 'a2', last: 't3'),
+    final outline = Outline([
+      OutlineChapter(id: 'A', title: 'A', first: 'a1', last: 't1'),
+      OutlineChapter(id: 'B', title: 'B', first: 'a2', last: 't3'),
     ]);
     // "late" shows B's messages but comes first; "early" shows A's, after it.
     const items = <ChatItem>[
@@ -266,8 +230,8 @@ void main() {
     ];
     final layout = OutlineLayout.build(
       outline: outline,
-      items: items,
-      messageIds: const ['u1', 'a1', 't1', 'a2', 'a3', 't3'],
+      itemIds: [for (final item in items) item.id],
+      anchorIds: const ['u1', 'a1', 't1', 'a2', 'a3', 't3'],
       anchorOf: const {
         'a2': 'late',
         't3': 'late',
@@ -276,7 +240,10 @@ void main() {
       },
       folded: (_) => false,
     );
-    expect(layout.rows.whereType<ChapterRow>().map((r) => r.key), ['chap:B']);
+    expect(
+      layout.rows.where((r) => r.key.startsWith('chap:')).map((r) => r.key),
+      ['chap:B'],
+    );
     expect(layout.chapterOfItem('early'), 1);
   });
 }

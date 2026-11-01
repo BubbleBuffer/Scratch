@@ -1,9 +1,10 @@
+import 'package:bb_ui/search.dart' as bb;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:notes_app/shell/search.dart';
 
 import 'harness.dart';
+import 'search_hits_fixture.dart' show shownHits;
 
 const hint = 'Showing title matches — keep typing to search page text';
 
@@ -37,14 +38,12 @@ void main() {
     await tester.enterText(field, 'g');
     await settle(tester);
     expect(find.text(hint), findsOneWidget);
-    expect(
-      tester.widgetList<SearchResultRow>(find.byType(SearchResultRow)),
-      isNotEmpty,
-    );
+    expect(shownHits(tester), isNotEmpty);
+    expect(shownHits(tester).every((hit) => hit.snippet.isEmpty), isTrue);
     expect(
       tester
-          .widgetList<SearchResultRow>(find.byType(SearchResultRow))
-          .every((row) => row.hit.snippet.isEmpty),
+          .widgetList<bb.SearchResultRow>(find.byType(bb.SearchResultRow))
+          .every((row) => row.result.snippet.isEmpty),
       isTrue,
     );
     await tester.enterText(field, 'garden');

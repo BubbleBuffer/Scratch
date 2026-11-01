@@ -88,7 +88,9 @@ void main() {
           await tapAndSettle(tester, key('settings-nav-sync'));
           await settle(tester);
           await shot('$tag-settings-sync');
-          await tapAndSettle(tester, key('settings-nav-devices'));
+          // Devices sit below the sync part of the same page.
+          await tester.ensureVisible(key('devices-add'));
+          await settle(tester);
           await shot('$tag-settings-devices');
         }
       });
@@ -103,7 +105,7 @@ void main() {
         } else {
           _fakeHub(tv.app.sync);
           await tapAndSettle(tester, key('sidebar-settings'));
-          await tapAndSettle(tester, key('settings-nav-devices'));
+          await tapAndSettle(tester, key('settings-nav-sync'));
           showAddDevice(tester.element(key('devices-add')), token: _token);
           await settle(tester);
           await shot('$tag-pairing');

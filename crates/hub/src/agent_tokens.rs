@@ -477,7 +477,7 @@ fn now_ms() -> i64 {
 /// Writes `bytes` to a new temp file beside `path`, then renames it over
 /// `path`, so a reader sees the old file or the new one, never half of
 /// either. The temp file is 0600 on Unix from its creation.
-fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let dir = path.parent().unwrap_or(Path::new("."));
     fs::create_dir_all(dir)?;
     let nanos = SystemTime::now()

@@ -1,6 +1,6 @@
 // What the chat shows, built from a session snapshot: user and assistant
 // text, compact assistant turns with edits and work, quiet lines for failed
-// or stopped runs, the reply being written, and pending approvals. Tool
+// or stopped runs and the reply being written. Tool
 // messages supply code-cell results, behind the optional code disclosure.
 
 import 'dart:convert';
@@ -79,7 +79,6 @@ List<ChatItem> agentTurns(
   AgentSessionState? s, {
   String streaming = '',
   String? error,
-  List<AgentApproval> approvals = const [],
   Map<String, String>? anchorOf,
   Map<String, String>? segmentOf,
 }) {
@@ -236,7 +235,6 @@ List<ChatItem> agentTurns(
     for (final e in out) e.$3,
     if (s == null && streaming.trim().isNotEmpty)
       AssistantText('live', streaming, live: true),
-    for (final a in approvals) ApprovalItem(a),
     if (error != null && error.isNotEmpty) RunNote('error', error),
   ];
 }
@@ -281,19 +279,17 @@ class RunNote extends ChatItem {
   final bool error;
 }
 
-class ApprovalItem extends ChatItem {
-  ApprovalItem(this.approval) : super('approval-${approval.id}');
-  final AgentApproval approval;
-}
-
 /// The code of a `js` call (its `code` argument), or the arguments as
 /// JSON for any other tool.
-String codeOf(AgentToolCall c) {
+String codeOf(AgentToolCall c) => codeOfArguments(c.argumentsJson);
+
+/// [codeOf] from a call's arguments JSON.
+String codeOfArguments(String argumentsJson) {
   try {
-    final args = jsonDecode(c.argumentsJson);
+    final args = jsonDecode(argumentsJson);
     if (args is Map && args['code'] is String) return args['code'] as String;
   } catch (_) {}
-  return c.argumentsJson;
+  return argumentsJson;
 }
 
 /// What a `js` cell's tool message says, for people: its value or error,
@@ -317,79 +313,4 @@ String cellResult(String raw) {
     }
   } catch (_) {}
   return text;
-}
-
-/// Pretty-printed JSON, or [raw] as it is.
-String prettyJson(String raw) {
-  try {
-    return const JsonEncoder.withIndent('  ').convert(jsonDecode(raw));
-  } catch (_) {
-    return raw;
-  }
-}
-
-/// The chat's items in order. [streaming] is the live reply, [error] a
-/// command error, [approvals] the pending approvals.
-List<ChatItem> chatItems(
-  AgentSessionState? s, {
-  String streaming = '',
-  String? error,
-  List<AgentApproval> approvals = const [],
-}) {
-  final out = <(String, int, ChatItem)>[];
-  var order = 0;
-  void add(String at, ChatItem item) => out.add((at, order++, item));
-  if (s != null) {
-    final results = <String, AgentMessage>{
-      for (final m in s.messages)
-        if (m.role == 'tool' && m.toolCallId != null) m.toolCallId!: m,
-    };
-    final active = s.runs.any(runActive);
-    for (final m in s.messages) {
-      switch (m.role) {
-        case 'user':
-          if (m.text.trim().isNotEmpty) {
-            add(m.createdAt, UserText(m.id, m.text, context: m.context));
-          }
-        case 'assistant':
-          if (m.content.trim().isNotEmpty) {
-            add(m.createdAt, AssistantText(m.id, m.content));
-          }
-          for (final c in m.toolCalls) {
-            final r = results[c.id];
-            add(
-              m.createdAt,
-              CodeCell(
-                'cell-${c.id}',
-                tool: c.name,
-                code: codeOf(c),
-                result: r == null ? null : cellResult(r.content),
-                status: r == null
-                    ? (active ? CellStatus.running : CellStatus.failed)
-                    : (r.isError ? CellStatus.failed : CellStatus.done),
-              ),
-            );
-          }
-      }
-    }
-    for (final r in s.runs) {
-      final at = r.endedAt ?? r.startedAt;
-      if (r.status == 'cancelled') {
-        add(at, RunNote('run-${r.id}', 'Stopped.', error: false));
-      } else if ((r.error ?? '').isNotEmpty) {
-        add(at, RunNote('run-${r.id}', r.error!));
-      }
-    }
-  }
-  out.sort((a, b) {
-    final t = a.$1.compareTo(b.$1);
-    return t != 0 ? t : a.$2.compareTo(b.$2);
-  });
-  return [
-    for (final e in out) e.$3,
-    if (streaming.trim().isNotEmpty)
-      AssistantText('live', streaming, live: true),
-    for (final a in approvals) ApprovalItem(a),
-    if (error != null && error.isNotEmpty) RunNote('error', error),
-  ];
 }

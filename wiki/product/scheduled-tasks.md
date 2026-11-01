@@ -10,7 +10,7 @@ status: "current (phase 1 built)"
 
 ## Format
 
-**A schedule is a note of type `schedule`.** Its definition is the note's frontmatter, stored as `type_data.schedule` ([data model](../architecture/data-model.md)). Reason: only pages carry properties and frontmatter; blocks do not. It sits in normal notes as a child page or an embed. Frontmatter is the stored format; users edit it in the schedule view.
+**A schedule is a note of type `schedule`.** Its definition is the note's frontmatter, stored as `type_data.schedule` ([data model](../core/data-model.md)). Reason: only pages carry properties and frontmatter; blocks do not. It sits in normal notes as a child page or an embed. Frontmatter is the stored format; users edit it in the schedule view.
 
 ```yaml
 type: schedule
@@ -72,7 +72,7 @@ The runner reads `schedule` and writes changed `schedule_status` fields without 
 `app/rust/src/api/vault.rs` exposes vault-owned local scheduling and portable preview through the `app/lib/core/vault.dart` wrappers. `app/rust/src/api/agent.rs` retains hub routing.
 `app/rust/src/api/clock.rs` exposes the device's IANA time-zone name through jiff's system-zone lookup.
 `app/lib/addons/schedule/` shows the schedule page with a status band under the title; hub runners are called through the hub's agent connection, and other desktops are shown from the vault and never called ([schedule add-on](../addons/schedule.md)).
-The vault-open wrappers receive the app-data directory from `app/lib/shell/boot.dart`, preserving the existing scheduler state location. The "Run schedules on this device" setting is registered by the schedule add-on under Settings > Add-ons on desktop; boot starts the local runner when it is on.
+The vault-open wrappers receive the app-data directory from `app/lib/shell/boot.dart`, preserving the existing scheduler state location. The "Run schedules on this device" setting is shown on Settings > Sync and devices on desktop; boot starts the local runner when it is on.
 A desktop with the runner off publishes no node record; an existing record is marked `available: false`.
 The live-queries lane's generic unsupported card is not yet on this branch; older clients show the existing "Unsupported note type" placeholder.
 

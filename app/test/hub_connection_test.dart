@@ -59,7 +59,7 @@ class _Sync extends SyncStore {
   @override
   bool get connected => running;
   @override
-  Future<void> connect(String url, String token, {SyncOptions? options, List<String> trusted = const []}) async {
+  Future<void> connect(String url, String token, {SyncOptions? options, List<TrustedHubCertificate> trusted = const []}) async {
     if (connectError case final error?) throw error;
     hubUrl = url;
     this.token = token;

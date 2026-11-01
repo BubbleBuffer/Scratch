@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:agent_kit/agent_kit.dart'
+    show AnchoredList, OutlineChapterCard, OutlineChapterHeading;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
-import 'package:notes_app/ui/decision_line.dart';
-import 'package:notes_app/ui/anchored_list.dart';
 
 import 'agent_test.dart' show openAgentStore, openAgentScreen;
 import 'harness.dart';
@@ -124,11 +124,11 @@ void main() {
       expect(card.messagesShown, isFalse);
       expect(card.chapter.title, 'BubblePlay headless cursor');
       expect(card.chapter.gist, contains('Mouse Keys workaround hardened'));
-      expect(find.byType(DecisionLine), findsNothing);
+      expect(find.textContaining('◆'), findsNothing);
       await capture('polish-closed-chapter');
       await jump(chapters.last.id);
       expect(find.byType(OutlineChapterHeading), findsWidgets);
-      expect(find.byType(DecisionLine), findsNothing);
+      expect(find.textContaining('◆'), findsNothing);
       await capture('polish-open-chapter');
       if (reportDir != null) {
         await real(

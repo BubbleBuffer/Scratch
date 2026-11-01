@@ -46,6 +46,12 @@ class _StubHub {
   }
 
   Future<void> _accept(HttpRequest request) async {
+    // A hub without device keys: `/health` answers without X-Device-Keys,
+    // so the client sends its bare Hub token, as before.
+    if (request.method == 'GET' && request.uri.path == '/health') {
+      await request.response.close();
+      return;
+    }
     if (request.uri.path == '/auth/redeem') {
       final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map;
       if (body['code'] != 'synthetic-code' || body['device'] != device) {

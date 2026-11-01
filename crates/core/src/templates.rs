@@ -10,7 +10,7 @@ use crate::blockdiff::insert_ops;
 use crate::doc::PageDoc;
 use crate::error::{invalid, not_found, Result};
 use crate::index::Index;
-use crate::types::{Block, BlockKind, BlockOp, Change, PageId, PageSummary, Property};
+use crate::types::{Block, BlockKind, BlockOp, Change, NewBlock, PageId, PageSummary, Property};
 use crate::vault::{fresh_ids, lock, Vault};
 
 /// What a new child page starts from.
@@ -69,6 +69,56 @@ impl TemplateCopy {
         let mut inserts = insert_ops(&self.blocks);
         if let Some(BlockOp::Insert { after: a, .. }) = inserts.first_mut() {
             *a = after;
+        }
+        ops.extend(inserts);
+        doc.apply(&ops)?;
+        let set: Vec<String> = doc.props().into_iter().map(|p| p.key).collect();
+        for p in &self.props {
+            if !set.contains(&p.key) {
+                doc.set_prop(&p.key, &p.value)?;
+            }
+        }
+        let m = doc.meta();
+        if m.icon.is_none() {
+            doc.set_meta_str("icon", self.icon.as_deref())?;
+        }
+        if m.cover.is_none() {
+            doc.set_meta_str("cover", self.cover.as_deref())?;
+        }
+        Ok(())
+    }
+}
+
+impl TemplateCopy {
+    /// Appends the copied blocks at the end of `doc`, under a divider and a
+    /// "Merged from" line naming `merged_from`. Properties, icon and cover
+    /// fill only what `doc` has not set. Used by `merge_pages`.
+    pub fn append_after_divider(&self, doc: &mut PageDoc, merged_from: &str) -> Result<()> {
+        let have = doc.blocks();
+        let divider = crate::ids::new_id();
+        let note = crate::ids::new_id();
+        let plain = |id: &str, kind: BlockKind, text: String| NewBlock {
+            id: id.to_owned(),
+            kind,
+            text,
+            marks: vec![],
+            checked: false,
+        };
+        let mut ops = vec![
+            BlockOp::Insert {
+                parent: None,
+                after: have.last().map(|b| b.id.clone()),
+                block: plain(&divider, BlockKind::Divider, String::new()),
+            },
+            BlockOp::Insert {
+                parent: None,
+                after: Some(divider),
+                block: plain(&note, BlockKind::Paragraph, format!("Merged from {merged_from}")),
+            },
+        ];
+        let mut inserts = insert_ops(&self.blocks);
+        if let Some(BlockOp::Insert { after, .. }) = inserts.first_mut() {
+            *after = Some(note);
         }
         ops.extend(inserts);
         doc.apply(&ops)?;

@@ -1,11 +1,22 @@
 // Certificates trusted on this device for hubs whose certificate has an
-// unknown issuer (self-signed or a private CA). One pin per server origin
-// (`scheme://host:port`), kept in the device's settings (never synced).
-// Plain Dart, so the rules are testable without widgets:
+// unknown issuer (self-signed, a private CA or a TLS-inspecting proxy). One
+// pin per server origin (`scheme://host:port`), kept in the device's
+// settings (never synced). Plain Dart, so the rules are testable without
+// widgets:
 // - origins are lowercased with the default port filled in;
 // - trusting replaces the pin for that origin;
+// - a pin keeps the leaf's fingerprint and, when the hub sent it, the DER of
+//   the certificate that issued the leaf: every hub client (sync, the agent
+//   and host relay sockets) takes [TrustedCertificates.trustFor], and the
+//   issuer is a trust anchor for that origin only, so a re-minted leaf from
+//   the same CA is accepted;
 // - a pin whose fingerprint differs from the one the hub presents means the
 //   certificate changed since it was trusted.
+
+import 'dart:convert';
+import 'dart:typed_data';
+
+import '../../src/rust/api/types.dart' show TrustedHubCertificate;
 
 /// The prefix of a sync error for an unknown-issuer certificate that is not
 /// pinned; the SHA-256 fingerprint follows.
@@ -69,6 +80,47 @@ String serverHostOf(String url) {
   final def = uri.scheme == 'https' ? 443 : 80;
   final h = uri.host.contains(':') ? '[${uri.host}]' : uri.host;
   return uri.port == def ? h : '$h:${uri.port}';
+}
+
+/// The parts of an RFC 4514 name (`CN=Example Proxy CA,O=Example Corp,OU=IT`) a
+/// certificate row shows: the first CN, O and OU, unescaped. Null for a part
+/// the name does not have.
+({String? cn, String? o, String? ou}) nameParts(String dn) {
+  final parts = <String, String>{};
+  final key = StringBuffer(), value = StringBuffer();
+  var inValue = false;
+  void flush() {
+    final k = key.toString().trim().toUpperCase();
+    final v = value.toString().trim();
+    if (k.isNotEmpty && v.isNotEmpty) parts.putIfAbsent(k, () => v);
+    key.clear();
+    value.clear();
+    inValue = false;
+  }
+
+  bool isHex(String c) => RegExp(r'^[0-9A-Fa-f]$').hasMatch(c);
+  for (var i = 0; i < dn.length; i++) {
+    final ch = dn[i];
+    if (ch == '\\' && i + 1 < dn.length) {
+      // `\,` and friends, or `\XX` (a hex byte; kept as is when not ASCII).
+      if (i + 2 < dn.length && isHex(dn[i + 1]) && isHex(dn[i + 2])) {
+        final code = int.parse(dn.substring(i + 1, i + 3), radix: 16);
+        (inValue ? value : key).write(code < 0x80 ? String.fromCharCode(code) : dn.substring(i, i + 3));
+        i += 2;
+      } else {
+        (inValue ? value : key).write(dn[i + 1]);
+        i += 1;
+      }
+    } else if (ch == ',' || ch == '+') {
+      flush();
+    } else if (ch == '=' && !inValue) {
+      inValue = true;
+    } else {
+      (inValue ? value : key).write(ch);
+    }
+  }
+  flush();
+  return (cn: parts['CN'], o: parts['O'], ou: parts['OU']);
 }
 
 /// One certificate's details, as shown on the certificate view (the
@@ -138,7 +190,8 @@ class CertDetails {
 }
 
 /// The trusted certificate of one origin: the leaf's fingerprint and
-/// details, when it was trusted, and the chain (leaf first) for viewing.
+/// details, when it was trusted, the chain (leaf first) for viewing, and
+/// the issuing certificate when the hub sent it.
 class PinnedCertificate {
   const PinnedCertificate({
     required this.sha256,
@@ -148,12 +201,21 @@ class PinnedCertificate {
     this.notAfterMs = 0,
     required this.trustedAtMs,
     this.chain = const [],
+    this.issuerDer,
+    this.issuerSha256 = '',
   });
 
   /// A pin for [chain] (leaf first); [fingerprint] wins over the leaf's
-  /// when given (the one the error named).
-  factory PinnedCertificate.of(List<CertDetails> chain, {String? fingerprint, required int trustedAtMs}) {
+  /// when given (the one the error named). [issuerDer] is the DER of
+  /// `chain[1]`, the certificate that issued the leaf, when the hub sent it.
+  factory PinnedCertificate.of(
+    List<CertDetails> chain, {
+    String? fingerprint,
+    required int trustedAtMs,
+    Uint8List? issuerDer,
+  }) {
     final leaf = chain.isEmpty ? null : chain.first;
+    final der = issuerDer != null && issuerDer.isNotEmpty && chain.length > 1 ? issuerDer : null;
     return PinnedCertificate(
       sha256: formatFingerprint(fingerprint ?? leaf?.sha256 ?? ''),
       subject: leaf?.subject ?? '',
@@ -162,12 +224,28 @@ class PinnedCertificate {
       notAfterMs: leaf?.notAfterMs ?? 0,
       trustedAtMs: trustedAtMs,
       chain: chain,
+      issuerDer: der,
+      issuerSha256: der == null ? '' : formatFingerprint(chain[1].sha256),
     );
   }
 
   final String sha256, subject, issuer;
   final int notBeforeMs, notAfterMs, trustedAtMs;
   final List<CertDetails> chain;
+
+  /// DER of the certificate that issued the leaf (null for pins saved
+  /// before issuers were kept, and for hubs that sent no issuer).
+  final Uint8List? issuerDer;
+
+  /// SHA-256 of [issuerDer] (empty without it).
+  final String issuerSha256;
+
+  /// The issuer's CN, O and OU, from the leaf's issuer name.
+  ({String? cn, String? o, String? ou}) get issuerName => nameParts(issuer);
+
+  /// What this pin trusts, for the hub clients of [origin].
+  TrustedHubCertificate trustFor(String origin) =>
+      TrustedHubCertificate(origin: origin, sha256: sha256, issuerDer: issuerDer);
 
   /// The chain to show: the stored one, or the leaf from the pin's own
   /// fields when none was stored.
@@ -185,6 +263,8 @@ class PinnedCertificate {
         'notAfterMs': notAfterMs,
         'trustedAtMs': trustedAtMs,
         'chain': [for (final c in chain) c.toJson()],
+        if (issuerDer != null) 'issuerDer': base64Encode(issuerDer!),
+        if (issuerDer != null) 'issuerSha256': issuerSha256,
       };
 
   static PinnedCertificate? fromJson(Object? j) {
@@ -194,6 +274,15 @@ class PinnedCertificate {
     int n(Object? v) => v is num ? v.toInt() : 0;
     String s(Object? v) => v is String ? v : '';
     final chain = j['chain'];
+    Uint8List? der;
+    final d = j['issuerDer'];
+    if (d is String && d.isNotEmpty) {
+      try {
+        der = base64Decode(d);
+      } on FormatException {
+        der = null;
+      }
+    }
     return PinnedCertificate(
       sha256: sha,
       subject: s(j['subject']),
@@ -202,6 +291,8 @@ class PinnedCertificate {
       notAfterMs: n(j['notAfterMs']),
       trustedAtMs: n(j['trustedAtMs']),
       chain: chain is List ? [for (final c in chain) ?CertDetails.fromJson(c)] : const [],
+      issuerDer: der,
+      issuerSha256: der == null ? '' : s(j['issuerSha256']),
     );
   }
 }
@@ -229,6 +320,20 @@ class TrustedCertificates {
   List<String> fingerprintsFor(String url) {
     final p = lookup(url);
     return p == null ? const [] : [p.sha256];
+  }
+
+  /// What the hub clients of [url] trust beyond the public roots: the pin
+  /// for its origin (its leaf fingerprint and issuer), or nothing.
+  List<TrustedHubCertificate> trustFor(String url) {
+    final o = originOf(url);
+    final p = o == null ? null : _pins[o];
+    return p == null ? const [] : [p.trustFor(o!)];
+  }
+
+  /// Changes whenever [trustFor] of [url] changes (for restart keys).
+  String trustKeyFor(String url) {
+    final p = lookup(url);
+    return p == null ? '' : '${normalizeFingerprint(p.sha256)}/${normalizeFingerprint(p.issuerSha256)}/${p.issuerDer?.length ?? 0}';
   }
 
   /// Trusts [pin] for [url]'s origin, replacing an earlier pin. Returns the

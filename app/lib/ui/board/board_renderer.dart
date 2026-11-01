@@ -1,4 +1,5 @@
 // Shared board layout and interactions. Storage belongs to BoardSource.
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
@@ -15,6 +16,15 @@ class BoardCardDrag {
   final String cardId, fromColumnId;
 }
 
+/// Lets a host find the keyboard stop of a card on a board it draws, for
+/// example to give a card focus back when a panel it opened closes.
+class BoardFocusHandle {
+  _BoardRendererState? _state;
+
+  /// The focus node of the card [id], or null while the card is not drawn.
+  FocusNode? cardNode(String id) => _state?._stops[id];
+}
+
 class BoardRenderer extends StatefulWidget {
   const BoardRenderer({
     super.key,
@@ -26,11 +36,17 @@ class BoardRenderer extends StatefulWidget {
     this.inlinePageSize = 25,
     this.addCardLabel = 'New page',
     this.cardBuilder,
+    this.onCardMenu,
+    this.cardLabel,
     this.columnLabelBuilder,
     this.columnMenu,
     this.trailing,
+    this.focusHandle,
   });
   final BoardSource source;
+
+  /// Attached to this board for as long as it is drawn.
+  final BoardFocusHandle? focusHandle;
   final bool inline;
   final double gutter, columnWidth, columnGap;
   final int inlinePageSize;
@@ -41,6 +57,16 @@ class BoardRenderer extends StatefulWidget {
   /// may keep its existing pointer handling; descendant keyboard focus is
   /// excluded so the board provides one focus stop and one open callback.
   final BoardCardBuilder? cardBuilder;
+
+  /// Opens a card's menu from the keyboard: the context-menu key or Shift+F10
+  /// on a focused card. [anchor] is the card's rectangle; [focus] is the
+  /// card's focus node, which gets focus back when the menu closes.
+  final BoardCardMenuOpener? onCardMenu;
+
+  /// The accessible name of a card. With it, a card is one semantics node
+  /// (the board's focus stop) named by it; the card's body should leave its
+  /// own text out of semantics. Without it, the body's semantics stand.
+  final String Function(BoardCard card)? cardLabel;
   final BoardColumnLabelBuilder? columnLabelBuilder;
   final BoardColumnMenu? columnMenu;
   final Widget? trailing;
@@ -51,6 +77,147 @@ class BoardRenderer extends StatefulWidget {
 
 class _BoardRendererState extends State<BoardRenderer> {
   final _h = ScrollController();
+
+  /// The board is one Tab stop: only the card that last had focus (the first
+  /// card until one does) takes Tab. Arrow keys move between cards.
+  final _stops = <String, FocusNode>{};
+  String? _activeCard;
+
+  /// Each column's New card button, as the wrapper above its focus node.
+  final _adds = <String, FocusNode>{};
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusHandle?._state = this;
+  }
+
+  @override
+  void didUpdateWidget(BoardRenderer old) {
+    super.didUpdateWidget(old);
+    if (old.focusHandle != widget.focusHandle) {
+      if (old.focusHandle?._state == this) old.focusHandle!._state = null;
+      widget.focusHandle?._state = this;
+    }
+  }
+
+  void _show(FocusNode node) {
+    node.requestFocus();
+    final ctx = node.context;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 120),
+        alignment: 0.5,
+      );
+    }
+  }
+
+  /// The New card button of column [columnId] takes focus. False when the
+  /// button is not drawn.
+  bool _focusAdd(String columnId) {
+    final wrapper = _adds[columnId];
+    if (wrapper == null) return false;
+    for (final node in wrapper.descendants) {
+      if (node.canRequestFocus) {
+        _show(node);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// The last card of column [columnId] takes focus. False when the column
+  /// has no card with a focus stop.
+  bool _focusLastCard(String columnId) {
+    for (final card in widget.source.loadedCards(columnId).toList().reversed) {
+      final node = _stops[card.id];
+      if (node != null) {
+        _show(node);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _registerCard(String id, FocusNode node) {
+    _stops[id] = node;
+    node.skipTraversal = !_isTabStop(id);
+  }
+
+  void _unregisterCard(String id, FocusNode node) {
+    if (_stops[id] == node) _stops.remove(id);
+    if (_activeCard == id) _activeCard = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStops());
+  }
+
+  /// Called from a card's focus-change callback, while the focus manager is
+  /// still going through its changed nodes: the stop is moved afterwards,
+  /// because changing a node's traversal flag there would modify that set.
+  void _noteFocus(String id) {
+    _activeCard = id;
+    scheduleMicrotask(_refreshStops);
+  }
+
+  /// The card the board's Tab stop sits on.
+  String? _tabStopId() {
+    final active = _activeCard;
+    if (active != null && _stops.containsKey(active)) return active;
+    for (final column in widget.source.columns) {
+      for (final card in widget.source.loadedCards(column.id)) {
+        if (_stops.containsKey(card.id)) return card.id;
+      }
+    }
+    return null;
+  }
+
+  bool _isTabStop(String id) => _tabStopId() == id;
+
+  void _refreshStops() {
+    if (!mounted) return;
+    final stop = _tabStopId();
+    _stops.forEach((id, node) => node.skipTraversal = id != stop);
+  }
+
+  /// Moves focus from card [id] one card up, down, left or right: up and
+  /// down stay in the column, left and right go to the nearest column with
+  /// cards, keeping the row where the next column is long enough.
+  void _moveCardFocus(String id, TraversalDirection direction) {
+    final columns = widget.source.columns;
+    final lists = [
+      for (final c in columns)
+        [
+          for (final card in widget.source.loadedCards(c.id))
+            if (_stops.containsKey(card.id)) card.id,
+        ],
+    ];
+    final col = lists.indexWhere((l) => l.contains(id));
+    if (col < 0) return;
+    final row = lists[col].indexOf(id);
+    String? target;
+    switch (direction) {
+      case TraversalDirection.up:
+        if (row > 0) target = lists[col][row - 1];
+      case TraversalDirection.down:
+        if (row < lists[col].length - 1) {
+          target = lists[col][row + 1];
+        } else {
+          // Below the last card is the column's New card button.
+          _focusAdd(columns[col].id);
+          return;
+        }
+      case TraversalDirection.left || TraversalDirection.right:
+        final step = direction == TraversalDirection.left ? -1 : 1;
+        for (var i = col + step; i >= 0 && i < lists.length; i += step) {
+          if (lists[i].isNotEmpty) {
+            target = lists[i][math.min(row, lists[i].length - 1)];
+            break;
+          }
+        }
+    }
+    final node = target == null ? null : _stops[target];
+    if (node != null) _show(node);
+  }
 
   @override
   void dispose() {
@@ -132,7 +299,14 @@ class _BoardRendererState extends State<BoardRenderer> {
     if (lifted) return ExcludeFocus(child: body);
     return _BoardCardSurface(
       key: ValueKey('board-card-${card.id}'),
+      cardId: card.id,
+      board: this,
+      label: widget.cardLabel?.call(card),
       onOpen: () => widget.source.openCard(context, card),
+      onMenu: widget.onCardMenu == null
+          ? null
+          : (anchor, focus) =>
+                widget.onCardMenu!(context, column, card, anchor, focus),
       child: body,
     );
   }
@@ -141,6 +315,7 @@ class _BoardRendererState extends State<BoardRenderer> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.source,
     builder: (context, _) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStops());
       final columns = widget.source.columns;
       final cols = <Widget>[
         for (final column in columns)
@@ -190,14 +365,64 @@ class _BoardRendererState extends State<BoardRenderer> {
   );
 }
 
+/// Opens the menu of [card] under [anchor]; see [BoardRenderer.onCardMenu].
+typedef BoardCardMenuOpener =
+    void Function(
+      BuildContext context,
+      BoardColumn column,
+      BoardCard card,
+      Rect anchor,
+      FocusNode focus,
+    );
+
+/// Tells a card's body whether its card has keyboard focus, and which node
+/// it is. The body sits under the card's focus stop, so it cannot read the
+/// focus itself.
+class BoardCardFocus extends InheritedWidget {
+  const BoardCardFocus({
+    super.key,
+    required this.focused,
+    required this.node,
+    required super.child,
+  });
+
+  final bool focused;
+  final FocusNode node;
+
+  /// The card focus around [context], or null outside a card.
+  static BoardCardFocus? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<BoardCardFocus>();
+
+  @override
+  bool updateShouldNotify(BoardCardFocus old) =>
+      focused != old.focused || node != old.node;
+}
+
+class _CardMenuIntent extends Intent {
+  const _CardMenuIntent();
+}
+
+class _CardMoveIntent extends Intent {
+  const _CardMoveIntent(this.direction);
+  final TraversalDirection direction;
+}
+
 /// One keyboard stop for any card presentation, including interactive cards.
 class _BoardCardSurface extends StatefulWidget {
   const _BoardCardSurface({
     super.key,
+    required this.cardId,
+    required this.board,
+    required this.label,
     required this.onOpen,
+    required this.onMenu,
     required this.child,
   });
+  final String cardId;
+  final _BoardRendererState board;
+  final String? label;
   final VoidCallback onOpen;
+  final void Function(Rect anchor, FocusNode focus)? onMenu;
   final Widget child;
   @override
   State<_BoardCardSurface> createState() => _BoardCardSurfaceState();
@@ -206,19 +431,61 @@ class _BoardCardSurface extends StatefulWidget {
 class _BoardCardSurfaceState extends State<_BoardCardSurface> {
   final _focus = FocusNode();
   bool _highlight = false;
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.board._registerCard(widget.cardId, _focus);
+  }
+
   @override
   void dispose() {
+    widget.board._unregisterCard(widget.cardId, _focus);
     _focus.dispose();
     super.dispose();
   }
 
+  /// Opens the menu under the card as it is on screen now: the board may
+  /// scroll to a focused card, so the card is brought into view first and its
+  /// rectangle read after that frame.
+  void _openMenu() {
+    if (Scrollable.maybeOf(context) != null) {
+      Scrollable.ensureVisible(context, duration: Duration.zero);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = context.findRenderObject();
+      if (box is RenderBox && box.hasSize) {
+        widget.onMenu?.call(box.localToGlobal(Offset.zero) & box.size, _focus);
+      }
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
   @override
-  Widget build(BuildContext context) => FocusableActionDetector(
+  Widget build(BuildContext context) => _named(FocusableActionDetector(
     focusNode: _focus,
+    // A named card puts the focus flag and action on its own node.
+    includeFocusSemantics: widget.label == null,
     onShowFocusHighlight: (highlight) => setState(() => _highlight = highlight),
-    shortcuts: const {
-      SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-      SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+    shortcuts: {
+      const SingleActivator(LogicalKeyboardKey.enter): const ActivateIntent(),
+      const SingleActivator(LogicalKeyboardKey.space): const ActivateIntent(),
+      const SingleActivator(LogicalKeyboardKey.arrowUp): const _CardMoveIntent(
+        TraversalDirection.up,
+      ),
+      const SingleActivator(LogicalKeyboardKey.arrowDown):
+          const _CardMoveIntent(TraversalDirection.down),
+      const SingleActivator(LogicalKeyboardKey.arrowLeft):
+          const _CardMoveIntent(TraversalDirection.left),
+      const SingleActivator(LogicalKeyboardKey.arrowRight):
+          const _CardMoveIntent(TraversalDirection.right),
+      if (widget.onMenu != null) ...const {
+        SingleActivator(LogicalKeyboardKey.contextMenu): _CardMenuIntent(),
+        SingleActivator(LogicalKeyboardKey.f10, shift: true):
+            _CardMenuIntent(),
+      },
     },
     actions: {
       ActivateIntent: CallbackAction<ActivateIntent>(
@@ -227,6 +494,22 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
           return null;
         },
       ),
+      _CardMenuIntent: CallbackAction<_CardMenuIntent>(
+        onInvoke: (_) {
+          _openMenu();
+          return null;
+        },
+      ),
+      _CardMoveIntent: CallbackAction<_CardMoveIntent>(
+        onInvoke: (intent) {
+          widget.board._moveCardFocus(widget.cardId, intent.direction);
+          return null;
+        },
+      ),
+    },
+    onFocusChange: (focused) {
+      if (focused) widget.board._noteFocus(widget.cardId);
+      setState(() => _focused = focused);
     },
     child: CustomPaint(
       foregroundPainter: _highlight
@@ -234,11 +517,34 @@ class _BoardCardSurfaceState extends State<_BoardCardSurface> {
           : null,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: widget.label != null,
         onTap: widget.onOpen,
-        child: ExcludeFocus(child: widget.child),
+        child: BoardCardFocus(
+          focused: _focused,
+          node: _focus,
+          child: ExcludeFocus(child: widget.child),
+        ),
       ),
     ),
-  );
+  ));
+
+  /// With a label the card is one named semantics node: the focus stop's
+  /// focusable flag and the tap merge into it (they sit below it and are not
+  /// containers), while the card's own controls stay separate nodes.
+  Widget _named(Widget child) {
+    final label = widget.label;
+    if (label == null) return child;
+    return Semantics(
+      container: true,
+      button: true,
+      focusable: true,
+      focused: _focused,
+      label: label,
+      onTap: widget.onOpen,
+      onFocus: _focus.requestFocus,
+      child: child,
+    );
+  }
 }
 
 /// Same inset-independent focus outline used by the UI-kit Hover surface.
@@ -279,8 +585,24 @@ class _BoardColumnState extends State<_BoardColumn> {
   late int _limit = b.widget.inlinePageSize;
   final _v = ScrollController();
 
+  /// Wraps the New card button: Up there goes to the card above it, which
+  /// directional focus would skip (only the board's Tab stop is traversable).
+  final _addFocus = FocusNode(
+    debugLabel: 'board new card',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    b._adds[g.id] = _addFocus;
+  }
+
   @override
   void dispose() {
+    if (b._adds[g.id] == _addFocus) b._adds.remove(g.id);
+    _addFocus.dispose();
     _v.dispose();
     super.dispose();
   }
@@ -494,11 +816,20 @@ class _BoardColumnState extends State<_BoardColumn> {
             _BoardLoadMore(
               onTap: () => setState(() => _limit += b.widget.inlinePageSize),
             ),
-          _BoardAddButton(
-            key: ValueKey('board-new-$label'),
-            label: b.widget.addCardLabel,
-            onTap: () => source.addCard(context, g.id),
-            height: m ? 40 : 32,
+          Focus(
+            focusNode: _addFocus,
+            onKeyEvent: (_, event) =>
+                event is! KeyUpEvent &&
+                    event.logicalKey == LogicalKeyboardKey.arrowUp &&
+                    b._focusLastCard(g.id)
+                ? KeyEventResult.handled
+                : KeyEventResult.ignored,
+            child: _BoardAddButton(
+              key: ValueKey('board-new-$label'),
+              label: b.widget.addCardLabel,
+              onTap: () => source.addCard(context, g.id),
+              height: m ? 40 : 32,
+            ),
           ),
         ],
       ),

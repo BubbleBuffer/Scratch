@@ -23,9 +23,9 @@ use crate::types::{
 };
 
 /// An index of another version is rebuilt from the vault documents. Version
-/// 13 retains undated to-dos and task notes with NULL dates in the derived
-/// agenda cache. Rebuilding preserves the existing document representation.
-const SCHEMA_VERSION: i64 = 13;
+/// 14 excludes view settings JSON from searchable text. Rebuilding preserves
+/// the existing document representation.
+const SCHEMA_VERSION: i64 = 14;
 
 /// Broad queries exceed the larger of 200 documents or 5% of live pages.
 /// No letter-count rule: selectivity comes from this vault's indexed words.
@@ -702,6 +702,21 @@ impl Index {
             .prepare_cached("SELECT src FROM links WHERE dst = ?1 AND src != ?1")?;
         let v = st
             .query_map([id], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(v)
+    }
+
+    /// Every page whose properties hold `id` in an id-set value (a relation
+    /// or a multi-select). Callers check the value kind.
+    pub fn id_set_sources(&self, id: &str) -> Result<Vec<String>> {
+        let mut st = self.conn.prepare_cached(
+            "SELECT DISTINCT p.id FROM props r JOIN pages p ON p.rowid = r.page
+             WHERE r.t LIKE ?1 AND p.id != ?2",
+        )?;
+        // Page ids are plain alphanumerics, so they need no LIKE escaping.
+        let pat = format!("%{SEP}{id}{SEP}%");
+        let v = st
+            .query_map([pat, id.to_owned()], |r| r.get(0))?
             .collect::<rusqlite::Result<Vec<String>>>()?;
         Ok(v)
     }

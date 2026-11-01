@@ -41,9 +41,6 @@ class AppSettings extends ChangeNotifier {
 
   ThemePref theme = ThemePref.system;
 
-  /// Optional compiled-in add-ons disabled on this device, applied at boot.
-  Set<String> disabledAddons = {};
-
   /// The vault folder chosen in settings (null: the default in the data
   /// folder). Takes effect at the next start.
   String? vaultPath;
@@ -63,6 +60,26 @@ class AppSettings extends ChangeNotifier {
 
   /// Phones: a shake opens the feedback sheet. Device-local, on by default.
   bool shakeToSend = true;
+
+  /// Phones: a notice when a delegated run finishes or fails (see
+  /// features/ai/run_notices.dart). Device-local, on by default.
+  bool runNotices = true;
+
+  /// Run notices already handled, task id to the state that was noticed. Null
+  /// until the first look at the task rows, which only records them. Kept so
+  /// a restart never repeats a notice.
+  Map<String, String>? runNoticesSeen;
+
+  /// When that first look happened (epoch ms). Rows last changed before it
+  /// never get a notice.
+  int? runNoticesSince;
+
+  /// Windows updates: also offer nightly builds. Off by default.
+  bool updatesIncludeNightly = false;
+
+  /// Windows updates: download a new version in the background (it is only
+  /// installed on the user's click). On by default.
+  bool updatesAutoDownload = true;
 
   String hubAddress = defaultHubAddress;
 
@@ -113,8 +130,9 @@ class AppSettings extends ChangeNotifier {
     return s;
   }
 
+  /// Every add-on is always on, so a legacy `disabledAddons` key is not read,
+  /// and [toJson] leaves it out: the next save drops it from the file.
   void _fromJson(Map<String, dynamic> j) {
-    disabledAddons = (j['disabledAddons'] as List?)?.whereType<String>().toSet() ?? {};
     theme = ThemePref.values.firstWhere(
       (t) => t.name == j['theme'],
       orElse: () => ThemePref.system,
@@ -124,6 +142,17 @@ class AppSettings extends ChangeNotifier {
     scheduleRunsHere = (j['scheduleRunsHere'] as bool?) ?? false;
     hubUsesThisComputer = (j['hubUsesThisComputer'] as bool?) ?? false;
     shakeToSend = (j['shakeToSend'] as bool?) ?? true;
+    runNotices = (j['runNotices'] as bool?) ?? true;
+    runNoticesSince = j['runNoticesSince'] as int?;
+    if (j['runNoticesSeen'] case final Map seen) {
+      runNoticesSeen = {
+        for (final e in seen.entries)
+          if (e.key is String && e.value is String)
+            e.key as String: e.value as String,
+      };
+    }
+    updatesIncludeNightly = (j['updatesIncludeNightly'] as bool?) ?? false;
+    updatesAutoDownload = (j['updatesAutoDownload'] as bool?) ?? true;
     hubAddress = (j['hubAddress'] as String?) ?? defaultHubAddress;
     clientUrl = j['clientUrl'] as String?;
     clientToken = j['clientToken'] as String?;
@@ -158,13 +187,17 @@ class AppSettings extends ChangeNotifier {
   }
 
   Map<String, dynamic> toJson() => {
-    if (disabledAddons.isNotEmpty) 'disabledAddons': disabledAddons.toList()..sort(),
     'theme': theme.name,
     'vaultPath': ?vaultPath,
     'hubEnabled': ?_hubEnabled,
     'scheduleRunsHere': scheduleRunsHere,
     'hubUsesThisComputer': hubUsesThisComputer,
     'shakeToSend': shakeToSend,
+    'runNotices': runNotices,
+    'runNoticesSeen': ?runNoticesSeen,
+    'runNoticesSince': ?runNoticesSince,
+    'updatesIncludeNightly': updatesIncludeNightly,
+    'updatesAutoDownload': updatesAutoDownload,
     'hubAddress': hubAddress,
     'clientUrl': ?clientUrl,
     'clientToken': ?clientToken,

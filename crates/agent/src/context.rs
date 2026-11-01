@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use bubblepaw_core::{
-    Approval, Role, Session, Store, Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult,
-};
+use bubblepaw_sdk::approvals::Approval;
+use bubblepaw_sdk::store::{Role, Session, Store};
+use bubblepaw_sdk::tools::{Tool, ToolContext, ToolDefinition, ToolRegistry, ToolResult};
 use notes_agent_wire::MessageContext;
 use serde_json::{json, Value};
 

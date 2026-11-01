@@ -18,7 +18,7 @@ use axum::http::{header, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::{ClientInfo, ToolDefinition};
+use vault_agent::bubblepaw_sdk::{harness::ClientInfo, tools::ToolDefinition};
 use vault_agent::wire::notes_agent_wire::host as relay;
 
 use crate::agent::Shared;

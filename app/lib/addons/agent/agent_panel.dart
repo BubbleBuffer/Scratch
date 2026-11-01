@@ -11,6 +11,7 @@ import '../../state/pages_store.dart';
 import '../../state/ui_state.dart';
 import '../../ui/ui.dart';
 import 'agent_screen.dart';
+import 'scratch_chat_pane.dart';
 import 'agent_store.dart';
 
 /// One dock outside page routes. A presentation navigator supplies the shared
@@ -172,7 +173,9 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
         }
         return CallbackShortcuts(
           bindings: {
-            const SingleActivator(LogicalKeyboardKey.keyJ, control: true): () =>
+            platformActivator(
+              const SingleActivator(LogicalKeyboardKey.keyJ, control: true),
+            ): () =>
                 unawaited(toggleAgentPanel(context)),
           },
           child: Navigator(
@@ -221,7 +224,7 @@ class AgentPanelToggle extends StatelessWidget {
       builder: (context, _) => IconBtn(
         Ico.comment,
         key: const ValueKey('agent-panel-toggle'),
-        semanticLabel: 'Toggle agent panel (Ctrl+J)',
+        semanticLabel: 'Toggle agent panel (${shortcutHint('Ctrl+J')})',
         tooltip: 'Toggle agent panel',
         command: 'agent.open',
         selected: app.ui.agentPanelOpen,
@@ -351,7 +354,7 @@ class AgentPanel extends StatelessWidget {
                     ),
                   ),
                 ),
-                Expanded(child: AgentChat(store: store, panel: true)),
+                Expanded(child: ScratchChatPane(store: store, panel: true)),
               ],
             ),
           ),

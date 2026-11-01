@@ -18,11 +18,11 @@ import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/features/reminders/backends.dart';
 import 'package:notes_app/features/settings/settings_store.dart';
 import 'package:notes_app/shell/app_shell.dart';
-import 'package:notes_app/shell/search.dart';
 import 'package:notes_app/state/app_state.dart';
 import 'package:notes_app/ui/ui.dart';
 
 import 'harness.dart' show finishAsync, initCore, loadFonts, resetTestClock;
+import 'search_hits_fixture.dart' show shownHits;
 
 const _pages = 10000;
 const _query = 'apple';
@@ -198,10 +198,7 @@ Future<List<double>> _typeQuery(
       if (mentions) {
         expect(_key('mention-page-${probe.last.first.id}'), findsOneWidget);
       } else {
-        final first = tester
-            .widgetList<SearchResultRow>(find.byType(SearchResultRow))
-            .first;
-        expect(first.hit.id, probe.last.first.id);
+        expect(shownHits(tester).first.id, probe.last.first.id);
       }
       if (round >= 0) samples.add(watch.elapsedMicroseconds / 1000);
     }
@@ -252,7 +249,7 @@ void main() {
       // ignore: avoid_print
       print('search perf: query controls cached');
       final measured = vault = _SearchVault(raw, cached);
-      expect(await tester.runAsync(measured.pageCount), _pages);
+      expect(await tester.runAsync(measured.pageCount), _pages + 1);
       // Construct the stores in the real zone as well: ReminderStore's
       // initial Future.value must complete while runAsync awaits start.
       final state = (await tester.runAsync(() async {

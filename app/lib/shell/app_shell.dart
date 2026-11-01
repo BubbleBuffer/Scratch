@@ -1,7 +1,9 @@
 // The app shell: WidgetsApp (no Material), the theme from the tokens
 // (following the system brightness unless forced), the form factor from the
-// window width, and the registered commands' keyboard shortcuts.
+// window width, the same tokens for the kit's widgets, and the registered
+// commands' keyboard shortcuts.
 
+import 'package:agent_kit/agent_kit.dart' show BbThemeScope;
 import 'package:flutter/widgets.dart';
 
 import '../feedback/feedback_host.dart';
@@ -77,16 +79,22 @@ class _NotesShellState extends State<NotesShell> {
                   child: CallbackShortcuts(
                     bindings: {
                       for (final c in commandRegistry.all)
-                        for (final s in c.shortcuts)
+                        for (final s in c.boundShortcuts)
                           s: () {
                             final ctx = navKey.currentContext;
                             if (ctx != null) commandRegistry.run(c.id, ctx);
                           },
                     },
-                    child: FeedbackHost(
-                      navigatorKey: navKey,
-                      child: AddonPanelShell(
-                        child: PageStackChrome(child: child!),
+                    // The kit's widgets (the chat outline) and their sheets
+                    // read the same tokens through this scope.
+                    child: BbThemeScope(
+                      brightness: dark ? Brightness.dark : Brightness.light,
+                      formFactor: form,
+                      child: FeedbackHost(
+                        navigatorKey: navKey,
+                        child: AddonPanelShell(
+                          child: PageStackChrome(child: child!),
+                        ),
                       ),
                     ),
                   ),

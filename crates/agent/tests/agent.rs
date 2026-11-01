@@ -7,14 +7,15 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::{
-    Approval, EventKind, Tool, ToolCall, ToolContext, ToolDefinition, ToolResult,
-};
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::approvals::Approval;
+use vault_agent::bubblepaw_sdk::events::EventKind;
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
+use vault_agent::bubblepaw_sdk::tools::{Tool, ToolCall, ToolContext, ToolDefinition, ToolResult};
 use vault_agent::{
-    tasks::session_title, Agent, AgentConfig, Forwarded, PermissionMode, Sent, TestHooks,
+    tasks::{limit_error, session_title, TaskRun, RUN_LIMIT},
+    Agent, AgentConfig, Forwarded, PermissionMode, Sent, TestHooks,
 };
-use vault_core::Vault;
+use vault_core::{PropValue, Vault};
 use vault_mcp::tasks;
 
 struct Temp {
@@ -64,9 +65,10 @@ fn open_with(
         AgentConfig {
             data_dir: t.data.clone(),
             default_model: "scripted/scripted".into(),
-            // An explicit missing override keeps these scripted tests independent
-            // of Claude/Bun installations discovered on the developer machine.
-            bun_path: Some(t.data.join("missing-test-bun")),
+            // An explicit missing extension folder disables Claude Code, keeping these
+            // scripted tests independent of Claude/Bun on the developer machine. A missing
+            // bun override only falls back to PATH, so it cannot do this.
+            claude_code_dir: Some(t.data.join("missing-test-claude-code")),
             permission_mode: PermissionMode::Manual,
             test: TestHooks {
                 scripted: Some((steps, "All done.".into())),
@@ -338,6 +340,8 @@ fn ai_task_runs_in_its_own_session_and_writes_back() {
     let t = temp();
     let v = &t.vault;
     let page = v.create_page(None, "Trip".into()).unwrap();
+    // The prompt quotes the page id, a random ULID that can contain "MCP".
+    let page_id = page.clone();
     v.insert_markdown(page.clone(), None, None, true, "Day one".into())
         .unwrap();
     let task = tasks::create(v, "Plan day two", &page, None, vault_agent::tasks::RUNNER).unwrap();
@@ -359,7 +363,7 @@ fn ai_task_runs_in_its_own_session_and_writes_back() {
 
     let session = agent.session_state(&run.session_id).unwrap();
     assert_eq!(session.session.title, "AI task: Plan day two");
-    let prompt = &session.messages[0].content;
+    let prompt = session.messages[0].content.replace(&page_id, "");
     assert!(
         prompt.contains("tools.$search") && !prompt.contains("MCP"),
         "{prompt}"
@@ -479,7 +483,8 @@ fn test_confirm_tool_exists_only_with_its_flag_and_reports_a_denial() {
 #[test]
 fn ai_task_runs_never_wait_for_approval() {
     // The app's permission mode is Manual, yet an AI task (Ask AI on this
-    // device) runs like a hub job: nobody is there to approve.
+    // device) cannot wait for approval. This task has
+    // no project, so its Confirm tool is denied outright and the run completes.
     let t = temp();
     let v = &t.vault;
     let page = v.create_page(None, "Approvals".into()).unwrap();
@@ -491,13 +496,262 @@ fn ai_task_runs_never_wait_for_approval() {
         vec![],
         true,
     );
-    let run = agent.run_task(v, &task.id).unwrap();
+    // Bounded: a regression that asks for approval fails here instead of hanging.
+    let run = agent
+        .run_task_with_limit(v, &task.id, Duration::from_secs(30))
+        .unwrap();
     assert!(run.ok, "{run:?}");
     assert_eq!(run.text, "All done.");
     let state = agent.session_state(&run.session_id).unwrap();
-    assert!(
-        state.messages.iter().any(|m| m.content.contains("confirmed: go")),
-        "{:?}",
-        state.messages
+    assert!(state.pending_approvals.is_empty());
+    let transcript: String = state.messages.iter().map(|m| m.content.as_str()).collect();
+    assert!(!transcript.contains("confirmed: go"), "{transcript}");
+    assert!(transcript.contains("Denied by the user"), "{transcript}");
+}
+
+/// Signals `started` when invoked, then waits for the run's cancel (or 60 s).
+/// Lets a task test know the engine is inside a run before it cancels.
+struct HoldTool {
+    started: mpsc::Sender<()>,
+}
+
+#[async_trait]
+impl Tool for HoldTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "test_hold".into(),
+            description: "Test tool: signals it started, then waits to be cancelled.".into(),
+            input_schema: json!({"type": "object", "properties": {}}),
+            read_only: true,
+            approval: Approval::None,
+        }
+    }
+
+    async fn invoke(&self, context: ToolContext, _input: Value) -> anyhow::Result<ToolResult> {
+        let _ = self.started.send(());
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(60)) => Ok(ToolResult::text("held")),
+            _ = context.cancellation.cancelled() => anyhow::bail!("cancelled"),
+        }
+    }
+}
+
+const HOLD_JS: &str = r#"return await tools.test_hold({});"#;
+
+/// The session id the task row names in its `session` property, if saved.
+fn session_of(v: &Vault, task: &str) -> Option<String> {
+    let page = v.load_page(task.to_string()).ok()?;
+    page.properties
+        .iter()
+        .find(|p| p.key == "session")
+        .and_then(|p| match &p.value {
+            PropValue::Text(s) => Some(s.clone()),
+            _ => None,
+        })
+}
+
+/// Runs a claimed task that holds in its tool, cancels it with `cancel` once
+/// the engine is inside the tool, and returns the run, the session and the
+/// time from the cancel to the run's return.
+fn run_then_cancel(
+    t: &Temp,
+    cancel: impl FnOnce(&Vault, &str),
+) -> (Arc<Agent>, tasks::Task, TaskRun, Duration) {
+    let v = t.vault.clone();
+    let page = v.create_page(None, "Hold".into()).unwrap();
+    let task = tasks::create(&v, "Hold on", &page, None, vault_agent::tasks::RUNNER).unwrap();
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    let (started, reached) = mpsc::channel();
+    let agent = Arc::new(open(
+        t,
+        vec![js(HOLD_JS)],
+        vec![Arc::new(HoldTool { started })],
+    ));
+    let worker = {
+        let (agent, v, id) = (agent.clone(), v.clone(), task.id.clone());
+        std::thread::spawn(move || agent.run_task(&v, &id))
+    };
+    reached
+        .recv_timeout(Duration::from_secs(60))
+        .expect("the run reached the tool");
+    cancel(&*v, &task.id);
+    let cancelled_at = Instant::now();
+    let run = worker.join().unwrap().unwrap();
+    let elapsed = cancelled_at.elapsed();
+    let task = tasks::get(&v, &task.id).unwrap();
+    (agent, task, run, elapsed)
+}
+
+#[test]
+fn ai_task_cancel_stops_the_engine_and_the_row_stays_cancelled() {
+    let t = temp();
+    let v = t.vault.clone();
+    let (started, reached) = mpsc::channel();
+    let page = v.create_page(None, "Cancel".into()).unwrap();
+    let task = tasks::create(&v, "Hold on", &page, None, vault_agent::tasks::RUNNER).unwrap();
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    let agent = Arc::new(open(
+        &t,
+        vec![js(HOLD_JS)],
+        vec![Arc::new(HoldTool { started })],
+    ));
+    let worker = {
+        let (agent, v, id) = (agent.clone(), v.clone(), task.id.clone());
+        std::thread::spawn(move || agent.run_task(&v, &id))
+    };
+    reached
+        .recv_timeout(Duration::from_secs(60))
+        .expect("the run reached the tool");
+
+    // The session is saved on the row while the run is in flight.
+    let session = session_of(&v, &task.id).expect("session saved while running");
+    assert_eq!(tasks::get(&v, &task.id).unwrap().status, tasks::RUNNING);
+
+    let cancelled_at = Instant::now();
+    assert!(tasks::cancel(&v, &task.id).unwrap());
+    let run = worker.join().unwrap().unwrap();
+    // The engine stopped at the cancel: the hold would have run for a minute.
+    assert!(cancelled_at.elapsed() < Duration::from_secs(30));
+    assert_eq!(run.session_id, session);
+    assert!(!run.ok, "{run:?}");
+    let state = agent.session_state(&session).unwrap();
+    assert_eq!(state.runs.last().expect("a run").status, "cancelled");
+    // The runner acknowledged the cancel, and the attempt keeps its record.
+    assert_eq!(tasks::get(&v, &task.id).unwrap().status, tasks::CANCELLED);
+    let record = &vault_mcp::tasks::attempts::list(&v, &task.id).unwrap()[0];
+    assert_eq!(record.session, session);
+    assert!(record.brief.contains("Hold on"), "{}", record.brief);
+    assert_eq!(record.outcome.as_deref(), Some("cancelled"));
+    let kinds: Vec<&str> = record.events.iter().map(|e| e.kind.as_str()).collect();
+    assert!(kinds.contains(&"started"), "{kinds:?}");
+    assert!(kinds.contains(&"cancel_requested"), "{kinds:?}");
+    assert!(kinds.contains(&"cancel_acknowledged"), "{kinds:?}");
+}
+
+#[test]
+fn ai_task_cancelled_by_sync_stops_the_engine() {
+    let t = temp();
+    let (agent, task, run, elapsed) = run_then_cancel(&t, |v, id| {
+        let other = Vault::open(
+            t._dir
+                .path()
+                .join("other-vault")
+                .to_string_lossy()
+                .into_owned(),
+        )
+        .unwrap();
+        for page in v.page_versions().unwrap() {
+            other
+                .import_updates(
+                    page.page.clone(),
+                    v.export_updates(page.page, vec![]).unwrap(),
+                )
+                .unwrap();
+        }
+        assert!(tasks::cancel(&other, id).unwrap());
+        v.import_updates(
+            id.to_string(),
+            other.export_updates(id.to_string(), vec![]).unwrap(),
+        )
+        .unwrap();
+    });
+    assert!(elapsed < Duration::from_secs(30), "{elapsed:?}");
+    assert!(!run.ok, "{run:?}");
+    assert_eq!(task.status, tasks::CANCELLED);
+    let state = agent.session_state(&run.session_id).unwrap();
+    assert_eq!(state.runs.last().expect("a run").status, "cancelled");
+}
+
+#[test]
+fn ai_task_cancelled_before_it_starts_never_starts_the_engine() {
+    let t = temp();
+    let v = t.vault.clone();
+    let page = v.create_page(None, "Early".into()).unwrap();
+    let task = tasks::create(&v, "Too late", &page, None, vault_agent::tasks::RUNNER).unwrap();
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    assert!(tasks::cancel(&v, &task.id).unwrap());
+    let agent = open(&t, vec![], vec![]);
+    assert!(agent.run_task(&v, &task.id).is_err());
+    assert_eq!(session_of(&v, &task.id), None);
+    assert_eq!(tasks::get(&v, &task.id).unwrap().status, tasks::CANCELLED);
+}
+
+#[test]
+fn ai_task_pinned_elsewhere_is_never_run_here() {
+    let t = temp();
+    let v = t.vault.clone();
+    let page = v.create_page(None, "Pinned".into()).unwrap();
+    let task = tasks::create_on(
+        &v,
+        "Elsewhere",
+        &page,
+        None,
+        vault_agent::tasks::RUNNER,
+        "another-device",
+    )
+    .unwrap();
+    let agent = open(&t, vec![], vec![]);
+    assert!(agent.run_task(&v, &task.id).is_err());
+    assert_eq!(session_of(&v, &task.id), None);
+    assert_eq!(tasks::get(&v, &task.id).unwrap().status, tasks::QUEUED);
+}
+
+#[test]
+fn ai_task_past_the_limit_is_cancelled_and_fails() {
+    assert_eq!(RUN_LIMIT, Duration::from_secs(60 * 60));
+    assert_eq!(
+        limit_error(RUN_LIMIT),
+        "the run passed the 1 h limit and was stopped"
     );
+
+    let t = temp();
+    let v = t.vault.clone();
+    let page = v.create_page(None, "Limit".into()).unwrap();
+    let task = tasks::create(&v, "Hold too long", &page, None, vault_agent::tasks::RUNNER).unwrap();
+    tasks::claim_next(&v, &v.device_id()).unwrap().unwrap();
+    let (started, _reached) = mpsc::channel();
+    let agent = open(&t, vec![js(HOLD_JS)], vec![Arc::new(HoldTool { started })]);
+    let limit = Duration::from_millis(1500);
+    let begun = Instant::now();
+    let run = agent.run_task_with_limit(&v, &task.id, limit).unwrap();
+    assert!(
+        begun.elapsed() < Duration::from_secs(30),
+        "{:?}",
+        begun.elapsed()
+    );
+    assert!(!run.ok, "{run:?}");
+    assert_eq!(run.text, limit_error(limit));
+
+    let row = tasks::get(&v, &task.id).unwrap();
+    assert_eq!(row.status, tasks::FAILED);
+    assert_eq!(row.error, limit_error(limit));
+    assert_eq!(
+        session_of(&v, &task.id).as_deref(),
+        Some(run.session_id.as_str())
+    );
+    let state = agent.session_state(&run.session_id).unwrap();
+    assert_eq!(state.runs.last().expect("a run").status, "cancelled");
+}
+
+#[test]
+fn an_invalid_bun_override_is_ignored_and_reported() {
+    let t = temp();
+    let missing = t.data.join("missing-bun");
+    let agent = Agent::open(
+        t.vault.clone(),
+        AgentConfig {
+            data_dir: t.data.clone(),
+            bun_path: Some(missing.clone()),
+            claude_code_dir: Some(t.data.join("missing-test-claude-code")),
+            ..AgentConfig::default()
+        },
+    )
+    .unwrap();
+    let detected = agent.claude_detection();
+    assert_eq!(detected.ignored_bun_override, Some(missing.clone()));
+    // Whatever PATH or ~/.bun/bin holds on this machine, the ignored file is never used.
+    assert!(detected
+        .bun_path
+        .iter()
+        .all(|path| path.is_file() && *path != missing));
 }

@@ -1,4 +1,4 @@
-//! `Vault`: the public entry point. See `wiki/architecture/core-state.md` for
+//! `Vault`: the public entry point. See `wiki/core/core-state.md` for
 //! the storage design (update logs, background writer, index).
 //!
 //! The API is split over several files, each an `impl Vault` block:
@@ -3248,6 +3248,15 @@ impl Vault {
     /// The page with its blocks, properties and details. Pages in the trash
     /// load too (`in_trash` is set).
     pub fn load_page(&self, id: PageId) -> Result<Page> {
+        if self.inner.read(&id, |doc| doc.needs_view_block_upgrade())? {
+            let changed = self.inner.edit(&id, |doc| doc.upgrade_view_blocks())?;
+            if changed {
+                let db = lock(&self.inner.db);
+                self.inner.sync_meta(&db, &id)?;
+                drop(db);
+                self.inner.emit([Change::TreeChanged]);
+            }
+        }
         let in_trash = lock(&self.inner.db).in_trash(&id)?.unwrap_or(false);
         let slot = self.inner.slot(&id)?;
         let mut st = lock(&slot.state);
@@ -3305,6 +3314,24 @@ impl Vault {
             return Ok(());
         }
         self.inner.edit(&id, |doc| doc.apply(&ops))
+    }
+
+    /// Applies a reconciliation only if the block tree still matches the
+    /// snapshot used to plan it. The comparison shares the edit lock with
+    /// the write, so a concurrent user edit cannot be overwritten or deleted
+    /// by operations planned against an older tree.
+    pub fn apply_if_blocks_match(
+        &self,
+        id: PageId,
+        expected: &[Block],
+        ops: Vec<BlockOp>,
+    ) -> Result<()> {
+        self.inner.edit(&id, |doc| {
+            if doc.blocks().as_slice() != expected {
+                return Err(invalid("the page blocks changed during reconciliation"));
+            }
+            doc.apply(&ops)
+        })
     }
 
     /// Waits until every change so far is written to the Loro snapshots,

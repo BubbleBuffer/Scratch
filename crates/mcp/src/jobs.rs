@@ -3,9 +3,10 @@
 //! job note: properties hold the state, the node, the owner, the tool set and
 //! the session; the body holds the result.
 //!
-//! A job row has `node` set (only `hub` for now) and no target page. Desktops
-//! never claim it ([`crate::tasks::claim_next`] skips rows with a node). Only
-//! the node's jobs API changes a job's state; this module is its storage.
+//! A job row has `node` = [`NODE_HUB`], the only node that runs jobs; a row
+//! pinned to a desktop is a task, never a job. Desktops never claim a job
+//! ([`crate::tasks::claim_next`] skips hub rows). Only the node's jobs API
+//! changes a job's state; this module is its storage.
 //!
 //! A job may be about a page ("Ask AI" or a task assigned to the agent, sent
 //! by a device): it then has a target page and a placeholder there, like a
@@ -20,7 +21,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use vault_core::{PageId, PageSummary, PropValue, Sort, Vault};
 
-use crate::tasks::{self, text, CANCELLED, DONE, FAILED, INTERRUPTED, QUEUED, RUNNING};
+use crate::tasks::{self, attempts, text, CANCELLED, DONE, FAILED, INTERRUPTED, QUEUED, RUNNING};
 use crate::{err, Result};
 
 /// The node value of jobs the hub runs.
@@ -46,6 +47,10 @@ pub struct Job {
     pub session: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub error: String,
+    /// A cancel was asked for and the runner has not stopped the run yet:
+    /// the job is still `running`.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub cancel_requested: bool,
     /// The page the job is about, whose placeholder gets its result.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<PageId>,
@@ -86,7 +91,7 @@ pub fn now_ms() -> i64 {
 
 fn api_status(stored: &str) -> String {
     match stored {
-        DONE => COMPLETED.to_string(),
+        DONE | tasks::REVIEW => COMPLETED.to_string(),
         s => s.to_string(),
     }
 }
@@ -98,6 +103,7 @@ fn job_of(v: &Vault, row: &PageSummary, with_result: bool) -> Job {
         .then(|| v.load_page(row.id.clone()).ok())
         .flatten()
         .map(|page| v.blocks_markdown(page.blocks).trim().to_string());
+    let cancel_requested = status == RUNNING && !text(p, attempts::CANCEL_REQUESTED).is_empty();
     Job {
         id: row.id.clone(),
         prompt: text(p, "prompt"),
@@ -107,6 +113,7 @@ fn job_of(v: &Vault, row: &PageSummary, with_result: bool) -> Job {
         tools: text(p, "tools"),
         session: text(p, "session"),
         error: text(p, "error"),
+        cancel_requested,
         page: p
             .iter()
             .find(|x| x.key == "page")
@@ -147,16 +154,21 @@ fn summary(v: &Vault, id: &str) -> Result<Option<PageSummary>> {
     }))
 }
 
-/// Creates a queued job for `node`, owned by `owner`, with tool set `tools`.
+/// Creates a queued job for `node` (only [`NODE_HUB`] runs jobs), owned by
+/// `owner`, with tool set `tools`.
 pub fn create(v: &Vault, prompt: &str, owner: &str, tools: &str, node: &str) -> Result<Job> {
     let prompt = prompt.trim();
     if prompt.is_empty() {
         return err("the job needs a prompt");
     }
+    if node != NODE_HUB {
+        return err("a job runs on the hub");
+    }
     let coll = tasks::ensure_collection(v)?;
     let row = v.create_page(Some(coll), tasks::first_line(prompt, 60))?;
-    v.set_property(row.clone(), "prompt".into(), PropValue::Text(prompt.into()))?;
+    // The node before the status, as in [`tasks::create_on`].
     v.set_property(row.clone(), "node".into(), PropValue::Text(node.into()))?;
+    v.set_property(row.clone(), "prompt".into(), PropValue::Text(prompt.into()))?;
     v.set_property(row.clone(), "owner".into(), PropValue::Text(owner.into()))?;
     v.set_property(row.clone(), "tools".into(), PropValue::Text(tools.into()))?;
     v.set_property(
@@ -182,10 +194,14 @@ pub fn create_for_page(
     page: &PageId,
     after: Option<&str>,
 ) -> Result<Job> {
-    let task = tasks::create_on(v, prompt, page, after, "", node)?;
+    if node != NODE_HUB {
+        return err("a job runs on the hub");
+    }
+    // The owner and tools are set before the row is queued: the hub may
+    // start a queued job at once.
+    let extra = [("owner", owner), ("tools", tools)];
+    let task = tasks::create_on_with(v, prompt, page, after, "", node, &extra)?;
     let row = task.id;
-    v.set_property(row.clone(), "owner".into(), PropValue::Text(owner.into()))?;
-    v.set_property(row.clone(), "tools".into(), PropValue::Text(tools.into()))?;
     match get(v, &row)? {
         Some(job) => Ok(job),
         None => err("the job was not saved"),
@@ -209,14 +225,15 @@ fn placeholder(v: &Vault, id: &str, status: &str) -> Result<()> {
 }
 
 /// The job with row id `id`, with its result; None when there is no such
-/// job (another row, a trashed row, or no row).
+/// job (another row, a trashed row, no row, or a desktop task row).
 pub fn get(v: &Vault, id: &str) -> Result<Option<Job>> {
     Ok(summary(v, id)?
         .map(|row| job_of(v, &row, true))
-        .filter(|j| !j.node.is_empty()))
+        .filter(|j| j.node == NODE_HUB))
 }
 
-/// Every job (rows with a node), newest first, without results.
+/// Every job (hub rows), newest first, without results. Desktop task rows
+/// are not jobs.
 pub fn all(v: &Vault) -> Result<Vec<Job>> {
     let Some(c) = tasks::collection(v)? else {
         return Ok(Vec::new());
@@ -233,7 +250,7 @@ pub fn all(v: &Vault) -> Result<Vec<Job>> {
         out.extend(
             rows.iter()
                 .map(|r| job_of(v, r, false))
-                .filter(|j| !j.node.is_empty()),
+                .filter(|j| j.node == NODE_HUB),
         );
         if n < 500 {
             break;
@@ -250,18 +267,79 @@ pub fn mark_running(v: &Vault, id: &str, session: &str) -> Result<()> {
         "session".into(),
         PropValue::Text(session.into()),
     )?;
-    v.set_property(id.to_string(), "device".into(), PropValue::Text(NODE_HUB.into()))?;
+    v.set_property(
+        id.to_string(),
+        "device".into(),
+        PropValue::Text(NODE_HUB.into()),
+    )?;
     v.set_property(
         id.to_string(),
         "status".into(),
         PropValue::Select(RUNNING.into()),
     )?;
+    // The job's attempt record (a hub job is run once; a retry is a new job).
+    let t = tasks::get(v, id)?;
+    let owner = v
+        .load_page(id.to_string())
+        .map(|p| text(&p.properties, "owner"))
+        .unwrap_or_default();
+    attempts::begin(v, &t, &owner)?;
     placeholder(v, id, RUNNING)
 }
 
+/// Records a cancel command on a running job. The job stays `running`
+/// until its run stops and [`finish`] acknowledges with
+/// [`End::Cancelled`]. Returns false for a job that is not running.
+pub fn request_cancel(v: &Vault, id: &str) -> Result<bool> {
+    let t = tasks::get(v, id)?;
+    if t.status != RUNNING {
+        return Ok(false);
+    }
+    tasks::request_cancel(v, &t)?;
+    Ok(true)
+}
+
 /// Ends a job: the result goes into the row's body, an error into `error`.
+///
+/// A job whose cancel was asked for ends as `cancelled` whatever the run
+/// returned (the cancel is acknowledged; a result that came anyway is kept
+/// in the attempt's history). A job that already ended is not changed; the
+/// outcome goes to its history as a late result.
 pub fn finish(v: &Vault, id: &str, end: End) -> Result<()> {
     let id = id.to_string();
+    let t = tasks::get(v, &id)?;
+    let kept = match &end {
+        End::Completed(md) => Some(md.clone()),
+        End::Failed(msg) => Some(msg.clone()),
+        _ => None,
+    };
+    let outcome_of = |end: &End| match end {
+        End::Completed(_) => DONE,
+        End::Failed(_) => FAILED,
+        End::Cancelled => CANCELLED,
+        End::Interrupted => INTERRUPTED,
+    };
+    if t.status != QUEUED && t.status != RUNNING {
+        let _ = attempts::close(v, &id, None, outcome_of(&end), kept.as_deref(), true);
+        return Ok(());
+    }
+    let acknowledged = t.status == RUNNING && t.cancel_requested_ms.is_some();
+    let had_result = matches!(end, End::Completed(_));
+    let end = if acknowledged { End::Cancelled } else { end };
+    let outcome = outcome_of(&end);
+    let _ = attempts::close(v, &id, None, outcome, kept.as_deref(), false);
+    if acknowledged {
+        if had_result {
+            let _ = attempts::event(
+                v,
+                &id,
+                None,
+                attempts::kind::LATE_RESULT,
+                "a result came after the cancel and was kept in history",
+            );
+        }
+        let _ = attempts::event(v, &id, None, attempts::kind::CANCEL_ACKNOWLEDGED, "");
+    }
     let status = match &end {
         End::Completed(md) => {
             let md = md.trim();
@@ -275,7 +353,16 @@ pub fn finish(v: &Vault, id: &str, end: End) -> Result<()> {
             // A job about a page answers into it, like a desktop AI task.
             let t = tasks::get(v, &id)?;
             tasks::write_result(v, &t, md)?;
-            DONE
+            // A job started from a card waits for the user's acceptance.
+            if v.load_page(id.clone())?
+                .properties
+                .iter()
+                .any(|p| p.key == "review" && p.value != PropValue::Text(String::new()))
+            {
+                tasks::REVIEW
+            } else {
+                DONE
+            }
         }
         End::Failed(msg) => {
             let msg = if msg.trim().is_empty() {
@@ -306,7 +393,7 @@ pub fn finish(v: &Vault, id: &str, end: End) -> Result<()> {
         "status".into(),
         PropValue::Select(status.into()),
     )?;
-    if status != DONE {
+    if status != DONE && status != tasks::REVIEW {
         placeholder(v, &id, status)?;
     }
     Ok(())
@@ -326,16 +413,20 @@ pub fn recover(v: &Vault, node: &str) -> Result<u32> {
     Ok(n)
 }
 
-/// Moves `node`'s jobs that ended more than `keep_ms` before `now` to the
-/// trash. Returns how many.
-pub fn sweep(v: &Vault, node: &str, keep_ms: i64, now: i64) -> Result<u32> {
-    let mut n = 0;
-    for job in all(v)?.into_iter().filter(|j| j.node == node && j.ended()) {
-        let ended = job.finished_ms.unwrap_or(job.created_ms);
-        if now.saturating_sub(ended) >= keep_ms {
-            v.delete_page(job.id.clone())?;
-            n += 1;
-        }
-    }
-    Ok(n)
+/// `node`'s jobs that ended more than `keep_ms` before `now` and still name a
+/// session. The job row (outcome, attempts) is kept for good; only the raw
+/// session (the transcript and logs) expires. The caller deletes each session
+/// and then calls [`session_expired`].
+pub fn expired_sessions(v: &Vault, node: &str, keep_ms: i64, now: i64) -> Result<Vec<Job>> {
+    Ok(all(v)?
+        .into_iter()
+        .filter(|j| j.node == node && j.ended() && !j.session.is_empty())
+        .filter(|j| now.saturating_sub(j.finished_ms.unwrap_or(j.created_ms)) >= keep_ms)
+        .collect())
+}
+
+/// Clears the job's `session` once its session is deleted.
+pub fn session_expired(v: &Vault, id: &str) -> Result<()> {
+    v.remove_property(id.to_string(), "session".into())?;
+    Ok(())
 }

@@ -1,6 +1,6 @@
 // Scratch: a notes app over the Rust vault core, through
 // flutter_rust_bridge. WidgetsApp only (no Material or Cupertino); every
-// screen is built from the UI kit in lib/ui. Layers: wiki/architecture/app-state.md.
+// screen is built from the UI kit in lib/ui. Layers: wiki/app/app-state.md.
 
 import 'package:flutter/widgets.dart';
 

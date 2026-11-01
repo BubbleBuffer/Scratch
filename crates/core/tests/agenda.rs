@@ -2081,3 +2081,65 @@ fn bare_task_pages_are_undated_notes_without_persisting_default_metadata() {
     assert_eq!(bare_entry.date_ms, Some(DAY));
     assert!(!entries.iter().any(|entry| entry.item.page == cleared));
 }
+
+#[test]
+fn undated_day_note_todos_are_dated_to_their_note_and_plain_todos_stay_out() {
+    let t = TempVault::new();
+    let v = t.open();
+    let yesterday = v
+        .daily_note(DAY - DAY_MS, "Monday 5 October".into(), true)
+        .unwrap()
+        .unwrap();
+    insert(&v, &yesterday, todo("undated-day", false, false));
+    insert(
+        &v,
+        &yesterday,
+        NewBlock {
+            id: "explicit-day".into(),
+            kind: BlockKind::Todo,
+            text: "Pay rent @due".into(),
+            marks: vec![Mark {
+                start: 9,
+                end: 13,
+                kind: MarkKind::Date("2026-09-28".into()),
+            }],
+            checked: false,
+        },
+    );
+    let plain = v.create_page(None, "Plain page".into()).unwrap();
+    insert(&v, &plain, todo("plain-undated", false, false));
+    v.flush().unwrap();
+
+    let overdue = v.overdue(DAY, DAY, 50).unwrap();
+    let undated = overdue
+        .iter()
+        .find(|i| i.block.as_deref() == Some("undated-day"))
+        .expect("undone undated day-note to-do is overdue today");
+    assert_eq!(undated.page, yesterday);
+    assert_eq!(undated.start_ms, DAY - DAY_MS);
+    assert!(!undated.has_time);
+    let explicit = overdue
+        .iter()
+        .find(|i| i.block.as_deref() == Some("explicit-day"))
+        .expect("explicitly dated day-note to-do is overdue today");
+    assert_eq!(explicit.start_ms, DAY - 8 * DAY_MS);
+    assert!(overdue
+        .iter()
+        .all(|i| i.block.as_deref() != Some("plain-undated")));
+    assert!(all(&v)
+        .iter()
+        .all(|i| i.block.as_deref() != Some("plain-undated")));
+    assert_eq!(
+        t.sql("SELECT d0 FROM agenda WHERE block = 'plain-undated'"),
+        vec![vec![Value::Null]]
+    );
+
+    v.set_agenda_done(yesterday.clone(), Some("undated-day".into()), true)
+        .unwrap();
+    v.flush().unwrap();
+    assert!(v
+        .overdue(DAY, DAY, 50)
+        .unwrap()
+        .iter()
+        .all(|i| i.block.as_deref() != Some("undated-day")));
+}

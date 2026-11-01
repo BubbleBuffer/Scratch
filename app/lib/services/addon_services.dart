@@ -13,7 +13,8 @@ import '../shell/page_stack.dart';
 // Transitional host UI contracts. Features move behind their own add-on APIs
 // later; an add-on never imports these host implementations directly.
 export '../features/ai/ai_settings.dart';
-export '../features/ai/ai_store.dart' show AgentRuns, AiStatus, AiTask;
+export '../features/ai/ai_store.dart'
+    show AgentRuns, AiRunnerBridge, AiStatus, AiTask, AiTaskSource;
 export '../features/settings/settings_store.dart' show AppSettings;
 export '../features/settings/controls.dart'
     show
@@ -24,6 +25,7 @@ export '../features/settings/controls.dart'
         Toggle,
         OutlineButton,
         CopyableText;
+export '../features/settings/settings_kit.dart';
 export '../features/settings/settings_screen.dart'
     show showSettings, openSettingsSection, SettingsSection;
 export '../features/sync/hub_auth.dart' show HubAuthService;
@@ -50,6 +52,15 @@ class AddonServices {
 
   /// Starts and stops the agent's runs (on the synced default runner).
   AgentRuns agentRuns(BuildContext context) => AiStore.of(context.app);
+
+  /// The agent's task rows and runner calls (the kanban runner picker).
+  AiTaskSource aiTasks(BuildContext context) => AiStore.of(context.app);
+
+  /// Opens the agent chat of a run's session.
+  Future<void> openAgentSession(BuildContext context, String sessionId) async {
+    await AiStore.openSession(context, sessionId);
+  }
+
   bool addonEnabled(String id) =>
       activeAddonContext?.installedIds.contains(id) ?? true;
   void closeRoute(BuildContext context, String name) {

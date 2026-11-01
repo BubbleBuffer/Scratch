@@ -13,6 +13,7 @@ export 'menu.dart';
 export 'modal.dart';
 export 'page_icon.dart';
 export 'picker_sheet.dart';
+export 'platform_keys.dart';
 export 'reference_chip.dart';
 export 'routes.dart';
 export 'selection.dart';

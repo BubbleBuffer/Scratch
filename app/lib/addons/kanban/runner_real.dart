@@ -1,0 +1,325 @@
+// The real runner backend, on the open vault's agent. The runners are the
+// vault's (ai_list_runners, hub first). An assign queues a real AI task row
+// pinned to the runner, even an offline one. A card's state is read from the
+// newest task row about the card's page. Changes arrive through the AI store's
+// notifications, so nothing here polls.
+
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
+
+import '../../services/addon_services.dart'
+    show AiTask, AiTaskSource;
+import '../../src/rust/api/ai.dart'
+    show AiRunner, AiRunnerKind, AiRunnerList, AiRunnerProject;
+import 'runner_backend.dart';
+
+/// What an assigned card asks the agent to do with its note.
+const runnerCardPrompt = 'Work on this note and write the result at its end.';
+
+class RealRunnerBackend extends ChangeNotifier implements RunnerBackend {
+  RealRunnerBackend(this.source, {DateTime Function()? clock})
+    : _clock = clock ?? DateTime.now {
+    source.addListener(_onSource);
+  }
+
+  final AiTaskSource source;
+  final DateTime Function() _clock;
+
+  /// The runners by id from the last listing; null until the first one.
+  Map<String, AiRunner>? _runners;
+  bool _listing = false;
+  bool _disposed = false;
+
+  @override
+  Listenable get changes => this;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    source.removeListener(_onSource);
+    super.dispose();
+  }
+
+  /// The rows or the store changed. A PC may also have come or gone, so the
+  /// runners are listed again. A listing writes nothing, so this cannot loop.
+  void _onSource() {
+    notifyListeners();
+    unawaited(_refreshRunners());
+  }
+
+  /// Lists the runners into the cache and tells the cards. Throws when the
+  /// vault cannot list them.
+  Future<AiRunnerList> _fetch() async {
+    final list = await source.runnerBridge.listRunners(
+      hubUsable: source.hubUsable,
+    );
+    _runners = {for (final r in list.runners) r.id: r};
+    if (!_disposed) notifyListeners();
+    return list;
+  }
+
+  /// A background listing: one at a time, and it never throws. After a
+  /// failure the cache is empty, so the cards do not ask again on every draw.
+  Future<void> _refreshRunners() async {
+    if (_listing || _disposed) return;
+    _listing = true;
+    try {
+      await _fetch();
+    } catch (_) {
+      _runners ??= {};
+    } finally {
+      _listing = false;
+    }
+  }
+
+  @override
+  RunnerAssignment? current(String taskId) {
+    if (_runners == null) unawaited(_refreshRunners());
+    for (final t in source.tasks) {
+      if (t.page == taskId) return _fromTask(taskId, t);
+    }
+    return null;
+  }
+
+  @override
+  Future<List<Runner>> listRunners() async {
+    try {
+      final list = await _fetch();
+      return [for (final r in list.runners) _runner(r, list.defaultRunnerId)];
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  @override
+  Future<RunnerAssignment> assign(
+    String taskId,
+    String runnerId, {
+    String? projectId,
+  }) async {
+    try {
+      if (_runners?.containsKey(runnerId) != true) await _fetch();
+      final task = await source.runnerBridge.assign(
+        prompt: runnerCardPrompt,
+        page: taskId,
+        runnerId: runnerId,
+        projectId: projectId,
+      );
+      await source.refresh();
+      source.onDelegated?.call();
+      return _fromTask(taskId, task) ??
+          RunnerAssignment(
+            taskId: taskId,
+            runnerId: runnerId,
+            runnerName: _nameOf(runnerId),
+            state: AssignState.queued,
+            projectName: _projectName(runnerId, projectId ?? ''),
+          );
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  Runner _runner(AiRunner r, String defaultId) => Runner(
+    id: r.id,
+    name: r.name,
+    kind: r.kind == AiRunnerKind.hub ? RunnerKind.hub : RunnerKind.pc,
+    online: r.online,
+    lastSeen: _time(r.lastSeenMs?.toInt()),
+    isThisDevice: r.isThisDevice,
+    isDefault: r.id == defaultId,
+    projects: [
+      for (final p in r.projects) RunnerProject(id: p.id, name: p.name),
+    ],
+  );
+
+  String _nameOf(String runnerId) => _runners?[runnerId]?.name ?? runnerId;
+
+  /// The name of the project [projectId] on the runner [runnerId], from the
+  /// last listing. Null for no project, or when the listing does not have it.
+  String? _projectName(String runnerId, String projectId) {
+    if (projectId.isEmpty) return null;
+    final projects = _runners?[runnerId]?.projects ?? const <AiRunnerProject>[];
+    for (final p in projects) {
+      if (p.id == projectId) return p.name;
+    }
+    return null;
+  }
+
+  DateTime? _time(int? ms) =>
+      ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+
+  /// The chip state of [t] for the card [cardId]. A row without a runner
+  /// (a legacy row) is not an assignment, so it shows nothing.
+  RunnerAssignment? _fromTask(String cardId, AiTask t) {
+    if (t.node.isEmpty) return null;
+    final runner = _runners?[t.node];
+    final s = _stateOf(t, runner);
+    return RunnerAssignment(
+      taskId: cardId,
+      runnerId: t.node,
+      runnerName: runner?.name ?? t.node,
+      state: s.state,
+      reason: s.reason,
+      progress: _progressOf(t),
+      projectName: _projectName(t.node, t.project),
+      outdated: t.status == 'running' && !t.cancelRequested && t.stale,
+      note: s.note,
+      question: s.state == AssignState.needsInput ? t.question : null,
+    );
+  }
+
+  @override
+  Future<void> accept(String taskId) => _command(taskId, source.accept);
+
+  @override
+  Future<void> markFailed(String taskId) => _command(taskId, source.markFailed);
+
+  @override
+  Future<void> addStep(String taskId, String text) async {
+    final t = _taskOf(taskId);
+    if (t == null) return;
+    try {
+      await source.addStep(t.id, text);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  @override
+  Future<void> reply(String taskId, String text) async {
+    final t = _taskOf(taskId);
+    if (t == null) return;
+    try {
+      await source.reply(t.id, text);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  @override
+  String? sessionOf(String taskId) {
+    final s = _taskOf(taskId)?.session;
+    return s == null || s.isEmpty ? null : s;
+  }
+
+  Future<void> _command(String cardId, Future<void> Function(String) run) async {
+    final t = _taskOf(cardId);
+    if (t == null) return;
+    try {
+      await run(t.id);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  /// The task row about the card [cardId], or null.
+  AiTask? _taskOf(String cardId) {
+    for (final t in source.tasks) {
+      if (t.page == cardId) return t;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> cancel(String taskId) async {
+    final t = _taskOf(taskId);
+    if (t == null) return;
+    try {
+      await source.cancel(t.id);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  @override
+  Future<void> sendUpdate(String taskId) async {
+    final t = _taskOf(taskId);
+    if (t == null) return;
+    try {
+      await source.sendUpdate(t.id);
+    } catch (e) {
+      throw RunnerUnavailable('$e');
+    }
+  }
+
+  /// The row's progress line, trimmed, or null while it has none. The chip
+  /// decides by state whether to show it.
+  String? _progressOf(AiTask t) {
+    final text = t.progress.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  /// Maps a row's status to the chip. A run with a cancel the runner has not
+  /// acknowledged shows as cancellation requested, never as stopped. An interrupted run
+  /// reads as failed. A queued row pinned to an offline runner is waiting.
+  ({AssignState state, String? reason, String? note}) _stateOf(AiTask t, AiRunner? runner) {
+    switch (t.status) {
+      case 'running':
+        if (t.cancelRequested) {
+          return (state: AssignState.cancelling, reason: null, note: null);
+        }
+        final since = _time(t.stalledSinceMs?.toInt());
+        if (since != null) {
+          final hh = since.hour.toString().padLeft(2, '0');
+          final mm = since.minute.toString().padLeft(2, '0');
+          return (
+            state: AssignState.stalled,
+            reason: null,
+            note: 'no contact since $hh:$mm',
+          );
+        }
+        if (t.question.isNotEmpty) {
+          return (state: AssignState.needsInput, reason: null, note: null);
+        }
+        return (state: AssignState.running, reason: null, note: null);
+      case 'review':
+        return (state: AssignState.review, reason: null, note: null);
+      case 'done':
+        return (state: AssignState.done, reason: null, note: null);
+      case 'failed':
+        return (
+          state: AssignState.failed,
+          reason: t.error.isEmpty ? null : t.error,
+          note: null,
+        );
+      case 'interrupted':
+        if (t.error.startsWith('waiting for input')) {
+          // The run ended while it waited; a reply starts a new attempt.
+          return (state: AssignState.needsInput, reason: null, note: null);
+        }
+        return (
+          state: AssignState.failed,
+          reason: 'The run was interrupted before it finished.',
+          note: null,
+        );
+      case 'cancelled':
+        return (state: AssignState.cancelled, reason: null, note: null);
+      default:
+        if (runner != null && !runner.online) {
+          return (
+            state: AssignState.waiting,
+            reason: _offlineReason(runner),
+            note: null,
+          );
+        }
+        return (state: AssignState.queued, reason: null, note: null);
+    }
+  }
+
+  String _offlineReason(AiRunner runner) {
+    final seen = _time(runner.lastSeenMs?.toInt());
+    final since = seen == null
+        ? ''
+        : ' (last seen ${lastSeenText(seen, _clock())})';
+    return '${runner.name} is offline$since';
+  }
+}
+
+final _assignments = Expando<RunnerAssignments>('ai runner assignments');
+
+/// The runner assignments of [source]'s agent: one per store, so every board
+/// shares the chips and the picker's answers.
+RunnerAssignments aiRunnerAssignments(AiTaskSource source) =>
+    _assignments[source] ??= RunnerAssignments(RealRunnerBackend(source));

@@ -106,7 +106,7 @@ impl Net {
         Device {
             dir: TempDir::new(label),
             url: self.url.clone(),
-            token: self.hub.pair(label).unwrap(),
+            token: self.hub.pair_legacy_token(label).unwrap(),
             client: None,
         }
         .started()
@@ -327,7 +327,7 @@ fn a_stale_copy_stays_purged_through_replays_and_restarts() {
 fn legacy_purge_with_offline_edit(net: &Net) -> (Device, PageId) {
     let a = net.device("phone");
     let t = shared_page(net, &[&a]);
-    let token = net.hub.pair("old").unwrap();
+    let token = net.hub.pair_legacy_token("old").unwrap();
     let body = SyncRequest {
         full: true,
         purged: vec![t.clone()],
@@ -404,7 +404,7 @@ fn an_old_client_on_the_v1_wire_keeps_delete_wins() {
     old.rename_page(t.clone(), "T (old client)".into()).unwrap();
     let edited = old.export_updates(t.clone(), Vec::new()).unwrap();
 
-    let token = net.hub.pair("old").unwrap();
+    let token = net.hub.pair_legacy_token("old").unwrap();
     let body = SyncRequest {
         full: true,
         purged: vec![t.clone()],
@@ -496,7 +496,7 @@ fn an_old_clients_persisted_purges_never_remove_a_restored_page() {
 
     // The old client's v1 syncs replay its persisted purge set, again and
     // again. Each replay leaves the restored page alone.
-    let token = net.hub.pair("old").unwrap();
+    let token = net.hub.pair_legacy_token("old").unwrap();
     assert_eq!(persisted_purges(&old_dir), vec![t.clone()]);
     for _ in 0..3 {
         // Reopening the old vault discards its in-memory sync base, so every
@@ -558,7 +558,7 @@ fn an_unedited_legacy_copy_returns_to_marked_trash_through_the_hub() {
     let t = shared_page(&net, &[&a]);
     // An old client's ID-only purge reaches the hub first. The phone's copy
     // has no offline edit.
-    let token = net.hub.pair("old").unwrap();
+    let token = net.hub.pair_legacy_token("old").unwrap();
     let body = SyncRequest {
         full: true,
         purged: vec![t.clone()],

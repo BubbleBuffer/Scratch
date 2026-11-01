@@ -4,7 +4,8 @@ use std::sync::{mpsc, Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::{EventKind, ToolRegistry};
+use vault_agent::bubblepaw_sdk::events::EventKind;
+use vault_agent::bubblepaw_sdk::tools::ToolRegistry;
 use vault_agent::{Agent, AgentConfig, Forwarded, HostKind, PermissionMode, ToolPack};
 use vault_core::Vault;
 
@@ -106,6 +107,7 @@ fn assert_host_tool_names(names: &[String], desktop: bool) {
         "read_page",
         "create_page",
         "edit_page",
+        "attach_file",
         "upsert_row",
         "trash_page",
         "move_page",
@@ -290,7 +292,7 @@ fn desktop_tools_are_always_shown_with_the_host_approval_policy() {
             "write" | "edit" | "exec" | "project_switch" | "project_open"
         );
         assert_eq!(
-            definition.approval == vault_agent::bubblepaw_core::Approval::Confirm,
+            definition.approval == vault_agent::bubblepaw_sdk::approvals::Approval::Confirm,
             needs_approval
         );
     }
@@ -339,11 +341,11 @@ fn each_runner_registers_only_its_vault_tool_set() {
     assert_eq!(sorted(&agent.host_info().tools), expected);
     let value = script(
         &agent,
-        "return {create: typeof tools.create_page, read: typeof tools.read_page, exec: typeof tools.exec};",
+        "const listed = (await tools.$list()).map(t => t.name); return {create: 'create_page' in tools, read: 'read_page' in tools, exec: 'exec' in tools, listed_create: listed.includes('create_page'), listed_exec: listed.includes('exec')};",
     );
     assert_eq!(
         value,
-        json!({"create":"undefined", "read":"function", "exec":"undefined"})
+        json!({"create":false, "read":true, "exec":false, "listed_create":false, "listed_exec":false})
     );
     drop(agent);
 
@@ -394,9 +396,12 @@ fn base_host_has_no_desktop_tools() {
         .any(|name| name == "exec" || name == "read"));
     let value = script(
         &agent,
-        "return {read: typeof tools.read, exec: typeof tools.exec};",
+        "const listed = (await tools.$list()).map(t => t.name); return {read: 'read' in tools, exec: 'exec' in tools, listed_exec: listed.includes('exec'), listed_read: listed.includes('read')};",
     );
-    assert_eq!(value, json!({"read":"undefined", "exec":"undefined"}));
+    assert_eq!(
+        value,
+        json!({"read":false, "exec":false, "listed_exec":false, "listed_read":false})
+    );
 }
 
 #[test]
@@ -568,9 +573,13 @@ fn projects_switch_files_and_exec_cwd_per_session_and_persist() {
     let agent = f.open(true, PermissionMode::Auto);
     let home = agent.projects_list().unwrap().remove(0);
     assert_eq!(home.name, "Home");
+    // Stored paths drop canonicalize's Windows verbatim prefix.
     assert_eq!(
         home.path,
-        std::fs::canonicalize(&f.root).unwrap().to_string_lossy()
+        std::fs::canonicalize(&f.root)
+            .unwrap()
+            .to_string_lossy()
+            .trim_start_matches(r"\\?\")
     );
     let project = agent
         .project_add("Other", &second.to_string_lossy())

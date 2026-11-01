@@ -3,13 +3,13 @@
 // sections. Goldens for the folded card and the contents, in both themes.
 // Baselines live under goldens/outline and are made with --update-goldens.
 
+import 'package:agent_kit/agent_kit.dart' show AnchoredList, OutlineFlash;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/shell/app_shell.dart';
 import 'package:notes_app/src/rust/api/agent.dart';
 import 'package:notes_app/state/app_state.dart';
-import 'package:notes_app/ui/anchored_list.dart';
 
 import 'agent_test.dart' show openAgentStore;
 import 'harness.dart';
@@ -130,7 +130,7 @@ Future<void> _pumpChat(
         child: SizedBox(
           width: 480,
           height: 650,
-          child: AgentChat(store: store, panel: panel),
+          child: ScratchChatPane(store: store, panel: panel),
         ),
       ),
     ),
@@ -162,7 +162,7 @@ Future<void> _pumpDockAndScreen(
               height: 650,
               child: KeyedSubtree(
                 key: const ValueKey('dock-chat'),
-                child: AgentChat(store: store, panel: true),
+                child: ScratchChatPane(store: store, panel: true),
               ),
             ),
             SizedBox(
@@ -170,7 +170,7 @@ Future<void> _pumpDockAndScreen(
               height: 650,
               child: KeyedSubtree(
                 key: const ValueKey('screen-chat'),
-                child: AgentChat(store: store),
+                child: ScratchChatPane(store: store),
               ),
             ),
           ],

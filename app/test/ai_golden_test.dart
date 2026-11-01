@@ -1,4 +1,4 @@
-// Golden screenshots of AI: Settings > AI with tasks in each state and the
+// Golden screenshots of AI: Settings > Agent with tasks in each state and the
 // Ask AI box, at 1440x900 and 375x812, light and dark, on the real core.
 // Regenerate with: flutter test --update-goldens test/ai_golden_test.dart
 
@@ -60,7 +60,7 @@ void main() {
           } else {
             await tapAndSettle(tester, key('sidebar-settings'));
           }
-          await tapAndSettle(tester, key('settings-nav-ai'));
+          await tapAndSettle(tester, key('settings-nav-agent'));
           await shot('$tag-settings-ai');
         } finally {
           await closeAi(tester, store);

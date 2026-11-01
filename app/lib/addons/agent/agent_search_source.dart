@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 
 import '../../core/paths.dart';
 import '../../src/rust/api/agent.dart';
+import 'chat_search_target.dart';
 import 'outline_names.dart';
 
 /// Search rows for agent chats: one per chat title, one per chapter and one per
@@ -70,21 +70,21 @@ List<AgentSearchRow> agentSearchRows({
     String last = '',
     String? chapterTitle,
     String? sectionTitle,
-  }) => jsonEncode({
-    'sessionId': session.id,
-    'firstMessageId': first,
-    'lastMessageId': last,
-    'level': level,
-    'chapterTitle': ?chapterTitle,
-    'sectionTitle': ?sectionTitle,
-  });
+  }) => ChatSearchTarget(
+    sessionId: session.id,
+    firstMessageId: first,
+    lastMessageId: last,
+    level: level,
+    chapterTitle: chapterTitle,
+    sectionTitle: sectionTitle,
+  ).encode();
 
   final rows = [
     AgentSearchRow(
       id: 'chat:${session.id}',
       title: chatTitle,
       body: '',
-      target: target('chat'),
+      target: target(chatSearchLevelChat),
       updatedMs: updatedMs,
     ),
   ];
@@ -97,7 +97,7 @@ List<AgentSearchRow> agentSearchRows({
         title: chapterLabel,
         body: chapter.summary.trim(),
         target: target(
-          'chapter',
+          chatSearchLevelChapter,
           first: chapter.firstMessageId,
           last: chapter.lastMessageId,
           chapterTitle: chapter.title,
@@ -121,7 +121,7 @@ List<AgentSearchRow> agentSearchRows({
           title: '$chapterLabel › $sectionName',
           body: section.summary.trim(),
           target: target(
-            'section',
+            chatSearchLevelSection,
             first: section.firstMessageId,
             last: section.lastMessageId,
             chapterTitle: chapter.title,

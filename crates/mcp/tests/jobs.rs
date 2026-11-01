@@ -36,10 +36,11 @@ fn jobs_are_rows_that_desktops_never_claim() {
     assert!(job.result.is_none());
 
     // A desktop skips the job and claims the ordinary task behind it.
-    assert!(tasks::claim_next(&v, "desktop").unwrap().is_none());
+    let desktop = v.device_id();
+    assert!(tasks::claim_next(&v, &desktop).unwrap().is_none());
     let page = v.create_page(None, "Notes".into()).unwrap();
     let task = tasks::create(&v, "Tidy", &page, None, "").unwrap();
-    let claimed = tasks::claim_next(&v, "desktop").unwrap().unwrap();
+    let claimed = tasks::claim_next(&v, &desktop).unwrap().unwrap();
     assert_eq!(claimed.id, task.id);
     // Ordinary tasks are no jobs.
     assert!(jobs::get(&v, &task.id).unwrap().is_none());
@@ -47,7 +48,10 @@ fn jobs_are_rows_that_desktops_never_claim() {
 
     jobs::mark_running(&v, &job.id, "s1").unwrap();
     let running = jobs::get(&v, &job.id).unwrap().unwrap();
-    assert_eq!((running.status.as_str(), running.session.as_str()), ("running", "s1"));
+    assert_eq!(
+        (running.status.as_str(), running.session.as_str()),
+        ("running", "s1")
+    );
     jobs::finish(&v, &job.id, End::Completed("All summarised.".into())).unwrap();
     let done = jobs::get(&v, &job.id).unwrap().unwrap();
     assert_eq!(done.status, "completed");
@@ -57,7 +61,34 @@ fn jobs_are_rows_that_desktops_never_claim() {
 }
 
 #[test]
-fn recover_interrupts_and_sweep_trashes() {
+fn pinned_desktop_tasks_are_never_jobs() {
+    let t = Temp::new();
+    let v = t.open();
+    let page = v.create_page(None, "Notes".into()).unwrap();
+    let mine = tasks::create(&v, "Mine", &page, None, "").unwrap();
+    let other = tasks::create_on(&v, "Elsewhere", &page, None, "", "other-desktop").unwrap();
+    // A legacy row (no node) is no job either.
+    let legacy = tasks::create(&v, "Legacy", &page, None, "").unwrap();
+    v.remove_property(legacy.id.clone(), "node".into()).unwrap();
+    for id in [&mine.id, &other.id, &legacy.id] {
+        assert!(jobs::get(&v, id).unwrap().is_none());
+    }
+    assert!(jobs::all(&v).unwrap().is_empty());
+
+    // Ended desktop tasks are neither recovered nor swept, even with no keep
+    // time; the task API still owns them.
+    tasks::finish(&v, &mine.id, Ok("Done".into())).unwrap();
+    assert_eq!(jobs::recover(&v, "hub").unwrap(), 0);
+    assert!(jobs::expired_sessions(&v, "hub", 0, jobs::now_ms() + 1).unwrap().is_empty());
+    assert_eq!(tasks::get(&v, &mine.id).unwrap().status, tasks::DONE);
+    // Cancelling a pinned desktop task is the task API's; only hub jobs
+    // are cancelled through the jobs API.
+    assert!(tasks::cancel(&v, &other.id).unwrap());
+    assert!(jobs::create(&v, "Not a hub job", "agent:a", "read", "other-desktop").is_err());
+}
+
+#[test]
+fn recover_interrupts_and_only_the_session_expires() {
     let t = Temp::new();
     let v = t.open();
     let a = jobs::create(&v, "A", "agent:a", "write", "hub").unwrap();
@@ -69,12 +100,18 @@ fn recover_interrupts_and_sweep_trashes() {
     assert!(a.error.contains("restarted"));
     assert_eq!(jobs::get(&v, &b.id).unwrap().unwrap().status, "queued");
 
-    // Only ended jobs older than the keep time go.
+    // Only the sessions of ended jobs older than the keep time expire; the
+    // row stays.
     let now = jobs::now_ms();
-    assert_eq!(jobs::sweep(&v, "hub", 60_000, now).unwrap(), 0);
-    assert_eq!(jobs::sweep(&v, "hub", 60_000, now + 120_000).unwrap(), 1);
-    assert!(jobs::get(&v, &a.id).unwrap().is_none());
-    assert!(v.load_page(a.id.clone()).unwrap().in_trash);
+    assert!(jobs::expired_sessions(&v, "hub", 60_000, now).unwrap().is_empty());
+    let due = jobs::expired_sessions(&v, "hub", 60_000, now + 120_000).unwrap();
+    assert_eq!(due.len(), 1);
+    jobs::session_expired(&v, &a.id).unwrap();
+    assert!(jobs::expired_sessions(&v, "hub", 60_000, now + 120_000).unwrap().is_empty());
+    let kept = jobs::get(&v, &a.id).unwrap().unwrap();
+    assert_eq!(kept.status, "interrupted");
+    assert!(kept.session.is_empty());
+    assert!(!v.load_page(a.id.clone()).unwrap().in_trash);
     jobs::finish(&v, &b.id, End::Cancelled).unwrap();
     assert_eq!(jobs::get(&v, &b.id).unwrap().unwrap().status, "cancelled");
 }
@@ -88,7 +125,8 @@ fn an_older_tasks_database_gains_the_job_properties() {
         .into_iter()
         .filter(|d| !["node", "owner", "tools", "session", "finished"].contains(&d.key.as_str()))
         .map(|mut d| {
-            d.options.retain(|o| !["cancelled", "interrupted"].contains(&o.id.as_str()));
+            d.options
+                .retain(|o| !["cancelled", "interrupted"].contains(&o.id.as_str()));
             d
         })
         .collect();
@@ -108,5 +146,8 @@ fn an_older_tasks_database_gains_the_job_properties() {
     let status = schema.iter().find(|d| d.key == "status").unwrap();
     assert!(status.options.iter().any(|o| o.id == "interrupted"));
     jobs::finish(&v, &job.id, End::Interrupted).unwrap();
-    assert_eq!(jobs::get(&v, &job.id).unwrap().unwrap().status, "interrupted");
+    assert_eq!(
+        jobs::get(&v, &job.id).unwrap().unwrap().status,
+        "interrupted"
+    );
 }

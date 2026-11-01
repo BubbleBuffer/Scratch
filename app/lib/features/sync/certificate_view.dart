@@ -39,6 +39,20 @@ String formatCertDate(int ms) {
   return '${months[t.month - 1]} ${t.day}, ${t.year}';
 }
 
+/// The trust prompt's text: names the issuing CA (its CN, then O · OU)
+/// when the issuer has a CN, else the host only, as before.
+String trustConfirmText(String host, String issuer) {
+  final n = nameParts(issuer);
+  final cn = n.cn;
+  if (cn == null) {
+    return 'Sync will accept this certificate from $host. Trust it only if this SHA-256 fingerprint matches your hub’s.';
+  }
+  final org = [?n.o, ?n.ou].join(' · ');
+  final by = org.isEmpty ? cn : '$cn ($org)';
+  return 'This device will accept certificates for $host issued by $by. '
+      'Trust it only if this SHA-256 fingerprint matches your hub’s.';
+}
+
 // ---------------------------------------------------------------------------
 // The current client's untrusted certificate
 
@@ -78,8 +92,11 @@ Future<bool> trustSyncCertificate(BuildContext context) async {
   final chain = syncCertificateChain(sync);
   if (url == null || chain.isEmpty) return false;
   final fp = sync.untrustedFingerprint ?? chain.first.sha256;
-  if (!await confirmTrustCertificate(context, host: serverHostOf(url), fingerprint: fp)) return false;
-  await trustCertificate(sync, s, url, chain, fingerprint: fp);
+  final issuerDer = sync.untrustedChain != null ? sync.untrustedIssuerDer : null;
+  if (!await confirmTrustCertificate(context, host: serverHostOf(url), fingerprint: fp, issuer: chain.first.issuer)) {
+    return false;
+  }
+  await trustCertificate(sync, s, url, chain, fingerprint: fp, issuerDer: issuerDer);
   return true;
 }
 
@@ -162,10 +179,20 @@ class CertificateProblem extends StatelessWidget {
 
 /// "Trust this certificate?" naming [host] and showing [fingerprint]
 /// (selectable). True when confirmed.
-Future<bool> confirmTrustCertificate(BuildContext context, {required String host, required String fingerprint}) async {
+Future<bool> confirmTrustCertificate(
+  BuildContext context, {
+  required String host,
+  required String fingerprint,
+  String issuer = '',
+}) async {
   final r = await showModalPanel<bool>(
     context,
-    (ctx) => _TrustConfirm(host: host, fingerprint: formatFingerprint(fingerprint), onDone: (v) => Navigator.of(ctx).pop(v)),
+    (ctx) => _TrustConfirm(
+      host: host,
+      fingerprint: formatFingerprint(fingerprint),
+      issuer: issuer,
+      onDone: (v) => Navigator.of(ctx).pop(v),
+    ),
     width: 360,
     shrink: true,
   );
@@ -173,8 +200,11 @@ Future<bool> confirmTrustCertificate(BuildContext context, {required String host
 }
 
 class _TrustConfirm extends StatelessWidget {
-  const _TrustConfirm({required this.host, required this.fingerprint, required this.onDone});
+  const _TrustConfirm({required this.host, required this.fingerprint, this.issuer = '', required this.onDone});
   final String host, fingerprint;
+
+  /// The leaf's issuer (RFC 4514); its CN names the CA in the text.
+  final String issuer;
   final ValueChanged<bool> onDone;
 
   @override
@@ -191,7 +221,8 @@ class _TrustConfirm extends StatelessWidget {
           Text('Trust this certificate?', textAlign: TextAlign.center, style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
           const SizedBox(height: 6),
           Text(
-            'Sync will accept this certificate from $host. Trust it only if this SHA-256 fingerprint matches your hub’s.',
+            trustConfirmText(host, issuer),
+            key: const ValueKey('cert-confirm-text'),
             textAlign: TextAlign.center,
             style: ts(ty.uiSmall, c.textSecondary, weight: 400),
           ),

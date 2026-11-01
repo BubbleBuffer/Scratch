@@ -57,11 +57,8 @@ void main() {
           );
           final overdue = byTitle('Book the room');
           expect(overdue.status, 'Underway');
-          expect(row(overdue), findsNothing);
-          await tapAndSettle(
-            tester,
-            find.byKey(const ValueKey('today-overdue')),
-          );
+          // Overdue is expanded by default, so its row is already shown.
+          expect(row(overdue), findsOneWidget);
           await showItem(tester, overdue);
           expect(
             tester.widget<StacksCheckbox>(check(overdue)).checked,

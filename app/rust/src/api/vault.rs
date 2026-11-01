@@ -226,6 +226,7 @@ impl NotesVault {
     pub fn open(root: String, data_dir: Option<String>) -> Result<NotesVault, String> {
         let inner = Arc::new(Vault::open(root).map_err(err)?);
         if cfg!(any(target_os = "windows", target_os = "linux", target_os = "macos")) {
+            inner.publish_device_activity().map_err(err)?;
             poll_mounts(Arc::downgrade(&inner));
         }
         let runner = LocalRunner::open(inner.clone(), data_dir);
@@ -488,7 +489,36 @@ impl NotesVault {
 
     /// One transaction: all ops or none.
     pub fn apply(&self, page_id: String, ops: Vec<BOp>) -> Result<(), String> {
-        let ops = ops.into_iter().map(block_op).collect::<Result<Vec<_>, _>>()?;
+        let ops = block_ops(ops)?;
+        self.inner.apply(page_id, ops).map_err(err)
+    }
+
+    /// Read settings using the block's identity. Invalid JSON gives a List view.
+    pub fn view_block_def(&self, id: String, text: String) -> ViewDef {
+        let block = vault_core::Block {
+            id, kind: vault_core::BlockKind::View, text, marks: vec![], checked: false,
+            children: vec![], target: None, color: None, width: None, numbered_start: None,
+        };
+        view_from(vault_core::ViewBlock::def(&block))
+    }
+
+    /// Encode settings with a contents source; identity belongs to the block.
+    pub fn view_block_text(&self, view: ViewDef) -> Result<String, String> {
+        Ok(vault_core::view_block_text(&view_to(view)?))
+    }
+
+    /// Insert a contents view. None for target means the containing page.
+    /// Parent and after use the same positioning rules as a regular Insert.
+    pub fn insert_view_block(&self, page_id: String, id: String, parent: Option<String>, after: Option<String>, view: ViewDef, target: Option<String>) -> Result<(), String> {
+        let text = vault_core::view_block_text(&view_to(view)?);
+        let mut ops = vec![vault_core::BlockOp::Insert {
+            parent, after, block: vault_core::NewBlock {
+                id: id.clone(), kind: vault_core::BlockKind::View, text, marks: vec![], checked: false,
+            },
+        }];
+        if target.is_some() {
+            ops.push(vault_core::BlockOp::SetTarget { id, target });
+        }
         self.inner.apply(page_id, ops).map_err(err)
     }
 
@@ -1286,6 +1316,47 @@ mod conflict_tests {
     }
 }
 
+#[cfg(test)]
+mod view_block_tests {
+    use super::*;
+
+    #[test]
+    fn settings_and_contents_insertion_cross_the_bridge() {
+        struct TempRoot(std::path::PathBuf);
+        impl Drop for TempRoot {
+            fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+        }
+        let root = TempRoot(std::env::temp_dir().join(format!("notes_bridge_views_{}", vault_core::new_id())));
+        let vault = NotesVault {
+            inner: Arc::new(Vault::open(root.0.to_string_lossy().into_owned()).unwrap()),
+            runner: LocalRunner::Unconfigured,
+        };
+        let page = vault.inner.create_page(None, "Contents".into()).unwrap();
+        let mut def = vault.view_block_def("view-a".into(), "{broken".into());
+        assert_eq!(def.id, "view-a");
+        assert_eq!(def.kind, ViewKind::List);
+        def.kind = ViewKind::Gallery;
+        def.name = "Cards".into();
+        def.config = r#"{"cardSize":"large"}"#.into();
+        let encoded = vault.view_block_text(def.clone()).unwrap();
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&encoded).unwrap()["source"], "contents");
+        vault.insert_view_block(page.clone(), "view-a".into(), None, None, def.clone(), None).unwrap();
+        vault.insert_view_block(page.clone(), "view-b".into(), None, Some("view-a".into()), def,
+            Some("source-page".into())).unwrap();
+        let loaded = vault.load_page(page).unwrap();
+        assert_eq!(loaded.blocks.len(), 2);
+        assert_eq!(loaded.blocks[0].kind, "view");
+        assert_eq!(loaded.blocks[0].text, encoded);
+        assert_eq!(loaded.blocks[0].target, None);
+        assert_eq!(loaded.blocks[1].target.as_deref(), Some("source-page"));
+        let restored = vault.view_block_def(loaded.blocks[1].id.clone(), loaded.blocks[1].text.clone());
+        assert_eq!(restored.id, "view-b");
+        assert_eq!(restored.kind, ViewKind::Gallery);
+        assert_eq!(restored.name, "Cards");
+        assert_eq!(restored.config, r#"{"cardSize":"large"}"#);
+    }
+}
+
 /// A new ULID-style id (the core's page id format).
 #[frb(sync)]
 pub fn new_id() -> String {
@@ -1320,6 +1391,8 @@ pub fn version_includes(a: Vec<u8>, b: Vec<u8>) -> Result<bool, String> {
 #[frb(init)]
 pub fn init_app() {
     flutter_rust_bridge::setup_default_user_utils();
+    // The app runs on the user's own device: attach_file may read local paths.
+    vault_tools::allow_local_paths(true);
 }
 
 /// Calls `rescan_mounts` every 2 seconds until the vault is closed. Holds

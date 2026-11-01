@@ -3,12 +3,13 @@
 
 export 'add_to_note.dart';
 export 'agent_cells.dart';
-export 'agent_chat.dart';
+export 'scratch_chat_pane.dart' show ScratchChatPane;
 export 'agent_composer.dart';
 export 'agent_markdown.dart';
+export 'agent_mcp_controller.dart';
+export 'agent_mcp_draft.dart';
 export 'agent_mcp_settings.dart';
 export 'agent_outline.dart';
-export 'agent_outline_view.dart';
 export 'agent_panel.dart';
 export 'agent_screen.dart';
 export 'agent_search_source.dart';
@@ -30,8 +31,6 @@ export 'mobile_agent_settings.dart';
 export 'navigation.dart';
 export 'outline_names.dart';
 
-import 'package:flutter/widgets.dart';
-
 import '../../registry/addon_registry.dart';
 import '../../registry/block_codecs.dart';
 import '../../services/addon_services.dart';
@@ -46,7 +45,8 @@ import 'commands.dart';
 import 'chat_type.dart';
 import 'chat_search.dart';
 export 'chat_search.dart'
-    show AgentChatSearchSource, ChatSearchTarget, openChatHit;
+    show AgentChatSearchSource, ChatSearchTargetNavigation, openChatHit;
+export 'chat_search_target.dart' show ChatSearchTarget;
 export 'chat_type.dart' show chatNoteType, chatChip, chatCard, chatEmbed;
 import 'navigation.dart';
 
@@ -98,15 +98,9 @@ class AgentAddon extends Addon {
         location: 'ai',
         placement: 'top',
         isVisible: (_) => AgentStore.canRun && !hubAgentPlatform,
-        build: (context) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SettingsHeading('Agent'),
-            AgentSettingsSection(
-              store: AgentStore.of(context.app),
-              onChanged: () => ctx.services.pumpAi(context),
-            ),
-          ],
+        build: (context) => AgentSettingsSection(
+          store: AgentStore.of(context.app),
+          onChanged: () => ctx.services.pumpAi(context),
         ),
       ),
     );
@@ -117,13 +111,8 @@ class AgentAddon extends Addon {
         location: 'ai',
         placement: 'beforeTasks',
         isVisible: (_) => hubAgentPlatform,
-        build: (context) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SettingsHeading('Agent', top: 24),
+        build: (context) =>
             MobileAgentSettings(store: AgentStore.of(context.app)),
-          ],
-        ),
       ),
     );
   }

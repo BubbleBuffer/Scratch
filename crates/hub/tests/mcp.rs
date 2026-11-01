@@ -137,7 +137,7 @@ async fn initialize_and_scoped_tool_lists() {
         .collect();
     assert_eq!(
         listed, LISTED,
-        "tools/list over HTTP is exactly the 16 names, in order"
+        "tools/list over HTTP is exactly the 17 names, in order"
     );
     assert!(
         !listed.contains(&"feedback_list"),
@@ -207,12 +207,13 @@ async fn a_token_lists_and_calls_only_its_tool_set() {
     env.server.stop().await;
 }
 
-/// The 16 listed MCP tools, in serving order.
-const LISTED: [&str; 16] = [
+/// The 17 listed MCP tools, in serving order.
+const LISTED: [&str; 17] = [
     "search_notes",
     "read_page",
     "create_page",
     "edit_page",
+    "attach_file",
     "trash_page",
     "move_page",
     "daily_note",
@@ -519,7 +520,7 @@ async fn reads_and_write_attribution_with_separate_actors() {
 #[tokio::test]
 async fn authentication_origin_method_and_live_revocation() {
     let env = Env::new().await;
-    let device = env.server.hub().pair("test-device").unwrap();
+    let device = env.server.hub().pair_legacy_token("test-device").unwrap();
     let request = json!({"jsonrpc":"2.0","id":1,"method":"tools/list"});
     for token in [None, Some("bad-token"), Some(device.as_str())] {
         let mut req = env.client.post(&env.url).json(&request);

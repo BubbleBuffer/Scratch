@@ -158,6 +158,38 @@ impl Env {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn attach_puts_an_image_block_on_a_page() {
+    let env = Env::new().await;
+    env.cli(&["write", "CLI pics"], Some("Intro line.")).await;
+    let png: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\x06\0\0\0\x1f\x15\xc4\x89";
+    fs::write(env.data.0.join("dot.png"), png).unwrap();
+    let out = env
+        .cli(&["attach", "CLI pics", "dot.png", "--caption", "A dot"], None)
+        .await;
+    assert!(out.contains("as an image block"), "{out}");
+    let vault = env.server.hub().vault();
+    let id = vault_tools::resolve_page(vault, "CLI pics").unwrap();
+    let last = vault.load_page(id).unwrap().blocks.pop().unwrap();
+    assert_eq!(last.kind, vault_core::BlockKind::Image);
+    assert_eq!(last.text, "A dot");
+    let blob = vault.attachment_path(last.target.unwrap()).unwrap();
+    assert_eq!(fs::read(blob).unwrap(), png);
+
+    // --as must be image or file; a missing file fails before any call.
+    let e = env
+        .cli_at(&["attach", "CLI pics", "dot.png", "--as", "gif"], None, &env.data.0)
+        .await
+        .unwrap_err();
+    assert!(e.to_string().contains("--as"), "{e}");
+    let e = env
+        .cli_at(&["attach", "CLI pics", "missing.png"], None, &env.data.0)
+        .await
+        .unwrap_err();
+    assert!(e.to_string().contains("cannot read"), "{e}");
+    env.server.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn page_roundtrip_search_and_raw_json() {
     let env = Env::new().await;
     env.cli(

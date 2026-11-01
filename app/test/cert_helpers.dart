@@ -3,6 +3,8 @@
 // otherwise fails as the bridge does ("untrusted certificate: <sha256>").
 // SyncStore.clientFactory builds it; [FakeHubs.calls] records each client.
 
+import 'dart:typed_data';
+
 import 'package:flutter/widgets.dart';
 import 'package:notes_app/core/models.dart';
 import 'package:notes_app/features/sync/cert_trust.dart';
@@ -38,6 +40,10 @@ const caCert = CertificateInfo(
   selfSigned: true,
 );
 
+/// The DER the fake hub "sends" for its chain (leaf, CA): stand-in bytes.
+final leafDer = Uint8List.fromList([0x30, 0x01, 0x01]);
+final caDer = Uint8List.fromList([0x30, 0x01, 0x02]);
+
 class FakeHubs {
   FakeHubs({this.chain = const [leafCert, caCert], this.error});
 
@@ -47,16 +53,21 @@ class FakeHubs {
   /// Another failure instead of the certificate's (e.g. "hub connection").
   String? error;
 
-  /// (url, trusted) per client built.
+  /// (url, trusted leaf fingerprints) per client built.
   final calls = <(String, List<String>)>[];
 
+  /// The full trust passed to each client built.
+  final trust = <List<TrustedHubCertificate>>[];
+
   void install() => SyncStore.clientFactory = (vault, url, token, trusted) {
-        calls.add((url, List.of(trusted)));
-        return FakeSync(this, trusted);
+        final fingerprints = [for (final t in trusted) t.sha256];
+        calls.add((url, fingerprints));
+        trust.add(List.of(trusted));
+        return FakeSync(this, fingerprints);
       };
 
-  static void uninstall() => SyncStore.clientFactory =
-      (vault, url, token, trusted) => NotesSync.withTrusted(vault: vault, url: url, token: token, trusted: trusted);
+  static void uninstall() => SyncStore.clientFactory = (vault, url, token, trusted) =>
+      NotesSync.withTrustedCertificates(vault: vault, url: url, token: token, trusted: trusted);
 }
 
 class FakeSync implements NotesSync {
@@ -81,6 +92,10 @@ class FakeSync implements NotesSync {
 
   @override
   List<CertificateInfo>? untrustedCertificate() => _ok || hubs.error != null ? null : hubs.chain;
+
+  @override
+  List<Uint8List>? untrustedCertificateDer() =>
+      _ok || hubs.error != null ? null : [leafDer, caDer].take(hubs.chain.length).toList();
 
   @override
   Future<void> start({required SyncOptions options}) async {}

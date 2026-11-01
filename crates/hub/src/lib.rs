@@ -2,13 +2,14 @@
 //! [`vault_sync::Hub::handle`], and device tokens issued after an OIDC
 //! login (Authentik), behind a TLS proxy (Caddy).
 //!
-//! Routes, config and the login sequence: `wiki/architecture/hub.md`.
+//! Routes, config and the login sequence: `wiki/sync/hub.md`.
 
 pub mod agent;
 mod agent_token_api;
 pub mod agent_tokens;
 pub mod config;
 mod hosts;
+mod html;
 mod jobs;
 mod login;
 mod mcp;
@@ -16,6 +17,8 @@ mod mcp_agent;
 mod mcp_log;
 mod mcp_oauth;
 mod oidc;
+mod render;
+mod web;
 
 use std::io;
 use std::net::SocketAddr;
@@ -24,7 +27,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use axum::body::Body;
-use axum::extract::{ConnectInfo, DefaultBodyLimit, Path, Query, Request, State};
+use axum::extract::{ConnectInfo, DefaultBodyLimit, Request, State};
 use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
@@ -63,6 +66,8 @@ pub(crate) struct AppState {
     schedule_runner: std::sync::Mutex<Option<vault_agent::schedules::RunningScheduler>>,
     /// The jobs API (`jobs` tool) and its worker's state.
     pub jobs: jobs::Jobs,
+    /// The web viewer: sessions and shares.
+    pub web: web::Web,
 }
 
 /// Opens (creating it on first start) the vault replica at
@@ -72,7 +77,13 @@ pub fn open_hub(config: &Config) -> Result<Arc<Hub>, String> {
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let vault = Vault::open(dir.to_string_lossy().into_owned())
         .map_err(|e| format!("open vault {}: {e}", dir.display()))?;
-    Hub::new(Arc::new(vault)).map_err(|e| e.to_string())
+    let hub = Hub::new(Arc::new(vault)).map_err(|e| e.to_string())?;
+    // Session proofs name the public URL's origin; without one, the Host.
+    hub.set_key_policy(vault_sync::KeyPolicy {
+        public_url: Some(config.public_url.trim().to_string()).filter(|u| !u.is_empty()),
+        require_device_keys: config.require_device_keys,
+    });
+    Ok(hub)
 }
 
 /// A running `notes-hub`.
@@ -247,6 +258,9 @@ pub async fn start_with(
         None
     };
     let hub_vault = hub.vault().clone();
+    let addr = listener.local_addr().map_err(|e| e.to_string())?;
+    let base = link_base(&config, addr.port());
+    let web = web::Web::open(&config.vault_dir(), base.clone(), login.is_some());
     let state = Arc::new(AppState {
         hub,
         stopping: AtomicBool::new(false),
@@ -266,6 +280,7 @@ pub async fn start_with(
             config.job_limits.clone(),
             config.agent.enabled,
         ),
+        web,
     });
     tokio::spawn(jobs::run_worker(state.clone()));
     if state.agent.enabled() {
@@ -276,8 +291,6 @@ pub async fn start_with(
             let _ = st.agent.get().await;
         });
     }
-    let addr = listener.local_addr().map_err(|e| e.to_string())?;
-    let base = link_base(&config, addr.port());
     vault_tools::set_link_base(Some(base.as_str()));
     let app = router(state.clone());
     let (tx, rx) = oneshot::channel::<()>();
@@ -315,29 +328,6 @@ fn link_base(config: &Config, port: u16) -> String {
     format!("http://127.0.0.1:{port}")
 }
 
-#[derive(serde::Deserialize)]
-struct OpenQuery {
-    block: Option<String>,
-}
-
-/// `GET /open/<page id>[?block=<block id>]`: a page that bounces to the
-/// `notes://page/...` link, which opens the Scratch client. Public: it shows
-/// nothing beyond the ids in the URL. The page and its id checks are shared
-/// with the desktop's embedded hub ([`vault_sync::open`]).
-async fn open_page(Path(page): Path<String>, Query(q): Query<OpenQuery>) -> Response {
-    match vault_sync::bounce_page(&page, q.block.as_deref()) {
-        Ok(html) => (
-            [
-                (header::CONTENT_TYPE, vault_sync::open::CONTENT_TYPE),
-                (header::CACHE_CONTROL, vault_sync::open::CACHE_CONTROL),
-            ],
-            html,
-        )
-            .into_response(),
-        Err(msg) => (StatusCode::BAD_REQUEST, format!("{msg}\n")).into_response(),
-    }
-}
-
 fn router(state: Arc<AppState>) -> Router {
     let mut app = Router::new()
         .route(
@@ -353,12 +343,26 @@ fn router(state: Arc<AppState>) -> Router {
                             vault_sync::PURGE_DEVICE_CAPABILITY_HEADER,
                             vault_sync::PURGE_DEVICE_CAPABILITY,
                         ),
+                        (
+                            vault_sync::DEVICE_KEYS_CAPABILITY_HEADER,
+                            vault_sync::DEVICE_KEYS_CAPABILITY,
+                        ),
                     ],
                     "notes-hub",
                 )
             }),
         )
-        .route("/open/{id}", get(open_page))
+        // `/open/<id>`: the bounce page, or the rendered page for a web
+        // session (`web.rs`).
+        .route("/open/{id}", get(web::open_page))
+        .route("/open/{id}/a/{asset}", get(web::open_asset))
+        .route("/s/{token}", get(web::share_page))
+        .route("/s/{token}/a/{asset}", get(web::share_asset))
+        .route("/shares", get(web::list).post(web::create))
+        .route("/shares/{id}", axum::routing::delete(web::revoke))
+        .route("/icon.png", get(web::icon))
+        .route("/auth/web", get(login::web_start))
+        .route("/auth/web/logout", post(web::logout))
         .route("/auth/start", get(login::start))
         .route("/auth/callback", get(login::callback))
         .route("/auth/redeem", post(login::redeem))

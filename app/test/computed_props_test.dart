@@ -21,13 +21,12 @@ Future<List<PropDef>> _schema(WidgetTester tester, String collection) async {
 Future<Map<String, PropDef>> _addToProjects(WidgetTester tester, List<PropDef> defs) async {
   final old = await _schema(tester, db.projects);
   final saved = await core(tester, (v) => v.run((x) => x.setSchema(collection: db.projects, schema: [...old, ...defs]), writes: true));
-  final views = await core(tester, (v) => v.run((x) => x.listViews(collection: db.projects)));
-  final table = views.firstWhere((v) => v.name == 'Table');
+  // The Table tab is a view block: save it through the open view.
+  await settle(tester);
+  final store = dbState(tester).store;
+  final table = store.views.firstWhere((v) => v.name == 'Table');
   final added = [for (final d in saved) if (!old.any((o) => o.key == d.key)) d.key];
-  await core(
-      tester,
-      (v) => v.run((x) => x.updateView(collection: db.projects, view: table.copyWith(visibleProps: [...added, ...table.visibleProps])),
-          writes: true));
+  await tester.runAsync(() => store.updateView(table.copyWith(visibleProps: [...added, ...table.visibleProps])));
   await settleUntil(tester, () => defs.every((d) => byKey('col-${d.name}').evaluate().isNotEmpty));
   return {for (final d in saved) d.name: d};
 }

@@ -11,10 +11,10 @@ use notes_hub::agent_tokens::{AgentScope, AgentTokens};
 use notes_hub::{AgentSection, Config, JobLimits, Server};
 use reqwest::Client;
 use serde_json::{json, Value};
-use vault_agent::bubblepaw_core::ToolCall;
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::tools::ToolCall;
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
 use vault_agent::TestHooks;
-use vault_core::{new_id, Vault};
+use vault_core::{new_id, BlockKind, Vault};
 
 struct TempDir(PathBuf);
 
@@ -83,6 +83,7 @@ async fn env_with(
         trust_proxy: false,
         agent: AgentSection {
             default_model: "scripted/scripted".into(),
+            models: vec!["scripted/scripted".into()],
             ..AgentSection::default()
         },
         job_limits: limits,
@@ -105,7 +106,7 @@ async fn env_with(
         .unwrap();
     let url = format!("http://{}/mcp", server.addr());
     let hub = server.hub().clone();
-    let device = tokio::task::spawn_blocking(move || hub.pair("phone"))
+    let device = tokio::task::spawn_blocking(move || hub.pair_legacy_token("phone"))
         .await
         .unwrap()
         .unwrap();
@@ -258,6 +259,47 @@ impl Env {
 
 fn sleep_call(ms: u64) -> ToolCall {
     call("test_sleep", json!({"ms": ms}))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_hub_job_reports_progress_even_with_the_read_tool_set() {
+    let env = env(
+        steps(vec![call(
+            "report_progress",
+            json!({"message":"  Read the references  "}),
+        )]),
+        "Finished.",
+    )
+    .await;
+    let job = env
+        .jobs(
+            &env.writer,
+            json!({
+                "action":"create", "prompt":"Read references", "tools":"read"
+            }),
+        )
+        .await
+        .unwrap();
+    let id = job["id"].as_str().unwrap().to_string();
+    let done = env.finished(&env.writer, &id).await;
+    assert_eq!(done["status"], "completed", "{done}");
+    let vault = env.vault().clone();
+    tokio::task::spawn_blocking(move || {
+        let row = vault.load_page(id).unwrap();
+        let prop = |key: &str| {
+            row.properties
+                .iter()
+                .find_map(|p| match &p.value {
+                    vault_core::PropValue::Text(text) if p.key == key => Some(text.clone()),
+                    _ => None,
+                })
+                .unwrap_or_default()
+        };
+        assert_eq!(prop("progress"), "Read the references");
+        assert!(prop("progress_at").parse::<i64>().unwrap() > 0);
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -496,7 +538,7 @@ async fn queue_wait_and_run_limits() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn ended_jobs_are_trashed_after_the_keep_time() {
+async fn an_ended_jobs_session_expires_after_the_keep_time_but_the_row_stays() {
     let limits = JobLimits {
         keep: Duration::from_secs(1),
         ..fast_limits()
@@ -507,24 +549,31 @@ async fn ended_jobs_are_trashed_after_the_keep_time() {
     let done = env.finished(&env.writer, &id).await;
     assert_eq!(done["status"], "completed", "{done}");
 
+    // The session (transcript and logs) expires; the row and its outcome stay.
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
-        match env.jobs(&env.writer, json!({"action":"get", "job":id})).await {
-            Err(e) => {
-                assert!(e.contains("no such job"), "{e}");
-                break;
-            }
-            Ok(_) => {
-                assert!(Instant::now() < deadline, "the job was never trashed");
-                tokio::time::sleep(Duration::from_millis(100)).await;
-            }
+        let vault = env.vault().clone();
+        let job_id = id.clone();
+        let cleared = std::thread::spawn(move || {
+            vault_mcp::jobs::get(&vault, &job_id)
+                .unwrap()
+                .map(|j| j.session.is_empty())
+        })
+        .join()
+        .unwrap();
+        if cleared == Some(true) {
+            break;
         }
+        assert!(Instant::now() < deadline, "the session never expired");
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
+    let kept = env.finished(&env.writer, &id).await;
+    assert_eq!(kept["status"], "completed", "{kept}");
     let vault = env.vault().clone();
     let trashed = std::thread::spawn(move || vault.load_page(id).unwrap().in_trash)
         .join()
         .unwrap();
-    assert!(trashed);
+    assert!(!trashed);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -693,7 +742,7 @@ async fn any_device_cancels_a_device_job_but_agents_do_not_see_it() {
     // Another signed-in device, with its own token (a device token stays
     // bound to the device that first used it).
     let hub = env.server.as_ref().unwrap().hub().clone();
-    let phone = tokio::task::spawn_blocking(move || hub.pair("phone2"))
+    let phone = tokio::task::spawn_blocking(move || hub.pair_legacy_token("phone2"))
         .await
         .unwrap()
         .unwrap();
@@ -728,4 +777,82 @@ async fn any_device_cancels_a_device_job_but_agents_do_not_see_it() {
     assert_eq!(cancelled["status"], "cancelled", "{cancelled}");
     let md = page_markdown(env.vault(), &page);
     assert!(md.contains("AI task cancelled"), "{md}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_job_leaves_its_todo_subtasks_nested_under_its_placeholder() {
+    // Three todo replacements, then the final reply. Each replacement mirrors
+    // into the placeholder; the run drains them before the job completes.
+    // The todo tool takes the whole list as {items: [...]}; the saved state is
+    // the bare array the mirror reads.
+    let todo = |items: Value| call("todo", json!({"items": items}));
+    let env = env(
+        steps(vec![
+            todo(json!([
+                {"text": "Read the notes", "status": "pending"},
+                {"text": "Draft", "status": "pending"}
+            ])),
+            todo(json!([
+                {"text": "Read the notes", "status": "done"},
+                {"text": "Draft", "status": "in_progress"}
+            ])),
+            todo(json!([
+                {"text": "Read the notes", "status": "done"},
+                {"text": "Draft", "status": "done"},
+                {"text": "Publish", "status": "pending"}
+            ])),
+        ]),
+        "All done.",
+    )
+    .await;
+    let vault = env.vault().clone();
+    let (page, first) = std::thread::spawn(move || {
+        let page = vault.create_page(None, "Writing plan".into()).unwrap();
+        let ids = vault
+            .insert_markdown(page.clone(), None, None, true, "First line".into())
+            .unwrap();
+        (page, ids[0].clone())
+    })
+    .join()
+    .unwrap();
+    let job = env
+        .device_jobs(
+            "laptop",
+            json!({"action":"create", "prompt":"Write the post",
+                   "page":page, "after":first}),
+        )
+        .await
+        .unwrap();
+    let id = job["id"].as_str().unwrap().to_string();
+    let done = env.device_finished("laptop", &id).await;
+    assert_eq!(done["status"], "completed", "{done}");
+    assert_eq!(done["result"], "All done.", "{done}");
+
+    let vault = env.vault().clone();
+    let doc = std::thread::spawn(move || vault.load_page(page).unwrap())
+        .join()
+        .unwrap();
+    assert_eq!(doc.blocks[0].text, "First line");
+    let at = doc
+        .blocks
+        .iter()
+        .position(|b| b.text.starts_with("AI task done"))
+        .unwrap_or_else(|| panic!("no placeholder left"));
+    assert_eq!(at, 1, "placeholder moved");
+    let subtasks: Vec<(String, bool)> = doc.blocks[at]
+        .children
+        .iter()
+        .filter(|c| c.kind == BlockKind::Todo)
+        .map(|c| (c.text.clone(), c.checked))
+        .collect();
+    assert_eq!(
+        subtasks,
+        vec![
+            ("Read the notes".to_string(), true),
+            ("Draft".to_string(), true),
+            ("Publish".to_string(), false),
+        ]
+    );
+    // The final reply goes after the placeholder, not inside it.
+    assert_eq!(doc.blocks[at + 1].text, "All done.");
 }

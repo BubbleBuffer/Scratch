@@ -316,12 +316,12 @@ fn store_attachment(root: &Path, db: &Index, src: &Path) -> Result<String> {
 
 // ------------------------------------------------------------ import
 
-/// Points embeds at the new ids of the pages this import created from their
-/// source ids. Targets that are not in `ids`, or that map to `None` (shared
+/// Points embeds and contents views at the new ids created from their source
+/// ids. Targets that are not in `ids`, or that map to `None` (shared
 /// by several files), are left exactly as they were.
 fn remap_embeds(blocks: &mut [Block], ids: &HashMap<String, Option<String>>) {
     for b in blocks {
-        if b.kind == BlockKind::Embed {
+        if matches!(b.kind, BlockKind::Embed | BlockKind::View) {
             if let Some(new) = b
                 .target
                 .as_ref()

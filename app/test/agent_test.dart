@@ -7,7 +7,7 @@
 // - an approval card decides (fake state), while the shipped bridge
 //   runs Confirm tools without asking in Bypass;
 // - while a run is going, Send says Steer and Stop cancels it;
-// - turning the agent off in Settings > AI hides the sidebar row;
+// - turning the agent off in Settings > Agent hides the sidebar row;
 // - an AI task with the Agent runner ends done;
 // - closing the agent ends its event stream at once.
 
@@ -21,7 +21,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/debounce.dart';
 import 'package:notes_app/addons/agent/api.dart';
-import 'package:notes_app/ui/ui.dart' show TextBtn;
 import 'package:notes_app/features/ai/ai_settings.dart';
 import 'package:notes_app/features/ai/ai_store.dart';
 import 'package:notes_app/src/rust/api/ai.dart';
@@ -33,22 +32,28 @@ import 'ai_test.dart' show aiStore, closeAi;
 import 'harness.dart';
 import 'sync_helpers.dart';
 
-/// BubblePaw's fake extension: NOTES_FAKE_EXTENSION, or its debug build
-/// next to this repo.
-String fakeExtension() {
+/// The fake extension built from the public BubblePaw-Core revision pinned
+/// in Cargo.lock. CI builds it and sets NOTES_FAKE_EXTENSION explicitly;
+/// local tests use the same override without assuming a sibling checkout.
+String? get fakeExtensionSkipReason {
   final forced = Platform.environment['NOTES_FAKE_EXTENSION'];
-  if (forced != null && forced.isNotEmpty) return forced;
-  final repo = File(bridgeLibrary()).parent.parent.parent;
-  final sep = Platform.pathSeparator;
-  final p =
-      '${repo.parent.path}${sep}BubblePaw-base-agent${sep}target${sep}debug$sep'
-      'bubblepaw-fake-extension${Platform.isWindows ? '.exe' : ''}';
-  if (!File(p).existsSync()) {
-    fail(
-      'build BubblePaw\'s fake extension (cargo build -p bubblepaw-fake-extension) or set NOTES_FAKE_EXTENSION ($p)',
-    );
+  if (forced == null || forced.isEmpty) {
+    return 'Agent tests require NOTES_FAKE_EXTENSION. Build the public '
+        'BubbleBuffer/BubblePaw-Core revision pinned in Cargo.lock with '
+        '`cargo build -p bubblepaw-runner --features test-fixtures '
+        '--bin bubblepaw-fake-extension`, then set NOTES_FAKE_EXTENSION '
+        'to that executable (see .github/workflows/ci.yml).';
   }
-  return p;
+  if (!File(forced).existsSync()) {
+    return 'NOTES_FAKE_EXTENSION does not name an existing executable: $forced';
+  }
+  return null;
+}
+
+String fakeExtension() {
+  final reason = fakeExtensionSkipReason;
+  if (reason != null) fail(reason);
+  return Platform.environment['NOTES_FAKE_EXTENSION']!;
 }
 
 /// Agent settings with the fake extension as Claude Code.
@@ -128,12 +133,17 @@ String buttonLabel(WidgetTester tester, String k) => tester
 // aborts this cell; successful tests do not wait for its natural completion.
 const busyScript = 'const t = Date.now(); while (Date.now() - t < 30000) {} 1';
 
+/// The summary line that opens a turn's work.
+Finder workToggle(String turnId) => find
+    .descendant(of: key('agent-work-$turnId'), matching: find.byType(Text))
+    .first;
+
 /// The opened result of the session's last `js` cell.
 Future<String> lastCellResult(WidgetTester tester, AgentStore store) async {
   final call = store.state!.messages.expand((m) => m.toolCalls).last;
   final run = store.state!.runs.last;
   if (key('agent-cell-${call.id}-toggle').evaluate().isEmpty) {
-    await tapAndSettle(tester, key('agent-work-${run.id}-toggle'));
+    await tapAndSettle(tester, workToggle(run.id));
     await tapAndSettle(tester, key('agent-work-${run.id}-code'));
   }
   await tapAndSettle(tester, key('agent-cell-${call.id}-toggle'));
@@ -141,6 +151,10 @@ Future<String> lastCellResult(WidgetTester tester, AgentStore store) async {
 }
 
 void main() {
+  group('Agent integration', _agentTests, skip: fakeExtensionSkipReason);
+}
+
+void _agentTests() {
   setUpAll(initCore);
 
   appTest('chats: create, rename and delete', (tester) async {
@@ -262,7 +276,7 @@ void main() {
     final call = store.state!.messages.expand((m) => m.toolCalls).single;
     final cell = 'agent-cell-${call.id}';
     expect(key(cell), findsNothing);
-    await tapAndSettle(tester, key('agent-work-${run!.id}-toggle'));
+    await tapAndSettle(tester, workToggle(run!.id));
     expect(key(cell), findsNothing);
     await tapAndSettle(tester, key('agent-work-${run.id}-code'));
     expect(key(cell), findsOneWidget);
@@ -306,25 +320,45 @@ void main() {
     );
     store.debugAddApproval(approval('a1'));
     await settle(tester);
-    expect(textOf(tester, 'agent-approval-tool-a1'), 'delete_page');
+    // The bar names the tool and its key argument on one line; the full
+    // arguments are one click away.
+    expect(find.text('Needs approval'), findsOneWidget);
     expect(
-      textOf(tester, 'agent-approval-args-a1'),
-      contains('"page": "Garden plan"'),
+      find.descendant(of: key('agent-approval-a1'), matching: find.text('delete_page')),
+      findsOneWidget,
     );
-    expect(key('agent-approve-a1'), findsOneWidget);
-    expect(key('agent-approve-session-a1'), findsOneWidget);
-    await tapAndSettle(tester, key('agent-approve-a1'));
+    expect(
+      find.descendant(of: key('agent-approval-a1'), matching: find.text('Garden plan')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('"permanent"'), findsNothing);
+    await tapAndSettle(tester, find.text('Details'));
+    expect(find.textContaining('"page": "Garden plan"'), findsOneWidget);
+    expect(find.text('For session'), findsOneWidget);
+    await tapAndSettle(tester, find.text('Approve'));
     expect(key('agent-approval-a1'), findsNothing);
 
     // Deny opens an optional reason, then decides.
     store.debugAddApproval(approval('a2'));
     await settle(tester);
-    await tapAndSettle(tester, key('agent-deny-a2'));
-    expect(key('agent-deny-reason-a2'), findsOneWidget);
-    expect(key('agent-approve-a2'), findsNothing);
-    await enterField(tester, 'agent-deny-reason-a2', 'Keep it');
-    await tapAndSettle(tester, key('agent-deny-confirm-a2'));
+    await tapAndSettle(tester, find.text('Deny'));
+    expect(find.text('Approve'), findsNothing);
+    final reason = find.descendant(
+      of: key('agent-approval-a2'),
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(reason, 'Keep it');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await settle(tester);
     expect(key('agent-approval-a2'), findsNothing);
+
+    // 1, 2 and 3 answer while the composer is empty.
+    store.debugAddApproval(approval('a3'));
+    await settle(tester);
+    expect(key('agent-approval-a3'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+    await settle(tester);
+    expect(key('agent-approval-a3'), findsNothing);
   });
 
   appTest('Confirm tools run without approval in the shipped Bypass agent', (
@@ -441,14 +475,14 @@ void main() {
     expect(find.text('Stopped.'), findsOneWidget);
   });
 
-  appTest('turning the agent off in Settings > AI hides its sidebar row', (
+  appTest('turning the agent off in Settings > Agent hides its sidebar row', (
     tester,
   ) async {
     await pumpApp(tester, mobile: false);
     final store = await openAgentStore(tester);
     expect(key('sidebar-agent'), findsOneWidget);
     await tapAndSettle(tester, key('sidebar-settings'));
-    await tapAndSettle(tester, key('settings-nav-ai'));
+    await tapAndSettle(tester, key('settings-nav-agent'));
     expect(key('agent-enabled-toggle'), findsOneWidget);
     await tapAndSettle(tester, key('agent-enabled-toggle'));
     await settleUntil(tester, () => !store.isOpen);
@@ -470,7 +504,7 @@ void main() {
     expect(store.hostInfo?.packs, contains('desktop'));
     expect(store.hostInfo?.tools, contains('exec'));
     await tapAndSettle(tester, key('sidebar-settings'));
-    await tapAndSettle(tester, key('settings-nav-ai'));
+    await tapAndSettle(tester, key('settings-nav-agent'));
     expect(key('agent-desktop-tools'), findsOneWidget);
     expect(key('agent-permissions'), findsNothing);
     expect(key('agent-projects'), findsOneWidget);
@@ -589,7 +623,7 @@ void main() {
     expect(store.state!.session.projectId, store.projects.single.id);
   });
 
-  appTest('projects settings block last removal and hide permission controls', (
+  appTest('projects settings keep the last folder and hide permission controls', (
     tester,
   ) async {
     await pumpApp(tester, mobile: false);
@@ -597,14 +631,16 @@ void main() {
     final ai = await aiStore(tester, settings: store.settings);
     try {
       await tapAndSettle(tester, key('sidebar-settings'));
-      await tapAndSettle(tester, key('settings-nav-ai'));
+      await tapAndSettle(tester, key('settings-nav-agent'));
       expect(key('agent-permissions'), findsNothing);
       expect(find.text('Permissions'), findsNothing);
       expect(key('agent-projects'), findsOneWidget);
-      final removal = tester.widget<TextBtn>(
+      // The last folder has no remove button at all now; the page says why.
+      expect(
         key('agent-project-remove-${store.projects.single.id}'),
+        findsNothing,
       );
-      expect(removal.onTap, isNull);
+      expect(find.textContaining('so far'), findsOneWidget);
     } finally {
       await closeAi(tester, ai);
     }
@@ -674,10 +710,10 @@ void main() {
       ),
     );
     await settle(tester);
-    expect(
-      textOf(tester, 'agent-approval-args-project-open'),
-      'Open folder C:/Work/Garden as project Garden?',
-    );
+    expect(find.text('project_open'), findsOneWidget);
+    expect(find.text('C:/Work/Garden'), findsOneWidget);
+    await tapAndSettle(tester, find.text('Details'));
+    expect(find.textContaining('"name": "Garden"'), findsOneWidget);
   });
 
   appTest('task availability follows host capabilities', (tester) async {

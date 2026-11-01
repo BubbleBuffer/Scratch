@@ -6,8 +6,10 @@ use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
 use serde_json::json;
-use vault_agent::bubblepaw_core::{ClientInfo, EventKind, ToolCall};
-use vault_agent::bubblepaw_runner::provider::ScriptedStep;
+use vault_agent::bubblepaw_sdk::harness::{ClientInfo};
+use vault_agent::bubblepaw_sdk::events::{EventKind};
+use vault_agent::bubblepaw_sdk::tools::{ToolCall};
+use vault_agent::bubblepaw_sdk::providers::ScriptedStep;
 use vault_agent::mcp::{self, McpServerSettings, McpSettings, ServerState};
 use vault_agent::{Agent, AgentConfig, Forwarded, HostKind, PermissionMode, TestHooks};
 use vault_core::Vault;
@@ -60,7 +62,8 @@ fn open(
         AgentConfig {
             data_dir: dir.path().join("data"),
             default_model: "scripted/scripted".into(),
-            bun_path: Some(dir.path().join("missing-test-bun")),
+            // A missing extension folder disables Claude Code deterministically.
+            claude_code_dir: Some(dir.path().join("missing-test-claude-code")),
             permission_mode: PermissionMode::Manual,
             host_kind,
             mcp,
@@ -83,7 +86,7 @@ fn relay_names(agent: &Agent) -> Vec<String> {
         .collect()
 }
 
-fn relay_echo(agent: &Agent, text: &str) -> vault_agent::bubblepaw_core::ToolResult {
+fn relay_echo(agent: &Agent, text: &str) -> vault_agent::bubblepaw_sdk::tools::ToolResult {
     let session = agent.create_session("relay").unwrap();
     agent
         .relay_call(

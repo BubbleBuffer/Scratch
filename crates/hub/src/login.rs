@@ -1,5 +1,7 @@
 //! The login routes: `/auth/start`, `/auth/callback`, `POST /auth/redeem`
-//! and `POST /auth/signout`. Started logins (10 min) and one-time codes
+//! and `POST /auth/signout`, and `/auth/web`, the browser login of the web
+//! viewer (same provider and callback; it ends in a web session cookie,
+//! see `web.rs`). Started logins (10 min) and one-time codes
 //! (2 min) live in memory, keyed by the SHA-256 of their secret.
 
 use std::collections::HashMap;
@@ -30,11 +32,22 @@ const MAX_PENDING: usize = 10_000;
 struct Pending {
     nonce: Nonce,
     verifier: PkceCodeVerifier,
-    device: String,
-    name: String,
-    redirect: Url,
-    app_state: Option<String>,
+    flow: Flow,
     expires: Instant,
+}
+
+/// Where a login goes once the provider sends the browser back.
+enum Flow {
+    /// The app: a one-time code for a device token, sent to `redirect`.
+    App {
+        device: String,
+        name: String,
+        redirect: Url,
+        app_state: Option<String>,
+    },
+    /// The web viewer: a session cookie, then back to `return_to` (a path
+    /// checked by [`crate::web::valid_return`]).
+    Web { return_to: String },
 }
 
 struct Issued {
@@ -252,6 +265,44 @@ pub(crate) async fn start(
     if p.state.as_ref().is_some_and(|s| s.len() > 512) {
         return page(StatusCode::BAD_REQUEST, "The app's state is too long.");
     }
+    begin(
+        login,
+        Flow::App {
+            device,
+            name,
+            redirect,
+            app_state: p.state,
+        },
+    )
+    .await
+}
+
+#[derive(Deserialize)]
+pub(crate) struct WebStartParams {
+    #[serde(rename = "return")]
+    return_to: Option<String>,
+}
+
+/// `GET /auth/web?return=/open/<id>|/s/<token>`: the browser login of the
+/// web viewer.
+pub(crate) async fn web_start(
+    State(state): State<Arc<AppState>>,
+    Query(p): Query<WebStartParams>,
+) -> Response {
+    let Some(login) = state.login.as_ref() else {
+        return not_configured();
+    };
+    let Some(return_to) = p.return_to.filter(|r| crate::web::valid_return(r)) else {
+        return page(
+            StatusCode::BAD_REQUEST,
+            "The return address is not allowed.",
+        );
+    };
+    begin(login, Flow::Web { return_to }).await
+}
+
+/// Starts a login at the provider and remembers it until the callback.
+async fn begin(login: &Login, flow: Flow) -> Response {
     let started = match login.oidc.start().await {
         Ok(s) => s,
         Err(e) => {
@@ -277,10 +328,7 @@ pub(crate) async fn start(
             Pending {
                 nonce: started.nonce,
                 verifier: started.verifier,
-                device,
-                name,
-                redirect,
-                app_state: p.state,
+                flow,
                 expires: now + PENDING_TTL,
             },
         );
@@ -308,8 +356,27 @@ pub(crate) async fn callback(
             "This sign-in has expired or was already used. Start again from the app.",
         );
     };
-    let app_state = pending.app_state.as_deref();
-    let fail = |error: &str| to_app(&pending.redirect, &[("error", error)], app_state);
+    let (device, name, redirect, app_state) = match pending.flow {
+        Flow::App {
+            device,
+            name,
+            redirect,
+            app_state,
+        } => (device, name, redirect, app_state),
+        Flow::Web { return_to } => {
+            return web_callback(
+                &state,
+                login,
+                p,
+                pending.verifier,
+                &pending.nonce,
+                &return_to,
+            )
+            .await
+        }
+    };
+    let app_state = app_state.as_deref();
+    let fail = |error: &str| to_app(&redirect, &[("error", error)], app_state);
     if let Some(e) = p.error {
         let e: String = e
             .chars()
@@ -330,7 +397,7 @@ pub(crate) async fn callback(
         Ok(u) => u,
         Err(e) => {
             tracing::warn!("login failed: {e}");
-            return to_app(&pending.redirect, &[("error", "login_failed")], app_state);
+            return to_app(&redirect, &[("error", "login_failed")], app_state);
         }
     };
     if !login.oidc.allowed(&user) {
@@ -339,15 +406,11 @@ pub(crate) async fn callback(
             email = user.email.as_deref().unwrap_or(""),
             "login refused: not in oidc.allowed_users or oidc.allowed_groups"
         );
-        return to_app(&pending.redirect, &[("error", "access_denied")], app_state);
+        return to_app(&redirect, &[("error", "access_denied")], app_state);
     }
     let account = account_of(&user);
-    let (hub, device, name) = (
-        state.hub.clone(),
-        pending.device.clone(),
-        pending.name.clone(),
-    );
-    let made = tokio::task::spawn_blocking(move || hub.login_device(&device, &name)).await;
+    let (hub, dev) = (state.hub.clone(), device.clone());
+    let made = tokio::task::spawn_blocking(move || hub.login_device(&dev, &name)).await;
     let (token, label) = match made {
         Ok(Ok(t)) => t,
         Ok(Err(e)) => {
@@ -364,18 +427,18 @@ pub(crate) async fn callback(
             let path =
                 std::path::PathBuf::from(state.hub.vault().root()).join(".vault/hub/tokens.json");
             tracing::warn!(path = %path.display(), error_kind, "login: device token refused");
-            return to_app(&pending.redirect, &[("error", "device_refused")], app_state);
+            return to_app(&redirect, &[("error", "device_refused")], app_state);
         }
         Err(e) => {
             tracing::error!("login: {e}");
-            return to_app(&pending.redirect, &[("error", "server_error")], app_state);
+            return to_app(&redirect, &[("error", "server_error")], app_state);
         }
     };
     let code = match random_hex() {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("login: {e}");
-            return to_app(&pending.redirect, &[("error", "server_error")], app_state);
+            return to_app(&redirect, &[("error", "server_error")], app_state);
         }
     };
     let ttl = Duration::from_millis(login.code_ttl_ms.load(Ordering::SeqCst));
@@ -385,18 +448,85 @@ pub(crate) async fn callback(
             token,
             label: label.clone(),
             account,
-            device: pending.device.clone(),
+            device,
             expires: Instant::now() + ttl,
         },
     );
     tracing::info!(sub = %user.sub, label = %label, "login: device signed in");
-    to_app(&pending.redirect, &[("code", &code)], app_state)
+    to_app(&redirect, &[("code", &code)], app_state)
+}
+
+/// The callback of a web viewer login: a session cookie for an allowed
+/// account, then back to the page.
+async fn web_callback(
+    state: &AppState,
+    login: &Login,
+    p: CallbackParams,
+    verifier: PkceCodeVerifier,
+    nonce: &Nonce,
+    return_to: &str,
+) -> Response {
+    if p.error.is_some() {
+        return page(
+            StatusCode::FORBIDDEN,
+            "The sign-in provider refused the sign-in.",
+        );
+    }
+    let Some(code) = p.code else {
+        return page(
+            StatusCode::BAD_REQUEST,
+            "The sign-in provider sent no code.",
+        );
+    };
+    let user = match login.oidc.finish(code, verifier, nonce).await {
+        Ok(u) => u,
+        Err(e) => {
+            tracing::warn!("web login failed: {e}");
+            return page(
+                StatusCode::FORBIDDEN,
+                "The sign-in could not be checked. Try again.",
+            );
+        }
+    };
+    if !login.oidc.allowed(&user) {
+        tracing::warn!(
+            sub = %user.sub,
+            email = user.email.as_deref().unwrap_or(""),
+            "web login refused: not in oidc.allowed_users or oidc.allowed_groups"
+        );
+        return page(
+            StatusCode::FORBIDDEN,
+            "This account may not view notes on this hub.",
+        );
+    }
+    let secret = match state.web.sessions.create(&account_of(&user)) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!("web login: {e}");
+            return page(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "The hub could not sign you in.",
+            );
+        }
+    };
+    tracing::info!(sub = %user.sub, "web login: signed in");
+    let mut r = found(return_to);
+    if let Ok(v) = crate::web::session_cookie(&secret).parse() {
+        r.headers_mut().insert(header::SET_COOKIE, v);
+    }
+    r
 }
 
 #[derive(Deserialize)]
 pub(crate) struct RedeemBody {
     code: String,
     device: String,
+    /// The device key (32 bytes, hex) and its key id: the new entry is
+    /// key-bound from the start, so the token alone buys only a session.
+    #[serde(default)]
+    pubkey: Option<String>,
+    #[serde(default)]
+    key_id: Option<String>,
 }
 
 pub(crate) async fn redeem(
@@ -407,13 +537,38 @@ pub(crate) async fn redeem(
         return not_configured();
     };
     // Taken on any attempt: a code is single use.
-    match login.take_code(&b.code) {
-        Some(i) if vault_sync::ct_eq(i.device.as_bytes(), b.device.as_bytes()) => no_store(
-            Json(json!({ "token": i.token, "label": i.label, "account": i.account }))
-                .into_response(),
-        ),
-        _ => json_error(StatusCode::BAD_REQUEST, "invalid_code"),
+    let i = match login.take_code(&b.code) {
+        Some(i) if vault_sync::ct_eq(i.device.as_bytes(), b.device.as_bytes()) => i,
+        _ => return json_error(StatusCode::BAD_REQUEST, "invalid_code"),
+    };
+    match (b.pubkey, b.key_id) {
+        (None, None) => {}
+        (Some(pubkey), Some(key_id)) => {
+            let (hub, token, device) = (state.hub.clone(), i.token.clone(), i.device.clone());
+            let bound = tokio::task::spawn_blocking(move || {
+                hub.bind_device_key(&token, &device, &pubkey, &key_id)
+            })
+            .await;
+            match bound {
+                Ok(Ok(())) => {}
+                Ok(Err(SyncError::Status(400, _))) => {
+                    return json_error(StatusCode::BAD_REQUEST, "invalid_key")
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!("redeem: binding the device key failed: {e}");
+                    return json_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error");
+                }
+                Err(e) => {
+                    tracing::error!("redeem: {e}");
+                    return json_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error");
+                }
+            }
+        }
+        _ => return json_error(StatusCode::BAD_REQUEST, "invalid_key"),
     }
+    no_store(
+        Json(json!({ "token": i.token, "label": i.label, "account": i.account })).into_response(),
+    )
 }
 
 pub(crate) async fn signout(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -427,14 +582,18 @@ pub(crate) async fn signout(State(state): State<Arc<AppState>>, headers: HeaderM
     };
     let hub = state.hub.clone();
     let t = token.clone();
-    match tokio::task::spawn_blocking(move || hub.sign_out(&t)).await {
-        Ok(Ok(true)) => {
-            // The device's agent sockets end with its token.
+    match tokio::task::spawn_blocking(move || hub.sign_out_device(&t)).await {
+        Ok(Ok(Some(device))) => {
+            // The device's agent sockets end with its token and sessions.
             state.agent.close_token(&token);
             state.hosts.close_token(&token);
+            if let Some(d) = device {
+                state.agent.close_device(&d);
+                state.hosts.close_device(&d);
+            }
             StatusCode::NO_CONTENT.into_response()
         }
-        Ok(Ok(false)) => json_error(StatusCode::UNAUTHORIZED, "unknown token"),
+        Ok(Ok(None)) => json_error(StatusCode::UNAUTHORIZED, "unknown token"),
         Ok(Err(e)) => {
             tracing::error!("signout: {e}");
             json_error(StatusCode::INTERNAL_SERVER_ERROR, "server_error")

@@ -7,7 +7,9 @@ import 'api/agent.dart';
 import 'api/ai.dart';
 import 'api/clock.dart';
 import 'api/sync.dart';
+import 'api/triage.dart';
 import 'api/types.dart';
+import 'api/update.dart';
 import 'api/vault.dart';
 
 import 'dart:async';
@@ -35,10 +37,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesHubPtr;
 
   CrossPlatformFinalizerArg
-  get rust_arc_decrement_strong_count_NotesMcpPtr => wire
-      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcpPtr;
-
-  CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_NotesSyncPtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesSyncPtr;
 
@@ -58,12 +56,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   NotesHub
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesHub(
-    dynamic raw,
-  );
-
-  @protected
-  NotesMcp
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
     dynamic raw,
   );
 
@@ -92,12 +84,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  NotesMcp
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-    dynamic raw,
-  );
-
-  @protected
   NotesSync
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesSync(
     dynamic raw,
@@ -118,12 +104,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   NotesHub
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesHub(
-    dynamic raw,
-  );
-
-  @protected
-  NotesMcp
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
     dynamic raw,
   );
 
@@ -256,6 +236,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentUiAction dco_decode_agent_ui_action(dynamic raw);
 
   @protected
+  AiRunner dco_decode_ai_runner(dynamic raw);
+
+  @protected
+  AiRunnerKind dco_decode_ai_runner_kind(dynamic raw);
+
+  @protected
+  AiRunnerList dco_decode_ai_runner_list(dynamic raw);
+
+  @protected
+  AiRunnerProject dco_decode_ai_runner_project(dynamic raw);
+
+  @protected
   AiTask dco_decode_ai_task(dynamic raw);
 
   @protected
@@ -309,6 +301,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CalendarCategory dco_decode_box_autoadd_calendar_category(dynamic raw);
 
   @protected
+  ChapterCard dco_decode_box_autoadd_chapter_card(dynamic raw);
+
+  @protected
   Condition dco_decode_box_autoadd_condition(dynamic raw);
 
   @protected
@@ -336,6 +331,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
   @protected
+  LegacyCard dco_decode_box_autoadd_legacy_card(dynamic raw);
+
+  @protected
   OutlineChapter dco_decode_box_autoadd_outline_chapter(dynamic raw);
 
   @protected
@@ -343,6 +341,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PagePrefsData dco_decode_box_autoadd_page_prefs_data(dynamic raw);
+
+  @protected
+  PointOfInterest dco_decode_box_autoadd_point_of_interest(dynamic raw);
 
   @protected
   PropDef dco_decode_box_autoadd_prop_def(dynamic raw);
@@ -375,6 +376,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt dco_decode_box_autoadd_u_64(dynamic raw);
 
   @protected
+  UpdateRelease dco_decode_box_autoadd_update_release(dynamic raw);
+
+  @protected
   VaultAgentDefaults dco_decode_box_autoadd_vault_agent_defaults(dynamic raw);
 
   @protected
@@ -402,7 +406,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ChangeKind dco_decode_change_kind(dynamic raw);
 
   @protected
+  ChapterCard dco_decode_chapter_card(dynamic raw);
+
+  @protected
+  ChapterSection dco_decode_chapter_section(dynamic raw);
+
+  @protected
+  ChapterStatus dco_decode_chapter_status(dynamic raw);
+
+  @protected
   ChatOutline dco_decode_chat_outline(dynamic raw);
+
+  @protected
+  CompactedHistory dco_decode_compacted_history(dynamic raw);
 
   @protected
   Condition dco_decode_condition(dynamic raw);
@@ -453,6 +469,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DateMarkRef dco_decode_date_mark_ref(dynamic raw);
 
   @protected
+  DownloadedUpdate dco_decode_downloaded_update(dynamic raw);
+
+  @protected
+  EpisodeAction dco_decode_episode_action(dynamic raw);
+
+  @protected
+  EpisodeCard dco_decode_episode_card(dynamic raw);
+
+  @protected
   ExternalSearchRow dco_decode_external_search_row(dynamic raw);
 
   @protected
@@ -474,6 +499,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GroupRow dco_decode_group_row(dynamic raw);
 
   @protected
+  HistorySegment dco_decode_history_segment(dynamic raw);
+
+  @protected
+  HistorySegmentKind dco_decode_history_segment_kind(dynamic raw);
+
+  @protected
   Hit dco_decode_hit(dynamic raw);
 
   @protected
@@ -490,6 +521,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ImportReport dco_decode_import_report(dynamic raw);
+
+  @protected
+  LegacyCard dco_decode_legacy_card(dynamic raw);
+
+  @protected
+  LegacyKind dco_decode_legacy_kind(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
@@ -551,6 +588,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<AgentToolCall> dco_decode_list_agent_tool_call(dynamic raw);
 
   @protected
+  List<AiRunner> dco_decode_list_ai_runner(dynamic raw);
+
+  @protected
+  List<AiRunnerProject> dco_decode_list_ai_runner_project(dynamic raw);
+
+  @protected
   List<AiTask> dco_decode_list_ai_task(dynamic raw);
 
   @protected
@@ -575,6 +618,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<Change> dco_decode_list_change(dynamic raw);
 
   @protected
+  List<ChapterSection> dco_decode_list_chapter_section(dynamic raw);
+
+  @protected
   List<Conflict> dco_decode_list_conflict(dynamic raw);
 
   @protected
@@ -590,6 +636,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ConflictSide> dco_decode_list_conflict_side(dynamic raw);
 
   @protected
+  List<EpisodeAction> dco_decode_list_episode_action(dynamic raw);
+
+  @protected
+  List<EpisodeCard> dco_decode_list_episode_card(dynamic raw);
+
+  @protected
   List<Filter> dco_decode_list_filter(dynamic raw);
 
   @protected
@@ -599,6 +651,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<GroupRow> dco_decode_list_group_row(dynamic raw);
 
   @protected
+  List<HistorySegment> dco_decode_list_history_segment(dynamic raw);
+
+  @protected
   List<Hit> dco_decode_list_hit(dynamic raw);
 
   @protected
@@ -606,6 +661,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<HitMove> dco_decode_list_hit_move(dynamic raw);
+
+  @protected
+  List<Uint8List> dco_decode_list_list_prim_u_8_strict(dynamic raw);
 
   @protected
   List<MatchedFilterValue> dco_decode_list_matched_filter_value(dynamic raw);
@@ -674,6 +732,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TrashedPage> dco_decode_list_trashed_page(dynamic raw);
 
   @protected
+  List<TriageActionDto> dco_decode_list_triage_action_dto(dynamic raw);
+
+  @protected
+  List<TriageProposalDto> dco_decode_list_triage_proposal_dto(dynamic raw);
+
+  @protected
+  List<TriageRunDto> dco_decode_list_triage_run_dto(dynamic raw);
+
+  @protected
+  List<TrustedHubCertificate> dco_decode_list_trusted_hub_certificate(
+    dynamic raw,
+  );
+
+  @protected
   List<VaultAgentModel> dco_decode_list_vault_agent_model(dynamic raw);
 
   @protected
@@ -687,6 +759,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MatchedFilterValue dco_decode_matched_filter_value(dynamic raw);
+
+  @protected
+  MessageRange dco_decode_message_range(dynamic raw);
 
   @protected
   MountInfo dco_decode_mount_info(dynamic raw);
@@ -723,6 +798,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiTask? dco_decode_opt_box_autoadd_ai_task(dynamic raw);
 
   @protected
+  ChapterCard? dco_decode_opt_box_autoadd_chapter_card(dynamic raw);
+
+  @protected
   Condition? dco_decode_opt_box_autoadd_condition(dynamic raw);
 
   @protected
@@ -749,6 +827,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
 
   @protected
+  LegacyCard? dco_decode_opt_box_autoadd_legacy_card(dynamic raw);
+
+  @protected
+  PointOfInterest? dco_decode_opt_box_autoadd_point_of_interest(dynamic raw);
+
+  @protected
   Resolution? dco_decode_opt_box_autoadd_resolution(dynamic raw);
 
   @protected
@@ -764,7 +848,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
 
   @protected
+  UpdateRelease? dco_decode_opt_box_autoadd_update_release(dynamic raw);
+
+  @protected
   List<CertificateInfo>? dco_decode_opt_list_certificate_info(dynamic raw);
+
+  @protected
+  List<Uint8List>? dco_decode_opt_list_list_prim_u_8_strict(dynamic raw);
 
   @protected
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
@@ -795,6 +885,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ParsedQuery dco_decode_parsed_query(dynamic raw);
+
+  @protected
+  PointOfInterest dco_decode_point_of_interest(dynamic raw);
 
   @protected
   Progress dco_decode_progress(dynamic raw);
@@ -875,6 +968,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SyncStatus dco_decode_sync_status(dynamic raw);
 
   @protected
+  TargetKind dco_decode_target_kind(dynamic raw);
+
+  @protected
   Token dco_decode_token(dynamic raw);
 
   @protected
@@ -882,6 +978,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TrashedPage dco_decode_trashed_page(dynamic raw);
+
+  @protected
+  TriageActionDto dco_decode_triage_action_dto(dynamic raw);
+
+  @protected
+  TriageProposalDto dco_decode_triage_proposal_dto(dynamic raw);
+
+  @protected
+  TriageRunDto dco_decode_triage_run_dto(dynamic raw);
+
+  @protected
+  TrustedHubCertificate dco_decode_trusted_hub_certificate(dynamic raw);
 
   @protected
   TypeDataListItem dco_decode_type_data_list_item(dynamic raw);
@@ -897,6 +1005,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void dco_decode_unit(dynamic raw);
+
+  @protected
+  UpdateCheck dco_decode_update_check(dynamic raw);
+
+  @protected
+  UpdateCheckStatus dco_decode_update_check_status(dynamic raw);
+
+  @protected
+  UpdateProgress dco_decode_update_progress(dynamic raw);
+
+  @protected
+  UpdateRelease dco_decode_update_release(dynamic raw);
 
   @protected
   BigInt dco_decode_usize(dynamic raw);
@@ -935,12 +1055,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  NotesMcp
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   NotesSync
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesSync(
     SseDeserializer deserializer,
@@ -965,12 +1079,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  NotesMcp
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   NotesSync
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesSync(
     SseDeserializer deserializer,
@@ -991,12 +1099,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   NotesHub
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesHub(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  NotesMcp
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
     SseDeserializer deserializer,
   );
 
@@ -1151,6 +1253,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentUiAction sse_decode_agent_ui_action(SseDeserializer deserializer);
 
   @protected
+  AiRunner sse_decode_ai_runner(SseDeserializer deserializer);
+
+  @protected
+  AiRunnerKind sse_decode_ai_runner_kind(SseDeserializer deserializer);
+
+  @protected
+  AiRunnerList sse_decode_ai_runner_list(SseDeserializer deserializer);
+
+  @protected
+  AiRunnerProject sse_decode_ai_runner_project(SseDeserializer deserializer);
+
+  @protected
   AiTask sse_decode_ai_task(SseDeserializer deserializer);
 
   @protected
@@ -1220,6 +1334,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ChapterCard sse_decode_box_autoadd_chapter_card(SseDeserializer deserializer);
+
+  @protected
   Condition sse_decode_box_autoadd_condition(SseDeserializer deserializer);
 
   @protected
@@ -1255,6 +1372,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
+  LegacyCard sse_decode_box_autoadd_legacy_card(SseDeserializer deserializer);
+
+  @protected
   OutlineChapter sse_decode_box_autoadd_outline_chapter(
     SseDeserializer deserializer,
   );
@@ -1266,6 +1386,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PagePrefsData sse_decode_box_autoadd_page_prefs_data(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PointOfInterest sse_decode_box_autoadd_point_of_interest(
     SseDeserializer deserializer,
   );
 
@@ -1304,6 +1429,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
+  UpdateRelease sse_decode_box_autoadd_update_release(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   VaultAgentDefaults sse_decode_box_autoadd_vault_agent_defaults(
     SseDeserializer deserializer,
   );
@@ -1333,7 +1463,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ChangeKind sse_decode_change_kind(SseDeserializer deserializer);
 
   @protected
+  ChapterCard sse_decode_chapter_card(SseDeserializer deserializer);
+
+  @protected
+  ChapterSection sse_decode_chapter_section(SseDeserializer deserializer);
+
+  @protected
+  ChapterStatus sse_decode_chapter_status(SseDeserializer deserializer);
+
+  @protected
   ChatOutline sse_decode_chat_outline(SseDeserializer deserializer);
+
+  @protected
+  CompactedHistory sse_decode_compacted_history(SseDeserializer deserializer);
 
   @protected
   Condition sse_decode_condition(SseDeserializer deserializer);
@@ -1396,6 +1538,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DateMarkRef sse_decode_date_mark_ref(SseDeserializer deserializer);
 
   @protected
+  DownloadedUpdate sse_decode_downloaded_update(SseDeserializer deserializer);
+
+  @protected
+  EpisodeAction sse_decode_episode_action(SseDeserializer deserializer);
+
+  @protected
+  EpisodeCard sse_decode_episode_card(SseDeserializer deserializer);
+
+  @protected
   ExternalSearchRow sse_decode_external_search_row(
     SseDeserializer deserializer,
   );
@@ -1419,6 +1570,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GroupRow sse_decode_group_row(SseDeserializer deserializer);
 
   @protected
+  HistorySegment sse_decode_history_segment(SseDeserializer deserializer);
+
+  @protected
+  HistorySegmentKind sse_decode_history_segment_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Hit sse_decode_hit(SseDeserializer deserializer);
 
   @protected
@@ -1435,6 +1594,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ImportReport sse_decode_import_report(SseDeserializer deserializer);
+
+  @protected
+  LegacyCard sse_decode_legacy_card(SseDeserializer deserializer);
+
+  @protected
+  LegacyKind sse_decode_legacy_kind(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
@@ -1522,6 +1687,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<AiRunner> sse_decode_list_ai_runner(SseDeserializer deserializer);
+
+  @protected
+  List<AiRunnerProject> sse_decode_list_ai_runner_project(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<AiTask> sse_decode_list_ai_task(SseDeserializer deserializer);
 
   @protected
@@ -1554,6 +1727,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<Change> sse_decode_list_change(SseDeserializer deserializer);
 
   @protected
+  List<ChapterSection> sse_decode_list_chapter_section(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<Conflict> sse_decode_list_conflict(SseDeserializer deserializer);
 
   @protected
@@ -1577,6 +1755,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<EpisodeAction> sse_decode_list_episode_action(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<EpisodeCard> sse_decode_list_episode_card(SseDeserializer deserializer);
+
+  @protected
   List<Filter> sse_decode_list_filter(SseDeserializer deserializer);
 
   @protected
@@ -1586,6 +1772,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<GroupRow> sse_decode_list_group_row(SseDeserializer deserializer);
 
   @protected
+  List<HistorySegment> sse_decode_list_history_segment(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<Hit> sse_decode_list_hit(SseDeserializer deserializer);
 
   @protected
@@ -1593,6 +1784,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<HitMove> sse_decode_list_hit_move(SseDeserializer deserializer);
+
+  @protected
+  List<Uint8List> sse_decode_list_list_prim_u_8_strict(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<MatchedFilterValue> sse_decode_list_matched_filter_value(
@@ -1675,6 +1871,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TrashedPage> sse_decode_list_trashed_page(SseDeserializer deserializer);
 
   @protected
+  List<TriageActionDto> sse_decode_list_triage_action_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<TriageProposalDto> sse_decode_list_triage_proposal_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<TriageRunDto> sse_decode_list_triage_run_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<TrustedHubCertificate> sse_decode_list_trusted_hub_certificate(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<VaultAgentModel> sse_decode_list_vault_agent_model(
     SseDeserializer deserializer,
   );
@@ -1692,6 +1908,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MatchedFilterValue sse_decode_matched_filter_value(
     SseDeserializer deserializer,
   );
+
+  @protected
+  MessageRange sse_decode_message_range(SseDeserializer deserializer);
 
   @protected
   MountInfo sse_decode_mount_info(SseDeserializer deserializer);
@@ -1736,6 +1955,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiTask? sse_decode_opt_box_autoadd_ai_task(SseDeserializer deserializer);
 
   @protected
+  ChapterCard? sse_decode_opt_box_autoadd_chapter_card(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Condition? sse_decode_opt_box_autoadd_condition(SseDeserializer deserializer);
 
   @protected
@@ -1768,6 +1992,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
+  LegacyCard? sse_decode_opt_box_autoadd_legacy_card(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PointOfInterest? sse_decode_opt_box_autoadd_point_of_interest(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Resolution? sse_decode_opt_box_autoadd_resolution(
     SseDeserializer deserializer,
   );
@@ -1789,7 +2023,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
+  UpdateRelease? sse_decode_opt_box_autoadd_update_release(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<CertificateInfo>? sse_decode_opt_list_certificate_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<Uint8List>? sse_decode_opt_list_list_prim_u_8_strict(
     SseDeserializer deserializer,
   );
 
@@ -1822,6 +2066,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ParsedQuery sse_decode_parsed_query(SseDeserializer deserializer);
+
+  @protected
+  PointOfInterest sse_decode_point_of_interest(SseDeserializer deserializer);
 
   @protected
   Progress sse_decode_progress(SseDeserializer deserializer);
@@ -1904,6 +2151,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SyncStatus sse_decode_sync_status(SseDeserializer deserializer);
 
   @protected
+  TargetKind sse_decode_target_kind(SseDeserializer deserializer);
+
+  @protected
   Token sse_decode_token(SseDeserializer deserializer);
 
   @protected
@@ -1911,6 +2161,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   TrashedPage sse_decode_trashed_page(SseDeserializer deserializer);
+
+  @protected
+  TriageActionDto sse_decode_triage_action_dto(SseDeserializer deserializer);
+
+  @protected
+  TriageProposalDto sse_decode_triage_proposal_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TriageRunDto sse_decode_triage_run_dto(SseDeserializer deserializer);
+
+  @protected
+  TrustedHubCertificate sse_decode_trusted_hub_certificate(
+    SseDeserializer deserializer,
+  );
 
   @protected
   TypeDataListItem sse_decode_type_data_list_item(SseDeserializer deserializer);
@@ -1926,6 +2192,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
+
+  @protected
+  UpdateCheck sse_decode_update_check(SseDeserializer deserializer);
+
+  @protected
+  UpdateCheckStatus sse_decode_update_check_status(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  UpdateProgress sse_decode_update_progress(SseDeserializer deserializer);
+
+  @protected
+  UpdateRelease sse_decode_update_release(SseDeserializer deserializer);
 
   @protected
   BigInt sse_decode_usize(SseDeserializer deserializer);
@@ -1972,13 +2252,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-    NotesMcp self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesSync(
     NotesSync self,
     SseSerializer serializer,
@@ -2007,13 +2280,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-    NotesMcp self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesSync(
     NotesSync self,
     SseSerializer serializer,
@@ -2037,13 +2303,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesHub(
     NotesHub self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-    NotesMcp self,
     SseSerializer serializer,
   );
 
@@ -2230,6 +2489,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_agent_ui_action(AgentUiAction self, SseSerializer serializer);
 
   @protected
+  void sse_encode_ai_runner(AiRunner self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ai_runner_kind(AiRunnerKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ai_runner_list(AiRunnerList self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ai_runner_project(
+    AiRunnerProject self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_ai_task(AiTask self, SseSerializer serializer);
 
   @protected
@@ -2314,6 +2588,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_chapter_card(
+    ChapterCard self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_condition(
     Condition self,
     SseSerializer serializer,
@@ -2362,6 +2642,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_legacy_card(
+    LegacyCard self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_outline_chapter(
     OutlineChapter self,
     SseSerializer serializer,
@@ -2376,6 +2662,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_page_prefs_data(
     PagePrefsData self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_point_of_interest(
+    PointOfInterest self,
     SseSerializer serializer,
   );
 
@@ -2431,6 +2723,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_update_release(
+    UpdateRelease self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_vault_agent_defaults(
     VaultAgentDefaults self,
     SseSerializer serializer,
@@ -2473,7 +2771,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_change_kind(ChangeKind self, SseSerializer serializer);
 
   @protected
+  void sse_encode_chapter_card(ChapterCard self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_chapter_section(
+    ChapterSection self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_chapter_status(ChapterStatus self, SseSerializer serializer);
+
+  @protected
   void sse_encode_chat_outline(ChatOutline self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_compacted_history(
+    CompactedHistory self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_condition(Condition self, SseSerializer serializer);
@@ -2554,6 +2870,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_date_mark_ref(DateMarkRef self, SseSerializer serializer);
 
   @protected
+  void sse_encode_downloaded_update(
+    DownloadedUpdate self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_episode_action(EpisodeAction self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_episode_card(EpisodeCard self, SseSerializer serializer);
+
+  @protected
   void sse_encode_external_search_row(
     ExternalSearchRow self,
     SseSerializer serializer,
@@ -2578,6 +2906,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_group_row(GroupRow self, SseSerializer serializer);
 
   @protected
+  void sse_encode_history_segment(
+    HistorySegment self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_history_segment_kind(
+    HistorySegmentKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_hit(Hit self, SseSerializer serializer);
 
   @protected
@@ -2594,6 +2934,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_import_report(ImportReport self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_legacy_card(LegacyCard self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_legacy_kind(LegacyKind self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
@@ -2707,6 +3053,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_ai_runner(List<AiRunner> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_ai_runner_project(
+    List<AiRunnerProject> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_ai_task(List<AiTask> self, SseSerializer serializer);
 
   @protected
@@ -2743,6 +3098,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_change(List<Change> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_chapter_section(
+    List<ChapterSection> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_conflict(List<Conflict> self, SseSerializer serializer);
 
   @protected
@@ -2770,6 +3131,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_episode_action(
+    List<EpisodeAction> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_episode_card(
+    List<EpisodeCard> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_filter(List<Filter> self, SseSerializer serializer);
 
   @protected
@@ -2782,6 +3155,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_group_row(List<GroupRow> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_history_segment(
+    List<HistorySegment> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_hit(List<Hit> self, SseSerializer serializer);
 
   @protected
@@ -2789,6 +3168,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_hit_move(List<HitMove> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_list_prim_u_8_strict(
+    List<Uint8List> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_matched_filter_value(
@@ -2902,6 +3287,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_triage_action_dto(
+    List<TriageActionDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_triage_proposal_dto(
+    List<TriageProposalDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_triage_run_dto(
+    List<TriageRunDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_trusted_hub_certificate(
+    List<TrustedHubCertificate> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_vault_agent_model(
     List<VaultAgentModel> self,
     SseSerializer serializer,
@@ -2927,6 +3336,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     MatchedFilterValue self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_message_range(MessageRange self, SseSerializer serializer);
 
   @protected
   void sse_encode_mount_info(MountInfo self, SseSerializer serializer);
@@ -2980,6 +3392,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_chapter_card(
+    ChapterCard? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_condition(
     Condition? self,
     SseSerializer serializer,
@@ -3025,6 +3443,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_legacy_card(
+    LegacyCard? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_point_of_interest(
+    PointOfInterest? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_resolution(
     Resolution? self,
     SseSerializer serializer,
@@ -3049,8 +3479,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_update_release(
+    UpdateRelease? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_list_certificate_info(
     List<CertificateInfo>? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_list_list_prim_u_8_strict(
+    List<Uint8List>? self,
     SseSerializer serializer,
   );
 
@@ -3092,6 +3534,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_parsed_query(ParsedQuery self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_point_of_interest(
+    PointOfInterest self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_progress(Progress self, SseSerializer serializer);
@@ -3187,6 +3635,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_sync_status(SyncStatus self, SseSerializer serializer);
 
   @protected
+  void sse_encode_target_kind(TargetKind self, SseSerializer serializer);
+
+  @protected
   void sse_encode_token(Token self, SseSerializer serializer);
 
   @protected
@@ -3194,6 +3645,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_trashed_page(TrashedPage self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_triage_action_dto(
+    TriageActionDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_triage_proposal_dto(
+    TriageProposalDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_triage_run_dto(TriageRunDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_trusted_hub_certificate(
+    TrustedHubCertificate self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_type_data_list_item(
@@ -3212,6 +3684,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_update_check(UpdateCheck self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_update_check_status(
+    UpdateCheckStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_update_progress(
+    UpdateProgress self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_update_release(UpdateRelease self, SseSerializer serializer);
 
   @protected
   void sse_encode_usize(BigInt self, SseSerializer serializer);
@@ -3321,40 +3811,6 @@ class RustLibWire implements BaseWire {
       );
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesHub =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesHubPtr
-          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
-
-  void
-  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-    ffi.Pointer<ffi.Void> ptr,
-  ) {
-    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-      ptr,
-    );
-  }
-
-  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcpPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_notes_app_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp',
-      );
-  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp =
-      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcpPtr
-          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
-
-  void
-  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-    ffi.Pointer<ffi.Void> ptr,
-  ) {
-    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp(
-      ptr,
-    );
-  }
-
-  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcpPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_notes_app_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp',
-      );
-  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcp =
-      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerNotesMcpPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void

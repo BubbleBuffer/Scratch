@@ -4,23 +4,22 @@ import '../../services/addon_services.dart';
 //
 // - Chats: newest first, a title filter, New chat, and rename or delete
 //   from each row's menu (delete asks first).
-// - AgentChat is shared with the editor dock: assistant markdown, compact
+// - ScratchChatPane is shared with the editor dock: assistant markdown, compact
 //   edits, work summaries with optional code, and the context-aware composer.
 // - The composer: Enter sends, Shift+Enter is a new line. While a run is
 //   going, Send steers it and Stop cancels it. The model is picked per
 //   chat. Sending with no chat open starts one named after the message.
 // - Phones: no chat list, so New chat is an icon in the top bar. Signed out
-//   on Android it is off and the chat shows Sign in (see AgentChat).
+//   on Android it is off and the chat shows Sign in (see ScratchChatPane).
 
-export 'agent_cells.dart' show CodeCellRow, ApprovalCard;
-export 'agent_chat.dart' show AgentChat, agentEmptyLine;
+export 'agent_cells.dart' show CodeCellRow;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
 import '../../ui/ui.dart';
-import 'agent_chat.dart';
+import 'scratch_chat_pane.dart';
 import 'agent_store.dart';
 
 class AgentScreen extends StatefulWidget {
@@ -125,7 +124,7 @@ class _AgentScreenState extends State<AgentScreen> {
                             const SizedBox(width: 12),
                           ],
                           Expanded(
-                            child: AgentChat(
+                            child: ScratchChatPane(
                               store: store,
                               title: store.outline.chapters.isEmpty
                                   ? null

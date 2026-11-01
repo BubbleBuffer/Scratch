@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scratch settings redesign</title>
+<link rel="stylesheet" href="settings.css">
+<!-- Lucide (ISC), as published; the app uses the same set through lucide_icons_flutter. -->
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+<div class="review" aria-label="Review controls (not part of the design)">
+  <b>Mockup</b>
+  <label>Theme <select name="theme"><option value="light">light</option><option value="dark">dark</option></select></label>
+  <label>Lists <select name="data"><option value="filled">with items</option><option value="empty">empty</option></select></label>
+  <label>Hub <select name="sync"><option value="connected">signed in</option><option value="off">not set up</option></select></label>
+  <label>Help <select name="help"><option value="0">on demand</option><option value="1">all open</option></select></label>
+  <label>Editor <select name="edit"><option value="">closed</option><option value="project">add project</option><option value="server">add MCP server</option><option value="token">new token</option><option value="device">add device</option></select></label>
+  <span>Data is illustrative. Every option exists today; see audit.md.</span>
+</div>
+<div class="stage">
+  <div class="panel" role="dialog" aria-label="Settings">
+    <nav class="nav" aria-label="Settings sections"></nav>
+    <main class="main"></main>
+  </div>
+</div>
+<script src="settings.js"></script>
+</body>
+</html>

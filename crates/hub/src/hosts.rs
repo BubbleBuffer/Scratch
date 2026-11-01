@@ -255,6 +255,13 @@ impl Hosts {
         }
     }
 
+    /// Closes `device`'s host socket, opened with its token or a session.
+    pub fn close_device(&self, device: &str) {
+        if let Some(conn) = self.by_device.lock().unwrap().get(device) {
+            conn.close.cancel();
+        }
+    }
+
     /// Closes the sockets opened with `token` (its device signed out).
     pub fn close_token(&self, token: &str) {
         let hash = sha256_hex(token.as_bytes());

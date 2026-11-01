@@ -58,7 +58,7 @@ class EngineScheduleBackend extends ScheduleBackend {
         'No hub is connected. Add one in Sync settings.',
       );
     }
-    final key = '${link.url}\n${link.token}';
+    final key = '${link.url}\n${link.token}\n${_settings.trustedCertificates.trustKeyFor(link.url)}';
     if (_hub != null && _hubKey == key) return _hub!;
     await _closeHub();
     final NotesAgent agent;
@@ -67,6 +67,8 @@ class EngineScheduleBackend extends ScheduleBackend {
         url: link.url,
         device: _vault.deviceId,
         token: link.token,
+        trusted: _settings.trustedCertificates.trustFor(link.url),
+        vaultRoot: _vault.root,
       );
     } catch (e) {
       throw ScheduleUnavailable('Hub not reachable: ${_detail(e)}');

@@ -1,5 +1,5 @@
 //! Folder mounts (desktop): a folder on this device shown as a page whose
-//! child pages are the folder's `.md` files (`wiki/architecture/mounts.md`).
+//! child pages are the folder's `.md` files (`wiki/core/mounts.md`).
 //!
 //! - The mount table is device-local: `.vault/mounts.json`, never synced.
 //!   The pages themselves are ordinary vault pages and sync as usual.

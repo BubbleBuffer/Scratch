@@ -411,7 +411,7 @@ fn health_advertises_both_purge_capabilities() {
 fn a_malformed_device_flag_is_refused_before_the_body_is_read() {
     let dir = TempDir::new("flags");
     let hub = Hub::new(dir.open()).unwrap();
-    let token = hub.pair("flags").unwrap();
+    let token = hub.pair_legacy_token("flags").unwrap();
     let cases: Vec<Vec<&str>> = vec![vec!["2"], vec!["yes"], vec![""], vec!["1", "1"]];
     for flags in &cases {
         let r = sync_with_flags(&hub, &token, flags, &[PURGE_PROTOCOL]);
@@ -425,7 +425,7 @@ fn a_malformed_device_flag_is_refused_before_the_body_is_read() {
 fn the_device_flag_needs_a_protocol_two_body() {
     let dir = TempDir::new("v1flag");
     let hub = Hub::new(dir.open()).unwrap();
-    let token = hub.pair("flags").unwrap();
+    let token = hub.pair_legacy_token("flags").unwrap();
     let r = sync_with_flags(&hub, &token, &["1"], &[PROTOCOL]);
     assert_eq!(r.status, 400);
     let text = String::from_utf8_lossy(&r.body);
