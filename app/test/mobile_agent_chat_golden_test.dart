@@ -13,7 +13,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:notes_app/addons/agent/agent_store.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/shell/home.dart';
 
