@@ -198,6 +198,11 @@ class SyncStore extends ChangeNotifier {
     _refreshStatus();
   }
 
+  /// Pulls pages [ids] and their missing parents from the hub now, ahead of
+  /// the regular sync (a link to a page that has not synced yet). Null when
+  /// there is no client. The caller applies its own timeout.
+  Future<PageFetch?> fetchPages(List<String> ids) async => _client?.fetchPages(ids: ids);
+
   /// One complete sync, outside the background loop.
   Future<SyncReport?> syncOnce() async => _client?.syncOnce();
 

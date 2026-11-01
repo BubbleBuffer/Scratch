@@ -1072,3 +1072,214 @@ impl Drop for BackgroundSync {
         self.shutdown();
     }
 }
+
+/// How far up the parent chain [`SyncClient::fetch_pages`] follows missing
+/// ancestors.
+const FETCH_ANCESTOR_DEPTH: usize = 16;
+
+/// The result of [`SyncClient::fetch_pages`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FetchOutcome {
+    /// Every requested page is now in this vault and not in the trash.
+    Fetched,
+    /// The hub has no such page (never existed, purged), or it is in the
+    /// trash there. Pages already purged here count as well.
+    NotOnHub,
+    /// The hub could not be reached.
+    Offline,
+    /// The hub refused the device token.
+    Unauthorized,
+    /// Anything else (including `untrusted certificate: ...`), as a message.
+    Error(String),
+}
+
+impl FetchOutcome {
+    fn of_error(e: SyncError) -> FetchOutcome {
+        match e {
+            SyncError::Http(_) => FetchOutcome::Offline,
+            SyncError::Status(401 | 403, _) => FetchOutcome::Unauthorized,
+            e => FetchOutcome::Error(e.to_string()),
+        }
+    }
+}
+
+impl SyncClient {
+    /// Pulls the given pages from the hub right away, plus any of their
+    /// ancestors this vault lacks (up to 16 levels, so breadcrumbs work).
+    /// Sub-pages and attachments are left to the regular sync and to
+    /// [`SyncClient::fetch_attachment`].
+    ///
+    /// This is one targeted `/sync` round against the hub's current feed
+    /// position. It never reads or writes the client's sync state (delta
+    /// base, known versions), so it does not wait for a running sync, and
+    /// the next regular sync still brings in every other hub change. If a
+    /// regular sync imports the same page in between, the second import
+    /// merges into the first (a CRDT update applies at most once), so
+    /// both orders give the same page.
+    pub fn fetch_pages(&self, ids: &[PageId]) -> FetchOutcome {
+        match self.fetch_pages_inner(ids) {
+            Ok(o) => o,
+            Err(e) => FetchOutcome::of_error(e),
+        }
+    }
+
+    fn fetch_pages_inner(&self, ids: &[PageId]) -> Result<FetchOutcome> {
+        let v = &self.vault;
+        let local = |id: &str| v.load_page(id.to_string()).is_ok();
+        let gone: HashSet<PageId> = v.purged_pages().into_iter().collect();
+        if ids.iter().any(|id| gone.contains(id)) {
+            return Ok(FetchOutcome::NotOnHub);
+        }
+        let mut pending: Vec<PageId> = ids.iter().filter(|id| !local(id)).cloned().collect();
+        let mut seen: HashSet<PageId> = pending.iter().cloned().collect();
+        if !pending.is_empty() {
+            let health = self
+                .http
+                .call("GET", "/health", None, None, Zstd::default(), false)?;
+            if let Some(s) = &self.http.session {
+                s.note_health(health.device_keys);
+            }
+            let purge_device = health.purge_v2 && health.purge_device;
+            let head = self.http.changes(None, 0)?;
+            for _ in 0..FETCH_ANCESTOR_DEPTH {
+                if pending.is_empty() {
+                    break;
+                }
+                self.fetch_round(&pending, (head.epoch, head.seq), health.purge_v2, purge_device)?;
+                let mut next = Vec::new();
+                for id in &pending {
+                    let Ok(page) = v.load_page(id.clone()) else {
+                        continue;
+                    };
+                    if let Some(parent) = page.parent {
+                        if !gone.contains(&parent) && !local(&parent) && seen.insert(parent.clone())
+                        {
+                            next.push(parent);
+                        }
+                    }
+                }
+                pending = next;
+            }
+        }
+        for id in ids {
+            match v.load_page(id.clone()) {
+                Ok(p) if !p.in_trash => {}
+                Ok(_) | Err(VaultError::NotFound(_)) => return Ok(FetchOutcome::NotOnHub),
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(FetchOutcome::Fetched)
+    }
+
+    /// One `/sync` asking for snapshots of `ids`, importing what comes back.
+    fn fetch_round(
+        &self,
+        ids: &[PageId],
+        base: (u64, u32),
+        purge_v2: bool,
+        purge_device: bool,
+    ) -> Result<()> {
+        let request = SyncRequest {
+            full: false,
+            base: Some(base),
+            // An empty version asks for the whole page.
+            versions: ids.iter().map(|id| (id.clone(), Vec::new())).collect(),
+            purged: Vec::new(),
+            // As if every hub purge were already applied: nothing to send.
+            hub_purged_known: u32::MAX,
+            blobs: Vec::new(),
+            budget: self.budget,
+        };
+        let body = if purge_v2 {
+            SyncRequestV2 {
+                request,
+                purges: Vec::new(),
+                restores: Vec::new(),
+            }
+            .encode_with_device(purge_device)
+        } else {
+            request.encode()
+        };
+        let reply = self.http.call(
+            "POST",
+            "/sync",
+            Some(&body),
+            None,
+            Zstd::default(),
+            purge_v2 && purge_device,
+        )?;
+        let resp = if purge_v2 {
+            SyncResponseV2::decode_with_device(&reply.body, purge_device)?.response
+        } else {
+            SyncResponse::decode(&reply.body)?
+        };
+        if resp.reset {
+            return Err(SyncError::Protocol(
+                "the hub restarted during the fetch".into(),
+            ));
+        }
+        let updates: Vec<PageUpdate> = resp
+            .updates
+            .into_iter()
+            .filter(|(page, _)| ids.contains(page))
+            .map(|(page, bytes)| PageUpdate { page, bytes })
+            .collect();
+        if !updates.is_empty() {
+            if purge_v2 {
+                self.vault.import_updates_batch(updates)?;
+            } else {
+                self.vault.import_updates_batch_legacy(updates)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod fetch_tests {
+    use super::*;
+    use crate::Hub;
+    use vault_core::new_id;
+
+    fn open(tag: &str) -> (std::path::PathBuf, Arc<Vault>) {
+        let p = std::env::temp_dir().join(format!("vault_fetch_{tag}_{}", new_id()));
+        std::fs::create_dir_all(&p).unwrap();
+        let v = Arc::new(Vault::open(p.to_string_lossy().into_owned()).unwrap());
+        (p, v)
+    }
+
+    /// A fetch never takes the sync state lock, so it finishes while a
+    /// regular sync holds it, and a sync that imports the same page first
+    /// leaves the page as one copy.
+    #[test]
+    fn fetch_does_not_wait_for_a_running_sync() {
+        let (hp, hub_vault) = open("hub");
+        let (ap, a_vault) = open("a");
+        let hub = Hub::new(hub_vault.clone()).unwrap();
+        let server = hub.serve("127.0.0.1:0").unwrap();
+        let client = Arc::new(SyncClient::new(
+            a_vault.clone(),
+            &format!("http://{}", server.addr()),
+            &hub.pair_legacy_token("phone").unwrap(),
+        ));
+        let page = hub_vault.create_page(None, "Wanted".into()).unwrap();
+        let held = lock(&client.state);
+        let (tx, rx) = mpsc::channel();
+        let c = client.clone();
+        let id = page.clone();
+        std::thread::spawn(move || tx.send(c.fetch_pages(&[id])).unwrap());
+        let out = rx
+            .recv_timeout(Duration::from_secs(20))
+            .expect("fetch waited for the sync state lock");
+        assert_eq!(out, FetchOutcome::Fetched);
+        drop(held);
+        // The sync that was "running" now imports the same page again.
+        client.sync_once().unwrap();
+        let loaded = a_vault.load_page(page.clone()).unwrap();
+        assert_eq!(loaded.title, "Wanted");
+        assert_eq!(a_vault.page_versions().unwrap().len(), hub_vault.page_versions().unwrap().len());
+        drop(server);
+        let _ = std::fs::remove_dir_all(hp);
+        let _ = std::fs::remove_dir_all(ap);
+    }
+}

@@ -1284,3 +1284,15 @@ mod tests {
         assert_eq!(kind_parse(kind_name(&unknown)).unwrap(), unknown);
     }
 }
+
+pub(crate) fn page_fetch(o: vault_sync::FetchOutcome) -> PageFetch {
+    use vault_sync::FetchOutcome as O;
+    let (status, message) = match o {
+        O::Fetched => (PageFetchStatus::Fetched, String::new()),
+        O::NotOnHub => (PageFetchStatus::NotOnHub, String::new()),
+        O::Offline => (PageFetchStatus::Offline, String::new()),
+        O::Unauthorized => (PageFetchStatus::Unauthorized, String::new()),
+        O::Error(m) => (PageFetchStatus::Error, m),
+    };
+    PageFetch { status, message }
+}

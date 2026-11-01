@@ -72,7 +72,7 @@ pub mod wire;
 use std::fmt;
 
 pub use auth::PairedDevice;
-pub use client::{BackgroundSync, SyncClient, SyncOptions, SyncReport};
+pub use client::{BackgroundSync, FetchOutcome, SyncClient, SyncOptions, SyncReport};
 pub use hub::{Hub, HubRequest, HubResponse, HubServer};
 pub use keys::{origin_of, KeyPolicy};
 pub use session::DeviceSession;
