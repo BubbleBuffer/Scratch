@@ -29,13 +29,13 @@ The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same f
 
 ## The pin
 
-`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui's `v0.7.1` tag. Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
+`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui's `v0.7.2` tag. Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
 
 ```yaml
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/bb-ui
-      ref: v0.7.1
+      ref: v0.7.2
       path: packages/bb_ui
 ```
 
@@ -51,7 +51,7 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The chat pane's packages
 
-The agent chat's outline and the Agent chat pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.17.2` (commit `e3c42202`). `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent chat pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.17.3` (commit `e19afa44`). `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
 
 ## The chat outline
 
