@@ -211,8 +211,9 @@ Future<void> openPageLink(BuildContext context, PageLink link) async {
         }
     }
     final sync = context.read<SyncStore>();
-    await openPage(context, link.pageId, title, initialBlock: link.blockId);
+    // openPage returns only when the page is closed, so ask for the sync first.
     sync.syncNow();
+    await openPage(context, link.pageId, title, initialBlock: link.blockId);
     return;
   }
   await openPage(context, link.pageId, title, initialBlock: link.blockId);
