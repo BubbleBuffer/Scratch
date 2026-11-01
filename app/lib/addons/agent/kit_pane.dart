@@ -15,6 +15,7 @@ import '../../ui/ui.dart';
 import 'agent_store.dart';
 import 'kit_backend.dart';
 import 'kit_commands.dart';
+import 'kit_hooks.dart';
 
 /// Built with `--dart-define=AGENT_KIT_PANE=true`.
 const agentKitPane = bool.fromEnvironment('AGENT_KIT_PANE');
@@ -97,7 +98,11 @@ class _AgentKitScreenState extends State<AgentKitScreen> {
                   if (backend == null || chat == null) {
                     return const SizedBox.expand();
                   }
-                  return AgentChatPane(backend: backend, chatId: chat);
+                  return AgentChatPane(
+                    backend: backend,
+                    chatId: chat,
+                    transcriptActions: scratchTranscriptActions(context, store),
+                  );
                 },
               ),
             ),

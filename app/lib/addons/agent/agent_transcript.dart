@@ -279,15 +279,17 @@ class RunNote extends ChatItem {
   final bool error;
 }
 
-
 /// The code of a `js` call (its `code` argument), or the arguments as
 /// JSON for any other tool.
-String codeOf(AgentToolCall c) {
+String codeOf(AgentToolCall c) => codeOfArguments(c.argumentsJson);
+
+/// [codeOf] from a call's arguments JSON.
+String codeOfArguments(String argumentsJson) {
   try {
-    final args = jsonDecode(c.argumentsJson);
+    final args = jsonDecode(argumentsJson);
     if (args is Map && args['code'] is String) return args['code'] as String;
   } catch (_) {}
-  return c.argumentsJson;
+  return argumentsJson;
 }
 
 /// What a `js` cell's tool message says, for people: its value or error,
