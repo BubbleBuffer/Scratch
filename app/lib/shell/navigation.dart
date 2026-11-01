@@ -191,6 +191,12 @@ Future<void> openPageLink(BuildContext context, PageLink link) async {
   var title = await _linkedPageTitle(context, link);
   if (!context.mounted) return;
   if (title == null) {
+    // A page in the trash here stays missing: no fetch, no sign-in prompt.
+    if (await _linkedPageTrashed(context, link)) {
+      if (context.mounted) showErrorToast(context, PageLink.missingMessage);
+      return;
+    }
+    if (!context.mounted) return;
     final fetch = await fetchLinkedPage(context, link);
     if (!context.mounted) return;
     switch (fetch) {
@@ -222,6 +228,14 @@ Future<void> openPageLink(BuildContext context, PageLink link) async {
 bool _hubKnown(BuildContext context) =>
     context.read<SyncStore>().connected ||
     AppSettings.read(context).hubSignInUrl.trim().isNotEmpty;
+
+Future<bool> _linkedPageTrashed(BuildContext context, PageLink link) async {
+  try {
+    return (await context.app.vault.loadPage(link.pageId)).inTrash;
+  } catch (_) {
+    return false;
+  }
+}
 
 /// The title of the linked page, or null if it is missing or trashed here.
 Future<String?> _linkedPageTitle(BuildContext context, PageLink link) async {

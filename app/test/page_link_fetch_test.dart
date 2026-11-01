@@ -56,13 +56,13 @@ void main() {
     Future<PageFetch> Function(List<String> ids, Future<void> Function() arrive) script,
   ) async {
     await pumpApp(tester, mobile: false);
-    final vault = current.app.vault;
-    final id = await real(tester, () async {
-      final id = await vault.createPage(title: 'From the hub');
-      await vault.deletePage(id);
-      return id;
-    });
-    Future<void> arrive() => vault.restorePage(id);
+    // The page lives in another vault (the "hub"); it reaches this one as the
+    // snapshot a fetch would import.
+    final other = await openOtherDevice(tester);
+    final id = await real(tester, () => other.vault.createPage(title: 'From the hub'));
+    final bytes = await real(tester, () => other.vault.raw.exportUpdates(page: id, since: const []));
+    await other.close(tester);
+    Future<void> arrive() => current.app.vault.run((v) => v.importUpdates(page: id, bytes: bytes), writes: true);
     late ScriptedSync client;
     final hubs = FakeHubs();
     SyncStore.clientFactory = (v, url, token, trusted) =>
@@ -171,14 +171,28 @@ void main() {
     expect(key('link-fetch-title'), findsNothing);
   });
 
-  appTest('with no hub set up only the not-found toast shows', (tester) async {
-    await pumpApp(tester, mobile: false);
+  appTest('a page in the trash stays missing: toast, no fetch, no sign-in prompt', (tester) async {
+    var calls = 0;
+    final (_, _, _) = await setup(tester, (ids, arrive) async {
+      calls++;
+      return result(PageFetchStatus.fetched);
+    });
     final vault = current.app.vault;
     final id = await real(tester, () async {
-      final id = await vault.createPage(title: 'Local only');
+      final id = await vault.createPage(title: 'Trashed');
       await vault.deletePage(id);
       return id;
     });
+    unawaited(openPageLink(homeContext(tester), PageLink(id)));
+    await settle(tester);
+    expect(key('link-fetch-title'), findsNothing);
+    expect(find.text(PageLink.missingMessage), findsOneWidget);
+    expect(calls, 0);
+  });
+
+  appTest('with no hub set up only the not-found toast shows', (tester) async {
+    await pumpApp(tester, mobile: false);
+    const id = '01M5CZCX81NZWZM4KEBKTR9SJN';
     unawaited(openPageLink(homeContext(tester), PageLink(id)));
     await settle(tester);
     expect(key('link-fetch-title'), findsNothing);

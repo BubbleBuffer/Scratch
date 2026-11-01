@@ -1136,9 +1136,12 @@ impl SyncClient {
             let health = self
                 .http
                 .call("GET", "/health", None, None, Zstd::default(), false)?;
+            if let Some(s) = &self.http.session {
+                s.note_health(health.device_keys);
+            }
             let purge_device = health.purge_v2 && health.purge_device;
             let head = self.http.changes(None, 0)?;
-            for _ in 0..=FETCH_ANCESTOR_DEPTH {
+            for _ in 0..FETCH_ANCESTOR_DEPTH {
                 if pending.is_empty() {
                     break;
                 }

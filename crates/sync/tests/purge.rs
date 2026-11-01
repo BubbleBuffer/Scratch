@@ -595,3 +595,34 @@ fn an_unedited_legacy_copy_returns_to_marked_trash_through_the_hub() {
     a.sync();
     assert_eq!(snapshot(a.v()), snapshot(&net.hub_vault));
 }
+
+#[test]
+fn a_restored_page_fetched_ahead_of_the_sync_ends_up_the_same() {
+    let net = Net::new();
+    let (a, b) = (net.device("phone"), net.device("laptop"));
+    let t = shared_page(&net, &[&a, &b]);
+    phone_edit(&a, &t);
+    laptop_purge(&b, &t);
+    b.sync();
+    a.sync();
+    b.sync();
+    assert_restored_whole(&net.hub_vault, &t);
+    // A third device that has never seen the page fetches the restored page
+    // first. A page with a restoration record is whole from the hub.
+    let c = net.device("tablet");
+    let out = c.client.as_ref().unwrap().fetch_pages(&[t.clone()]);
+    assert_eq!(out, vault_sync::FetchOutcome::Fetched);
+    assert_eq!(texts(c.v(), &t), vec!["one (phone)", "two"]);
+    // The regular sync that follows (the restoration proof arrives with it)
+    // leaves the same page, and the devices stay converged afterwards.
+    c.sync();
+    assert_restored_whole(c.v(), &t);
+    assert_eq!(snapshot(c.v()), snapshot(&net.hub_vault));
+    c.sync();
+    b.sync();
+    a.sync();
+    for v in [a.v(), b.v(), c.v(), &*net.hub_vault] {
+        assert_restored_whole(v, &t);
+    }
+    assert_eq!(snapshot(c.v()), snapshot(&net.hub_vault));
+}
