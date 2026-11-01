@@ -245,7 +245,7 @@ class SemanticsDriver {
   Future<bool> focus(String id) async {
     final node = _find(id);
     if (!node.actions.contains('focus')) {
-      throw RemoteError(400, 'element "" has no focus action');
+      throw RemoteError(400, 'element "$id" has no focus action');
     }
     _requireOwner().performAction(node.nodeId, ui.SemanticsAction.focus);
     await _nextFrame();

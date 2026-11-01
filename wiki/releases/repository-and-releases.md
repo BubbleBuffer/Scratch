@@ -55,11 +55,12 @@ bash scripts/check-private-strings.sh --patterns <path to private-strings.txt> -
 - Tag and push: `git tag v0.1.0-prealpha.2 && git push origin v0.1.0-prealpha.2`
 - Or, for a tag that already exists: `gh workflow run release.yml -f tag=v0.1.0-prealpha.2`
 
-The tag must look like `v<major>.<minor>.<patch>` with an optional `-<pre-release>` part. A tag with a pre-release part becomes a GitHub prerelease. The release has five assets:
+The tag must look like `v<major>.<minor>.<patch>` with an optional `-<pre-release>` part. A tag with a pre-release part becomes a GitHub prerelease. The release has seven assets:
 
 - `Scratch-Setup-<version>.exe`, the Windows installer
 - `scratch-<version>-android-arm64.apk`, the Android app
-- `notes-cli-<version>-windows-x64.exe` and `notes-cli-<version>-linux-x64.tar.gz`, the CLI
+- `notes-cli-<version>-windows-x64.exe` and `notes-cli-<version>-linux-x64.tar.gz`, the notes CLI
+- `scratch-cli-<version>-windows-x64.exe` and `scratch-cli-<version>-linux-x64.tar.gz`, the scratch-cli headless AI task runner ([scratch-cli](../integrations/scratch-cli.md))
 - `SHA256SUMS.txt`
 
 The Android versionCode is the build time in epoch minutes, so each release is newer than the last. The GitHub APK is signed with a separate pre-alpha key when the `PREALPHA_*` secrets are set, and ships as `...-unsigned.apk` otherwise. It is never signed with the release key, so a pre-alpha install and a release-signed install cannot update each other; see [Android release](android-release.md).
