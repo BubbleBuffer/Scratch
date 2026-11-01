@@ -10,6 +10,8 @@
 #                                          (-unsigned.apk without the key secrets)
 #   notes-cli-<version>-windows-x64.exe    the notes CLI for Windows
 #   notes-cli-<version>-linux-x64.tar.gz   the notes CLI for Linux (glibc)
+#   scratch-cli-<version>-windows-x64.exe  the scratch-cli headless AI task runner for Windows
+#   scratch-cli-<version>-linux-x64.tar.gz the scratch-cli headless AI task runner for Linux (glibc)
 #   SHA256SUMS.txt
 #
 # Android versionCode is the build time in epoch minutes, so every release is
@@ -112,10 +114,11 @@ jobs:
       - name: Build app and installer
         run: |
           bash scripts/build-windows-installer.sh "${{ needs.meta.outputs.tag }}" "${{ needs.meta.outputs.numeric }}" "${{ needs.meta.outputs.code }}" dist
-      - name: Build notes CLI
+      - name: Build notes CLI and scratch-cli
         run: |
-          cargo build --release --locked -p vault_tools --bin notes
+          cargo build --release --locked -p vault_tools --bin notes -p scratch_cli --bin scratch-cli
           cp target/release/notes.exe "dist/notes-cli-${{ needs.meta.outputs.version }}-windows-x64.exe"
+          cp target/release/scratch-cli.exe "dist/scratch-cli-${{ needs.meta.outputs.version }}-windows-x64.exe"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-windows
@@ -140,11 +143,12 @@ jobs:
         with:
           shared-key: release-linux-cli
           save-if: false
-      - name: Build notes CLI
+      - name: Build notes CLI and scratch-cli
         run: |
-          cargo build --release --locked -p vault_tools --bin notes
+          cargo build --release --locked -p vault_tools --bin notes -p scratch_cli --bin scratch-cli
           mkdir -p dist
           tar -C target/release -czf "dist/notes-cli-${{ needs.meta.outputs.version }}-linux-x64.tar.gz" notes
+          tar -C target/release -czf "dist/scratch-cli-${{ needs.meta.outputs.version }}-linux-x64.tar.gz" scratch-cli
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-linux-cli
@@ -273,7 +277,8 @@ jobs:
 
           - Windows: \`Scratch-Setup-$VERSION.exe\` installs per user.
           $APK_LINE
-          - CLI: \`notes-cli-$VERSION-windows-x64.exe\` and \`notes-cli-$VERSION-linux-x64.tar.gz\`.
+          - CLI: \`notes-cli-$VERSION-windows-x64.exe\` and \`notes-cli-$VERSION-linux-x64.tar.gz\` (notes).
+          - scratch-cli: \`scratch-cli-$VERSION-windows-x64.exe\` and \`scratch-cli-$VERSION-linux-x64.tar.gz\`.
 
           Checksums are in \`SHA256SUMS.txt\`.
           EOF
