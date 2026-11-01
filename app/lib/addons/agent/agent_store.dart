@@ -2032,22 +2032,25 @@ class AgentStore extends ChangeNotifier {
   // ------------------------------------------------------------ runs
 
   /// Sends [text] in the open chat: a new run, or steering while one runs.
-  Future<void> send(
+  /// Gives back what the engine did, or null when nothing was sent (the
+  /// reason is in [error]).
+  Future<AgentSent?> send(
     String text, {
     AgentMessageContext? context,
     String? sessionId,
   }) async {
     final id = sessionId ?? openId;
     final t = text.trim();
-    if (id == null || t.isEmpty) return;
+    if (id == null || t.isEmpty) return null;
     final a = await ensureOpen();
     if (a == null) {
       // Nothing was sent: say so, so the composer keeps the draft.
       error = openError ?? 'The agent is not available.';
       _notify();
-      return;
+      return null;
     }
     error = null;
+    AgentSent? sent;
     try {
       // On Android the tools read the Hub replica. Finish local saves and a
       // sync round before asking the model to read or edit notes.
@@ -2067,7 +2070,7 @@ class AgentStore extends ChangeNotifier {
             requiresHubSignIn ||
             _resetHubState ||
             !identical(a, _agent)) {
-          return;
+          return null;
         }
         if (synced == null || !app.sync.connected) {
           throw StateError(
@@ -2077,7 +2080,7 @@ class AgentStore extends ChangeNotifier {
       }
       // send queues a follow-up while busy and preserves its structured
       // attachments; the older steer endpoint accepts text only.
-      await _count(
+      sent = await _count(
         () => a.send(
           sessionId: id,
           text: replay?.sessionId == id ? text : t,
@@ -2089,6 +2092,7 @@ class AgentStore extends ChangeNotifier {
       error = '$e';
     }
     await _loadState();
+    return error == null ? sent : null;
   }
 
   Future<AgentEdit> undoEdit(String editId) async {
@@ -2101,9 +2105,9 @@ class AgentStore extends ChangeNotifier {
     return edit;
   }
 
-  /// Stops the open chat's run.
-  Future<void> stop() async {
-    final id = openId, a = _agent;
+  /// Stops the run of chat [sessionId], or of the open chat.
+  Future<void> stop({String? sessionId}) async {
+    final id = sessionId ?? openId, a = _agent;
     if (id == null || a == null) return;
     try {
       await _count(() => a.cancel(sessionId: id));

@@ -1,4 +1,4 @@
-// Dev pane: the shared agent kit's chat pane over Scratch's agent, read-only.
+// Dev pane: the shared agent kit's chat pane over Scratch's agent.
 //
 // Off unless the app is built with `--dart-define=AGENT_KIT_PANE=true`; then
 // the Agent screen shows this pane instead of the old chat. The old screen is
@@ -14,6 +14,7 @@ import '../../state/app_state.dart';
 import '../../ui/ui.dart';
 import 'agent_store.dart';
 import 'kit_backend.dart';
+import 'kit_commands.dart';
 
 /// Built with `--dart-define=AGENT_KIT_PANE=true`.
 const agentKitPane = bool.fromEnvironment('AGENT_KIT_PANE');
@@ -69,6 +70,7 @@ class _AgentKitScreenState extends State<AgentKitScreen> {
       _agent = agent;
       _backend = ScratchKitBackend(
         NotesAgentSource(agent, events: store.eventsFor(agent)),
+        commands: StoreKitCommands(store),
       );
     });
   }
