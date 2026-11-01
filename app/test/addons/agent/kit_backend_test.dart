@@ -229,6 +229,36 @@ Future<void> _settle() =>
 void main() {
   pumpPaneTests();
   group('snapshot', () {
+    test('a message sent with a selection carries it as a selection ref', () {
+      const selection = AgentContextSelection(
+        pageId: 'page-1',
+        pageTitle: 'Groceries',
+        blockIds: ['b1'],
+        text: 'eggs',
+      );
+      final snap = kitSnapshot(
+        _state(
+          messages: [
+            _msg(
+              'm1',
+              'user',
+              'Fix this',
+              context: const AgentMessageContext(
+                pages: [],
+                selection: selection,
+              ),
+            ),
+          ],
+        ),
+      );
+      final m = snap.items.single as kit.UserMessage;
+      expect(m.refs.single.kind, 'selection');
+      final back = kitContext(m.refs)!.selection!;
+      expect(back.pageId, 'page-1');
+      expect(back.blockIds, ['b1']);
+      expect(back.text, 'eggs');
+    });
+
     test('maps messages, tool rows, edits, approvals, run and usage', () {
       final snap = kitSnapshot(
         _state(

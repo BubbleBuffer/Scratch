@@ -757,6 +757,12 @@ kit.ChatSnapshot kitSnapshot(AgentSessionState s) {
               kit.KitRef(kind: 'page', id: p.id, label: p.title),
             for (final c in ctx?.chats ?? const <AgentContextChat>[])
               kit.KitRef(kind: 'chat', id: c.id, label: c.title),
+            if (ctx?.selection case final s?)
+              kit.KitRef(
+                kind: 'selection',
+                id: encodeKitSelection(s),
+                label: 'Selection',
+              ),
           ],
         ),
       );

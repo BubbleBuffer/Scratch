@@ -124,6 +124,15 @@ String workSummary(AgentTurn turn) {
   final names = turn.activity.isEmpty
       ? turn.cells.map((c) => c.tool)
       : turn.activity.map((a) => a.name);
+  final failed = turn.activity.isEmpty
+      ? turn.cells.where((c) => c.status == CellStatus.failed).length
+      : turn.activity.where((a) => a.isError).length;
+  return verbSummary(names, failed);
+}
+
+/// The verb line for tool [names] ("Searched 2× · Read 1 page"), with a
+/// count of [failed] calls.
+String verbSummary(Iterable<String> names, int failed) {
   final counts = <String, int>{};
   for (final name in names) {
     final group = switch (name) {
@@ -165,9 +174,6 @@ String workSummary(AgentTurn turn) {
     };
     counts[group] = (counts[group] ?? 0) + 1;
   }
-  final failed = turn.activity.isEmpty
-      ? turn.cells.where((c) => c.status == CellStatus.failed).length
-      : turn.activity.where((a) => a.isError).length;
   return [
     for (final label in [
       'searched',
@@ -245,20 +251,23 @@ class AgentWorkRow extends StatelessWidget {
       initiallyOpen: false,
       summaryOf: (_) => workSummary(turn),
       footer: turn.cells.isNotEmpty && !turn.live
-          ? _CodeDisclosure(turn: turn)
+          ? CodeDisclosure(id: turn.id, cells: turn.cells)
           : null,
     ),
   );
 }
 
-class _CodeDisclosure extends StatefulWidget {
-  const _CodeDisclosure({required this.turn});
-  final AgentTurn turn;
+/// "Show code" for a turn's code cells (the chat's old work row and the kit
+/// pane's activity footer).
+class CodeDisclosure extends StatefulWidget {
+  const CodeDisclosure({super.key, required this.id, required this.cells});
+  final String id;
+  final List<CodeCell> cells;
   @override
-  State<_CodeDisclosure> createState() => _CodeDisclosureState();
+  State<CodeDisclosure> createState() => _CodeDisclosureState();
 }
 
-class _CodeDisclosureState extends State<_CodeDisclosure> {
+class _CodeDisclosureState extends State<CodeDisclosure> {
   bool _code = false;
   @override
   Widget build(BuildContext context) => Column(
@@ -268,13 +277,13 @@ class _CodeDisclosureState extends State<_CodeDisclosure> {
         alignment: Alignment.centerLeft,
         child: TextBtn(
           _code ? 'Hide code' : 'Show code',
-          key: ValueKey('agent-work-${widget.turn.id}-code'),
+          key: ValueKey('agent-work-${widget.id}-code'),
           height: 28,
           onTap: () => setState(() => _code = !_code),
         ),
       ),
       if (_code)
-        for (final cell in widget.turn.cells)
+        for (final cell in widget.cells)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: CodeCellRow(key: ValueKey('agent-${cell.id}'), cell: cell),
