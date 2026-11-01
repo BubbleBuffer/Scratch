@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import '../core/change_feed.dart';
 import '../core/debounce.dart';
 import '../core/models.dart';
+import '../core/paths.dart';
 import '../core/vault.dart';
 
 class PagesStore extends ChangeNotifier {
@@ -60,6 +61,7 @@ class PagesStore extends ChangeNotifier {
   Future<void> _reloadUntilCurrent() async {
     for (var round = 0; round < maxReloadRounds && !_inactive; round++) {
       await vault.flush();
+      BootTiming.mark('pages: flush');
       if (_inactive || await _reloadOnce()) return;
     }
     if (!_inactive) {
@@ -79,10 +81,13 @@ class PagesStore extends ChangeNotifier {
     if (_inactive) return false;
     final gen = ++_generation;
     final n = await vault.pageCount();
+    BootTiming.mark('pages: pageCount');
     if (_inactive || gen != _generation) return false;
     final first = await vault.listPages(offset: 0, limit: chunk);
+    BootTiming.mark('pages: first listPages');
     if (_inactive) return false;
     await feed.poll();
+    BootTiming.mark('pages: feed.poll');
     if (gen != _generation || _inactive) return false;
     count = n;
     _chunks
@@ -98,6 +103,7 @@ class PagesStore extends ChangeNotifier {
     _contentPending.clear();
     notifyListeners();
     await _scanDocs(gen);
+    BootTiming.mark('pages: _scanDocs');
     return !_inactive && gen == _generation;
   }
 
@@ -187,6 +193,7 @@ class PagesStore extends ChangeNotifier {
           if (r.isDatabase) _isDatabase[r.id] = true;
         }
         final parents = {for (final r in rows) ?r.parent}.where((p) => !_isDatabase.containsKey(p)).toList();
+        BootTiming.mark('pages: scan chunk listPages (${parents.length} unknown parents)');
         for (final p in parents) {
           try {
             _isDatabase[p] = (await vault.loadPage(p)).isDatabase;

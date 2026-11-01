@@ -4,6 +4,7 @@
 // a refused list show in the section; an old mcp.toml is imported once.
 // The engine's MCP calls go through AgentStore's debug hooks.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -85,6 +86,27 @@ void main() {
         'call_timeout_secs': 60,
       },
     });
+  });
+
+  appTest('a hung MCP server does not hold the engine open', (t) async {
+    final hang = Completer<void>();
+    AgentStore.debugSetMcpServers = (json) => hang.future;
+    AgentStore.debugMcpStatus = () async => const [];
+    AgentStore.mcpStartWait = const Duration(milliseconds: 200);
+    addTearDown(() {
+      _resetHooks();
+      AgentStore.mcpStartWait = const Duration(seconds: 5);
+      if (!hang.isCompleted) hang.complete();
+    });
+    final tv = await pumpApp(t, mobile: false);
+    final settings = _settings(File('${tv.dir.path}/mcp-settings.json'), {
+      'slow': {'command': 'npx', 'enabled': true},
+    });
+    // openAgentStore waits for ensureOpen and expects no open error: before
+    // the wait was bounded it never returned while the server hung.
+    final store = await openAgentStore(t, settings: settings);
+    expect(store.openError, isNull);
+    expect(store.hostInfo, isNotNull);
   });
 
   appTest('MCP servers: add, edit and remove save in the AI settings', (

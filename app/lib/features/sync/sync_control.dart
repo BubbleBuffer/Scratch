@@ -21,7 +21,7 @@ import 'cert_trust.dart';
 import 'hub_auth.dart';
 
 /// Called once the vault is open.
-Future<void> startSyncAtBoot(SyncStore sync, AppSettings s) async {
+Future<void> startSyncAtBoot(SyncStore sync, AppSettings s, {Future<void>? afterFirstFrame}) async {
   BootTiming.mark('sync boot: begin');
   if (SyncStore.canHost && s.hubEnabled) {
     await setHubEnabled(sync, s, true);
@@ -37,6 +37,8 @@ Future<void> startSyncAtBoot(SyncStore sync, AppSettings s) async {
       AppLog.info('sync client failed: $e');
     }
   }
+  // Boot: Home paints first; the conflict scan and the agent / AI start wait.
+  if (afterFirstFrame != null) await afterFirstFrame;
   try {
     await sync.refreshConflicts();
   } catch (_) {}

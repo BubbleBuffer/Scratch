@@ -46,12 +46,27 @@ class ReminderStore extends ChangeNotifier {
   final List<String> _pendingTaps = [];
   bool get hasPendingTap => _pendingTaps.isNotEmpty;
 
-  Future<void> start() async {
-    if (_started || _inactive) return;
-    _started = true;
+  Future<void>? _init;
+
+  /// Registers the tap listener and starts the backend (the plugin, its
+  /// channels, the launch tap). Cheap; boot waits for it so a notification
+  /// that started the app is known before Home restores a page. Repeated
+  /// calls share one run.
+  Future<void> init() => _init ??= _initOnce();
+
+  Future<void> _initOnce() async {
     _taps = backend.taps.listen(_tap);
     await backend.init();
     BootTiming.mark('backend.init');
+  }
+
+  /// Plans and schedules the reminders (reads the agenda, may ask for the
+  /// notification permission, schedules each one). Boot runs it after Home's
+  /// first frame.
+  Future<void> start() async {
+    if (_started || _inactive) return;
+    _started = true;
+    await init();
     if (_inactive) return;
     feed.addListener(_changed);
     settings.addListener(_settingsChanged);

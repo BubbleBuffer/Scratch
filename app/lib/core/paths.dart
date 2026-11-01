@@ -84,6 +84,8 @@ abstract final class BootTiming {
     final s = _startUs;
     if (s == null) return;
     final ms = (clockNow().microsecondsSinceEpoch - s) / 1000;
+    // Boot only: later reloads and reconnects stay out of the log.
+    if (ms > 30000) return;
     AppLog.info('boot: $step ${ms.toStringAsFixed(0)}ms');
   }
 }

@@ -60,6 +60,7 @@ class _NotesAppState extends State<NotesApp> {
   late final AppSettings _settings = AppSettings.load(File('${widget.dataDir}${Platform.pathSeparator}settings.json'));
   AppState? _app;
   AppRemote? _remote;
+  Timer? _frameFallback;
   bool _seeding = false;
   int _seeded = 0;
   String? _error;
@@ -133,7 +134,7 @@ class _NotesAppState extends State<NotesApp> {
       final links = LinkPreviews(file: File('${widget.dataDir}${Platform.pathSeparator}link_previews.json'));
       final app = AppState(vault, ui: ui, links: links, settings: _settings);
       BootTiming.mark('before app.start');
-      await app.start();
+      await app.start(startReminders: false);
       BootTiming.mark('after app.start');
       AppLog.info('ready pages=${app.pages.count} fresh=$fresh');
       if (!mounted) {
@@ -142,9 +143,23 @@ class _NotesAppState extends State<NotesApp> {
       }
       setState(() => _app = app);
       BootTiming.mark('after setState');
+      // After Home's first frame: the reminder plan and the agent / AI start.
+      final firstFrame = Completer<void>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        BootTiming.mark('first frame after setState');
+        _frameFallback?.cancel();
+        if (!firstFrame.isCompleted) firstFrame.complete();
+        unawaited(app.reminders.start().catchError((Object e) {
+          AppLog.info('reminders failed to start: $e');
+        }).whenComplete(() => BootTiming.mark('reminders.start (after first frame)')));
+      });
+      // A frame is not scheduled when the window is hidden; do not wait forever.
+      _frameFallback = Timer(const Duration(seconds: 3), () {
+        if (!firstFrame.isCompleted) firstFrame.complete();
+      });
       unawaited(_startRemote().whenComplete(() => BootTiming.mark('remote start done')));
       unawaited(
-        startSyncAtBoot(app.sync, _settings).whenComplete(() {
+        startSyncAtBoot(app.sync, _settings, afterFirstFrame: firstFrame.future).whenComplete(() {
           BootTiming.mark('startSyncAtBoot done');
           return app.runNotices.start().catchError((Object e) {
             AppLog.info('run notices failed to start: $e');
@@ -202,6 +217,7 @@ class _NotesAppState extends State<NotesApp> {
 
   @override
   void dispose() {
+    _frameFallback?.cancel();
     _lifecycle.dispose();
     unawaited(_remote?.stop());
     _remote = null;

@@ -2707,6 +2707,43 @@ fn writer_loop(inner: Arc<Inner>, rx: Receiver<Msg>, index: Index) {
     }
 }
 
+/// How long the typo-correction word index waits after an open before it is
+/// built in the background: long enough that the first screens' queries are
+/// not queued behind its database lock (it holds the lock for 50-200 ms at
+/// 10,000 pages).
+const FUZZY_PREWARM_DELAY: std::time::Duration = std::time::Duration::from_millis(1500);
+
+/// The background step of [`Vault::open_deferred`]. Holds only a weak
+/// reference, so closing the vault never waits for it.
+fn deferred_startup(inner: std::sync::Weak<Inner>, scan: bool) {
+    if scan {
+        let Some(i) = inner.upgrade() else { return };
+        let ids: Vec<String> = match fs::read_dir(i.docs_dir()) {
+            Ok(rd) => rd
+                .filter_map(|e| e.ok())
+                .filter_map(|e| e.file_name().to_string_lossy().strip_suffix(".loro").map(str::to_owned))
+                .collect(),
+            Err(_) => Vec::new(),
+        };
+        let mut missing = Vec::new();
+        for chunk in ids.chunks(500) {
+            let db = lock(&i.db);
+            for id in chunk {
+                if !i.is_purged(id) && !db.exists(id).unwrap_or(true) {
+                    missing.push(id.clone());
+                }
+            }
+        }
+        if !missing.is_empty() {
+            let db = lock(&i.db);
+            let _ = i.recover_missing_rows(&db, &missing);
+        }
+    }
+    std::thread::sleep(FUZZY_PREWARM_DELAY);
+    let Some(i) = inner.upgrade() else { return };
+    let _ = lock(&i.db).refresh_fuzzy();
+}
+
 /// Copies of `blocks` with fresh block ids.
 pub(crate) fn fresh_ids(blocks: &[Block]) -> Vec<Block> {
     blocks
@@ -2724,6 +2761,21 @@ impl Vault {
     /// index if it is missing or from an older version, recovers missing rows
     /// before returning, and finishes interrupted file writes in the background.
     pub fn open(root: String) -> Result<Vault> {
+        Self::open_with(root, false)
+    }
+
+    /// Like [`Vault::open`], but the work that only protects rare cases or
+    /// warms caches runs on a background thread right after the open: the
+    /// scan for page documents that have no index row (crash recovery) and
+    /// the typo-correction word index. Search builds that index on demand if
+    /// a query comes first, so results are the same, never stale. A full
+    /// reindex (new or outdated index) still runs before this returns. The
+    /// app opens its vault this way; tests and tools use `open`.
+    pub fn open_deferred(root: String) -> Result<Vault> {
+        Self::open_with(root, true)
+    }
+
+    fn open_with(root: String, deferred: bool) -> Result<Vault> {
         let root = PathBuf::from(root);
         let mut tr = crate::boot_trace::Trace::new(&root, "Vault::open");
         for d in [
@@ -2828,6 +2880,8 @@ impl Vault {
         tr.mark("recover_restorations+purged");
         if fresh && fs::read_dir(vault.inner.docs_dir())?.next().is_some() {
             vault.reindex()?;
+        } else if !fresh && deferred {
+            // Recovery scan and fuzzy warm-up: see `deferred_startup`.
         } else if !fresh {
             let db = lock(&vault.inner.db);
             let mut missing = Vec::new();
@@ -2844,7 +2898,9 @@ impl Vault {
         tr.mark("reindex / docs scan + recover_missing_rows");
         // Typo correction's titles and vocabulary are built now, not on the
         // first misspelled query.
-        lock(&vault.inner.db).refresh_fuzzy()?;
+        if !deferred {
+            lock(&vault.inner.db).refresh_fuzzy()?;
+        }
         tr.mark("refresh_fuzzy");
         let mut seen = HashSet::new();
         for entry in fs::read_dir(vault.inner.logs_dir())? {
@@ -2896,6 +2952,13 @@ impl Vault {
         *lock(&vault.live_worker) = Some(live_worker);
         tr.mark("live worker");
         tr.finish(true);
+        if deferred {
+            let weak = Arc::downgrade(&vault.inner);
+            let scan = !fresh;
+            let _ = std::thread::Builder::new()
+                .name("vault-startup".into())
+                .spawn(move || deferred_startup(weak, scan));
+        }
         Ok(vault)
     }
 

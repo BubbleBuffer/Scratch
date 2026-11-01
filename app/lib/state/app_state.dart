@@ -86,14 +86,22 @@ class AppState {
   }
 
   /// Starts the change feed and loads what the first screen shows.
-  Future<void> start() async {
+  ///
+  /// With [startReminders] false the reminder plan is left to
+  /// [ReminderStore.start] (boot calls it after Home's first frame); only the
+  /// backend's `init` runs here, so a launch tap is known.
+  Future<void> start({bool startReminders = true}) async {
     await feed.start();
     BootTiming.mark('feed.start');
     await pages.reload();
     BootTiming.mark('pages.reload');
     await agenda.reload();
     BootTiming.mark('agenda.reload');
-    await reminders.start();
+    if (startReminders) {
+      await reminders.start();
+    } else {
+      await reminders.init();
+    }
     BootTiming.mark('reminders.start');
     tree.childrenOf(null);
   }

@@ -224,7 +224,7 @@ impl NotesVault {
     /// failure is reported by the local controls and never fails the open. Without
     /// it, the vault has no local runner. Neither depends on an agent.
     pub fn open(root: String, data_dir: Option<String>) -> Result<NotesVault, String> {
-        let inner = Arc::new(Vault::open(root).map_err(err)?);
+        let inner = Arc::new(Vault::open_deferred(root).map_err(err)?);
         let mut tr = vault_core::boot_trace::Trace::new(std::path::Path::new(&inner.root()), "NotesVault::open");
         if cfg!(any(target_os = "windows", target_os = "linux", target_os = "macos")) {
             inner.publish_device_activity().map_err(err)?;

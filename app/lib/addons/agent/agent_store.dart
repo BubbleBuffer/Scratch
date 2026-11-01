@@ -1227,6 +1227,12 @@ class AgentStore extends ChangeNotifier {
     unawaited(_sendMcp(a, json));
   }
 
+  /// How long opening the engine waits for its MCP servers to start. A server
+  /// that is slower (a hung `npx`, say) keeps starting in the background: its
+  /// result still lands in [mcpError] when it ends, and its tools join the
+  /// engine's tool list as the servers come up.
+  static Duration mcpStartWait = const Duration(seconds: 5);
+
   Future<void> _sendMcp(NotesAgent a, String json) async {
     _mcpSent = json;
     String? failed;
@@ -1443,7 +1449,10 @@ class AgentStore extends ChangeNotifier {
         // A new engine starts with no servers: give it the list.
         _mcpSent = null;
         BootTiming.mark('agent open: claudeDetection');
-        await _sendMcp(agent, _mcpJson);
+        await _sendMcp(agent, _mcpJson).timeout(
+          mcpStartWait,
+          onTimeout: () => AppLog.info('agent MCP servers still starting after ${mcpStartWait.inSeconds} s; continuing'),
+        );
         BootTiming.mark('agent open: _sendMcp');
       }
       _sub = _eventFeed.bind(
