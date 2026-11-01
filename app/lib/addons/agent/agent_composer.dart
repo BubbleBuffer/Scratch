@@ -249,7 +249,12 @@ class _AgentComposerState extends State<AgentComposer> {
         refs: refs,
       ),
     );
-    if (!sent || !mounted) return false;
+    if (!sent) return false;
+    // A draft that became its chat can remount the composer mid-send, and the
+    // kit composer then never clears the text; the pane's controller does.
+    final controller = slot.controller;
+    if (controller.text.trim() == submission.text.trim()) controller.clear();
+    if (!mounted) return true;
     setState(_clearSent);
     return true;
   }
@@ -328,7 +333,7 @@ class _AgentComposerState extends State<AgentComposer> {
     final store = widget.store;
     final pages = context.watch<PagesStore>();
     final slot = widget.slot;
-    final running = slot?.running ?? store.running;
+    final running = store.running || (slot?.running ?? false);
     final model = store.modelOf(store.openId);
     final models = store.shownModels(current: model);
     final showModel = models.isNotEmpty && model != null;
