@@ -263,7 +263,11 @@ void main() {
     );
     await expectLater(
       () => driver.focus(byLabel('Plain').id),
-      throwsA(isA<RemoteError>().having((e) => e.status, 'status', 400)),
+      throwsA(
+        isA<RemoteError>()
+            .having((e) => e.status, 'status', 400)
+            .having((e) => e.message, 'message', contains('"plain"')),
+      ),
     );
     semantics.dispose();
   });
