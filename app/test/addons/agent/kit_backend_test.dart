@@ -429,7 +429,10 @@ void main() {
       expect(kitToolKind('exec'), kit.ToolKind.exec);
       expect(kitToolKind('mystery'), kit.ToolKind.other);
       expect(kitToolTarget('{"query":"milk"}'), 'milk');
-      expect(kitToolTarget('{"command":"cargo test","cwd":"/w"}'), 'cargo test');
+      expect(
+        kitToolTarget('{"command":"cargo test","cwd":"/w"}'),
+        'cargo test',
+      );
       expect(kitToolTarget('{"url":"https://a.test/x"}'), 'https://a.test/x');
       expect(kitToolTarget('not json'), isNull);
       expect(kitToolTarget('[1]'), isNull);
@@ -449,7 +452,7 @@ void main() {
   });
 
   group('backend', () {
-    test('declares no capabilities, including writes', () {
+    test('declares no capabilities without commands', () {
       final backend = ScratchKitBackend(_Source());
       expect(backend.capabilities.values, isEmpty);
     });
@@ -1208,4 +1211,256 @@ void pumpPaneTests() {
       await tester.pumpWidget(const SizedBox());
     });
   });
+
+  group('commands', () {
+    ScratchKitBackend backend(_Commands c, [_Source? source]) =>
+        ScratchKitBackend(source ?? _Source(), commands: c);
+
+    test('declare what the store can do, and not steer', () {
+      final caps = backend(_Commands()).capabilities;
+      expect(
+        caps.values,
+        containsAll([
+          kit.KitCapability.send,
+          kit.KitCapability.cancel,
+          kit.KitCapability.approve,
+          kit.KitCapability.createChat,
+          kit.KitCapability.rename,
+          kit.KitCapability.editUndo,
+          kit.KitCapability.models,
+        ]),
+      );
+      expect(caps.has(kit.KitCapability.steer), isFalse);
+      expect(caps.has(kit.KitCapability.fork), isFalse);
+    });
+
+    test('send maps refs to the message context', () async {
+      final c = _Commands();
+      final result = await backend(c).send(
+        _chat,
+        'hello',
+        refs: [
+          const kit.KitRef(kind: 'page', id: 'p1', label: 'Plan'),
+          const kit.KitRef(kind: 'mention', id: 'p2', label: 'Budget'),
+          const kit.KitRef(kind: 'chat', id: 'c2', label: 'Other chat'),
+          kit.KitRef(
+            kind: 'selection',
+            id: encodeKitSelection(
+              const AgentContextSelection(
+                pageId: 'p1',
+                pageTitle: 'Plan',
+                blockIds: ['b1', 'b2'],
+                text: 'a passage',
+              ),
+            ),
+            label: 'Selection',
+          ),
+        ],
+      );
+      expect(c.sent.single.sessionId, _chat);
+      expect(c.sent.single.text, 'hello');
+      final ctx = c.sent.single.context!;
+      expect(ctx.pages.map((p) => p.id), ['p1', 'p2']);
+      expect(ctx.pages.first.title, 'Plan');
+      expect(ctx.chats.single.id, 'c2');
+      expect(ctx.selection!.blockIds, ['b1', 'b2']);
+      expect(ctx.selection!.text, 'a passage');
+      expect(result.delivery, kit.SendDelivery.started);
+    });
+
+    test('send without refs has no context, and a busy chat queues', () async {
+      final c = _Commands()
+        ..sentResult = const AgentSent(started: false, inputId: 'q1');
+      final result = await backend(c).send(_chat, 'later');
+      expect(c.sent.single.context, isNull);
+      expect(result.delivery, kit.SendDelivery.queued);
+      expect(result.inputId, 'q1');
+    });
+
+    test('a follow-up is the same call as send', () async {
+      final c = _Commands();
+      await backend(c).followup(_chat, 'also');
+      expect(c.sent.single.text, 'also');
+    });
+
+    test('an empty message is invalid and reaches no one', () async {
+      final c = _Commands();
+      await expectLater(
+        backend(c).send(_chat, '  '),
+        throwsA(isA<kit.KitInvalid>()),
+      );
+      expect(c.sent, isEmpty);
+    });
+
+    test('a failure the store reports becomes a typed error', () async {
+      final c = _Commands()..failWith = 'The agent is not available.';
+      await expectLater(
+        backend(c).send(_chat, 'hi'),
+        throwsA(
+          isA<kit.KitFailed>().having(
+            (e) => e.message,
+            'message',
+            'The agent is not available.',
+          ),
+        ),
+      );
+    });
+
+    test('createChat passes the title and returns the summary', () async {
+      final c = _Commands();
+      final chat = await backend(c).createChat(title: 'First line');
+      expect(c.created, ['First line']);
+      expect(chat.id, 'new-chat');
+    });
+
+    test('createChat fails when the agent is off', () async {
+      final c = _Commands()..createdSession = null;
+      await expectLater(
+        backend(c).createChat(title: 'x'),
+        throwsA(isA<kit.KitUnavailable>()),
+      );
+    });
+
+    test('cancel stops that chat, not the open one', () async {
+      final c = _Commands();
+      await backend(c).cancel('other');
+      expect(c.stopped, ['other']);
+    });
+
+    test('approval choices map to the store strings', () async {
+      final c = _Commands();
+      final b = backend(c);
+      await b.decideApproval(_chat, 'a1', kit.ApprovalDecision.approve);
+      await b.decideApproval(
+        _chat,
+        'a2',
+        kit.ApprovalDecision.approveForSession,
+      );
+      await b.decideApproval(
+        _chat,
+        'a3',
+        const kit.ApprovalDecision.deny('no'),
+      );
+      expect(c.decisions, [
+        ('a1', 'approve', null),
+        ('a2', 'approve_session', null),
+        ('a3', 'deny', 'no'),
+      ]);
+    });
+
+    test('a refused undo is a conflict with the reason', () async {
+      final c = _Commands()..undoError = StateError('That edit changed since.');
+      await expectLater(
+        backend(c).undoEdit(_chat, 'e1'),
+        throwsA(
+          isA<kit.KitConflict>().having(
+            (e) => e.message,
+            'message',
+            'That edit changed since.',
+          ),
+        ),
+      );
+    });
+
+    test('rename, a model pick and an undo reload the open chat', () async {
+      final c = _Commands()..undoError = StateError('no');
+      final b = backend(c);
+      final events = <kit.KitEvent>[];
+      final sub = b.events(_chat, after: 0).listen(events.add);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      events.clear();
+      await b.rename(_chat, 'New name');
+      await b.setModel(_chat, 'p/n');
+      await b.undoEdit(_chat, 'e1').catchError((_) {});
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await sub.cancel();
+      expect(events.whereType<kit.GapEvent>().length, 3);
+      expect(c.renamed, [(_chat, 'New name')]);
+      expect(c.models[_chat], 'p/n');
+    });
+
+    test('loadChat shows the pick before any run', () async {
+      final c = _Commands()..models = {_chat: 'p/picked'};
+      final snap = await backend(c).loadChat(_chat);
+      expect(snap.model, 'p/picked');
+    });
+
+    test('listModels comes from the store', () async {
+      final c = _Commands();
+      final choices = await backend(c).listModels();
+      expect(choices.map((x) => x.id), ['p/m', 'p/n']);
+      expect(choices.first.label, 'Model m');
+    });
+  });
+}
+
+class _Commands implements KitAgentCommands {
+  final sent =
+      <({String text, AgentMessageContext? context, String? sessionId})>[];
+  final created = <String>[];
+  final stopped = <String?>[];
+  final decisions = <(String, String, String?)>[];
+  final renamed = <(String, String)>[];
+  Map<String, String> models = {};
+  AgentSent? sentResult = const AgentSent(started: true);
+  AgentSession? createdSession = AgentSession(
+    id: 'new-chat',
+    title: 'New chat',
+    createdAt: '2026-10-20T08:00:00Z',
+    updatedAt: '2026-10-20T08:00:00Z',
+  );
+  String? failWith;
+  Object? undoError;
+
+  @override
+  String? get error => failWith;
+
+  @override
+  Future<AgentSession?> createSession({String title = 'New chat'}) async {
+    created.add(title);
+    return createdSession;
+  }
+
+  @override
+  Future<AgentSent?> send(
+    String text, {
+    AgentMessageContext? context,
+    String? sessionId,
+  }) async {
+    sent.add((text: text, context: context, sessionId: sessionId));
+    return failWith == null ? sentResult : null;
+  }
+
+  @override
+  Future<void> stop({String? sessionId}) async => stopped.add(sessionId);
+
+  @override
+  Future<void> decide(
+    String approvalId,
+    String decision, {
+    String? reason,
+  }) async => decisions.add((approvalId, decision, reason));
+
+  @override
+  Future<AgentEdit> undoEdit(String editId) async {
+    final e = undoError;
+    if (e != null) throw e;
+    throw StateError('unused');
+  }
+
+  @override
+  Future<void> renameSession(String id, String title) async =>
+      renamed.add((id, title));
+
+  @override
+  List<kit.KitChoice> modelChoices(String chatId) => const [
+    kit.KitChoice(id: 'p/m', label: 'Model m'),
+    kit.KitChoice(id: 'p/n', label: 'Model n'),
+  ];
+
+  @override
+  String? modelOf(String chatId) => models[chatId];
+
+  @override
+  void pickModel(String chatId, String model) => models[chatId] = model;
 }

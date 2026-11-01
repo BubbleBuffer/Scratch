@@ -1,9 +1,13 @@
-// Read-only `AgentBackend` for the shared agent kit, over Scratch's agent.
+// `AgentBackend` for the shared agent kit, over Scratch's agent.
 //
 // Scratch keeps its own data path (Dart -> flutter_rust_bridge -> NotesAgent).
-// This file only projects it onto the kit's port so `AgentChatPane` can draw a
-// chat. It reads: `listChats`, `loadChat` and `events`. Every command answers
-// with the port's `KitUnsupported`, and the declared capabilities are empty.
+// This file projects it onto the kit's port so `AgentChatPane` can draw a
+// chat. Reads (`listChats`, `loadChat`, `events`) go through [KitAgentSource].
+// Commands go through [KitAgentCommands], implemented by `AgentStore` (the
+// Hub sync gate, `store.error`, the busy counter and the replay mode live
+// there), never straight to `NotesAgent`. Without commands the backend is
+// read-only: the capabilities are empty and every command answers with the
+// port's `KitUnsupported`.
 //
 // Scratch concepts with no kit equivalent are dropped, not approximated; the
 // list is in wiki/addons/agent.md.
@@ -47,6 +51,92 @@ class NotesAgentSource implements KitAgentSource {
   Stream<AgentEvent> subscribe() => events ?? agent.subscribe();
 }
 
+/// What the backend asks of Scratch's `AgentStore` for commands. The store
+/// reports a failure by setting [error], not by throwing, so the backend reads
+/// it after each call. Tests pass a fake.
+abstract interface class KitAgentCommands {
+  /// The last failure, null when the last command worked.
+  String? get error;
+
+  /// Starts a chat and opens it; null when the agent is not available.
+  Future<AgentSession?> createSession({String title});
+
+  /// Sends [text] to chat [sessionId]; null when nothing was sent.
+  Future<AgentSent?> send(
+    String text, {
+    AgentMessageContext? context,
+    String? sessionId,
+  });
+
+  /// Stops chat [sessionId]'s run.
+  Future<void> stop({String? sessionId});
+
+  /// [decision] is `approve`, `approve_session` or `deny`.
+  Future<void> decide(String approvalId, String decision, {String? reason});
+
+  /// Reverts a file edit; throws when the edit can no longer be undone.
+  Future<AgentEdit> undoEdit(String editId);
+
+  Future<void> renameSession(String id, String title);
+
+  /// The models to offer, with the current one of [chatId] included.
+  List<kit.KitChoice> modelChoices(String chatId);
+
+  /// The model chat [chatId] uses (the pick, else the default).
+  String? modelOf(String chatId);
+
+  void pickModel(String chatId, String model);
+}
+
+/// The selection chip's [kit.KitRef.id]: the passage the composer sends as
+/// context, which a [kit.KitRef] has no fields for. The page and block ids
+/// and the text ride in the id (JSON) so the pane's commands carry them.
+String encodeKitSelection(AgentContextSelection s) => jsonEncode({
+  'pageId': s.pageId,
+  'pageTitle': s.pageTitle,
+  'blockIds': s.blockIds,
+  'text': s.text,
+});
+
+AgentContextSelection? _decodeSelection(String id) {
+  try {
+    final j = jsonDecode(id);
+    if (j is! Map) return null;
+    return AgentContextSelection(
+      pageId: j['pageId'] as String,
+      pageTitle: j['pageTitle'] as String,
+      blockIds: [for (final b in j['blockIds'] as List) b as String],
+      text: j['text'] as String,
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+/// A [kit.KitRef] list as Scratch's message context: pages and mentions, other
+/// chats, and the selection. Null when there is none.
+AgentMessageContext? kitContext(List<kit.KitRef> refs) {
+  final pages = <String, AgentContextPage>{};
+  final chats = <String, AgentContextChat>{};
+  AgentContextSelection? selection;
+  for (final r in refs) {
+    switch (r.kind) {
+      case 'chat':
+        chats[r.id] = AgentContextChat(id: r.id, title: r.label);
+      case 'selection':
+        selection = _decodeSelection(r.id) ?? selection;
+      default:
+        pages[r.id] = AgentContextPage(id: r.id, title: r.label);
+    }
+  }
+  if (pages.isEmpty && chats.isEmpty && selection == null) return null;
+  return AgentMessageContext(
+    pages: pages.values.toList(),
+    chats: chats.values.toList(),
+    selection: selection,
+  );
+}
+
 /// How long burst events (tool starts and ends) wait before one `gap` makes
 /// the kit reload the chat.
 const kitReloadDelay = Duration(milliseconds: 80);
@@ -55,14 +145,40 @@ const kitReloadDelay = Duration(milliseconds: 80);
 const kitToolOutputLimit = 4000;
 
 class ScratchKitBackend implements kit.AgentBackend {
-  ScratchKitBackend(this.source, {this.reloadDelay = kitReloadDelay});
+  ScratchKitBackend(
+    this.source, {
+    this.commands,
+    this.reloadDelay = kitReloadDelay,
+  });
   final KitAgentSource source;
+
+  /// The store behind the commands; null makes the backend read-only.
+  final KitAgentCommands? commands;
   final Duration reloadDelay;
+  final _reloaders = <String, Set<void Function()>>{};
   final _snapshots = <String, AgentSessionState>{};
   final _snapshotListeners = <String, Set<void Function(AgentSessionState)>>{};
 
   @override
-  kit.KitCapabilities get capabilities => kit.KitCapabilities.none();
+  kit.KitCapabilities get capabilities => commands == null
+      ? kit.KitCapabilities.none()
+      : kit.KitCapabilities([
+          kit.KitCapability.send,
+          kit.KitCapability.cancel,
+          kit.KitCapability.approve,
+          kit.KitCapability.createChat,
+          kit.KitCapability.rename,
+          kit.KitCapability.editUndo,
+          kit.KitCapability.models,
+        ]);
+
+  /// Makes the open streams of [chatId] reload, for changes that arrive as no
+  /// event (a model pick, a rename, an undone edit).
+  void _reload(String chatId) {
+    for (final reload in [...?_reloaders[chatId]]) {
+      reload();
+    }
+  }
 
   @override
   Future<kit.ChatPage> listChats({String? cursor, String? query}) async {
@@ -86,7 +202,10 @@ class ScratchKitBackend implements kit.AgentBackend {
       for (final listener in [...?_snapshotListeners[chatId]]) {
         listener(state);
       }
-      return kitSnapshot(state);
+      final snapshot = kitSnapshot(state);
+      // The model is a client-side pick, remembered before the first run.
+      final model = commands?.modelOf(chatId);
+      return model == null ? snapshot : snapshot.copyWith(model: model);
     } catch (e) {
       throw const kit.KitFailed('That chat could not be loaded.');
     }
@@ -143,6 +262,10 @@ class ScratchKitBackend implements kit.AgentBackend {
           }
         });
       }
+    }
+
+    void reloadNow() {
+      if (!stopped && !out.isClosed) gap(lastSeq);
     }
 
     Future<void> start() async {
@@ -204,11 +327,14 @@ class ScratchKitBackend implements kit.AgentBackend {
     out = StreamController<kit.KitEvent>(
       onListen: () {
         (_snapshotListeners[chatId] ??= {}).add(seed);
+        (_reloaders[chatId] ??= {}).add(reloadNow);
         unawaited(start());
       },
       onCancel: () async {
         stopped = true;
         _snapshotListeners[chatId]?.remove(seed);
+        _reloaders[chatId]?.remove(reloadNow);
+        if (_reloaders[chatId]?.isEmpty ?? false) _reloaders.remove(chatId);
         if (_snapshotListeners[chatId]?.isEmpty ?? false) {
           _snapshotListeners.remove(chatId);
         }
@@ -222,20 +348,62 @@ class ScratchKitBackend implements kit.AgentBackend {
   kit.KitUnsupported _readOnly(kit.KitCapability capability) =>
       kit.KitUnsupported(
         capability,
-        'The kit pane is read-only in Scratch for now.',
+        commands == null
+            ? 'This chat is read-only.'
+            : 'That isn’t available in this chat.',
       );
 
+  /// The commands port, or the read-only error for [capability].
+  KitAgentCommands _need(kit.KitCapability capability) =>
+      commands ?? (throw _readOnly(capability));
+
+  /// Turns the store's failure string into the port's typed error. The store
+  /// keeps the text for its own screens, so it is read, not cleared.
+  void _check(KitAgentCommands c) {
+    final error = c.error;
+    if (error != null && error.isNotEmpty) throw kit.KitFailed(error);
+  }
+
   @override
-  Future<kit.ChatSummary> createChat({String? title, String? workspace}) =>
-      Future.error(_readOnly(kit.KitCapability.createChat));
+  Future<kit.ChatSummary> createChat({String? title, String? workspace}) async {
+    final c = _need(kit.KitCapability.createChat);
+    final session = await c.createSession(
+      title: (title == null || title.isEmpty) ? 'New chat' : title,
+    );
+    if (session == null) {
+      throw const kit.KitUnavailable('The agent is not available.');
+    }
+    return kitSummary(session);
+  }
 
   @override
   Future<kit.SendResult> send(
     String chatId,
     String text, {
     List<kit.KitRef> refs = const [],
-  }) => Future.error(_readOnly(kit.KitCapability.send));
+  }) async {
+    final c = _need(kit.KitCapability.send);
+    if (text.trim().isEmpty) throw const kit.KitInvalid('Write a message.');
+    final sent = await c.send(
+      text,
+      context: kitContext(refs),
+      sessionId: chatId,
+    );
+    _check(c);
+    if (sent == null) {
+      throw const kit.KitFailed('The message was not sent.');
+    }
+    return kit.SendResult(
+      delivery: sent.started
+          ? kit.SendDelivery.started
+          : kit.SendDelivery.queued,
+      inputId: sent.inputId,
+      runId: sent.run?.id,
+    );
+  }
 
+  // The engine queues a message sent while a run is active, so a follow-up is
+  // the same call. Steer is not declared (a later product change).
   @override
   Future<String> steer(
     String chatId,
@@ -248,7 +416,10 @@ class ScratchKitBackend implements kit.AgentBackend {
     String chatId,
     String text, {
     List<kit.KitRef> refs = const [],
-  }) => Future.error(_readOnly(kit.KitCapability.send));
+  }) async {
+    final result = await send(chatId, text, refs: refs);
+    return result.inputId ?? result.runId ?? '';
+  }
 
   @override
   Future<void> sendQueuedNow(String chatId, String inputId) =>
@@ -263,8 +434,11 @@ class ScratchKitBackend implements kit.AgentBackend {
       Future.error(_readOnly(kit.KitCapability.queueEdit));
 
   @override
-  Future<void> cancel(String chatId) =>
-      Future.error(_readOnly(kit.KitCapability.cancel));
+  Future<void> cancel(String chatId) async {
+    final c = _need(kit.KitCapability.cancel);
+    await c.stop(sessionId: chatId);
+    _check(c);
+  }
 
   @override
   Future<void> resume(String chatId) =>
@@ -275,7 +449,15 @@ class ScratchKitBackend implements kit.AgentBackend {
     String chatId,
     String approvalId,
     kit.ApprovalDecision decision,
-  ) => Future.error(_readOnly(kit.KitCapability.approve));
+  ) async {
+    final c = _need(kit.KitCapability.approve);
+    await c.decide(approvalId, switch (decision.choice) {
+      kit.ApprovalChoice.approve => 'approve',
+      kit.ApprovalChoice.approveForSession => 'approve_session',
+      kit.ApprovalChoice.deny => 'deny',
+    }, reason: decision.reason);
+    _check(c);
+  }
 
   @override
   Future<void> answerQuestion(
@@ -293,8 +475,12 @@ class ScratchKitBackend implements kit.AgentBackend {
   ) => Future.error(_readOnly(kit.KitCapability.answerChildQuestion));
 
   @override
-  Future<void> rename(String chatId, String title) =>
-      Future.error(_readOnly(kit.KitCapability.rename));
+  Future<void> rename(String chatId, String title) async {
+    final c = _need(kit.KitCapability.rename);
+    await c.renameSession(chatId, title);
+    _check(c);
+    _reload(chatId);
+  }
 
   @override
   Future<void> archive(String chatId, {bool archived = true}) =>
@@ -317,20 +503,32 @@ class ScratchKitBackend implements kit.AgentBackend {
       Future.error(_readOnly(kit.KitCapability.jobs));
 
   @override
-  Future<void> undoEdit(String chatId, String editId) =>
-      Future.error(_readOnly(kit.KitCapability.editUndo));
+  Future<void> undoEdit(String chatId, String editId) async {
+    final c = _need(kit.KitCapability.editUndo);
+    try {
+      await c.undoEdit(editId);
+    } catch (e) {
+      throw kit.KitConflict(
+        '$e'.replaceFirst(RegExp(r'^(Bad state|Exception): '), ''),
+      );
+    } finally {
+      _reload(chatId);
+    }
+  }
 
   @override
-  Future<List<kit.KitChoice>> listModels() =>
-      Future.error(_readOnly(kit.KitCapability.models));
+  Future<List<kit.KitChoice>> listModels() async =>
+      _need(kit.KitCapability.models).modelChoices('');
 
   @override
   Future<List<kit.KitChoice>> listProfiles() =>
       Future.error(_readOnly(kit.KitCapability.profiles));
 
   @override
-  Future<void> setModel(String chatId, String modelId) =>
-      Future.error(_readOnly(kit.KitCapability.models));
+  Future<void> setModel(String chatId, String modelId) async {
+    _need(kit.KitCapability.models).pickModel(chatId, modelId);
+    _reload(chatId);
+  }
 
   @override
   Future<kit.ProviderSetup> listProviders() =>
