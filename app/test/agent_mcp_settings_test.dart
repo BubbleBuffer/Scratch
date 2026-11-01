@@ -108,7 +108,10 @@ void main() {
     expect(store.openError, isNull);
     expect(store.hostInfo, isNotNull);
     // The server finally answers: nothing is left in flight for the teardown.
-    hang.complete();
+    await real(t, () async {
+      hang.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
     await settle(t);
   });
 
