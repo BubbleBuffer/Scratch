@@ -138,12 +138,14 @@ class ReminderStore extends ChangeNotifier {
     final leadEnd = end.add(Duration(minutes: s.leadMinutes, milliseconds: 1));
     final timedTo = leadEnd.isAfter(to) ? leadEnd : to;
     await vault.flush();
+    BootTiming.mark('replan: flush');
     if (_inactive) return;
     final results = await Future.wait<Object>([
       vault.run((v) => v.agenda(timedFromMs: from.millisecondsSinceEpoch, timedToMs: timedTo.millisecondsSinceEpoch,
           dayFromMs: dayStamp(from), dayToMs: dayStamp(to))),
       vault.run((v) => v.overdueCount(timedBeforeMs: from.millisecondsSinceEpoch, dayBeforeMs: dayStamp(from))),
     ]);
+    BootTiming.mark('replan: agenda queries');
     if (_inactive) return;
     final items = results[0] as List<AgendaItem>;
     final names = <String, String>{};
@@ -167,10 +169,12 @@ class ReminderStore extends ChangeNotifier {
     if (_hasApplied && !_cancelled && listEquals(plan, next)) return;
     if (next.isNotEmpty) {
       permissionGranted = await backend.ensurePermission();
+      BootTiming.mark('replan: ensurePermission');
       if (_inactive) return;
       if (!settings.reminders.enabled) { _dirty = true; return; }
     }
     await backend.apply(next);
+    BootTiming.mark('replan: backend.apply (${next.length} reminders)');
     if (_inactive) return;
     plan = next;
     _hasApplied = true;
