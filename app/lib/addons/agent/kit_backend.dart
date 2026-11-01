@@ -149,8 +149,14 @@ class ScratchKitBackend implements kit.AgentBackend {
     this.source, {
     this.commands,
     this.reloadDelay = kitReloadDelay,
+    this.approvals = true,
   });
   final KitAgentSource source;
+
+  /// Whether the snapshot and the events carry the pending approvals. A host
+  /// that draws them itself (Scratch's bars read the store) turns this off,
+  /// so the pane draws none.
+  final bool approvals;
 
   /// The store behind the commands; null makes the backend read-only.
   final KitAgentCommands? commands;
@@ -202,7 +208,8 @@ class ScratchKitBackend implements kit.AgentBackend {
       for (final listener in [...?_snapshotListeners[chatId]]) {
         listener(state);
       }
-      final snapshot = kitSnapshot(state);
+      final shown = kitSnapshot(state);
+      final snapshot = approvals ? shown : shown.copyWith(approvals: const []);
       // The model is a client-side pick, remembered before the first run.
       final model = commands?.modelOf(chatId);
       return model == null ? snapshot : snapshot.copyWith(model: model);
@@ -213,7 +220,7 @@ class ScratchKitBackend implements kit.AgentBackend {
 
   @override
   Stream<kit.KitEvent> events(String chatId, {required int after}) {
-    final mapper = KitEventMapper(chatId);
+    final mapper = KitEventMapper(chatId, approvals: approvals);
     StreamSubscription<AgentEvent>? live;
     Timer? reload;
     var reloadSeq = 0;
@@ -882,8 +889,9 @@ class KitMapped {
 /// Maps one chat's Scratch events to kit events. It holds the text offset of
 /// each streaming run.
 class KitEventMapper {
-  KitEventMapper(this.chatId);
+  KitEventMapper(this.chatId, {this.approvals = true});
   final String chatId;
+  final bool approvals;
   final Map<String, String> _text = {};
   final Map<String, int> _textSeq = {};
 
@@ -976,6 +984,7 @@ class KitEventMapper {
           ),
         ]);
       case 'approval_requested':
+        if (!approvals) return const KitMapped([]);
         final a = e.approval;
         if (a == null) return const KitMapped([], reload: true);
         return KitMapped([
@@ -987,6 +996,7 @@ class KitEventMapper {
           ),
         ]);
       case 'approval_resolved':
+        if (!approvals) return const KitMapped([]);
         final id = e.approvalId;
         if (id == null) return const KitMapped([], reload: true);
         return KitMapped([

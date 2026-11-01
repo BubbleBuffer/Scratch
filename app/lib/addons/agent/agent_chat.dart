@@ -1,12 +1,10 @@
-
-import 'package:agent_kit/agent_kit.dart' show ApprovalBar, ApprovalKeyPane;
-import 'package:agent_kit_core/agent_kit_core.dart' show ApprovalChoice;
+import 'package:agent_kit/agent_kit.dart' show ApprovalKeyPane;
 import 'package:flutter/widgets.dart';
 
 import '../../ui/ui.dart';
+import 'agent_approval_bars.dart';
 import 'agent_composer.dart';
 import 'agent_store.dart';
-import 'kit_backend.dart' show kitApproval;
 import 'scratch_chat_body.dart';
 
 export 'scratch_chat_body.dart' show agentEmptyLine;
@@ -39,41 +37,15 @@ class _AgentChatState extends State<AgentChat> {
     super.dispose();
   }
 
-  /// The requests the agent waits on, above the composer: the first one
-  /// answers to 1, 2 and 3.
+  /// The requests the agent waits on, above the composer.
   Widget _approvalBars(AgentStore store, double pad) {
-    final pending = store.pendingApprovals;
-    if (pending.isEmpty) return const SizedBox.shrink();
+    if (store.pendingApprovals.isEmpty) return const SizedBox.shrink();
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: Layout.contentWidth + 64),
         child: Padding(
           padding: EdgeInsets.fromLTRB(pad, 0, pad, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < pending.length; i++)
-                Padding(
-                  padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
-                  child: ApprovalBar(
-                    key: ValueKey('agent-approval-${pending[i].id}'),
-                    approval: kitApproval(pending[i]),
-                    now: clockNow(),
-                    captureKeys: i == 0,
-                    composerEmpty: () => _draft.text.trim().isEmpty,
-                    onDecide: (d) => store.decide(
-                      pending[i].id,
-                      switch (d.choice) {
-                        ApprovalChoice.approve => 'approve',
-                        ApprovalChoice.approveForSession => 'approve_session',
-                        ApprovalChoice.deny => 'deny',
-                      },
-                      reason: d.reason,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          child: AgentApprovalBars(store: store, draft: _draft),
         ),
       ),
     );
