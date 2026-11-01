@@ -1,7 +1,7 @@
 // The chat's body: the transcript the reader moves through (outline list,
 // compacted history or the plain list, or the sign-in, off and empty states)
 // with the project picker, the history setting, the outline's where strip and
-// the replay controls around it. The old chat (AgentChat) and the kit pane's
+// the replay controls around it. The kit pane's and the pane's no-backend shell's
 // transcript slot both host it; it reads the store, owns the reader
 // controller and draws no composer or approvals.
 
@@ -375,8 +375,10 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
                       PrimaryButton(
                         key: const ValueKey('agent-sign-in'),
                         label: 'Sign in',
-                        onTap: () =>
-                            showSettings(context, section: SettingsSection.sync),
+                        onTap: () => showSettings(
+                          context,
+                          section: SettingsSection.sync,
+                        ),
                       ),
                     ],
                   ),
@@ -459,10 +461,14 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
           final box = _reader.transcriptViewport.currentContext
               ?.findRenderObject();
           if (_reader.onOutline && box is RenderBox && box.hasSize) {
-            _reader.keepMessagePosition((
-              id: switched.id,
-              y: box.localToGlobal(Offset.zero).dy + switched.y,
-            ), store.outline, afterInitialLayout: true);
+            _reader.keepMessagePosition(
+              (
+                id: switched.id,
+                y: box.localToGlobal(Offset.zero).dy + switched.y,
+              ),
+              store.outline,
+              afterInitialLayout: true,
+            );
           }
         });
       }
@@ -484,7 +490,10 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
                   value: store.state!.session.projectId!,
                   options: [for (final p in store.projects) p.id],
                   labelOf: (id) =>
-                      store.projects.where((p) => p.id == id).firstOrNull?.name ??
+                      store.projects
+                          .where((p) => p.id == id)
+                          .firstOrNull
+                          ?.name ??
                       store.state?.session.projectName ??
                       'Project',
                   onChanged: (id) =>

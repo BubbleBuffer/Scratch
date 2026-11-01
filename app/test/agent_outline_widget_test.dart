@@ -130,7 +130,7 @@ Future<void> _pumpChat(
         child: SizedBox(
           width: 480,
           height: 650,
-          child: AgentChat(store: store, panel: panel),
+          child: ScratchChatPane(store: store, panel: panel),
         ),
       ),
     ),
@@ -162,7 +162,7 @@ Future<void> _pumpDockAndScreen(
               height: 650,
               child: KeyedSubtree(
                 key: const ValueKey('dock-chat'),
-                child: AgentChat(store: store, panel: true),
+                child: ScratchChatPane(store: store, panel: true),
               ),
             ),
             SizedBox(
@@ -170,7 +170,7 @@ Future<void> _pumpDockAndScreen(
               height: 650,
               child: KeyedSubtree(
                 key: const ValueKey('screen-chat'),
-                child: AgentChat(store: store),
+                child: ScratchChatPane(store: store),
               ),
             ),
           ],

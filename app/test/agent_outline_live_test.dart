@@ -116,7 +116,7 @@ Future<void> _pumpChat(
         child: SizedBox(
           width: 480,
           height: 650,
-          child: AgentChat(store: store),
+          child: ScratchChatPane(store: store),
         ),
       ),
     ),
@@ -137,7 +137,7 @@ Future<void> _scroll(WidgetTester tester, double dy) async {
 
 Finder _transcript() => find
     .descendant(
-      of: find.byType(AgentChat),
+      of: find.byType(ScratchChatPane),
       matching: find.byWidgetPredicate(
         (w) => w is CustomScrollView || w is ListView,
       ),

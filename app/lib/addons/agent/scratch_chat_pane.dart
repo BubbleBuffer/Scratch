@@ -3,9 +3,11 @@
 // hooks in its slots. The pane brings the dock: approval bars, the error
 // line and the composer's state; its commands go through `AgentStore`.
 //
-// `--dart-define=AGENT_KIT_PANE=false` builds the old `AgentChat` instead.
-// The old chat is also what shows while there is no backend yet, and when the
-// chat asks to sign in (no dock).
+// While there is no backend yet (the agent is opening, or off), and when the
+// chat asks to sign in, the same shell shows Scratch's own body and composer
+// without the pane (`_Shell`): the sign-in prompt, the off and error lines
+// live in `ScratchChatBody`, and the composer is Scratch's without a pane
+// slot. Sign-in has no composer.
 
 import 'package:agent_kit/agent_kit.dart';
 import 'package:bb_ui/bb_ui.dart' as bb show FormFactor;
@@ -13,16 +15,12 @@ import 'package:flutter/widgets.dart';
 
 import '../../ui/ui.dart';
 import 'agent_approval_bars.dart';
-import 'agent_chat.dart';
 import 'agent_composer.dart' as scratch;
 import 'agent_store.dart';
 import 'kit_backend.dart';
 import 'kit_commands.dart';
 import 'kit_hooks.dart';
 import 'scratch_chat_body.dart';
-
-/// On unless built with `--dart-define=AGENT_KIT_PANE=false`.
-const agentKitPane = bool.fromEnvironment('AGENT_KIT_PANE', defaultValue: true);
 
 class ScratchChatPane extends StatefulWidget {
   const ScratchChatPane({
@@ -49,7 +47,6 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
   @override
   void initState() {
     super.initState();
-    if (!agentKitPane) return;
     widget.store.addListener(_sync);
     _sync();
   }
@@ -87,17 +84,17 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
     });
   }
 
-  AgentChat _old() =>
-      AgentChat(store: widget.store, panel: widget.panel, title: widget.title);
+  Widget _shell() =>
+      _Shell(store: widget.store, panel: widget.panel, title: widget.title);
 
   @override
   Widget build(BuildContext context) {
     final backend = _backend;
-    if (!agentKitPane || backend == null) return _old();
+    if (backend == null) return _shell();
     return ListenableBuilder(
       listenable: widget.store,
       builder: (context, _) =>
-          widget.store.requiresHubSignIn ? _old() : _pane(context, backend),
+          widget.store.requiresHubSignIn ? _shell() : _pane(context, backend),
     );
   }
 
@@ -167,4 +164,104 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
       ),
     );
   }
+}
+
+/// The chat without the pane: Scratch's body, approval bars and composer in
+/// the pane's frame. Shows while there is no backend and when signing in.
+class _Shell extends StatefulWidget {
+  const _Shell({required this.store, required this.panel, this.title});
+  final AgentStore store;
+  final bool panel;
+  final String? title;
+
+  @override
+  State<_Shell> createState() => _ShellState();
+}
+
+class _ShellState extends State<_Shell> {
+  /// The composer's text, so the approval bar knows when 1, 2 and 3 are not
+  /// typing.
+  final _draft = TextEditingController();
+
+  @override
+  void dispose() {
+    _draft.dispose();
+    super.dispose();
+  }
+
+  Widget _approvalBars(AgentStore store, double pad) {
+    if (store.pendingApprovals.isEmpty) return const SizedBox.shrink();
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: Layout.contentWidth + 64),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(pad, 0, pad, 8),
+          child: AgentApprovalBars(store: store, draft: _draft),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => ApprovalKeyPane(
+    child: ListenableBuilder(
+      listenable: widget.store,
+      builder: (context, _) {
+        final store = widget.store;
+        final c = context.colors;
+        final signIn = store.requiresHubSignIn;
+        final pad = widget.panel ? 12.0 : 32.0;
+        return Container(
+          decoration: BoxDecoration(
+            color: c.bgPrimary,
+            borderRadius: Radii.panel,
+            boxShadow: widget.panel ? null : c.seam,
+          ),
+          child: ClipRRect(
+            borderRadius: Radii.panel,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!widget.panel && widget.title != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 10),
+                    child: Text(
+                      widget.title!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tsDisplay(context.type.h3, c.textPrimary),
+                    ),
+                  ),
+                Expanded(
+                  child: ScratchChatBody(store: store, panel: widget.panel),
+                ),
+                if (!signIn) _approvalBars(store, pad),
+                if (!signIn)
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: Layout.contentWidth + 64,
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          pad,
+                          0,
+                          pad,
+                          widget.panel ? 12 : 20,
+                        ),
+                        child: scratch.AgentComposer(
+                          store: store,
+                          panel: widget.panel,
+                          controller: _draft,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
 }

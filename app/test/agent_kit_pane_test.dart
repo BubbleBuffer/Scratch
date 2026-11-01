@@ -17,8 +17,6 @@ import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/addons/agent/kit_backend.dart';
 import 'package:notes_app/addons/agent/kit_commands.dart';
 import 'package:notes_app/addons/agent/kit_hooks.dart';
-import 'package:notes_app/addons/agent/scratch_chat_pane.dart';
-import 'package:notes_app/src/rust/api/agent.dart';
 import 'package:notes_app/state/editor_focus.dart';
 import 'package:notes_app/features/settings/controls.dart' show SelectButton;
 
