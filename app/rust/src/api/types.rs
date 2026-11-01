@@ -225,6 +225,29 @@ impl SearchSpec {
 }
 
 /// Which variant of the core's `TokenKind` a [`TokenKind`] is.
+/// How `NotesSync.fetch_pages` ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PageFetchStatus {
+    /// The pages are in this vault now.
+    Fetched,
+    /// The hub has no such page, or has it in the trash.
+    NotOnHub,
+    /// The hub could not be reached.
+    Offline,
+    /// The hub refused this device's token.
+    Unauthorized,
+    /// Anything else; see `PageFetch.message`.
+    Error,
+}
+
+/// The result of `NotesSync.fetch_pages`. `message` is set for `Error`
+/// (for example `untrusted certificate: AB:CD:...`) and empty otherwise.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PageFetch {
+    pub status: PageFetchStatus,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SearchTokenKind {
     Text,

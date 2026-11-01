@@ -7,7 +7,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use vault_core::*;
-use vault_sync::{Hub, HubRequest, HubServer, SyncClient, SyncError, SyncOptions, DEVICE_HEADER};
+use vault_sync::{
+    FetchOutcome, Hub, HubRequest, HubServer, SyncClient, SyncError, SyncOptions, DEVICE_HEADER,
+};
 
 struct TempDir(PathBuf);
 
@@ -470,4 +472,79 @@ fn background_sync_does_not_run_for_local_or_hub_index_only_commits() {
     assert_eq!(bg.status().syncs, before, "{:?}", bg.status());
     assert!(!bg.status().syncing);
     bg.stop();
+}
+
+#[test]
+fn fetch_pages_pulls_a_page_and_leaves_the_sync_base_alone() {
+    let s = setup();
+    let h = s.hub_vault.clone();
+    h.create_page(None, "Old".into()).unwrap();
+    s.a.sync_once().unwrap();
+    // Two new hub pages; only one is fetched.
+    let wanted = h.create_page(None, "Wanted".into()).unwrap();
+    let other = h.create_page(None, "Other".into()).unwrap();
+    let av = s.a.vault();
+    assert!(av.load_page(wanted.clone()).is_err());
+    assert_eq!(s.a.fetch_pages(&[wanted.clone()]), FetchOutcome::Fetched);
+    assert_eq!(av.load_page(wanted.clone()).unwrap().title, "Wanted");
+    assert!(av.load_page(other.clone()).is_err(), "only the asked page");
+    // The regular sync still brings the rest, as a delta.
+    let r = s.a.sync_once().unwrap();
+    assert!(!r.full, "{r:?}");
+    assert_eq!(av.load_page(other).unwrap().title, "Other");
+    assert_eq!(av.load_page(wanted.clone()).unwrap().title, "Wanted");
+    // Fetching a page already here is a no-op.
+    assert_eq!(s.a.fetch_pages(&[wanted]), FetchOutcome::Fetched);
+}
+
+#[test]
+fn fetch_pages_works_before_the_first_sync_and_brings_the_ancestors() {
+    let s = setup();
+    let h = s.hub_vault.clone();
+    let root = h.create_page(None, "Root".into()).unwrap();
+    let mid = h.create_page(Some(root.clone()), "Mid".into()).unwrap();
+    let leaf = h.create_page(Some(mid.clone()), "Leaf".into()).unwrap();
+    let child = h.create_page(Some(leaf.clone()), "Child".into()).unwrap();
+    assert_eq!(s.a.fetch_pages(&[leaf.clone()]), FetchOutcome::Fetched);
+    let av = s.a.vault();
+    assert_eq!(av.load_page(leaf.clone()).unwrap().parent, Some(mid.clone()));
+    assert_eq!(av.load_page(mid.clone()).unwrap().parent, Some(root.clone()));
+    assert!(av.load_page(root).is_ok());
+    assert!(av.load_page(child.clone()).is_err(), "sub-pages stay for the sync");
+    // The first sync afterwards is still a full one and converges.
+    let r = s.a.sync_once().unwrap();
+    assert!(r.full);
+    assert_eq!(snapshot(av).len(), snapshot(&h).len());
+    assert!(av.load_page(child).is_ok());
+}
+
+#[test]
+fn fetch_pages_reports_what_the_hub_lacks_or_refuses() {
+    let s = setup();
+    let h = s.hub_vault.clone();
+    s.a.sync_once().unwrap();
+    // Unknown id.
+    let unknown = new_id();
+    assert_eq!(s.a.fetch_pages(&[unknown.clone()]), FetchOutcome::NotOnHub);
+    assert!(s.a.vault().load_page(unknown).is_err());
+    // Trashed on the hub.
+    let p = h.create_page(None, "Gone".into()).unwrap();
+    h.delete_page(p.clone()).unwrap();
+    assert_eq!(s.a.fetch_pages(&[p]), FetchOutcome::NotOnHub);
+    // Wrong token.
+    let td = TempDir::new("c");
+    let url = format!("http://{}", s.server.addr());
+    let c = SyncClient::new(td.open(), &url, "not-a-token");
+    let q = h.create_page(None, "Q".into()).unwrap();
+    assert_eq!(c.fetch_pages(&[q.clone()]), FetchOutcome::Unauthorized);
+    // Hub down.
+    let addr = s.server.addr();
+    drop(s.server);
+    let td = TempDir::new("d");
+    let d = SyncClient::new(
+        td.open(),
+        &format!("http://{addr}"),
+        &s.hub.pair_legacy_token("tablet").unwrap(),
+    );
+    assert_eq!(d.fetch_pages(&[q]), FetchOutcome::Offline);
 }

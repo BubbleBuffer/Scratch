@@ -12,9 +12,12 @@ import '../editor/page_screen.dart';
 import '../features/bakeoff.dart';
 import '../state/app_state.dart';
 import '../state/page_store.dart';
+import '../features/settings/settings_store.dart';
+import '../state/sync_store.dart';
 import '../state/tree_store.dart';
 import '../ui/toast.dart';
 import '../ui/ui.dart';
+import 'page_link_fetch.dart';
 import 'page_stack.dart';
 import 'mobile_page_history.dart';
 import 'addons.dart';
@@ -181,21 +184,52 @@ Future<void> openReminder(BuildContext context, String payload) async {
 
 /// Opens a `notes://page` link (cold start, a forwarded Windows link, Android
 /// VIEW, or a page mark) at its block, replacing the page shown as an external
-/// open does. A missing or trashed page gets a toast and nothing else changes.
+/// open does. A page this device lacks is asked for from the hub first (a
+/// "Loading page" step, then the page opens and a sync is requested). A page
+/// that is missing everywhere or trashed gets a toast and nothing else changes.
 Future<void> openPageLink(BuildContext context, PageLink link) async {
-  String? title;
-  try {
-    final page = await context.app.vault.loadPage(link.pageId);
-    if (!page.inTrash) title = page.title;
-  } catch (_) {
-    title = null;
-  }
+  var title = await _linkedPageTitle(context, link);
   if (!context.mounted) return;
   if (title == null) {
-    showErrorToast(context, PageLink.missingMessage);
+    final fetch = await fetchLinkedPage(context, link);
+    if (!context.mounted) return;
+    switch (fetch) {
+      case LinkFetch.cancelled:
+        // No hub set up (nothing was shown): the plain not-found toast. A
+        // closed step needs no toast.
+        if (!_hubKnown(context)) showErrorToast(context, PageLink.missingMessage);
+        return;
+      case LinkFetch.notFound:
+        showErrorToast(context, PageLink.missingMessage);
+        return;
+      case LinkFetch.fetched:
+        title = await _linkedPageTitle(context, link);
+        if (!context.mounted) return;
+        if (title == null) {
+          showErrorToast(context, PageLink.missingMessage);
+          return;
+        }
+    }
+    final sync = context.read<SyncStore>();
+    await openPage(context, link.pageId, title, initialBlock: link.blockId);
+    sync.syncNow();
     return;
   }
   await openPage(context, link.pageId, title, initialBlock: link.blockId);
+}
+
+bool _hubKnown(BuildContext context) =>
+    context.read<SyncStore>().connected ||
+    AppSettings.read(context).hubSignInUrl.trim().isNotEmpty;
+
+/// The title of the linked page, or null if it is missing or trashed here.
+Future<String?> _linkedPageTitle(BuildContext context, PageLink link) async {
+  try {
+    final page = await context.app.vault.loadPage(link.pageId);
+    return page.inTrash ? null : page.title;
+  } catch (_) {
+    return null;
+  }
 }
 
 void _closePanels(NavigatorState nav, PageStackNavigator sheets) {

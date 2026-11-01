@@ -116,6 +116,13 @@ impl NotesSync {
         Ok(sync_report(self.client.sync_once().map_err(err)?))
     }
 
+    /// Pulls these pages (and their missing ancestors) from the hub now,
+    /// without waiting for a running sync and without touching the sync
+    /// state. Blocking: call it off the UI thread.
+    pub fn fetch_pages(&self, ids: Vec<String>) -> PageFetch {
+        page_fetch(self.client.fetch_pages(&ids))
+    }
+
     pub fn fetch_attachment(&self, id: String) -> Result<(), String> {
         self.client.fetch_attachment(&id).map_err(err)
     }
