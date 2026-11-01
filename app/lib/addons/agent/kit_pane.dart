@@ -12,6 +12,7 @@ import 'package:flutter/widgets.dart';
 import '../../services/addon_services.dart';
 import '../../state/app_state.dart';
 import '../../ui/ui.dart';
+import 'agent_composer.dart' as scratch;
 import 'agent_store.dart';
 import 'kit_backend.dart';
 import 'kit_commands.dart';
@@ -33,6 +34,7 @@ class _AgentKitScreenState extends State<AgentKitScreen> {
   ScratchKitBackend? _backend;
   Object? _agent;
   int _syncGeneration = 0;
+  bool _opened = false;
 
   @override
   void initState() {
@@ -62,7 +64,11 @@ class _AgentKitScreenState extends State<AgentKitScreen> {
       }
       return;
     }
-    if (store.openId == null && store.sessions.isNotEmpty) {
+    // The newest chat opens once, on the way in; a later "new chat" stays a
+    // draft.
+    if (store.openId != null) _opened = true;
+    if (!_opened && store.openId == null && store.sessions.isNotEmpty) {
+      _opened = true;
       await store.openSession(store.sessions.first.id);
     }
     if (!mounted || generation != _syncGeneration || identical(agent, _agent)) {
@@ -95,15 +101,22 @@ class _AgentKitScreenState extends State<AgentKitScreen> {
               child: ListenableBuilder(
                 listenable: store,
                 builder: (context, _) {
-                  final backend = _backend, chat = store.openId;
-                  if (backend == null || chat == null) {
-                    return const SizedBox.expand();
-                  }
+                  final backend = _backend;
+                  if (backend == null) return const SizedBox.expand();
+                  // No open chat is a draft: the pane makes the chat on the
+                  // first send.
                   return AgentChatPane(
+                    key: const ValueKey('agent-kit-pane'),
                     backend: backend,
-                    chatId: chat,
+                    chatId: store.openId,
+                    onChatCreated: (id) {
+                      if (store.openId != id) store.openSession(id);
+                    },
+                    composerBuilder: (_, slot) =>
+                        scratch.AgentComposer(store: store, slot: slot),
                     transcriptActions: scratchTranscriptActions(context, store),
-                    transcriptBuilder: (_, _, _) => ScratchChatBody(store: store),
+                    transcriptBuilder: (_, _, _) =>
+                        ScratchChatBody(store: store),
                   );
                 },
               ),

@@ -11,6 +11,7 @@ import '../../state/pages_store.dart';
 import '../../state/editor_focus.dart';
 import '../../ui/ui.dart';
 import 'agent_store.dart';
+import 'kit_backend.dart' show encodeKitSelection;
 
 /// Looks up the pages an `@` query offers; [mentionPages] unless a test
 /// supplies its own.
@@ -27,6 +28,7 @@ class AgentComposer extends StatefulWidget {
     this.panel = false,
     this.mentionSource = mentionPages,
     this.controller,
+    this.slot,
   });
   final AgentStore store;
   final bool panel;
@@ -35,13 +37,20 @@ class AgentComposer extends StatefulWidget {
   /// The draft, when the host wants to read it; the composer makes its own
   /// otherwise.
   final TextEditingController? controller;
+
+  /// Set when the kit pane hosts the composer (its `composerBuilder`): the
+  /// pane's draft text, sending (it creates the chat on the first send),
+  /// stopping and the model pick go through the pane and so through the
+  /// backend. The store still holds the model's value and the host pick.
+  final kit.PaneComposerSlot? slot;
   @override
   State<AgentComposer> createState() => _AgentComposerState();
 }
 
 class _AgentComposerState extends State<AgentComposer> {
   final _ownText = TextEditingController();
-  TextEditingController get _text => widget.controller ?? _ownText;
+  TextEditingController get _text =>
+      widget.controller ?? widget.slot?.controller ?? _ownText;
   final _focus = FocusNode();
   EditorFocus? _editor;
   String? _pageId, _removedPage, _removedSelection;
@@ -211,7 +220,52 @@ class _AgentComposerState extends State<AgentComposer> {
     });
   }
 
+  /// Sends through the pane: the chips become the submission's refs (the
+  /// selection carries its page, blocks and text in its id), and the pane
+  /// creates the chat first when there is none.
+  Future<bool> _sendThroughPane(
+    kit.PaneComposerSlot slot,
+    kit.ComposerSubmission submission,
+  ) async {
+    final selection = _selection;
+    final refs = [
+      if (_autoPage != null)
+        kit.KitRef(kind: 'page', id: _autoPage!.id, label: _autoPage!.title),
+      if (selection != null)
+        kit.KitRef(
+          kind: 'selection',
+          id: encodeKitSelection(selection),
+          label: 'Selection',
+        ),
+      for (final chat in _chats.values)
+        kit.KitRef(kind: 'chat', id: chat.id, label: chat.title),
+      for (final page in _mentions.values)
+        kit.KitRef(kind: 'mention', id: page.id, label: page.title),
+    ];
+    final sent = await slot.submit(
+      kit.ComposerSubmission(
+        text: submission.text,
+        delivery: submission.delivery,
+        refs: refs,
+      ),
+    );
+    if (!sent || !mounted) return false;
+    setState(_clearSent);
+    return true;
+  }
+
+  void _clearSent() {
+    _mentions.clear();
+    _chats.clear();
+    _selection = null;
+    _removedPage = null;
+    _removedSelection = null;
+    _captureEditor();
+  }
+
   Future<bool> _send(kit.ComposerSubmission submission) async {
+    final slot = widget.slot;
+    if (slot != null) return _sendThroughPane(slot, submission);
     final text = submission.text;
     final store = widget.store;
     final pages = Map<String, AgentContextPage>.of(_mentions);
@@ -235,14 +289,7 @@ class _AgentComposerState extends State<AgentComposer> {
     }
     await store.send(text, context: context);
     if (!mounted || store.error != null) return false;
-    setState(() {
-      _mentions.clear();
-      _chats.clear();
-      _selection = null;
-      _removedPage = null;
-      _removedSelection = null;
-      _captureEditor();
-    });
+    setState(_clearSent);
     return true;
   }
 
@@ -280,7 +327,8 @@ class _AgentComposerState extends State<AgentComposer> {
   Widget build(BuildContext context) {
     final store = widget.store;
     final pages = context.watch<PagesStore>();
-    final running = store.running;
+    final slot = widget.slot;
+    final running = slot?.running ?? store.running;
     final model = store.modelOf(store.openId);
     final models = store.shownModels(current: model);
     final showModel = models.isNotEmpty && model != null;
@@ -289,7 +337,8 @@ class _AgentComposerState extends State<AgentComposer> {
     return kit.AgentComposer(
       onSubmit: _send,
       running: running,
-      onStop: store.stop,
+      onStop: slot == null ? store.stop : slot.onStop,
+      canSend: slot?.canSend ?? true,
       controller: _text,
       focusNode: _focus,
       placeholder: running ? 'Steer the agent…' : 'Ask the agent…',
@@ -303,7 +352,11 @@ class _AgentComposerState extends State<AgentComposer> {
           : const [],
       modelId: model,
       showModelPick: showModel,
-      onModelChanged: (c) => store.pickModel(store.openId, c.id),
+      // A chat's pick goes through the pane (the backend reloads the chat); a
+      // draft has no chat yet, so the store keeps the pick.
+      onModelChanged: (c) => slot == null || slot.draft
+          ? store.pickModel(store.openId, c.id)
+          : slot.onModelChanged?.call(c),
       // Where the chat runs; fixed once it has messages, so it shows without
       // a menu.
       workspaces: store.canPickHost
