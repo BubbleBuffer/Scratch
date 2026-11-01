@@ -16,6 +16,7 @@ import 'agent_store.dart';
 import 'kit_backend.dart';
 import 'kit_commands.dart';
 import 'kit_hooks.dart';
+import 'scratch_chat_body.dart';
 
 /// Built with `--dart-define=AGENT_KIT_PANE=true`.
 const agentKitPane = bool.fromEnvironment('AGENT_KIT_PANE');
@@ -102,6 +103,7 @@ class _AgentKitScreenState extends State<AgentKitScreen> {
                     backend: backend,
                     chatId: chat,
                     transcriptActions: scratchTranscriptActions(context, store),
+                    transcriptBuilder: (_, _, _) => ScratchChatBody(store: store),
                   );
                 },
               ),
