@@ -1451,7 +1451,7 @@ class AgentStore extends ChangeNotifier {
         BootTiming.mark('agent open: claudeDetection');
         await _sendMcp(agent, _mcpJson).timeout(
           mcpStartWait,
-          onTimeout: () => AppLog.info('agent MCP servers still starting after ${mcpStartWait.inSeconds} s; continuing'),
+          onTimeout: () => AppLog.info('agent MCP servers still starting after ${mcpStartWait.inMilliseconds} ms; continuing'),
         );
         BootTiming.mark('agent open: _sendMcp');
       }

@@ -107,6 +107,9 @@ void main() {
     final store = await openAgentStore(t, settings: settings);
     expect(store.openError, isNull);
     expect(store.hostInfo, isNotNull);
+    // The server finally answers: nothing is left in flight for the teardown.
+    hang.complete();
+    await settle(t);
   });
 
   appTest('MCP servers: add, edit and remove save in the AI settings', (
