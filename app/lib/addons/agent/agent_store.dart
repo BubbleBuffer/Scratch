@@ -144,6 +144,7 @@ class AgentStore extends ChangeNotifier {
     _hubKey = _hubConnectionKey();
     unawaited(_loadVaultDefaults());
     _packagesSub = _packages.installs.listen(_packageInstalled);
+    _packages.addListener(_packagesChanged);
   }
 
   final Vault vault;
@@ -479,14 +480,45 @@ class AgentStore extends ChangeNotifier {
 
   /// The models the open host reports. A chat keeps its current model
   /// available even when the host no longer lists it.
-  List<String> shownModels({String? current}) => [
-    ...allModelIds,
-    if (current != null && !allModelIds.contains(current)) current,
-  ];
+  List<String> shownModels({String? current}) {
+    final ids = allModelIds;
+    return [
+      ...ids,
+      if (offersClaudeCode) claudeCodePlaceholderModel,
+      if (current != null &&
+          !ids.contains(current) &&
+          current != claudeCodePlaceholderModel)
+        current,
+    ];
+  }
+
+  /// Whether the picker lists the "Claude Code, not installed" stand-in:
+  /// on this computer, when the host does not report the provider and the
+  /// package is on offer. Picking it shows the download card.
+  bool get offersClaudeCode {
+    final info = hostInfo;
+    if (host != AgentHost.local || info == null) return false;
+    if (info.providers.contains('claude-code')) return false;
+    final state = _packages.infoOf(claudeCodePackage)?.state;
+    return state == PackageState.notInstalled ||
+        state == PackageState.updateAvailable;
+  }
+
+  /// Whether a picked stand-in stays the chat's model: while it is offered,
+  /// and while the agent is re-opening after the install (host unknown).
+  bool get _placeholderStands =>
+      offersClaudeCode ||
+      (hostInfo == null &&
+          (_packages.installing || _packages.justInstalled(claudeCodePackage)));
+
+  /// The picker's secondary line for model [id] (null: none).
+  String? modelDetail(String id) =>
+      id == claudeCodePlaceholderModel ? 'Not installed' : null;
 
   List<String> get allModelIds => {for (final m in models) m.id}.toList();
 
   String modelLabel(String id) {
+    if (id == claudeCodePlaceholderModel) return 'Claude Code';
     if (id.startsWith('claude-code/')) {
       return switch (id.substring('claude-code/'.length)) {
         'opus' => 'Opus (latest)',
@@ -870,7 +902,10 @@ class AgentStore extends ChangeNotifier {
   String? modelOf(String? id) {
     final picked =
         _modelBySession[id ?? ''] ?? (id == null ? null : _prefs[id]?.model);
-    if (picked != null) return picked;
+    if (picked != null &&
+        (picked != claudeCodePlaceholderModel || _placeholderStands)) {
+      return picked;
+    }
     return defaultModel;
   }
 
@@ -1393,8 +1428,19 @@ class AgentStore extends ChangeNotifier {
   void usePackages(PackagesStore store) {
     if (identical(store, _packages)) return;
     unawaited(_packagesSub?.cancel());
-    _packages = store;
+    _packages.removeListener(_packagesChanged);
+    _packages = store..addListener(_packagesChanged);
     _packagesSub = store.installs.listen(_packageInstalled);
+  }
+
+  bool _offered = false;
+
+  /// The picker lists the stand-in as the package state comes and goes.
+  void _packagesChanged() {
+    final now = offersClaudeCode;
+    if (now == _offered) return;
+    _offered = now;
+    _notify();
   }
 
   void _packageInstalled(String name) {
@@ -2101,6 +2147,9 @@ class AgentStore extends ChangeNotifier {
     final id = sessionId ?? openId;
     final t = text.trim();
     if (id == null || t.isEmpty) return null;
+    // The "Claude Code, not installed" stand-in never runs: the download card
+    // stays up and the composer keeps the draft.
+    if (modelOf(id) == claudeCodePlaceholderModel) return null;
     final a = await ensureOpen();
     if (a == null) {
       // Nothing was sent: say so, so the composer keeps the draft.
@@ -2339,6 +2388,7 @@ class AgentStore extends ChangeNotifier {
     if (_agent != null || _sub != null) unawaited(_close());
     unawaited(_uiActions.close());
     unawaited(_packagesSub?.cancel());
+    _packages.removeListener(_packagesChanged);
     _stores[vault] = null;
     super.dispose();
   }

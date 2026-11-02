@@ -103,6 +103,10 @@ class PackageFailed extends PackageStatus {
 /// The package that carries the Claude Code provider.
 const claudeCodePackage = 'claude-code';
 
+/// The picker's stand-in for Claude Code while its package is missing. It is
+/// never run: sending with it does nothing and the download card shows.
+const claudeCodePlaceholderModel = 'claude-code/not-installed';
+
 /// The name shown for [package].
 String packageTitle(String package) =>
     package == claudeCodePackage ? 'Claude Code' : package;
