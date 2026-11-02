@@ -17,8 +17,11 @@ path = "src/main.rs"
 vault_core = { path = "../core" }
 vault_agent = { path = "../agent" }
 vault_mcp = { path = "../mcp" }
+scratch_packages = { path = "../packages" }
 anyhow = "1"
 serde_json = "1"
 
 [dev-dependencies]
 tempfile = "3"
+sha2 = "0.11"
+zip = { version = "2", default-features = false, features = ["deflate"] }

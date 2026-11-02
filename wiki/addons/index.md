@@ -16,4 +16,5 @@ The approved layering, migration rules and minimal example live in [Add-ons](../
 - [Schedule](schedule.md): Optional schedule note type that makes notes from templates on a hub or desktop runner.
 - [Kanban](kanban.md): Optional kanban notes with manually collected cards and compact embeds.
 - [Search card](search-card.md): Optional `query` block that shows the live results of a query.
+- [Runtime packages](packages.md): On-demand packages (the Claude Code bundle today): pinned manifest, verified download, atomic install into the data folder.
 <!-- /wiki:children -->

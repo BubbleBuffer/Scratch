@@ -80,7 +80,7 @@ pub fn run(flags: &Flags, out: &mut dyn Write) -> Result<()> {
 
 /// The app's data folder: --data-dir, else the app's own (NOTES_DATA_DIR,
 /// %LOCALAPPDATA%\Notes, ~/.local/share/notes_app).
-fn data_dir(flags: &Flags) -> Result<PathBuf> {
+pub(crate) fn data_dir(flags: &Flags) -> Result<PathBuf> {
     if let Some(dir) = flags.get("--data-dir") {
         let dir = PathBuf::from(dir);
         return std::path::absolute(&dir).with_context(|| format!("resolve {}", dir.display()));
