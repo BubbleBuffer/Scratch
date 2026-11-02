@@ -982,6 +982,7 @@ class AgentStore extends ChangeNotifier {
     final agent = _agent, id = visibleSessionId;
     if (_disposed || agent == null || _subscribedSession == id) return;
     _subscribedSession = id;
+    await _subscriptionsRegistered();
     final previous = _uiSub;
     _uiSub = null;
     // Cancel immediately; closing the Rust stream below makes cancellation
@@ -1002,13 +1003,12 @@ class AgentStore extends ChangeNotifier {
       if (_disposed || !identical(agent, _agent)) return;
       _sub = _eventFeed.bind(
         agent,
-        agent.subscribe(),
+        _registered(agent.subscribe()),
         onEvent: _onEvent,
         onError: (Object e) => AppLog.info('agent events: $e'),
       );
       if (id != null) {
-        _uiSub = agent
-            .subscribe(sessionId: id)
+        _uiSub = _registered(agent.subscribe(sessionId: id))
             .listen(
               _onUiEvent,
               onError: (Object e) => AppLog.info('agent page actions: $e'),
@@ -1039,14 +1039,68 @@ class AgentStore extends ChangeNotifier {
         return;
       }
       _uiAgent = connection;
-      _uiSub = connection
-          .subscribe(sessionId: id)
+      _uiSub = _registered(connection.subscribe(sessionId: id))
           .listen(
             _onUiEvent,
             onError: (Object e) => AppLog.info('agent page actions: $e'),
           );
     }
   }
+
+  /// Subscriptions made and not yet registered by the bridge. The bridge runs
+  /// calls on a pool, so `closeEvents` right after a `subscribe` can run
+  /// first: that stream then registers after the close, stays open, and its
+  /// cancel never finishes. So every `subscribe` is made through
+  /// [_registered], and every `closeEvents` waits for [_subscriptionsRegistered].
+  Future<void> _pendingRegistrations = Future<void>.value();
+
+  /// [events] without the bridge's `subscribed` event, which it sends once the
+  /// subscription is registered. That marks the subscription as registered
+  /// (also when it fails, ends or is cancelled before the event).
+  Stream<AgentEvent> _registered(Stream<AgentEvent> events) {
+    final registered = Completer<void>();
+    _pendingRegistrations = Future.wait([
+      _pendingRegistrations,
+      registered.future,
+    ]).then((_) {});
+    void mark() {
+      if (!registered.isCompleted) registered.complete();
+    }
+
+    StreamSubscription<AgentEvent>? inner;
+    late final StreamController<AgentEvent> out;
+    out = StreamController<AgentEvent>(
+      onListen: () {
+        inner = events.listen(
+          (e) {
+            if (e.kind == 'subscribed') {
+              mark();
+            } else {
+              out.add(e);
+            }
+          },
+          onError: (Object error, StackTrace stack) {
+            mark();
+            out.addError(error, stack);
+          },
+          onDone: () {
+            mark();
+            out.close();
+          },
+        );
+      },
+      onCancel: () {
+        mark();
+        return inner?.cancel();
+      },
+    );
+    return out.stream;
+  }
+
+  /// Waits until every subscription made so far is registered with the
+  /// bridge (bounded: a lost event must not hold a close forever).
+  Future<void> _subscriptionsRegistered() =>
+      _pendingRegistrations.timeout(closeTimeout, onTimeout: () {});
 
   void _onUiEvent(AgentEvent event) {
     final action = event.uiAction;
@@ -1457,7 +1511,7 @@ class AgentStore extends ChangeNotifier {
       }
       _sub = _eventFeed.bind(
         agent,
-        agent.subscribe(),
+        _registered(agent.subscribe()),
         onEvent: _onEvent,
         onError: (Object e) => AppLog.info('agent events: $e'),
       );
@@ -2180,11 +2234,26 @@ class AgentStore extends ChangeNotifier {
 
   // ------------------------------------------------------------ closing
 
+  /// Debug builds and tests: where the [_count]ed calls that have not
+  /// finished were started, so a stuck call is named when a test cannot
+  /// settle.
+  static final _pendingCounted = <Object, String>{};
+
+  @visibleForTesting
+  static List<String> get debugPendingCounted =>
+      _pendingCounted.values.toList();
+
   static Future<T> _count<T>(Future<T> Function() f) async {
     Vault.inFlight.value++;
+    final key = Object();
+    assert(() {
+      _pendingCounted[key] = f.toString();
+      return true;
+    }());
     try {
       return await f();
     } finally {
+      _pendingCounted.remove(key);
       Vault.inFlight.value--;
     }
   }
@@ -2203,6 +2272,7 @@ class AgentStore extends ChangeNotifier {
     _stopSearchPoll();
     _viewScope.cancel();
     await _scopeWork;
+    await _subscriptionsRegistered();
     final viewer = _uiAgent;
     _uiAgent = null;
     final uiCancelled = _uiSub?.cancel();
