@@ -48,7 +48,8 @@ class NotesAgentSource implements KitAgentSource {
       agent.eventsAfter(after: after, sessionId: sessionId);
 
   @override
-  Stream<AgentEvent> subscribe() => events ?? agent.subscribe();
+  Stream<AgentEvent> subscribe() =>
+      events ?? agent.subscribe().where((e) => e.kind != 'subscribed');
 }
 
 /// What the backend asks of Scratch's `AgentStore` for commands. The store

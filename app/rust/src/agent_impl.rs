@@ -66,6 +66,9 @@ fn page_named(vault: &vault_core::Vault, name: &str) -> Option<String> {
         })
 }
 
+/// The first event of every `subscribe` stream: the subscription is registered.
+const SUBSCRIBED_EVENT: &str = "subscribed";
+
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 const UNAVAILABLE: &str = "The agent is not available on this device";
 const RELAY_LOCAL_ONLY: &str = "Only the agent on this computer can be used by the hub";
@@ -303,8 +306,15 @@ impl Inner {
         session_id: Option<String>,
         sink: StreamSink<AgentEvent>,
     ) -> Result<(), String> {
-        let sink: crate::agent_remote::EventSink = Box::new(move |e| sink.add(e).is_ok());
-        host!(self, subscribe_with(session_id, sink))
+        let sink = std::sync::Arc::new(sink);
+        let ack = sink.clone();
+        let deliver: crate::agent_remote::EventSink = Box::new(move |e| sink.add(e).is_ok());
+        host!(self, subscribe_with(session_id, deliver))?;
+        // The bridge runs calls on a pool, so a `close_events` the app made
+        // after this `subscribe` can run before it. The app waits for this
+        // event, sent once the subscription is registered, before closing.
+        let _ = ack.add(notes_agent_wire::AgentEvent::blank(SUBSCRIBED_EVENT).into());
+        Ok(())
     }
 
     pub(crate) fn close_events(&self) -> Result<(), String> {

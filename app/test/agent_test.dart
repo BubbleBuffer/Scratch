@@ -20,6 +20,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/debounce.dart';
+import 'package:notes_app/core/vault.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/features/ai/ai_settings.dart';
 import 'package:notes_app/features/ai/ai_store.dart';
@@ -433,6 +434,27 @@ void _agentTests() {
     // until the guard timeout.
     expect(watch.elapsed, lessThan(const Duration(seconds: 1)));
     expect(AgentStore.closeTimeout, greaterThan(const Duration(seconds: 1)));
+  });
+
+  appTest('closing the event streams right after subscribing never leaves one '
+      'open', (tester) async {
+    await pumpApp(tester, mobile: false);
+    final store = await openAgentStore(tester);
+    await real(tester, () => store.createSession(title: 'Flip'));
+    // Each change of the viewed chat closes the bridge's event streams and
+    // subscribes again; the bridge runs those calls on a pool, so a close used
+    // to be able to run before the subscribe made just ahead of it, leaving
+    // that stream (and the call waiting for it) open for good.
+    await real(tester, () async {
+      for (var i = 0; i < 40; i++) {
+        store.showSession(true);
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+        store.showSession(false);
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+    });
+    await settle(tester);
+    expect(Vault.inFlight.value, 0);
   });
 
   appTest('while a run is going, Send steers and Stop cancels', (tester) async {
