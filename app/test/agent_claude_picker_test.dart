@@ -1,4 +1,4 @@
-// The model picker lists "Claude Code, Not installed" while the package is
+// The model picker lists "Claude Code (not installed)" while the package is
 // missing; picking it shows the download card and sends nothing.
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,7 +30,7 @@ void main() {
   setUpAll(initCore);
 
   group('Claude Code in the picker', () {
-    appTest('listed as Not installed; picking it shows the card', (
+    appTest('listed as not installed; picking it shows the card', (
       tester,
     ) async {
       await pumpApp(tester, mobile: false);
@@ -63,13 +63,12 @@ void main() {
       await settle(tester);
       expect(key('agent-runtime-card'), findsNothing);
 
-      // The pick shows the chat's current model; opening it lists the
-      // stand-in as an option. (bb_ui's SelectButton renders labels only, so
-      // the "Not installed" detail is asserted on the store.)
+      // The pick shows the chat's current model; the stand-in is an option
+      // labelled "Claude Code (not installed)".
       await tester.tap(find.text(store.modelLabel('other/model')));
       await settle(tester);
-      expect(store.modelDetail(claudeCodePlaceholderModel), 'Not installed');
-      await tester.tap(key('option-Claude Code'));
+      expect(find.text('Claude Code (not installed)'), findsOneWidget);
+      await tester.tap(find.text('Claude Code (not installed)'));
       await settle(tester);
 
       expect(store.modelOf(store.openId), claudeCodePlaceholderModel);
@@ -93,7 +92,6 @@ void main() {
       expect(store.shownModels(), isNot(contains(claudeCodePlaceholderModel)));
       store.hostInfo = _host(const []);
       expect(store.offersClaudeCode, isTrue);
-      expect(store.modelDetail(claudeCodePlaceholderModel), 'Not installed');
 
       // Where the build lists no package there is nothing to offer.
       final none = PackagesStore(backend: FakePackagesBackend(const []));

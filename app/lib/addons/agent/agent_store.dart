@@ -512,13 +512,10 @@ class AgentStore extends ChangeNotifier {
           (_packages.installing || _packages.justInstalled(claudeCodePackage)));
 
   /// The picker's secondary line for model [id] (null: none).
-  String? modelDetail(String id) =>
-      id == claudeCodePlaceholderModel ? 'Not installed' : null;
-
   List<String> get allModelIds => {for (final m in models) m.id}.toList();
 
   String modelLabel(String id) {
-    if (id == claudeCodePlaceholderModel) return 'Claude Code';
+    if (id == claudeCodePlaceholderModel) return 'Claude Code (not installed)';
     if (id.startsWith('claude-code/')) {
       return switch (id.substring('claude-code/'.length)) {
         'opus' => 'Opus (latest)',

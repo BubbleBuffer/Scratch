@@ -355,7 +355,6 @@ class _AgentComposerState extends State<AgentComposer> {
                 kit.KitChoice(
                   id: m,
                   label: store.modelLabel(m),
-                  detail: store.modelDetail(m),
                 ),
             ]
           : const [],

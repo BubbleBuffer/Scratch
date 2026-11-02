@@ -46,7 +46,6 @@ class StoreKitCommands implements KitAgentCommands {
       kit.KitChoice(
         id: m,
         label: store.modelLabel(m),
-        detail: store.modelDetail(m),
       ),
   ];
 
