@@ -32,6 +32,7 @@ mod history;
 mod ids;
 mod import;
 mod index;
+mod migrate;
 mod live_query;
 mod markdown;
 mod mdio;
