@@ -6,6 +6,7 @@
 import 'api/agent.dart';
 import 'api/ai.dart';
 import 'api/clock.dart';
+import 'api/packages.dart';
 import 'api/sync.dart';
 import 'api/triage.dart';
 import 'api/types.dart';
@@ -124,6 +125,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<LiveQueryUpdate> dco_decode_StreamSink_live_query_update_Sse(
+    dynamic raw,
+  );
+
+  @protected
+  RustStreamSink<PackageProgress> dco_decode_StreamSink_package_progress_Sse(
     dynamic raw,
   );
 
@@ -678,6 +684,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<OutlineSection> dco_decode_list_outline_section(dynamic raw);
 
   @protected
+  List<PackageInfo> dco_decode_list_package_info(dynamic raw);
+
+  @protected
   List<PageRow> dco_decode_list_page_row(dynamic raw);
 
   @protected
@@ -864,6 +873,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   OutlineSection dco_decode_outline_section(dynamic raw);
+
+  @protected
+  PackageInfo dco_decode_package_info(dynamic raw);
+
+  @protected
+  PackagePhase dco_decode_package_phase(dynamic raw);
+
+  @protected
+  PackageProgress dco_decode_package_progress(dynamic raw);
+
+  @protected
+  PackageState dco_decode_package_state(dynamic raw);
 
   @protected
   PageData dco_decode_page_data(dynamic raw);
@@ -1127,6 +1148,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<LiveQueryUpdate> sse_decode_StreamSink_live_query_update_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<PackageProgress> sse_decode_StreamSink_package_progress_Sse(
     SseDeserializer deserializer,
   );
 
@@ -1815,6 +1841,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<PackageInfo> sse_decode_list_package_info(SseDeserializer deserializer);
+
+  @protected
   List<PageRow> sse_decode_list_page_row(SseDeserializer deserializer);
 
   @protected
@@ -2051,6 +2080,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   OutlineSection sse_decode_outline_section(SseDeserializer deserializer);
+
+  @protected
+  PackageInfo sse_decode_package_info(SseDeserializer deserializer);
+
+  @protected
+  PackagePhase sse_decode_package_phase(SseDeserializer deserializer);
+
+  @protected
+  PackageProgress sse_decode_package_progress(SseDeserializer deserializer);
+
+  @protected
+  PackageState sse_decode_package_state(SseDeserializer deserializer);
 
   @protected
   PageData sse_decode_page_data(SseDeserializer deserializer);
@@ -2341,6 +2382,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_StreamSink_live_query_update_Sse(
     RustStreamSink<LiveQueryUpdate> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_package_progress_Sse(
+    RustStreamSink<PackageProgress> self,
     SseSerializer serializer,
   );
 
@@ -3212,6 +3259,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_package_info(
+    List<PackageInfo> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_page_row(List<PageRow> self, SseSerializer serializer);
 
   @protected
@@ -3525,6 +3578,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     OutlineSection self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_package_info(PackageInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_package_phase(PackagePhase self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_package_progress(
+    PackageProgress self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_package_state(PackageState self, SseSerializer serializer);
 
   @protected
   void sse_encode_page_data(PageData self, SseSerializer serializer);

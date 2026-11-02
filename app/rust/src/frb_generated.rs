@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1982305496;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1688147997;
 
 // Section: executor
 
@@ -12644,6 +12644,170 @@ fn wire__crate__api__vault__new_id_impl(
         },
     )
 }
+fn wire__crate__api__packages__package_info_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "package_info",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_data_dir = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok =
+                    Ok::<_, ()>(crate::api::packages::package_info(api_data_dir, api_name))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__packages__package_install_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "package_install",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_data_dir = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            let api_sink = <StreamSink<
+                crate::api::packages::PackageProgress,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok =
+                        crate::api::packages::package_install(api_data_dir, api_name, api_sink)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__packages__package_remove_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "package_remove",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_data_dir = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::packages::package_remove(api_data_dir, api_name)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__packages__packages_list_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "packages_list",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_data_dir = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::packages::packages_list(api_data_dir))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__packages__packages_platform_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "packages_platform",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::packages::packages_platform())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__types__page_prefs_data_default_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -13678,6 +13842,19 @@ impl SseDecode
 
 impl SseDecode
     for StreamSink<crate::api::vault::LiveQueryUpdate, flutter_rust_bridge::for_generated::SseCodec>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <String>::sse_decode(deserializer);
+        return StreamSink::deserialize(inner);
+    }
+}
+
+impl SseDecode
+    for StreamSink<
+        crate::api::packages::PackageProgress,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -16039,6 +16216,20 @@ impl SseDecode for Vec<crate::api::agent::OutlineSection> {
     }
 }
 
+impl SseDecode for Vec<crate::api::packages::PackageInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::packages::PackageInfo>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::types::PageRow> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -16787,6 +16978,68 @@ impl SseDecode for crate::api::agent::OutlineSection {
             decisions: var_decisions,
             first_message_id: var_firstMessageId,
             last_message_id: var_lastMessageId,
+        };
+    }
+}
+
+impl SseDecode for crate::api::packages::PackageInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_version = <String>::sse_decode(deserializer);
+        let mut var_downloadBytes = <i64>::sse_decode(deserializer);
+        let mut var_state = <crate::api::packages::PackageState>::sse_decode(deserializer);
+        let mut var_installedVersion = <Option<String>>::sse_decode(deserializer);
+        let mut var_installedBytes = <Option<i64>>::sse_decode(deserializer);
+        return crate::api::packages::PackageInfo {
+            name: var_name,
+            version: var_version,
+            download_bytes: var_downloadBytes,
+            state: var_state,
+            installed_version: var_installedVersion,
+            installed_bytes: var_installedBytes,
+        };
+    }
+}
+
+impl SseDecode for crate::api::packages::PackagePhase {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::packages::PackagePhase::Downloading,
+            1 => crate::api::packages::PackagePhase::Verifying,
+            2 => crate::api::packages::PackagePhase::Extracting,
+            3 => crate::api::packages::PackagePhase::Installing,
+            _ => unreachable!("Invalid variant for PackagePhase: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::packages::PackageProgress {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_phase = <crate::api::packages::PackagePhase>::sse_decode(deserializer);
+        let mut var_done = <i64>::sse_decode(deserializer);
+        let mut var_total = <i64>::sse_decode(deserializer);
+        return crate::api::packages::PackageProgress {
+            phase: var_phase,
+            done: var_done,
+            total: var_total,
+        };
+    }
+}
+
+impl SseDecode for crate::api::packages::PackageState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::packages::PackageState::NotAvailable,
+            1 => crate::api::packages::PackageState::NotInstalled,
+            2 => crate::api::packages::PackageState::Installed,
+            3 => crate::api::packages::PackageState::UpdateAvailable,
+            _ => unreachable!("Invalid variant for PackageState: {}", inner),
         };
     }
 }
@@ -18674,37 +18927,39 @@ fn pde_ffi_dispatcher_primary_impl(
             wire__crate__api__sync__hub_bearer_invalidate_impl(port, ptr, rust_vec_len, data_len)
         }
         239 => wire__crate__api__vault__init_app_impl(port, ptr, rust_vec_len, data_len),
-        241 => {
+        242 => wire__crate__api__packages__package_install_impl(port, ptr, rust_vec_len, data_len),
+        243 => wire__crate__api__packages__package_remove_impl(port, ptr, rust_vec_len, data_len),
+        246 => {
             wire__crate__api__types__page_prefs_data_default_impl(port, ptr, rust_vec_len, data_len)
         }
-        242 => wire__crate__api__sync__redeem_pairing_code_impl(port, ptr, rust_vec_len, data_len),
-        243 => wire__crate__api__types__search_spec_to_query_string_impl(
+        247 => wire__crate__api__sync__redeem_pairing_code_impl(port, ptr, rust_vec_len, data_len),
+        248 => wire__crate__api__types__search_spec_to_query_string_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        245 => wire__crate__api__vault__sha256_hex_impl(port, ptr, rust_vec_len, data_len),
-        246 => wire__crate__api__vault__status_group_impl(port, ptr, rust_vec_len, data_len),
-        247 => wire__crate__api__types__sync_report_default_impl(port, ptr, rust_vec_len, data_len),
-        248 => wire__crate__api__types__sync_status_default_impl(port, ptr, rust_vec_len, data_len),
-        249 => wire__crate__api__triage__triage_accept_impl(port, ptr, rust_vec_len, data_len),
-        250 => {
+        250 => wire__crate__api__vault__sha256_hex_impl(port, ptr, rust_vec_len, data_len),
+        251 => wire__crate__api__vault__status_group_impl(port, ptr, rust_vec_len, data_len),
+        252 => wire__crate__api__types__sync_report_default_impl(port, ptr, rust_vec_len, data_len),
+        253 => wire__crate__api__types__sync_status_default_impl(port, ptr, rust_vec_len, data_len),
+        254 => wire__crate__api__triage__triage_accept_impl(port, ptr, rust_vec_len, data_len),
+        255 => {
             wire__crate__api__triage__triage_all_proposals_impl(port, ptr, rust_vec_len, data_len)
         }
-        251 => wire__crate__api__triage__triage_applied_impl(port, ptr, rust_vec_len, data_len),
-        252 => wire__crate__api__triage__triage_dismiss_impl(port, ptr, rust_vec_len, data_len),
-        253 => wire__crate__api__triage__triage_page_id_impl(port, ptr, rust_vec_len, data_len),
-        254 => wire__crate__api__triage__triage_proposals_impl(port, ptr, rust_vec_len, data_len),
-        255 => wire__crate__api__triage__triage_start_impl(port, ptr, rust_vec_len, data_len),
-        256 => wire__crate__api__triage__triage_undo_impl(port, ptr, rust_vec_len, data_len),
-        257 => {
+        256 => wire__crate__api__triage__triage_applied_impl(port, ptr, rust_vec_len, data_len),
+        257 => wire__crate__api__triage__triage_dismiss_impl(port, ptr, rust_vec_len, data_len),
+        258 => wire__crate__api__triage__triage_page_id_impl(port, ptr, rust_vec_len, data_len),
+        259 => wire__crate__api__triage__triage_proposals_impl(port, ptr, rust_vec_len, data_len),
+        260 => wire__crate__api__triage__triage_start_impl(port, ptr, rust_vec_len, data_len),
+        261 => wire__crate__api__triage__triage_undo_impl(port, ptr, rust_vec_len, data_len),
+        262 => {
             wire__crate__api__triage__triage_undo_applied_impl(port, ptr, rust_vec_len, data_len)
         }
-        258 => wire__crate__api__update__update_check_impl(port, ptr, rust_vec_len, data_len),
-        259 => wire__crate__api__update__update_download_impl(port, ptr, rust_vec_len, data_len),
-        261 => wire__crate__api__update__update_install_impl(port, ptr, rust_vec_len, data_len),
-        262 => wire__crate__api__vault__version_includes_impl(port, ptr, rust_vec_len, data_len),
+        263 => wire__crate__api__update__update_check_impl(port, ptr, rust_vec_len, data_len),
+        264 => wire__crate__api__update__update_download_impl(port, ptr, rust_vec_len, data_len),
+        266 => wire__crate__api__update__update_install_impl(port, ptr, rust_vec_len, data_len),
+        267 => wire__crate__api__vault__version_includes_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -18750,8 +19005,11 @@ fn pde_ffi_dispatcher_sync_impl(
         233 => wire__crate__api__sync__default_sync_options_impl(ptr, rust_vec_len, data_len),
         235 => wire__crate__api__clock__device_time_zone_impl(ptr, rust_vec_len, data_len),
         240 => wire__crate__api__vault__new_id_impl(ptr, rust_vec_len, data_len),
-        244 => wire__crate__api__clock__set_test_clock_impl(ptr, rust_vec_len, data_len),
-        260 => wire__crate__api__update__update_download_progress_impl(ptr, rust_vec_len, data_len),
+        241 => wire__crate__api__packages__package_info_impl(ptr, rust_vec_len, data_len),
+        244 => wire__crate__api__packages__packages_list_impl(ptr, rust_vec_len, data_len),
+        245 => wire__crate__api__packages__packages_platform_impl(ptr, rust_vec_len, data_len),
+        249 => wire__crate__api__clock__set_test_clock_impl(ptr, rust_vec_len, data_len),
+        265 => wire__crate__api__update__update_download_progress_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -21088,6 +21346,99 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::agent::OutlineSection>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::packages::PackageInfo {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.version.into_into_dart().into_dart(),
+            self.download_bytes.into_into_dart().into_dart(),
+            self.state.into_into_dart().into_dart(),
+            self.installed_version.into_into_dart().into_dart(),
+            self.installed_bytes.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::packages::PackageInfo
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::packages::PackageInfo>
+    for crate::api::packages::PackageInfo
+{
+    fn into_into_dart(self) -> crate::api::packages::PackageInfo {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::packages::PackagePhase {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Downloading => 0.into_dart(),
+            Self::Verifying => 1.into_dart(),
+            Self::Extracting => 2.into_dart(),
+            Self::Installing => 3.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::packages::PackagePhase
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::packages::PackagePhase>
+    for crate::api::packages::PackagePhase
+{
+    fn into_into_dart(self) -> crate::api::packages::PackagePhase {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::packages::PackageProgress {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.phase.into_into_dart().into_dart(),
+            self.done.into_into_dart().into_dart(),
+            self.total.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::packages::PackageProgress
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::packages::PackageProgress>
+    for crate::api::packages::PackageProgress
+{
+    fn into_into_dart(self) -> crate::api::packages::PackageProgress {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::packages::PackageState {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::NotAvailable => 0.into_dart(),
+            Self::NotInstalled => 1.into_dart(),
+            Self::Installed => 2.into_dart(),
+            Self::UpdateAvailable => 3.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::packages::PackageState
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::packages::PackageState>
+    for crate::api::packages::PackageState
+{
+    fn into_into_dart(self) -> crate::api::packages::PackageState {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::types::PageData {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -22413,6 +22764,18 @@ impl SseEncode
 
 impl SseEncode
     for StreamSink<crate::api::vault::LiveQueryUpdate, flutter_rust_bridge::for_generated::SseCodec>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        unimplemented!("")
+    }
+}
+
+impl SseEncode
+    for StreamSink<
+        crate::api::packages::PackageProgress,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -24107,6 +24470,16 @@ impl SseEncode for Vec<crate::api::agent::OutlineSection> {
     }
 }
 
+impl SseEncode for Vec<crate::api::packages::PackageInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::packages::PackageInfo>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::types::PageRow> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -24714,6 +25087,63 @@ impl SseEncode for crate::api::agent::OutlineSection {
         <Vec<String>>::sse_encode(self.decisions, serializer);
         <String>::sse_encode(self.first_message_id, serializer);
         <String>::sse_encode(self.last_message_id, serializer);
+    }
+}
+
+impl SseEncode for crate::api::packages::PackageInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.version, serializer);
+        <i64>::sse_encode(self.download_bytes, serializer);
+        <crate::api::packages::PackageState>::sse_encode(self.state, serializer);
+        <Option<String>>::sse_encode(self.installed_version, serializer);
+        <Option<i64>>::sse_encode(self.installed_bytes, serializer);
+    }
+}
+
+impl SseEncode for crate::api::packages::PackagePhase {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::packages::PackagePhase::Downloading => 0,
+                crate::api::packages::PackagePhase::Verifying => 1,
+                crate::api::packages::PackagePhase::Extracting => 2,
+                crate::api::packages::PackagePhase::Installing => 3,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::packages::PackageProgress {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::packages::PackagePhase>::sse_encode(self.phase, serializer);
+        <i64>::sse_encode(self.done, serializer);
+        <i64>::sse_encode(self.total, serializer);
+    }
+}
+
+impl SseEncode for crate::api::packages::PackageState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::packages::PackageState::NotAvailable => 0,
+                crate::api::packages::PackageState::NotInstalled => 1,
+                crate::api::packages::PackageState::Installed => 2,
+                crate::api::packages::PackageState::UpdateAvailable => 3,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 
