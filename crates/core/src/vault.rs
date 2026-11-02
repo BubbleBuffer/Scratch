@@ -2769,33 +2769,37 @@ pub(crate) fn run_backfills(inner: Weak<Inner>, steps: &'static [crate::migrate:
 type ReindexPage = (MetaRow, PageMeta, Vec<Block>, Vec<u8>, Vec<(String, String)>);
 
 /// Pages a reindex batch commits at a time.
-fn reindex_batch() -> usize {
+fn reindex_batch(root: &Path) -> usize {
     #[cfg(test)]
-    {
-        let n = REINDEX_TEST_BATCH.load(Ordering::Relaxed);
-        if n > 0 {
-            return n;
-        }
+    if let Some((batch, _)) = lock(&REINDEX_TEST).get(&test_key(root)) {
+        return *batch;
     }
+    let _ = root;
     200
 }
 
+/// Tests: per vault folder (keyed by its name, so tests do not affect each
+/// other), the batch size and the number of batches left before a reindex
+/// stops as if the app had exited.
 #[cfg(test)]
-pub(crate) static REINDEX_TEST_BATCH: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-/// Tests: batches left before a reindex stops as if the app had exited
-/// (usize::MAX: no stop).
+pub(crate) static REINDEX_TEST: Mutex<BTreeMapKey> = Mutex::new(BTreeMapKey::new());
 #[cfg(test)]
-pub(crate) static REINDEX_TEST_STOP: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(usize::MAX);
+pub(crate) type BTreeMapKey = std::collections::BTreeMap<String, (usize, usize)>;
 
 #[cfg(test)]
-fn reindex_test_stop() -> bool {
-    let left = REINDEX_TEST_STOP.load(Ordering::SeqCst);
-    if left == usize::MAX {
-        return false;
+pub(crate) fn test_key(root: &Path) -> String {
+    root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+#[cfg(test)]
+fn reindex_test_stop(root: &Path) -> bool {
+    match lock(&REINDEX_TEST).get_mut(&test_key(root)) {
+        Some((_, left)) if *left > 0 => {
+            *left -= 1;
+            *left == 0
+        }
+        _ => false,
     }
-    REINDEX_TEST_STOP.store(left.saturating_sub(1), Ordering::SeqCst);
-    left <= 1
 }
 
 /// A list of ids kept in the index's `meta` between reindex batches.
@@ -2954,9 +2958,8 @@ impl Vault {
             vault.recover_purged_leftovers()?;
         }
         tr.mark("recover_restorations+purged");
-        let _ = fs::remove_file(vault.inner.index_update_file());
         if fresh && fs::read_dir(vault.inner.docs_dir())?.next().is_some() {
-            vault.reindex()?;
+            vault.reindex_with(true)?;
         } else if fresh {
             lock(&vault.inner.db).set_reindex_pending(false)?;
         } else if !fresh && deferred {
@@ -3039,7 +3042,7 @@ impl Vault {
                 .spawn(move || deferred_startup(weak, scan));
         }
         // Index steps that fill in data (`migrate`) finish in the background.
-        if !fresh && !lock(&vault.inner.db).backfills_pending(crate::migrate::STEPS)?.is_empty() {
+        if !lock(&vault.inner.db).backfills_pending(crate::migrate::STEPS)?.is_empty() {
             let weak = Arc::downgrade(&vault.inner);
             let _ = std::thread::Builder::new()
                 .name("vault-backfill".into())
@@ -3524,6 +3527,31 @@ impl Vault {
     /// nothing edits or syncs; the app shows "Updating search index" meanwhile
     /// (progress in `.vault/index-update.json`, see `index_update_progress`).
     pub fn reindex(&self) -> Result<u32> {
+        self.reindex_with(false)
+    }
+
+    /// [`Vault::reindex`]; with `resume_only` (the open of an index that is
+    /// marked unfinished) it does nothing if the rebuild turns out to be done.
+    ///
+    /// One process rebuilds at a time: `.vault/reindex.lock` is held for the
+    /// whole run. Another opener waits for it (the app keeps showing its
+    /// "Updating search index" screen from the first one's progress file; the
+    /// CLI simply waits), and finding the rebuild finished does nothing. The
+    /// OS drops the lock if the rebuilding process dies.
+    fn reindex_with(&self, resume_only: bool) -> Result<u32> {
+        let lock_file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(self.inner.root.join(".vault").join("reindex.lock"))?;
+        while !try_lock_exclusive(&lock_file)? {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        if resume_only && !lock(&self.inner.db).reindex_pending()? {
+            return Ok(0);
+        }
+        // A progress file left by a run that died is not this run's.
+        let _ = fs::remove_file(self.inner.index_update_file());
         self.recover_purged_leftovers()?;
         self.flush()?;
         let db = lock(&self.inner.db);
@@ -3560,7 +3588,7 @@ impl Vault {
         let mut missing_md = meta_list(&db, "reindex_missing_md")?;
         let defer = db.defer_guard();
         let started = Instant::now();
-        let batch = reindex_batch();
+        let batch = reindex_batch(&self.inner.root);
         let mut file_names: HashMap<String, String> = HashMap::new();
         let mut tx = Some(db.write_tx()?);
         let mut in_batch = 0;
@@ -3582,10 +3610,12 @@ impl Vault {
             tx.take().expect("open transaction").commit()?;
             self.index_update_progress(started, n + 1, total);
             #[cfg(test)]
-            if reindex_test_stop() {
+            if reindex_test_stop(&self.inner.root) {
                 return Err(invalid("reindex interrupted"));
             }
             tx = Some(db.write_tx()?);
+            embedding = meta_list(&db, "reindex_embed")?;
+            missing_md = meta_list(&db, "reindex_missing_md")?;
         }
         let titles = |pid: &str| db.title_of(pid).ok().flatten();
         for id in &embedding {

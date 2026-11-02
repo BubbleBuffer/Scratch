@@ -197,8 +197,23 @@ impl Index {
         // every row of a collection are 3x faster with it.
         conn.pragma_update(None, "cache_size", -16_000)?;
         let version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        let fresh = version != SCHEMA_VERSION;
+        let mut fresh = version != SCHEMA_VERSION;
         if fresh {
+            // One transaction, version and marker included: a crash leaves
+            // either the old index or a new one that is marked unfinished,
+            // never an empty index that looks current. The version is read
+            // again under the write lock: another process may have rebuilt.
+            conn.execute_batch("BEGIN IMMEDIATE")?;
+            let built = (|| -> Result<bool> {
+            let again: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+            if again == SCHEMA_VERSION {
+                return Ok(false);
+            }
+            // External rows are never dropped by a rebuild: their table is
+            // made sure of first, and their text goes back into the new FTS
+            // table (under negative rowids) in this same transaction.
+            conn.execute_batch("CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);")?;
+            crate::migrate::external_search_rows(&conn)?;
             conn.execute_batch(
                 "DROP TRIGGER IF EXISTS search_rows_insert;
                  DROP TRIGGER IF EXISTS search_rows_update;
@@ -216,7 +231,7 @@ impl Index {
                  DROP TABLE IF EXISTS attachments;
                  DROP TABLE IF EXISTS conflicts;
                  DROP TABLE IF EXISTS agenda;
-                 DROP TABLE IF EXISTS meta;
+                 DELETE FROM meta;
                  CREATE TABLE pages(
                    rowid INTEGER PRIMARY KEY,
                    id TEXT NOT NULL UNIQUE,
@@ -295,23 +310,28 @@ impl Index {
             // The rebuild is not done until `Vault::reindex` clears this: a
             // run that stops half way is continued at the next open.
             conn.execute_batch(&format!(
-                "CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
-                 INSERT OR REPLACE INTO meta(key, value) VALUES ('{REINDEX_KEY}', '1');"
+                "INSERT OR REPLACE INTO meta(key, value) VALUES ('{REINDEX_KEY}', '1');"
             ))?;
-        }
-        let rebuilt = fresh;
-        // Local bookkeeping and the additive steps (`migrate::STEPS`): an
-        // index of this generation gains new columns and tables in place.
-        crate::migrate::apply(&conn, crate::migrate::STEPS)?;
-        if rebuilt {
-            // External rows are never dropped by a rebuild. Their text shares
-            // the FTS table under negative rowids; a rebuilt FTS table gets
-            // it back.
             conn.execute(
                 "INSERT INTO fts(rowid, title, body) SELECT -rowid, title, body FROM search_external",
                 [],
             )?;
+            Ok(true)
+            })();
+            match built {
+                Ok(did) => {
+                    conn.execute_batch("COMMIT")?;
+                    fresh = did;
+                }
+                Err(e) => {
+                    let _ = conn.execute_batch("ROLLBACK");
+                    return Err(e);
+                }
+            }
         }
+        // Local bookkeeping and the additive steps (`migrate::STEPS`): an
+        // index of this generation gains new columns and tables in place.
+        crate::migrate::apply(&conn, crate::migrate::STEPS)?;
         let pending: Option<String> = conn
             .query_row("SELECT value FROM meta WHERE key = ?1", [REINDEX_KEY], |r| r.get(0))
             .optional()?;

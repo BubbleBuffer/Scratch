@@ -49,7 +49,7 @@ pub(crate) const STEPS: &[Step] = &[
     Step { n: 3, name: "conflict mirror record ids", apply: conflict_ids, backfill: None },
 ];
 
-fn external_search_rows(conn: &Connection) -> Result<()> {
+pub(crate) fn external_search_rows(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS search_external(
            rowid INTEGER PRIMARY KEY,
@@ -160,13 +160,14 @@ pub(crate) fn pending(conn: &Connection, steps: &'static [Step]) -> Result<Vec<&
 pub(crate) fn backfill_batch(conn: &Connection, step: &Step, limit: usize) -> Result<bool> {
     let Some(run) = step.backfill else { return Ok(true) };
     let key = backfill_key(step.n);
-    let cursor: i64 = match get(conn, &key)?.as_deref() {
-        Some("done") => return Ok(true),
-        Some(v) => v.parse().unwrap_or(0),
-        None => 0,
-    };
     conn.execute_batch("BEGIN IMMEDIATE")?;
     let result = (|| -> Result<bool> {
+        // Read under the write lock: another process may have moved it.
+        let cursor: i64 = match get(conn, &key)?.as_deref() {
+            Some("done") => return Ok(true),
+            Some(v) => v.parse().unwrap_or(0),
+            None => 0,
+        };
         let next = run(conn, cursor, limit)?;
         put(conn, &key, &next.map_or("done".to_string(), |c| c.to_string()))?;
         Ok(next.is_none())

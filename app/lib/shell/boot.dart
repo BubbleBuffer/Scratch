@@ -101,10 +101,11 @@ class _NotesAppState extends State<NotesApp> {
     } catch (_) {}
   }
 
-  void _readIndexProgress(String root) {
+  void _readIndexProgress(String root, DateTime openedAt) {
     try {
       final file = File('$root${Platform.pathSeparator}.vault${Platform.pathSeparator}index-update.json');
-      if (!file.existsSync()) return;
+      // A file from an earlier run (one that died) is older than this open.
+      if (!file.existsSync() || file.lastModifiedSync().isBefore(openedAt)) return;
       final j = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
       if (!mounted) return;
       setState(() {
@@ -136,7 +137,8 @@ class _NotesAppState extends State<NotesApp> {
       // A breaking index change rebuilds the index inside open; the core
       // reports its progress in `.vault/index-update.json` (only when it takes
       // more than a moment), which shows as the "Updating search index" screen.
-      final poll = Timer.periodic(const Duration(milliseconds: 250), (_) => _readIndexProgress(root));
+      final openedAt = DateTime.now().subtract(const Duration(seconds: 1));
+      final poll = Timer.periodic(const Duration(milliseconds: 250), (_) => _readIndexProgress(root, openedAt));
       final Vault vault;
       try {
         vault = await Vault.open(root, dataDir: widget.dataDir);
