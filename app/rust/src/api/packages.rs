@@ -32,13 +32,21 @@ pub struct PackageInfo {
     pub installed_bytes: Option<i64>,
 }
 
-/// What an install is doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PackageProgress {
-    Downloading { done: i64, total: i64 },
+pub enum PackagePhase {
+    Downloading,
     Verifying,
     Extracting,
     Installing,
+}
+
+/// What an install is doing. `done` and `total` are bytes and only mean
+/// something while downloading (no enums with data: see types.rs).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PackageProgress {
+    pub phase: PackagePhase,
+    pub done: i64,
+    pub total: i64,
 }
 
 fn store(data_dir: &str) -> Store {
@@ -134,15 +142,15 @@ pub fn package_install(
     })?;
     store
         .install(package, &mut |progress| {
-            let _ = sink.add(match progress {
-                Progress::Downloading { done, total } => PackageProgress::Downloading {
-                    done: size(done),
-                    total: size(total),
-                },
-                Progress::Verifying => PackageProgress::Verifying,
-                Progress::Extracting => PackageProgress::Extracting,
-                Progress::Installing => PackageProgress::Installing,
-            });
+            let (phase, done, total) = match progress {
+                Progress::Downloading { done, total } => {
+                    (PackagePhase::Downloading, size(done), size(total))
+                }
+                Progress::Verifying => (PackagePhase::Verifying, 0, 0),
+                Progress::Extracting => (PackagePhase::Extracting, 0, 0),
+                Progress::Installing => (PackagePhase::Installing, 0, 0),
+            };
+            let _ = sink.add(PackageProgress { phase, done, total });
         })
         .map_err(|e| e.to_string())?;
     Ok(info_for(&manifest, &store, platform, &name))
