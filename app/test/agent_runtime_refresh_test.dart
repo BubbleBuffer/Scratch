@@ -8,7 +8,6 @@ import 'package:notes_app/addons/agent/packages_store.dart';
 import 'addons/agent/packages_fakes.dart';
 import 'agent_test.dart' show fakeExtensionSkipReason, openAgentStore;
 import 'harness.dart';
-import 'sync_helpers.dart';
 
 void main() {
   setUpAll(initCore);

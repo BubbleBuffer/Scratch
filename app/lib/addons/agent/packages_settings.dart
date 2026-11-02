@@ -7,7 +7,6 @@
 import 'package:flutter/widgets.dart';
 
 import '../../services/addon_services.dart';
-import '../../ui/ui.dart';
 import 'packages_store.dart';
 
 class PackagesSettings extends StatefulWidget {

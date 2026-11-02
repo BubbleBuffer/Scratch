@@ -88,9 +88,7 @@ class _AgentRuntimeCardState extends State<AgentRuntimeCard> {
           packages: store.packages,
           selected:
               modelProvider(store.modelOf(store.openId)) == claudeCodeProvider,
-          available: info == null
-              ? null
-              : info.providers.contains(claudeCodeProvider),
+          available: info?.providers.contains(claudeCodeProvider),
         );
       },
     );
@@ -169,7 +167,7 @@ class RuntimePackageCard extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: ts(
         context.type.uiSmall,
-        failed != null ? c.dangerText : c.textSecondary,
+        failed != null ? c.textPrimary : c.textSecondary,
       ),
     );
     return Padding(
@@ -182,7 +180,7 @@ class RuntimePackageCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: c.bgSecondary,
         borderRadius: Radii.panel,
-        border: Border.all(color: c.border),
+        border: Border.all(color: failed != null ? c.dangerBg : c.border),
       ),
       child: Row(
         children: [
