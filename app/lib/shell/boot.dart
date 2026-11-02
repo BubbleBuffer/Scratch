@@ -12,6 +12,7 @@
 // - On Windows, the update checker starts (features/updates).
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show AppExitResponse;
 
@@ -62,6 +63,10 @@ class _NotesAppState extends State<NotesApp> {
   AppRemote? _remote;
   Timer? _frameFallback;
   bool _seeding = false;
+  // A rebuild of the search index during open: pages done of total.
+  bool _updatingIndex = false;
+  int _indexDone = 0;
+  int _indexTotal = 0;
   int _seeded = 0;
   String? _error;
 
@@ -96,6 +101,23 @@ class _NotesAppState extends State<NotesApp> {
     } catch (_) {}
   }
 
+  void _readIndexProgress(String root, DateTime openedAt) {
+    try {
+      final file = File('$root${Platform.pathSeparator}.vault${Platform.pathSeparator}index-update.json');
+      // A file from an earlier run (one that died) is older than this open.
+      if (!file.existsSync() || file.lastModifiedSync().isBefore(openedAt)) return;
+      final j = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _updatingIndex = true;
+        _indexDone = (j['done'] as num).toInt();
+        _indexTotal = (j['total'] as num).toInt();
+      });
+    } catch (_) {
+      // Half written or gone: the next tick reads it again.
+    }
+  }
+
   static bool _isNew(String root) {
     final d = Directory(root);
     return !d.existsSync() || d.listSync().isEmpty;
@@ -112,7 +134,18 @@ class _NotesAppState extends State<NotesApp> {
       if (fresh && seedBench && !seedDemo) await _seedBench(root);
       if (fresh && seedTaskRows > 0 && !seedDemo) await NotesVault.seedTasks(root: root, rows: seedTaskRows);
       BootTiming.mark('before Vault.open');
-      final vault = await Vault.open(root, dataDir: widget.dataDir);
+      // A breaking index change rebuilds the index inside open; the core
+      // reports its progress in `.vault/index-update.json` (only when it takes
+      // more than a moment), which shows as the "Updating search index" screen.
+      final openedAt = DateTime.now().subtract(const Duration(seconds: 1));
+      final poll = Timer.periodic(const Duration(milliseconds: 250), (_) => _readIndexProgress(root, openedAt));
+      final Vault vault;
+      try {
+        vault = await Vault.open(root, dataDir: widget.dataDir);
+      } finally {
+        poll.cancel();
+      }
+      if (_updatingIndex && mounted) setState(() => _updatingIndex = false);
       BootTiming.mark('after Vault.open');
       if (_settings.scheduleRunsHere && (Platform.isWindows || Platform.isLinux)) {
         vault.localRunnerSetAvailable(true).whenComplete(() => BootTiming.mark('localRunnerSetAvailable done')).ignore();
@@ -246,6 +279,9 @@ class _NotesAppState extends State<NotesApp> {
           return _Boot(
             seeding: _seeding,
             seeded: _seeded,
+            updatingIndex: _updatingIndex,
+            indexDone: _indexDone,
+            indexTotal: _indexTotal,
             error: _error,
             // A vault folder chosen in settings that fails to open.
             onUseDefault: _error == null || _settings.vaultPath == null
@@ -263,9 +299,20 @@ class _NotesAppState extends State<NotesApp> {
 }
 
 class _Boot extends StatelessWidget {
-  const _Boot({required this.seeding, required this.seeded, this.error, this.onUseDefault});
+  const _Boot({
+    required this.seeding,
+    required this.seeded,
+    this.updatingIndex = false,
+    this.indexDone = 0,
+    this.indexTotal = 0,
+    this.error,
+    this.onUseDefault,
+  });
   final bool seeding;
   final int seeded;
+  final bool updatingIndex;
+  final int indexDone;
+  final int indexTotal;
   final String? error;
   final VoidCallback? onUseDefault;
 
@@ -288,16 +335,17 @@ class _Boot extends StatelessWidget {
       );
     }
     // Loading: the theme's desk colour, the same one Home sits on.
-    if (!seeding) return ColoredBox(color: c.desk, child: const SizedBox.expand());
-    final total = benchPages + 1;
-    final frac = (seeded / total).clamp(0.0, 1.0);
+    if (!seeding && !updatingIndex) return ColoredBox(color: c.desk, child: const SizedBox.expand());
+    final total = updatingIndex ? indexTotal : benchPages + 1;
+    final done = updatingIndex ? indexDone : seeded;
+    final frac = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
     return Center(
       child: SizedBox(
         width: 280,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Creating the bench vault', style: ts(ty.h3, c.textPrimary)),
+          Text(updatingIndex ? 'Updating search index' : 'Creating the bench vault', style: ts(ty.h3, c.textPrimary)),
           const SizedBox(height: 8),
-          Text(frac < 1 ? '$seeded of $total pages' : 'Building the index…',
+          Text(frac < 1 ? '$done of $total pages' : 'Building the index…',
               style: ts(ty.ui, c.textSecondary, weight: 400)),
           const SizedBox(height: 16),
           ClipRRect(

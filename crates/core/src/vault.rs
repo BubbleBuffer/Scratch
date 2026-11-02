@@ -928,6 +928,11 @@ impl Inner {
     /// Publish only after SQLite has successfully committed. Keep generation
     /// allocation and feed insertion under the same lock so feed order is
     /// monotonic even when the foreground and background writers race.
+    /// Progress of a running reindex, read by the app while it boots.
+    pub(crate) fn index_update_file(&self) -> PathBuf {
+        self.root.join(".vault").join("index-update.json")
+    }
+
     pub(crate) fn index_committed(&self, db: &Index, mut pages: Vec<PageId>) {
         // Computed properties can update rows beyond the caller's pages.
         // Their existing buffer stays on the connection until commit succeeds.
@@ -2744,6 +2749,81 @@ fn deferred_startup(inner: std::sync::Weak<Inner>, scan: bool) {
     let _ = lock(&i.db).refresh_fuzzy();
 }
 
+/// Finishes the backfills of the index steps, a small transaction at a time:
+/// the db lock is free between batches, so editing and sync go on. The
+/// cursor lives in the index, so an exit mid-way is continued at next open.
+pub(crate) fn run_backfills(inner: Weak<Inner>, steps: &'static [crate::migrate::Step]) -> Result<()> {
+    loop {
+        let Some(i) = inner.upgrade() else { return Ok(()) };
+        let Some(step) = lock(&i.db).backfills_pending(steps)?.into_iter().next() else {
+            return Ok(());
+        };
+        let done = crate::migrate::backfill_batch(&lock(&i.db).conn, step, crate::migrate::BACKFILL_BATCH)?;
+        drop(i);
+        if !done {
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+}
+
+type ReindexPage = (MetaRow, PageMeta, Vec<Block>, Vec<u8>, Vec<(String, String)>);
+
+/// Pages a reindex batch commits at a time.
+fn reindex_batch(root: &Path) -> usize {
+    #[cfg(test)]
+    if let Some((batch, _)) = lock(&REINDEX_TEST).get(&test_key(root)) {
+        return *batch;
+    }
+    let _ = root;
+    200
+}
+
+/// Tests: per vault folder (keyed by its name, so tests do not affect each
+/// other), the batch size and the number of batches left before a reindex
+/// stops as if the app had exited.
+#[cfg(test)]
+pub(crate) static REINDEX_TEST: Mutex<BTreeMapKey> = Mutex::new(BTreeMapKey::new());
+#[cfg(test)]
+pub(crate) type BTreeMapKey = std::collections::BTreeMap<String, (usize, usize)>;
+
+#[cfg(test)]
+pub(crate) fn test_key(root: &Path) -> String {
+    root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+#[cfg(test)]
+fn reindex_test_stop(root: &Path) -> bool {
+    match lock(&REINDEX_TEST).get_mut(&test_key(root)) {
+        Some((_, left)) if *left > 0 => {
+            *left -= 1;
+            *left == 0
+        }
+        _ => false,
+    }
+}
+
+/// A list of ids kept in the index's `meta` between reindex batches.
+fn meta_list(db: &Index, key: &str) -> Result<Vec<String>> {
+    Ok(db.get_meta(key)?.map(|v| v.lines().map(str::to_owned).collect()).unwrap_or_default())
+}
+
+fn put_meta_list(db: &Index, key: &str, list: &[String]) -> Result<()> {
+    db.set_meta(key, &list.join("\n"))
+}
+
+/// Attachment rows for the blobs the pages indexed so far name.
+fn put_attachments(db: &Index, names: &mut HashMap<String, String>, blobs: &HashMap<String, i64>) -> Result<()> {
+    let now = now_ms();
+    for (blob, name) in names.drain() {
+        let Some(size) = blobs.get(&blob) else { continue };
+        db.put_attachment(
+            &crate::types::Attachment { mime: attach::mime_of(&name).to_string(), id: blob, name, size: *size },
+            now,
+        )?;
+    }
+    Ok(())
+}
+
 /// Copies of `blocks` with fresh block ids.
 pub(crate) fn fresh_ids(blocks: &[Block]) -> Vec<Block> {
     blocks
@@ -2879,7 +2959,9 @@ impl Vault {
         }
         tr.mark("recover_restorations+purged");
         if fresh && fs::read_dir(vault.inner.docs_dir())?.next().is_some() {
-            vault.reindex()?;
+            vault.reindex_with(true)?;
+        } else if fresh {
+            lock(&vault.inner.db).set_reindex_pending(false)?;
         } else if !fresh && deferred {
             // Recovery scan and fuzzy warm-up: see `deferred_startup`.
         } else if !fresh {
@@ -2958,6 +3040,13 @@ impl Vault {
             let _ = std::thread::Builder::new()
                 .name("vault-startup".into())
                 .spawn(move || deferred_startup(weak, scan));
+        }
+        // Index steps that fill in data (`migrate`) finish in the background.
+        if !lock(&vault.inner.db).backfills_pending(crate::migrate::STEPS)?.is_empty() {
+            let weak = Arc::downgrade(&vault.inner);
+            let _ = std::thread::Builder::new()
+                .name("vault-backfill".into())
+                .spawn(move || run_backfills(weak, crate::migrate::STEPS));
         }
         Ok(vault)
     }
@@ -3430,11 +3519,42 @@ impl Vault {
 
     /// Rebuilds the index from the Loro documents. Returns the page count
     /// (pages in the trash included).
+    ///
+    /// The rebuild commits every [`reindex_batch`] pages and keeps the
+    /// `reindex` marker in the index until it is done, so a run that stops
+    /// (an exit, a crash) is continued by the next call: pages already in the
+    /// index are not read again. While it runs it holds the index lock, so
+    /// nothing edits or syncs; the app shows "Updating search index" meanwhile
+    /// (progress in `.vault/index-update.json`, see `index_update_progress`).
     pub fn reindex(&self) -> Result<u32> {
+        self.reindex_with(false)
+    }
+
+    /// [`Vault::reindex`]; with `resume_only` (the open of an index that is
+    /// marked unfinished) it does nothing if the rebuild turns out to be done.
+    ///
+    /// One process rebuilds at a time: `.vault/reindex.lock` is held for the
+    /// whole run. Another opener waits for it (the app keeps showing its
+    /// "Updating search index" screen from the first one's progress file; the
+    /// CLI simply waits), and finding the rebuild finished does nothing. The
+    /// OS drops the lock if the rebuilding process dies.
+    fn reindex_with(&self, resume_only: bool) -> Result<u32> {
+        let lock_file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(self.inner.root.join(".vault").join("reindex.lock"))?;
+        while !try_lock_exclusive(&lock_file)? {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        if resume_only && !lock(&self.inner.db).reindex_pending()? {
+            return Ok(0);
+        }
+        // A progress file left by a run that died is not this run's.
+        let _ = fs::remove_file(self.inner.index_update_file());
         self.recover_purged_leftovers()?;
         self.flush()?;
         let db = lock(&self.inner.db);
-        let tx = db.write_tx()?;
         // Files in mounted folders keep their pages: their names cannot be
         // told from the titles (a taken name gets a number).
         let mounted: HashMap<String, crate::index::MdRow> = db
@@ -3443,77 +3563,63 @@ impl Vault {
             .filter(|(_, md, _, _)| Path::new(md).is_absolute())
             .map(|r| (r.0.clone(), r))
             .collect();
-        db.clear()?;
-        let defer = db.defer_guard();
-        let mut count = 0;
-        let mut missing_md = Vec::new();
-        let mut file_names: HashMap<String, String> = HashMap::new();
-        // Pages with embeds: their search text needs titles that may not be
-        // indexed yet, so they are written again once all pages are in.
-        let mut embedding = Vec::new();
+        if !db.reindex_pending()? {
+            let tx = db.write_tx()?;
+            db.clear()?;
+            db.set_reindex_pending(true)?;
+            tx.commit()?;
+        }
+        let mut ids: Vec<String> = Vec::new();
         for entry in fs::read_dir(self.inner.docs_dir())? {
             let name = entry?.file_name().to_string_lossy().into_owned();
-            let Some(id) = name.strip_suffix(".loro") else {
-                continue;
-            };
-            if self.inner.is_purged(id) {
-                continue;
-            }
-            let cached = self.inner.cached_slot(id);
-            let (row, meta, blocks, vv, conflicts) = match cached {
-                Some(slot) => {
-                    let mut st = lock(&slot.state);
-                    let vv = st.doc.doc.oplog_vv().encode();
-                    (meta_row(&st.doc), st.doc.meta(), st.doc.blocks(), vv, st.doc.conflicts())
+            if let Some(id) = name.strip_suffix(".loro") {
+                if !self.inner.is_purged(id) {
+                    ids.push(id.to_string());
                 }
-                None => {
-                    let mut doc = self.inner.read_doc(id)?;
-                    let vv = doc.doc.oplog_vv().encode();
-                    (meta_row(&doc), doc.meta(), doc.blocks(), vv, doc.conflicts())
-                }
-            };
-            db.set_conflicts(id, &crate::sync::mirror_rows(id, &conflicts))?;
-            collect_file_names(&blocks, &mut file_names);
-            if has_embed(&blocks) {
-                embedding.push((row.clone(), meta.clone(), blocks.clone(), vv.clone()));
             }
-            let titles = |pid: &str| db.title_of(pid).ok().flatten();
-            let mut content = content_row(&meta, &row.props, &blocks, &titles);
-            content.vv = Some(vv);
-            if let Some(folder) = self
-                .inner
-                .mount_folder(meta.parent.as_deref(), meta.is_template)
-            {
-                // A mounted page keeps the file the index knew, if it is
-                // still in the folder. Without one (a lost index) the page
-                // has no file: `rescan_mounts` attaches a file of the same
-                // name or imports it as a new page, so nothing is
-                // overwritten.
-                if let Some((_, md, hash, v)) = mounted.get(id) {
-                    let f = Path::new(md);
-                    if f.is_file() && f.starts_with(&folder) {
-                        content.md_path = Some(md.clone());
-                        content.md_hash = hash.clone();
-                        content.md_version = v.clone();
-                    }
-                }
-                db.upsert(&row, &content)?;
-                count += 1;
-                continue;
-            }
-            let md = markdown::file_name(&meta.title, id);
-            match fs::read(self.inner.pages_dir().join(&md)) {
-                Ok(bytes) => {
-                    content.md_hash = Some(attach::sha256_hex(&bytes));
-                    content.md_path = Some(md);
-                }
-                Err(_) => missing_md.push(id.to_string()),
-            }
-            db.upsert(&row, &content)?;
+        }
+        ids.sort();
+        let total = ids.len();
+        let blobs: HashMap<String, i64> = attach::list_blobs(&self.inner.root)?.into_iter().collect();
+        // Pages with embeds: their search text needs titles that may not be
+        // indexed yet, so they are written again once all pages are in. Both
+        // lists are kept in the index between batches.
+        let mut embedding = meta_list(&db, "reindex_embed")?;
+        let mut missing_md = meta_list(&db, "reindex_missing_md")?;
+        let defer = db.defer_guard();
+        let started = Instant::now();
+        let batch = reindex_batch(&self.inner.root);
+        let mut file_names: HashMap<String, String> = HashMap::new();
+        let mut tx = Some(db.write_tx()?);
+        let mut in_batch = 0;
+        let mut count = 0;
+        for (n, id) in ids.iter().enumerate() {
             count += 1;
+            if db.exists(id)? {
+                continue;
+            }
+            self.reindex_page(&db, id, &mounted, &mut file_names, &mut embedding, &mut missing_md)?;
+            in_batch += 1;
+            if in_batch < batch {
+                continue;
+            }
+            in_batch = 0;
+            put_meta_list(&db, "reindex_embed", &embedding)?;
+            put_meta_list(&db, "reindex_missing_md", &missing_md)?;
+            put_attachments(&db, &mut file_names, &blobs)?;
+            tx.take().expect("open transaction").commit()?;
+            self.index_update_progress(started, n + 1, total);
+            #[cfg(test)]
+            if reindex_test_stop(&self.inner.root) {
+                return Err(invalid("reindex interrupted"));
+            }
+            tx = Some(db.write_tx()?);
+            embedding = meta_list(&db, "reindex_embed")?;
+            missing_md = meta_list(&db, "reindex_missing_md")?;
         }
         let titles = |pid: &str| db.title_of(pid).ok().flatten();
-        for (row, meta, blocks, vv) in embedding {
+        for id in &embedding {
+            let (row, meta, blocks, vv, _) = self.reindex_load(id)?;
             // Markdown fields are kept: the content row leaves them unset.
             let mut content = content_row(&meta, &row.props, &blocks, &titles);
             content.vv = Some(vv);
@@ -3522,28 +3628,29 @@ impl Vault {
         db.refresh_all_trash()?;
         defer.finish()?;
         // Attachment details for blobs without a row (a fresh index).
+        put_attachments(&db, &mut file_names, &blobs)?;
         let known: HashSet<String> = db.all_attachment_ids()?.into_iter().collect();
         let now = now_ms();
-        for (blob, size) in attach::list_blobs(&self.inner.root)? {
-            if known.contains(&blob) {
+        for (blob, size) in &blobs {
+            if known.contains(blob) {
                 continue;
             }
-            let name = file_names
-                .get(&blob)
-                .cloned()
-                .unwrap_or_else(|| blob.clone());
             db.put_attachment(
                 &crate::types::Attachment {
-                    mime: attach::mime_of(&name).to_string(),
-                    id: blob,
-                    name,
-                    size,
+                    mime: attach::mime_of(blob).to_string(),
+                    id: blob.clone(),
+                    name: blob.clone(),
+                    size: *size,
                 },
                 now,
             )?;
         }
-        tx.commit()?;
+        db.conn.execute("DELETE FROM meta WHERE key IN ('reindex_embed', 'reindex_missing_md')", [])?;
+        db.set_reindex_pending(false)?;
+        tx.take().expect("open transaction").commit()?;
+        let _ = fs::remove_file(self.inner.index_update_file());
         self.inner.index_committed(&db, Vec::new());
+        drop(tx);
         drop(db);
         for id in missing_md {
             self.inner.send(Msg::Recover(id));
@@ -3551,6 +3658,81 @@ impl Vault {
         self.rebuild_conflict_archive_mirror()?;
         self.inner.emit([Change::TreeChanged]);
         Ok(count)
+    }
+
+    /// A page's row, metadata, blocks, version vector and conflicts, from the
+    /// cached document or the file.
+    fn reindex_load(&self, id: &str) -> Result<ReindexPage> {
+        Ok(match self.inner.cached_slot(id) {
+            Some(slot) => {
+                let mut st = lock(&slot.state);
+                let vv = st.doc.doc.oplog_vv().encode();
+                (meta_row(&st.doc), st.doc.meta(), st.doc.blocks(), vv, st.doc.conflicts())
+            }
+            None => {
+                let mut doc = self.inner.read_doc(id)?;
+                let vv = doc.doc.oplog_vv().encode();
+                (meta_row(&doc), doc.meta(), doc.blocks(), vv, doc.conflicts())
+            }
+        })
+    }
+
+    /// Indexes one page during [`Vault::reindex`].
+    fn reindex_page(
+        &self,
+        db: &Index,
+        id: &str,
+        mounted: &HashMap<String, crate::index::MdRow>,
+        file_names: &mut HashMap<String, String>,
+        embedding: &mut Vec<String>,
+        missing_md: &mut Vec<String>,
+    ) -> Result<()> {
+        let (row, meta, blocks, vv, conflicts) = self.reindex_load(id)?;
+        db.set_conflicts(id, &crate::sync::mirror_rows(id, &conflicts))?;
+        collect_file_names(&blocks, file_names);
+        if has_embed(&blocks) {
+            embedding.push(id.to_string());
+        }
+        let titles = |pid: &str| db.title_of(pid).ok().flatten();
+        let mut content = content_row(&meta, &row.props, &blocks, &titles);
+        content.vv = Some(vv);
+        if let Some(folder) = self.inner.mount_folder(meta.parent.as_deref(), meta.is_template) {
+            // A mounted page keeps the file the index knew, if it is still in
+            // the folder. Without one (a lost index) the page has no file:
+            // `rescan_mounts` attaches a file of the same name or imports it
+            // as a new page, so nothing is overwritten.
+            if let Some((_, md, hash, v)) = mounted.get(id) {
+                let f = Path::new(md);
+                if f.is_file() && f.starts_with(&folder) {
+                    content.md_path = Some(md.clone());
+                    content.md_hash = hash.clone();
+                    content.md_version = v.clone();
+                }
+            }
+            db.upsert(&row, &content)?;
+            return Ok(());
+        }
+        let md = markdown::file_name(&meta.title, id);
+        match fs::read(self.inner.pages_dir().join(&md)) {
+            Ok(bytes) => {
+                content.md_hash = Some(attach::sha256_hex(&bytes));
+                content.md_path = Some(md);
+            }
+            Err(_) => missing_md.push(id.to_string()),
+        }
+        db.upsert(&row, &content)?;
+        Ok(())
+    }
+
+    /// Writes `.vault/index-update.json` (done and total pages) once the
+    /// rebuild has run for more than a moment, so a quick one shows nothing.
+    fn index_update_progress(&self, started: Instant, done: usize, total: usize) {
+        if started.elapsed() > Duration::from_millis(300) {
+            let _ = fs::write(
+                self.inner.index_update_file(),
+                format!("{{\"done\":{done},\"total\":{total}}}"),
+            );
+        }
     }
 
     pub(crate) fn inner(&self) -> &Inner {
@@ -4382,3 +4564,7 @@ mod two_writer_storage_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "reindex_tests.rs"]
+mod reindex_tests;

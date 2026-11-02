@@ -22,9 +22,14 @@ use crate::types::{
     SearchIndexStats, SearchResults, SearchSpecResults, TrashedPage,
 };
 
-/// An index of another version is rebuilt from the vault documents. Version
-/// 14 excludes view settings JSON from searchable text. Rebuilding preserves
-/// the existing document representation.
+/// The breaking generation: an index of another generation is rebuilt from
+/// the vault documents (batched and resumable, see `Vault::reindex`).
+/// Generation 14 excludes view settings JSON from searchable text.
+///
+/// Do not bump this for an additive change (a new column, table or index,
+/// even one that needs its data filled in): add an ordered step to
+/// `migrate::STEPS` instead. Only a change that makes old rows wrong in a way
+/// a backfill cannot fix is a new generation.
 const SCHEMA_VERSION: i64 = 14;
 
 /// Broad queries exceed the larger of 200 documents or 5% of live pages.
@@ -32,6 +37,9 @@ const SCHEMA_VERSION: i64 = 14;
 const SEARCH_BREADTH: (u32, u32) = (200, 20);
 
 /// Separator of ids in the `t` column of multi-valued properties.
+/// `meta` key set while a full rebuild of the index is unfinished.
+const REINDEX_KEY: &str = "reindex";
+
 pub(crate) const SEP: char = '\u{1f}';
 
 pub(crate) struct Index {
@@ -189,8 +197,23 @@ impl Index {
         // every row of a collection are 3x faster with it.
         conn.pragma_update(None, "cache_size", -16_000)?;
         let version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        let fresh = version != SCHEMA_VERSION;
+        let mut fresh = version != SCHEMA_VERSION;
         if fresh {
+            // One transaction, version and marker included: a crash leaves
+            // either the old index or a new one that is marked unfinished,
+            // never an empty index that looks current. The version is read
+            // again under the write lock: another process may have rebuilt.
+            conn.execute_batch("BEGIN IMMEDIATE")?;
+            let built = (|| -> Result<bool> {
+            let again: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+            if again == SCHEMA_VERSION {
+                return Ok(false);
+            }
+            // External rows are never dropped by a rebuild: their table is
+            // made sure of first, and their text goes back into the new FTS
+            // table (under negative rowids) in this same transaction.
+            conn.execute_batch("CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);")?;
+            crate::migrate::external_search_rows(&conn)?;
             conn.execute_batch(
                 "DROP TRIGGER IF EXISTS search_rows_insert;
                  DROP TRIGGER IF EXISTS search_rows_update;
@@ -208,7 +231,7 @@ impl Index {
                  DROP TABLE IF EXISTS attachments;
                  DROP TABLE IF EXISTS conflicts;
                  DROP TABLE IF EXISTS agenda;
-                 DROP TABLE IF EXISTS meta;
+                 DELETE FROM meta;
                  CREATE TABLE pages(
                    rowid INTEGER PRIMARY KEY,
                    id TEXT NOT NULL UNIQUE,
@@ -284,64 +307,35 @@ impl Index {
                  );",
             )?;
             conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
-        }
-        // External rows are never dropped by a rebuild. Their text shares the
-        // FTS table under negative rowids; a rebuilt FTS table gets it back.
-        conn.execute_batch(
-            // Local bookkeeping is not part of page documents or sync. Like
-            // other additive tables, old indexes gain it without a rebuild.
-            "CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
-             CREATE TABLE IF NOT EXISTS search_external(
-               rowid INTEGER PRIMARY KEY,
-               source TEXT NOT NULL, id TEXT NOT NULL,
-               title TEXT NOT NULL, body TEXT NOT NULL,
-               page_type TEXT NOT NULL, target TEXT,
-               updated_ms INTEGER NOT NULL,
-               UNIQUE(source, id)
-             );",
-        )?;
-        if fresh {
+            // The rebuild is not done until `Vault::reindex` clears this: a
+            // run that stops half way is continued at the next open.
+            conn.execute_batch(&format!(
+                "INSERT OR REPLACE INTO meta(key, value) VALUES ('{REINDEX_KEY}', '1');"
+            ))?;
             conn.execute(
                 "INSERT INTO fts(rowid, title, body) SELECT -rowid, title, body FROM search_external",
                 [],
             )?;
+            Ok(true)
+            })();
+            match built {
+                Ok(did) => {
+                    conn.execute_batch("COMMIT")?;
+                    fresh = did;
+                }
+                Err(e) => {
+                    let _ = conn.execute_batch("ROLLBACK");
+                    return Err(e);
+                }
+            }
         }
-        // Additive, so an index of this version is not rebuilt: the conflict
-        // mirror gains its `scope` column in place. Existing rows were all
-        // format 1 (one block), which the default describes.
-        let scope_columns: i64 = conn.query_row(
-            "SELECT count(*) FROM pragma_table_info('conflicts') WHERE name = 'scope'",
-            [],
-            |r| r.get(0),
-        )?;
-        if scope_columns == 0 {
-            conn.execute_batch(
-                "ALTER TABLE conflicts ADD COLUMN scope TEXT NOT NULL DEFAULT 'block';",
-            )?;
-        }
-        // Rows were keyed by block. A format 1 record's id is its block, so
-        // each row keeps its key as both id and anchor. Rebuilt in one
-        // transaction: a failure drops the connection and rolls it back.
-        let id_columns: i64 = conn.query_row(
-            "SELECT count(*) FROM pragma_table_info('conflicts') WHERE name = 'id'",
-            [],
-            |r| r.get(0),
-        )?;
-        if id_columns == 0 {
-            conn.execute_batch(
-                "BEGIN;
-                 CREATE TABLE conflicts_v2(
-                   page TEXT NOT NULL, id TEXT NOT NULL, anchor TEXT NOT NULL,
-                   json TEXT NOT NULL, scope TEXT NOT NULL DEFAULT 'block',
-                   PRIMARY KEY(page, id)
-                 ) WITHOUT ROWID;
-                 INSERT INTO conflicts_v2(page, id, anchor, json, scope)
-                   SELECT page, block, block, json, scope FROM conflicts;
-                 DROP TABLE conflicts;
-                 ALTER TABLE conflicts_v2 RENAME TO conflicts;
-                 COMMIT;",
-            )?;
-        }
+        // Local bookkeeping and the additive steps (`migrate::STEPS`): an
+        // index of this generation gains new columns and tables in place.
+        crate::migrate::apply(&conn, crate::migrate::STEPS)?;
+        let pending: Option<String> = conn
+            .query_row("SELECT value FROM meta WHERE key = ?1", [REINDEX_KEY], |r| r.get(0))
+            .optional()?;
+        let fresh = fresh || pending.is_some();
         // Connection-local tokenizer tables over the existing index. Both
         // tokenizers use unicode61's same diacritic setting; the token view
         // normalizes estimator prefixes. Search reads `search_rows`, the
@@ -367,6 +361,28 @@ impl Index {
             },
             fresh,
         ))
+    }
+
+    /// Steps (in order) whose backfill is not finished.
+    pub(crate) fn backfills_pending(
+        &self,
+        steps: &'static [crate::migrate::Step],
+    ) -> Result<Vec<&'static crate::migrate::Step>> {
+        crate::migrate::pending(&self.conn, steps)
+    }
+
+    /// Whether a rebuild of the index is still unfinished.
+    pub(crate) fn reindex_pending(&self) -> Result<bool> {
+        Ok(self.get_meta(REINDEX_KEY)?.is_some())
+    }
+
+    pub(crate) fn set_reindex_pending(&self, on: bool) -> Result<()> {
+        if on {
+            self.set_meta(REINDEX_KEY, "1")
+        } else {
+            self.conn.execute("DELETE FROM meta WHERE key = ?1", [REINDEX_KEY])?;
+            Ok(())
+        }
     }
 
     pub(crate) fn get_meta(&self, key: &str) -> Result<Option<String>> {
@@ -2365,7 +2381,8 @@ impl Index {
     pub fn clear(&self) -> Result<()> {
         self.conn.execute_batch(
             "DELETE FROM agenda; DELETE FROM fts WHERE rowid > 0; DELETE FROM pages; DELETE FROM props; DELETE FROM links; DELETE FROM refs;
-             DELETE FROM conflicts; DELETE FROM meta;",
+             DELETE FROM conflicts;
+             DELETE FROM meta WHERE key NOT IN ('reindex') AND key NOT LIKE 'schema_step' AND key NOT LIKE 'backfill:%';",
         )?;
         Ok(())
     }
@@ -2664,7 +2681,7 @@ mod conflict_mirror_tests {
         {
             let (index, _) = Index::open(&root.join(".vault/index.sqlite")).unwrap();
             index.conn.execute_batch(
-                "DROP TABLE conflicts;
+                "DELETE FROM meta WHERE key = 'schema_step'; DROP TABLE conflicts;
                  CREATE TABLE conflicts(page TEXT NOT NULL, block TEXT NOT NULL, json TEXT NOT NULL,
                    PRIMARY KEY(page, block)) WITHOUT ROWID;"
             ).unwrap();
@@ -2710,10 +2727,11 @@ mod conflict_mirror_tests {
         {
             let (index, fresh) = Index::open(&path).unwrap();
             assert!(fresh);
+            index.set_reindex_pending(false).unwrap();
             index
                 .conn
                 .execute_batch(
-                    "DROP TABLE conflicts;
+                    "DELETE FROM meta WHERE key = 'schema_step'; DROP TABLE conflicts;
                      CREATE TABLE conflicts(
                        page TEXT NOT NULL, block TEXT NOT NULL, json TEXT NOT NULL,
                        PRIMARY KEY(page, block)
@@ -2770,10 +2788,11 @@ mod conflict_mirror_tests {
         let _ = std::fs::remove_file(&path);
         {
             let (index, _) = Index::open(&path).unwrap();
+            index.set_reindex_pending(false).unwrap();
             index
                 .conn
                 .execute_batch(
-                    "DROP TABLE conflicts;
+                    "DELETE FROM meta WHERE key = 'schema_step'; DROP TABLE conflicts;
                      CREATE TABLE conflicts(
                        page TEXT NOT NULL, block TEXT NOT NULL, json TEXT NOT NULL,
                        scope TEXT NOT NULL DEFAULT 'block',
