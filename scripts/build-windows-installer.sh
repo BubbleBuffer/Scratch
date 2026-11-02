@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Builds the Windows app and its Inno Setup installer for a release tag.
 # Used by .github/workflows/release.yml and nightly.yml on windows-latest
-# (Git Bash), after Flutter, Rust and Bun are set up.
+# (Git Bash), after Flutter and Rust are set up. Claude Code is not bundled:
+# it is a runtime package the app downloads on demand (wiki/addons/packages.md).
 #
 #   scripts/build-windows-installer.sh <tag> <numeric> <build-number> <out-dir>
 #
@@ -39,11 +40,7 @@ flutter build windows --release \
   --build-name="$numeric" --build-number="$code" \
   --dart-define=SCRATCH_RELEASE_TAG="$tag"
 
-# The app and scratch-cli find Claude Code as a `claude-code` folder and
-# `bun\bun.exe` beside the executable, so ship both in the Release folder
-# the installer packs.
 release_dir="$(cygpath -w "$app_dir/build/windows/x64/runner/Release")"
-pwsh -NoProfile -File "$(cygpath -w "$app_dir/windows/installer/bundle-claude-code.ps1")" -ReleaseDir "$release_dir"
 
 iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
 if [[ ! -x $iscc ]]; then
