@@ -38,10 +38,12 @@ import 'app_shell.dart';
 import 'addons.dart';
 import 'home.dart';
 
-const seedBench = bool.fromEnvironment('SEED_BENCH');
+// Boot timing runs also take SCRATCH_SEED_BENCH=1 and SCRATCH_SEED_PAGES=<n>
+// (environment, desktop) so one build can measure small and large vaults.
+final seedBench = const bool.fromEnvironment('SEED_BENCH') || Platform.environment['SCRATCH_SEED_BENCH'] == '1';
 const seedDemo = bool.fromEnvironment('SEED_DEMO');
 const seedTaskRows = int.fromEnvironment('SEED_TASKS');
-const benchPages = 10000;
+final benchPages = int.tryParse(Platform.environment['SCRATCH_SEED_PAGES'] ?? '') ?? 10000;
 const benchBigPageBlocks = 2000;
 
 class NotesApp extends StatefulWidget {
@@ -58,6 +60,7 @@ class _NotesAppState extends State<NotesApp> {
   late final AppSettings _settings = AppSettings.load(File('${widget.dataDir}${Platform.pathSeparator}settings.json'));
   AppState? _app;
   AppRemote? _remote;
+  Timer? _frameFallback;
   bool _seeding = false;
   int _seeded = 0;
   String? _error;
@@ -108,8 +111,12 @@ class _NotesAppState extends State<NotesApp> {
       final syncing = _settings.clientUrl != null && _settings.clientToken != null;
       if (fresh && seedBench && !seedDemo) await _seedBench(root);
       if (fresh && seedTaskRows > 0 && !seedDemo) await NotesVault.seedTasks(root: root, rows: seedTaskRows);
+      BootTiming.mark('before Vault.open');
       final vault = await Vault.open(root, dataDir: widget.dataDir);
-      if (_settings.scheduleRunsHere && (Platform.isWindows || Platform.isLinux)) vault.localRunnerSetAvailable(true).ignore();
+      BootTiming.mark('after Vault.open');
+      if (_settings.scheduleRunsHere && (Platform.isWindows || Platform.isLinux)) {
+        vault.localRunnerSetAvailable(true).whenComplete(() => BootTiming.mark('localRunnerSetAvailable done')).ignore();
+      }
       if (fresh) {
         if (seedDemo) {
           await createDemo(vault);
@@ -120,24 +127,44 @@ class _NotesAppState extends State<NotesApp> {
         }
         await vault.flush();
       }
+      BootTiming.mark('before ensureSpaceColors');
       await vault.run((v) => v.ensureSpaceColors(), writes: true);
+      BootTiming.mark('after ensureSpaceColors');
       final ui = UiState.load(File('${widget.dataDir}${Platform.pathSeparator}ui_state.json'), root);
       final links = LinkPreviews(file: File('${widget.dataDir}${Platform.pathSeparator}link_previews.json'));
       final app = AppState(vault, ui: ui, links: links, settings: _settings);
-      await app.start();
+      BootTiming.mark('before app.start');
+      await app.start(startReminders: false);
+      BootTiming.mark('after app.start');
       AppLog.info('ready pages=${app.pages.count} fresh=$fresh');
       if (!mounted) {
         await app.dispose();
         return;
       }
       setState(() => _app = app);
-      unawaited(_startRemote());
+      BootTiming.mark('after setState');
+      // After Home's first frame: the reminder plan and the agent / AI start.
+      final firstFrame = Completer<void>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        BootTiming.mark('first frame after setState');
+        _frameFallback?.cancel();
+        if (!firstFrame.isCompleted) firstFrame.complete();
+        unawaited(app.reminders.start().catchError((Object e) {
+          AppLog.info('reminders failed to start: $e');
+        }).whenComplete(() => BootTiming.mark('reminders.start (after first frame)')));
+      });
+      // A frame is not scheduled when the window is hidden; do not wait forever.
+      _frameFallback = Timer(const Duration(seconds: 3), () {
+        if (!firstFrame.isCompleted) firstFrame.complete();
+      });
+      unawaited(_startRemote().whenComplete(() => BootTiming.mark('remote start done')));
       unawaited(
-        startSyncAtBoot(app.sync, _settings).whenComplete(
-          () => app.runNotices.start().catchError((Object e) {
+        startSyncAtBoot(app.sync, _settings, afterFirstFrame: firstFrame.future).whenComplete(() {
+          BootTiming.mark('startSyncAtBoot done');
+          return app.runNotices.start().catchError((Object e) {
             AppLog.info('run notices failed to start: $e');
-          }),
-        ),
+          }).whenComplete(() => BootTiming.mark('runNotices.start done'));
+        }),
       );
       if (syncing && !seedDemo && !seedBench) {
         unawaited(seedStarterPagesAfterPull(vault, app.sync.firstSyncOk(), createTasks: seedTaskRows == 0).catchError((Object e) {
@@ -190,6 +217,7 @@ class _NotesAppState extends State<NotesApp> {
 
   @override
   void dispose() {
+    _frameFallback?.cancel();
     _lifecycle.dispose();
     unawaited(_remote?.stop());
     _remote = null;
@@ -261,7 +289,7 @@ class _Boot extends StatelessWidget {
     }
     // Loading: the theme's desk colour, the same one Home sits on.
     if (!seeding) return ColoredBox(color: c.desk, child: const SizedBox.expand());
-    const total = benchPages + 1;
+    final total = benchPages + 1;
     final frac = (seeded / total).clamp(0.0, 1.0);
     return Center(
       child: SizedBox(

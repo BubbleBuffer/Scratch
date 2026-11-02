@@ -7,6 +7,7 @@ import '../core/change_feed.dart';
 import '../core/clock.dart';
 import '../core/debounce.dart';
 import '../core/models.dart';
+import '../core/paths.dart';
 import '../core/today_timers.dart';
 import '../core/vault.dart';
 import '../features/reminders/backends.dart';
@@ -45,11 +46,27 @@ class ReminderStore extends ChangeNotifier {
   final List<String> _pendingTaps = [];
   bool get hasPendingTap => _pendingTaps.isNotEmpty;
 
+  Future<void>? _init;
+
+  /// Registers the tap listener and starts the backend (the plugin, its
+  /// channels, the launch tap). Cheap; boot waits for it so a notification
+  /// that started the app is known before Home restores a page. Repeated
+  /// calls share one run.
+  Future<void> init() => _init ??= _initOnce();
+
+  Future<void> _initOnce() async {
+    _taps = backend.taps.listen(_tap);
+    await backend.init();
+    BootTiming.mark('backend.init');
+  }
+
+  /// Plans and schedules the reminders (reads the agenda, may ask for the
+  /// notification permission, schedules each one). Boot runs it after Home's
+  /// first frame.
   Future<void> start() async {
     if (_started || _inactive) return;
     _started = true;
-    _taps = backend.taps.listen(_tap);
-    await backend.init();
+    await init();
     if (_inactive) return;
     feed.addListener(_changed);
     settings.addListener(_settingsChanged);
@@ -136,12 +153,14 @@ class ReminderStore extends ChangeNotifier {
     final leadEnd = end.add(Duration(minutes: s.leadMinutes, milliseconds: 1));
     final timedTo = leadEnd.isAfter(to) ? leadEnd : to;
     await vault.flush();
+    BootTiming.mark('replan: flush');
     if (_inactive) return;
     final results = await Future.wait<Object>([
       vault.run((v) => v.agenda(timedFromMs: from.millisecondsSinceEpoch, timedToMs: timedTo.millisecondsSinceEpoch,
           dayFromMs: dayStamp(from), dayToMs: dayStamp(to))),
       vault.run((v) => v.overdueCount(timedBeforeMs: from.millisecondsSinceEpoch, dayBeforeMs: dayStamp(from))),
     ]);
+    BootTiming.mark('replan: agenda queries');
     if (_inactive) return;
     final items = results[0] as List<AgendaItem>;
     final names = <String, String>{};
@@ -165,10 +184,12 @@ class ReminderStore extends ChangeNotifier {
     if (_hasApplied && !_cancelled && listEquals(plan, next)) return;
     if (next.isNotEmpty) {
       permissionGranted = await backend.ensurePermission();
+      BootTiming.mark('replan: ensurePermission');
       if (_inactive) return;
       if (!settings.reminders.enabled) { _dirty = true; return; }
     }
     await backend.apply(next);
+    BootTiming.mark('replan: backend.apply (${next.length} reminders)');
     if (_inactive) return;
     plan = next;
     _hasApplied = true;

@@ -64,6 +64,26 @@ void main() {
   setUpAll(initCore);
   tearDown(() => Clock.fixedAt = null);
 
+  test('boot starts the backend first and plans reminders on the later start', () async {
+    resetTestClock();
+    final dir = await Directory.systemTemp.createTemp('notes_reminders_boot_');
+    final vault = await Vault.open('${dir.path}/vault');
+    final settings = AppSettings();
+    final fake = FakeReminderBackend(settings: settings);
+    final app = AppState(vault, settings: settings, reminderBackend: fake);
+    try {
+      await app.start(startReminders: false);
+      expect(fake.initCalls, 1, reason: 'the backend (and its launch tap) is up before Home');
+      expect(fake.appliedPlans, isEmpty, reason: 'no plan is read or scheduled on the boot path');
+      expect(fake.permissionRequests, 0);
+      await app.reminders.start();
+      expect(fake.initCalls, 1, reason: 'init is shared, not repeated');
+      expect(fake.appliedPlans, hasLength(1));
+    } finally {
+      await closeFixture(app, dir);
+    }
+  });
+
   test('start applies and a Calendar event replans through the debounce', () async {
     final f = await fixture();
     try {

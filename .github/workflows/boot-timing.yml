@@ -1,0 +1,38 @@
+# Boot timing of the Rust core (Vault::open) on generated vaults, on
+# GitHub-hosted runners (Linux and Windows). Manual only.
+name: boot-timing
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CARGO_INCREMENTAL: "0"
+jobs:
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: boot-timing-${{ matrix.os }}
+      - name: Build
+        run: cargo build --release --locked -p vault_core --example boot_trace
+      - name: Small vault (50 pages)
+        run: ./target/release/examples/boot_trace "$RUNNER_TEMP/v50" 50
+      - name: Medium vault (3000 pages)
+        run: ./target/release/examples/boot_trace "$RUNNER_TEMP/v3000" 3000
+      - name: Large vault (10000 pages)
+        run: ./target/release/examples/boot_trace "$RUNNER_TEMP/v10000" 10000

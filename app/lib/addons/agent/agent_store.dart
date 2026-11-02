@@ -1227,6 +1227,12 @@ class AgentStore extends ChangeNotifier {
     unawaited(_sendMcp(a, json));
   }
 
+  /// How long opening the engine waits for its MCP servers to start. A server
+  /// that is slower (a hung `npx`, say) keeps starting in the background: its
+  /// result still lands in [mcpError] when it ends, and its tools join the
+  /// engine's tool list as the servers come up.
+  static Duration mcpStartWait = const Duration(seconds: 5);
+
   Future<void> _sendMcp(NotesAgent a, String json) async {
     _mcpSent = json;
     String? failed;
@@ -1409,7 +1415,9 @@ class AgentStore extends ChangeNotifier {
       // Settings may be reading this computer's models with a short-lived
       // engine: let it close before this one opens.
       if (hub == null) await _localModelsRead;
+      BootTiming.mark('agent open: begin (hub=${hub != null})');
       final agent = await _count(() => _connect(hub));
+      BootTiming.mark('agent open: _connect');
       if (_disposed || openingKey != _configKey()) {
         await agent.closeEvents();
         agent.dispose();
@@ -1427,6 +1435,7 @@ class AgentStore extends ChangeNotifier {
         agent.dispose();
         return null;
       }
+      BootTiming.mark('agent open: hostInfo');
       _agent = agent;
       _eventFeed.open(agent);
       _agentOnHub = hub != null;
@@ -1439,7 +1448,12 @@ class AgentStore extends ChangeNotifier {
         claudeDetection = await _count(agent.claudeDetection);
         // A new engine starts with no servers: give it the list.
         _mcpSent = null;
-        await _sendMcp(agent, _mcpJson);
+        BootTiming.mark('agent open: claudeDetection');
+        await _sendMcp(agent, _mcpJson).timeout(
+          mcpStartWait,
+          onTimeout: () => AppLog.info('agent MCP servers still starting after ${mcpStartWait.inMilliseconds} ms; continuing'),
+        );
+        BootTiming.mark('agent open: _sendMcp');
       }
       _sub = _eventFeed.bind(
         agent,
@@ -1450,9 +1464,13 @@ class AgentStore extends ChangeNotifier {
       _subscribedSession = null;
       _scheduleViewScope();
       await refreshProjects();
+      BootTiming.mark('agent open: refreshProjects');
       await _loadModels();
+      BootTiming.mark('agent open: _loadModels');
       await refreshSessions();
+      BootTiming.mark('agent open: refreshSessions');
       if (openId != null) await _loadState();
+      BootTiming.mark('agent open: done');
       return agent;
     } catch (e) {
       openError = '$e';

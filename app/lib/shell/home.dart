@@ -8,6 +8,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import '../core/models.dart';
+import '../core/paths.dart';
 import '../registry/addon_registry.dart';
 import 'addons.dart';
 import '../features/bakeoff.dart';
@@ -70,10 +71,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    BootTiming.mark('home built');
     searchRequest.addListener(_focusSearch);
     _mobilePagesRequest.addListener(_showPages);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      BootTiming.mark('home first frame');
       final s = widget.startedAtUs;
       final ms = s == null
           ? -1
@@ -114,10 +117,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final id = ui.lastPage;
     if (id == null) return;
     try {
+      BootTiming.mark('restore last page: loadPage begin');
       final p = await context.app.vault.loadPage(id);
+      BootTiming.mark('restore last page: loadPage done');
       if (!mounted) return;
       if (p.inTrash) throw StateError('in the trash');
       await openPage(context, id, p.title);
+      BootTiming.mark('restore last page: openPage done');
     } catch (_) {
       if (ui.lastPage == id) {
         ui.lastPage = null;
