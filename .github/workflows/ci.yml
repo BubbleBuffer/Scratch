@@ -137,7 +137,9 @@ jobs:
         env:
           NOTES_BRIDGE_LIB: ${{ github.workspace }}/scratch/target/release/libnotes_bridge.so
           NOTES_FAKE_EXTENSION: ${{ github.workspace }}/BubblePaw-Core/target/debug/bubblepaw-fake-extension
+          NOTES_TRACE_BRIDGE_CALLS: "1"
         run: |
+          flutter test --concurrency=1 test/agent_test.dart; exit $?
           # Skip golden-named files and any file that compares against a golden image.
           files=()
           while IFS= read -r f; do
