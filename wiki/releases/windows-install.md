@@ -57,7 +57,7 @@ are not releases: their manifest URL names a release that does not exist, and
 the zip is uploaded as an artifact only on a manual run.
 
 `scripts/build-windows-installer.sh` no longer bundles anything, so the
-Release folder, and the installer, hold only the app: about {SIZE}. Existing
+Release folder, and the installer, hold only the app. Measured on the windows-build run of 2026-11-02: the installer is 26 MB (it was 143 MB with the bundle); the package zip is 168 MB (about 360 MB unpacked). Existing
 installs keep a legacy `claude-code\` and `bun\` in the app folder until the
 update replaces the folder; the lookup still finds them.
 
