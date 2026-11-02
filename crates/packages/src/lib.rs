@@ -36,6 +36,8 @@ const TMP_OLD: &str = ".tmp-old";
 const LOCK: &str = ".lock";
 /// Upper bound for the unpacked size of one package (zip bomb guard).
 const MAX_UNPACKED: u64 = 4 << 30;
+/// Upper bound for the number of entries in one package.
+const MAX_ENTRIES: usize = 200_000;
 /// Progress is reported about every this many downloaded bytes.
 const PROGRESS_STEP: u64 = 256 << 10;
 
@@ -530,34 +532,155 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Unpacks `zip_path` into `dest`, refusing paths that leave it, symlinks and
-/// oversized archives.
+/// What an archive may hold: total unpacked bytes (counted as written, not as
+/// declared) and entries.
+struct Limits {
+    max_unpacked: u64,
+    max_entries: usize,
+}
+
+const LIMITS: Limits = Limits { max_unpacked: MAX_UNPACKED, max_entries: MAX_ENTRIES };
+
+/// The entry name as a relative path of plain components, or an error. This
+/// does not rely on the zip crate: absolute paths, drive letters, backslashes,
+/// `..`, empty names and NULs are refused.
+fn safe_relative(name: &str) -> Result<PathBuf, Error> {
+    let bad = || Error::BadArchive(format!("unsafe path {name:?}"));
+    if name.is_empty() || name.starts_with('/') || name.contains(['\\', ':', '\0']) {
+        return Err(bad());
+    }
+    let mut rel = PathBuf::new();
+    for part in name.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => return Err(bad()),
+            part => rel.push(part),
+        }
+    }
+    if rel.as_os_str().is_empty() {
+        return Err(bad());
+    }
+    // Belt and braces: only plain components may remain.
+    if rel.components().any(|c| !matches!(c, std::path::Component::Normal(_))) {
+        return Err(bad());
+    }
+    Ok(rel)
+}
+
+/// Unpacks `zip_path` into `dest`, refusing symlinks, paths that are absolute
+/// or leave `dest`, duplicate names (case-insensitive, as on Windows) and
+/// archives over the entry or size limits.
 fn unpack(zip_path: &Path, dest: &Path) -> Result<(), Error> {
+    unpack_with(zip_path, dest, &LIMITS)
+}
+
+/// The entry names as the archive's own central directory lists them, read
+/// without the zip crate, so a parser differential (a duplicate or hidden
+/// entry the crate reads differently) is caught. The end-of-central-directory
+/// record is the last one whose comment length reaches exactly to the end of
+/// the file, so a signature inside a comment is not taken for it. Zip64
+/// archives are refused: a package is far below their limits.
+fn central_directory_names(path: &Path) -> Result<Vec<Vec<u8>>, Error> {
+    use std::io::{Seek, SeekFrom};
+    let bad = |m: &str| Error::BadArchive(m.to_string());
+    let mut file = File::open(path)?;
+    let len = file.metadata()?.len();
+    let tail_len = len.min(22 + 65_535);
+    file.seek(SeekFrom::Start(len - tail_len))?;
+    let mut tail = vec![0u8; tail_len as usize];
+    file.read_exact(&mut tail)?;
+    let eocd = (0..tail.len().saturating_sub(21))
+        .rev()
+        .find(|&i| {
+            tail[i..i + 4] == [0x50, 0x4b, 0x05, 0x06]
+                && i + 22 + u16::from_le_bytes([tail[i + 20], tail[i + 21]]) as usize == tail.len()
+        })
+        .ok_or_else(|| bad("no end of central directory"))?;
+    let rec = &tail[eocd..];
+    let u16_at = |b: &[u8], o: usize| u16::from_le_bytes([b[o], b[o + 1]]) as usize;
+    let u32_at = |b: &[u8], o: usize| u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]) as u64;
+    let (count, size, offset) = (u16_at(rec, 10), u32_at(rec, 12), u32_at(rec, 16));
+    if count == 0xFFFF || size == 0xFFFF_FFFF || offset == 0xFFFF_FFFF {
+        return Err(bad("zip64 archives are not supported"));
+    }
+    if offset.checked_add(size).is_none_or(|end| end > len) || size > 256 << 20 {
+        return Err(bad("central directory out of range"));
+    }
+    file.seek(SeekFrom::Start(offset))?;
+    let mut cd = vec![0u8; size as usize];
+    file.read_exact(&mut cd)?;
+    let mut names = Vec::with_capacity(count);
+    let mut at = 0usize;
+    for _ in 0..count {
+        let head = cd.get(at..at + 46).ok_or_else(|| bad("truncated central directory"))?;
+        if head[..4] != [0x50, 0x4b, 0x01, 0x02] {
+            return Err(bad("bad central directory entry"));
+        }
+        let (n, x, c) = (u16_at(head, 28), u16_at(head, 30), u16_at(head, 32));
+        let name = cd.get(at + 46..at + 46 + n).ok_or_else(|| bad("truncated central directory"))?;
+        names.push(name.to_vec());
+        at += 46 + n + x + c;
+    }
+    if at != cd.len() {
+        return Err(bad("central directory has trailing data"));
+    }
+    Ok(names)
+}
+
+fn unpack_with(zip_path: &Path, dest: &Path, limits: &Limits) -> Result<(), Error> {
     let bad = |e: zip::result::ZipError| Error::BadArchive(e.to_string());
     let mut archive = zip::ZipArchive::new(File::open(zip_path)?).map_err(bad)?;
+    if archive.len() > limits.max_entries {
+        return Err(Error::BadArchive(format!("more than {} entries", limits.max_entries)));
+    }
+    // The archive's own list of names must be the one the crate reads, and
+    // free of duplicates (case-insensitive, as on Windows).
+    let listed = central_directory_names(zip_path)?;
+    let mut seen = std::collections::HashSet::new();
+    for raw in &listed {
+        if !seen.insert(raw.to_ascii_lowercase()) {
+            return Err(Error::BadArchive(format!(
+                "duplicate entry {:?}",
+                String::from_utf8_lossy(raw)
+            )));
+        }
+    }
+    if listed.len() != archive.len() {
+        return Err(Error::BadArchive("entry count differs from the central directory".to_string()));
+    }
+    let mut seen = std::collections::HashSet::new();
     let mut unpacked: u64 = 0;
+    #[allow(clippy::needless_range_loop)]
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(bad)?;
-        let rel = entry
-            .enclosed_name()
-            .ok_or_else(|| Error::BadArchive(format!("unsafe path {:?}", entry.name())))?;
-        if entry.is_symlink() {
-            return Err(Error::BadArchive(format!("symlink {:?}", entry.name())));
+        let name = entry.name().map_err(bad)?.into_owned();
+        let rel = safe_relative(&name)?;
+        if listed[i].as_slice() != name.as_bytes() {
+            return Err(Error::BadArchive(format!("entry {i} differs from the central directory")));
         }
-        let out = dest.join(rel);
+        if !seen.insert(rel.to_string_lossy().to_lowercase()) {
+            return Err(Error::BadArchive(format!("duplicate entry {name:?}")));
+        }
+        // 0o120000 is S_IFLNK; checked in addition to the crate's own test.
+        let linked = entry.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000);
+        if entry.is_symlink() || linked {
+            return Err(Error::BadArchive(format!("symlink {name:?}")));
+        }
+        let out = dest.join(&rel);
         if entry.is_dir() {
             fs::create_dir_all(&out)?;
             continue;
-        }
-        unpacked = unpacked.saturating_add(entry.size());
-        if unpacked > MAX_UNPACKED {
-            return Err(Error::BadArchive("unpacked size too large".to_string()));
         }
         if let Some(parent) = out.parent() {
             fs::create_dir_all(parent)?;
         }
         let mut file = File::create(&out)?;
-        io::copy(&mut entry.by_ref().take(MAX_UNPACKED), &mut file)?;
+        let budget = limits.max_unpacked - unpacked;
+        let written = io::copy(&mut entry.by_ref().take(budget.saturating_add(1)), &mut file)?;
+        if written > budget {
+            return Err(Error::BadArchive("unpacked size too large".to_string()));
+        }
+        unpacked += written;
         file.flush()?;
         #[cfg(unix)]
         if let Some(mode) = entry.unix_mode() {
@@ -566,4 +689,136 @@ fn unpack(zip_path: &Path, dest: &Path) -> Result<(), Error> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn build(f: impl FnOnce(&mut zip::ZipWriter<io::Cursor<Vec<u8>>>)) -> Vec<u8> {
+        let mut zip = zip::ZipWriter::new(io::Cursor::new(Vec::new()));
+        f(&mut zip);
+        zip.finish().unwrap().into_inner()
+    }
+
+    fn opts() -> zip::write::SimpleFileOptions {
+        zip::write::SimpleFileOptions::default()
+    }
+
+    /// Unpacks `bytes` into a fresh dir; returns the dir and the result.
+    fn run(bytes: &[u8], limits: &Limits) -> (tempfile::TempDir, Result<(), Error>) {
+        let dir = tempfile::tempdir().unwrap();
+        let zip_path = dir.path().join("p.zip");
+        fs::write(&zip_path, bytes).unwrap();
+        let dest = dir.path().join("out");
+        fs::create_dir(&dest).unwrap();
+        let result = unpack_with(&zip_path, &dest, limits);
+        (dir, result)
+    }
+
+    fn roomy() -> Limits {
+        Limits { max_unpacked: 1 << 20, max_entries: 100 }
+    }
+
+    fn rejects(bytes: &[u8], limits: &Limits, what: &str) -> tempfile::TempDir {
+        let (dir, result) = run(bytes, limits);
+        match result {
+            Err(Error::BadArchive(m)) => assert!(m.contains(what), "{m}"),
+            other => panic!("expected BadArchive({what}), got {other:?}"),
+        }
+        dir
+    }
+
+    #[test]
+    fn plain_archive_unpacks() {
+        let bytes = build(|z| {
+            z.add_directory("d/", opts()).unwrap();
+            z.start_file("d/a.txt", opts()).unwrap();
+            z.write_all(b"a").unwrap();
+        });
+        let (dir, result) = run(&bytes, &roomy());
+        result.unwrap();
+        assert_eq!(fs::read_to_string(dir.path().join("out/d/a.txt")).unwrap(), "a");
+    }
+
+    #[test]
+    fn rejects_parent_traversal() {
+        for name in ["../evil.txt", "a/../../evil.txt", "a/../b.txt"] {
+            let bytes = build(|z| {
+                z.start_file(name, opts()).unwrap();
+                z.write_all(b"x").unwrap();
+            });
+            let dir = rejects(&bytes, &roomy(), "unsafe path");
+            assert!(!dir.path().join("evil.txt").exists());
+        }
+    }
+
+    #[test]
+    fn rejects_absolute_and_drive_paths() {
+        for name in ["/etc/evil", "C:/evil.txt", "C:evil.txt", "\\\\server\\share\\x", "a\\..\\b.txt"] {
+            let bytes = build(|z| {
+                z.start_file(name, opts()).unwrap();
+                z.write_all(b"x").unwrap();
+            });
+            rejects(&bytes, &roomy(), "unsafe path");
+        }
+    }
+
+    #[test]
+    fn rejects_symlinks() {
+        let bytes = build(|z| {
+            z.add_symlink("link", "/etc/passwd", opts()).unwrap();
+        });
+        rejects(&bytes, &roomy(), "symlink");
+    }
+
+    #[test]
+    fn rejects_duplicate_names() {
+        let mut bytes = build(|z| {
+            for name in ["a.txt", "b.txt"] {
+                z.start_file(name, opts()).unwrap();
+                z.write_all(b"x").unwrap();
+            }
+        });
+        // Same-length rename of the second entry in its local and central headers.
+        for i in 0..bytes.len() - 5 {
+            if &bytes[i..i + 5] == b"b.txt" {
+                bytes[i..i + 5].copy_from_slice(b"a.txt");
+            }
+        }
+        rejects(&bytes, &roomy(), "duplicate");
+    }
+
+    #[test]
+    fn rejects_names_that_differ_only_by_case() {
+        let bytes = build(|z| {
+            for name in ["a.txt", "A.TXT"] {
+                z.start_file(name, opts()).unwrap();
+                z.write_all(b"x").unwrap();
+            }
+        });
+        rejects(&bytes, &roomy(), "duplicate");
+    }
+
+    #[test]
+    fn rejects_too_many_entries() {
+        let bytes = build(|z| {
+            for i in 0..5 {
+                z.start_file(format!("f{i}"), opts()).unwrap();
+            }
+        });
+        rejects(&bytes, &Limits { max_unpacked: 1 << 20, max_entries: 4 }, "entries");
+    }
+
+    #[test]
+    fn rejects_too_much_unpacked_data() {
+        let bytes = build(|z| {
+            for i in 0..3 {
+                z.start_file(format!("f{i}"), opts()).unwrap();
+                z.write_all(&[7u8; 600]).unwrap();
+            }
+        });
+        // 1800 bytes against a 1000 byte budget, counted across entries.
+        rejects(&bytes, &Limits { max_unpacked: 1000, max_entries: 100 }, "too large");
+    }
 }
