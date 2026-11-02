@@ -63,6 +63,9 @@ void main() {
       await settle(tester);
       expect(key('agent-runtime-card'), findsNothing);
 
+      final semantics = tester.ensureSemantics();
+      addTearDown(semantics.dispose);
+      await settle(tester);
       await tester.tap(find.bySemanticsLabel(RegExp('^Model:')));
       await settle(tester);
       expect(find.text('Not installed'), findsOneWidget);
