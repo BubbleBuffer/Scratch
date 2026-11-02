@@ -63,13 +63,13 @@ void main() {
       await settle(tester);
       expect(key('agent-runtime-card'), findsNothing);
 
-      final semantics = tester.ensureSemantics();
-      addTearDown(semantics.dispose);
+      // The pick shows the chat's current model; opening it lists the
+      // stand-in as an option. (bb_ui's SelectButton renders labels only, so
+      // the "Not installed" detail is asserted on the store.)
+      await tester.tap(find.text(store.modelLabel('other/model')));
       await settle(tester);
-      await tester.tap(find.bySemanticsLabel(RegExp('^Model:')));
-      await settle(tester);
-      expect(find.text('Not installed'), findsOneWidget);
-      await tester.tap(find.text('Claude Code'));
+      expect(store.modelDetail(claudeCodePlaceholderModel), 'Not installed');
+      await tester.tap(key('option-Claude Code'));
       await settle(tester);
 
       expect(store.modelOf(store.openId), claudeCodePlaceholderModel);
