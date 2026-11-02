@@ -55,6 +55,7 @@ import 'agent_event_feed.dart';
 import 'agent_search_source.dart';
 import 'agent_search_vault.dart';
 import 'outline_names.dart';
+import 'packages_store.dart';
 
 export '../../src/rust/api/agent.dart'
     show
@@ -142,6 +143,7 @@ class AgentStore extends ChangeNotifier {
     _key = _configKey();
     _hubKey = _hubConnectionKey();
     unawaited(_loadVaultDefaults());
+    _packagesSub = _packages.installs.listen(_packageInstalled);
   }
 
   final Vault vault;
@@ -1379,6 +1381,45 @@ class AgentStore extends ChangeNotifier {
     return _opening ??= _open().whenComplete(() => _opening = null);
   }
 
+  PackagesStore _packages = PackagesStore.shared;
+  StreamSubscription<String>? _packagesSub;
+
+  /// The runtime packages (the Claude Code download): the pane's card and
+  /// Settings read and drive them through this store.
+  PackagesStore get packages => _packages;
+
+  /// Tests: follow [store] instead of the shared one.
+  @visibleForTesting
+  void usePackages(PackagesStore store) {
+    if (identical(store, _packages)) return;
+    unawaited(_packagesSub?.cancel());
+    _packages = store;
+    _packagesSub = store.installs.listen(_packageInstalled);
+  }
+
+  void _packageInstalled(String name) {
+    if (name == claudeCodePackage) unawaited(refreshRuntime());
+  }
+
+  /// How many times [refreshRuntime] has finished re-opening the agent (tests).
+  @visibleForTesting
+  int runtimeRefreshes = 0;
+
+  /// Looks for the runtime again after a package was installed: closes the
+  /// agent and opens it, so detection (Claude Code and its models) runs on
+  /// the new files. The settings did not change, so the debounced reopen
+  /// would not run; this one does. Chats and their state stay. A hub agent
+  /// has no local runtime: nothing to do.
+  Future<void> refreshRuntime() async {
+    if (_disposed || (_agent != null && _agentOnHub)) return;
+    _reopen.cancel();
+    await _close(keepState: true);
+    if (_disposed) return;
+    if (enabled) await ensureOpen();
+    runtimeRefreshes++;
+    _notify();
+  }
+
   /// An agent on [hub], or on this computer when it is null.
   Future<NotesAgent> _connect(HubLink? hub) {
     final s = settings;
@@ -2297,6 +2338,7 @@ class AgentStore extends ChangeNotifier {
     unawaited(_relay.close());
     if (_agent != null || _sub != null) unawaited(_close());
     unawaited(_uiActions.close());
+    unawaited(_packagesSub?.cancel());
     _stores[vault] = null;
     super.dispose();
   }

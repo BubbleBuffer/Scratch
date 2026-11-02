@@ -17,6 +17,7 @@ import '../../core/file_dialogs.dart';
 import 'agent_runner_settings.dart';
 import 'agent_store.dart';
 import 'host_relay_status.dart' show showMcpServers;
+import 'packages_settings.dart';
 
 class AgentSettingsSection extends StatefulWidget {
   const AgentSettingsSection({
@@ -248,6 +249,7 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
                 ),
               ],
             ),
+            PackagesSettings(packages: store.packages),
           ],
         ],
       ],

@@ -16,6 +16,7 @@ import 'package:flutter/widgets.dart';
 import '../../ui/ui.dart';
 import 'agent_approval_bars.dart';
 import 'agent_composer.dart' as scratch;
+import 'agent_runtime_card.dart';
 import 'agent_store.dart';
 import 'kit_backend.dart';
 import 'kit_commands.dart';
@@ -148,6 +149,9 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
             composerBuilder: (_, slot) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Claude Code is a download: the card offers it (nothing
+                // when it is installed or the model is not from it).
+                AgentRuntimeCard(store: store),
                 if (store.pendingApprovals.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
