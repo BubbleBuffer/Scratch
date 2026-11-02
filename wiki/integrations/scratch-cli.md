@@ -19,6 +19,8 @@ It makes the app's Rust calls and adds no task logic of its own: `tasks::recover
 - `scratch-cli project add --vault <DIR> --name <NAME> --path <REPO>`: registers a repository as an agent project of this device and prints its id. It is the same project list the app's agent uses.
 - `scratch-cli page create --vault <DIR> --title <TITLE>`: creates a top-level page and prints its id, for `task create --page`.
 
+- `scratch-cli packages list [--json]`, `packages install <name>`, `packages remove <name>`: the on-demand packages in `<data dir>/packages`, shared with the app (see [Runtime packages](../addons/packages.md)).
+
 ## Close the app or use another vault
 
 Only one process may write a vault as its device. If the app (or another `scratch-cli`) has the vault open, every command exits non-zero with "close Scratch or use another vault". There is no locking or remote control of a running app.

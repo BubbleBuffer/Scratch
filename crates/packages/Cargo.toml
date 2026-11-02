@@ -1,0 +1,21 @@
+[package]
+name = "scratch_packages"
+description = "On-demand runtime packages for Scratch add-ons: manifest, verified download, atomic install."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lib]
+name = "scratch_packages"
+
+[dependencies]
+# Same pin and TLS setup as vault_sync (rustls, ring, bundled roots).
+ureq = { version = "=3.5.0", default-features = false, features = ["rustls"] }
+sha2 = "0.11"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -20,7 +20,11 @@ use vault_agent::{Agent, AgentConfig, HostKind, PermissionMode, TestHooks, ToolP
 use vault_core::Vault;
 use vault_mcp::tasks;
 
+mod packages;
 mod remote;
+
+#[doc(hidden)]
+pub use packages::run_with as run_packages_with;
 
 /// How long `run-tasks` waits between polls when no task is queued.
 const POLL: Duration = Duration::from_secs(5);
@@ -31,6 +35,9 @@ const USAGE: &str = "usage:
   scratch-cli task show --vault <DIR> <ID>
   scratch-cli project add --vault <DIR> --name <NAME> --path <REPO>
   scratch-cli page create --vault <DIR> --title <TITLE>
+  scratch-cli packages list [--json] [--data-dir <DIR>]
+  scratch-cli packages install <NAME> [--data-dir <DIR>]
+  scratch-cli packages remove <NAME> [--data-dir <DIR>]
   scratch-cli app status [--json] [--data-dir <DIR>]
   scratch-cli app open <PAGE> [--json] [--data-dir <DIR>]
   scratch-cli app navigate <ROUTE> [--json] [--data-dir <DIR>]
@@ -62,6 +69,11 @@ pub fn run_with(args: &[String], out: &mut dyn Write, hooks: Option<Hooks>) -> R
         ["task", "show", rest @ ..] => task_show(&Flags::parse(rest)?, out),
         ["project", "add", rest @ ..] => project_add(&Flags::parse(rest)?, out, hooks),
         ["page", "create", rest @ ..] => page_create(&Flags::parse(rest)?, out),
+        ["packages", rest @ ..] => {
+            let flags = Flags::parse(rest)?;
+            let words: Vec<&str> = flags.positional.iter().map(String::as_str).collect();
+            packages::run(&words, &flags, out)
+        }
         ["app", rest @ ..] => remote::run(&Flags::parse(rest)?, out),
         [] | ["help" | "--help" | "-h", ..] => {
             writeln!(out, "{USAGE}")?;
