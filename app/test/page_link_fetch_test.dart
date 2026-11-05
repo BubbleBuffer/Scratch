@@ -86,7 +86,9 @@ void main() {
     expect(key('link-fetch-retry'), findsNothing);
 
     gate.complete(result(PageFetchStatus.fetched));
-    await settle(tester);
+    // The fetch script awaits a native import: wait for the step to close
+    // rather than for a quiet frame, which can come first under load.
+    await settleUntil(tester, () => key('link-fetch-title').evaluate().isEmpty);
     expect(key('link-fetch-title'), findsNothing);
     expect(current.app.ui.lastPage, id);
     expect(client().syncNows, greaterThan(0));
@@ -115,6 +117,7 @@ void main() {
     expect(textOf(tester, 'link-fetch-title'), 'Hub unreachable');
     expect(textOf(tester, 'link-fetch-message'), "Can't reach the hub.");
     await tapAndSettle(tester, key('link-fetch-retry'));
+    await settleUntil(tester, () => key('link-fetch-title').evaluate().isEmpty);
     expect(calls, 2);
     expect(key('link-fetch-title'), findsNothing);
     expect(current.app.ui.lastPage, id);
@@ -152,6 +155,7 @@ void main() {
     await settle(tester);
     expect(textOf(tester, 'link-fetch-title'), 'Sign in needed');
     await tapAndSettle(tester, key('link-fetch-sign-in'));
+    await settleUntil(tester, () => key('link-fetch-title').evaluate().isEmpty);
     expect(signedIn, 1);
     expect(calls, 2);
     expect(key('link-fetch-title'), findsNothing);
