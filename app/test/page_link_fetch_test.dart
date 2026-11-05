@@ -37,6 +37,13 @@ class ScriptedSync extends FakeSync {
   void syncNow() => syncNows++;
 }
 
+/// Waits until the step shows [title]: one quiet frame can come before a
+/// scripted fetch that awaits a native import has answered.
+Future<void> stepIs(WidgetTester tester, String title) => settleUntil(
+  tester,
+  () => key('link-fetch-title').evaluate().isNotEmpty && textOf(tester, 'link-fetch-title') == title,
+);
+
 PageFetch result(PageFetchStatus s, [String message = '']) => PageFetch(status: s, message: message);
 
 void main() {
@@ -81,6 +88,7 @@ void main() {
     });
     unawaited(openPageLink(homeContext(tester), PageLink(id)));
     await settle(tester);
+    await stepIs(tester, 'Loading page');
     expect(textOf(tester, 'link-fetch-title'), 'Loading page');
     expect(key('link-fetch-cancel'), findsOneWidget);
     expect(key('link-fetch-retry'), findsNothing);
@@ -114,6 +122,7 @@ void main() {
     });
     unawaited(openPageLink(homeContext(tester), PageLink(id)));
     await settle(tester);
+    await stepIs(tester, 'Hub unreachable');
     expect(textOf(tester, 'link-fetch-title'), 'Hub unreachable');
     expect(textOf(tester, 'link-fetch-message'), "Can't reach the hub.");
     await tapAndSettle(tester, key('link-fetch-retry'));
@@ -127,9 +136,11 @@ void main() {
     final (id, _, _) = await setup(tester, (ids, arrive) => Completer<PageFetch>().future);
     unawaited(fetchLinkedPage(homeContext(tester), PageLink(id), timeout: const Duration(seconds: 2)));
     await settle(tester);
+    await stepIs(tester, 'Loading page');
     expect(textOf(tester, 'link-fetch-title'), 'Loading page');
     await tester.pump(const Duration(seconds: 3));
     await settle(tester);
+    await stepIs(tester, 'Hub unreachable');
     expect(textOf(tester, 'link-fetch-title'), 'Hub unreachable');
     expect(key('link-fetch-retry'), findsOneWidget);
   });
@@ -153,6 +164,7 @@ void main() {
     var signedIn = 0;
     unawaited(fetchLinkedPage(homeContext(tester), PageLink(id), signIn: () async => signedIn++));
     await settle(tester);
+    await stepIs(tester, 'Sign in needed');
     expect(textOf(tester, 'link-fetch-title'), 'Sign in needed');
     await tapAndSettle(tester, key('link-fetch-sign-in'));
     await settleUntil(tester, () => key('link-fetch-title').evaluate().isEmpty);
@@ -168,6 +180,7 @@ void main() {
     );
     unawaited(openPageLink(homeContext(tester), PageLink(id)));
     await settle(tester);
+    await stepIs(tester, 'Certificate not trusted');
     expect(textOf(tester, 'link-fetch-title'), 'Certificate not trusted');
     expect(key('cert-view'), findsOneWidget);
     expect(key('cert-trust'), findsOneWidget);
