@@ -86,7 +86,10 @@ impl Vault {
     /// history archives and keep the same conflict index current.
     pub(crate) fn sweep_conflict_policy(&self) -> Result<u32> {
         let enabled = self.inner.conflict_auto_resolve_cached();
-        let now = chrono::Utc::now().timestamp_millis();
+        // The same clock that stamps resolutions, so the 30-day cutoff
+        // follows the test clock; the system clock would expire logs
+        // stamped by a fixed test date.
+        let now = crate::ids::now_ms();
         let db = lock(&self.inner.db);
         let mut pages: Vec<_> = db
             .conflicts(None)?
