@@ -37,11 +37,46 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  # CI runs are not releases: the manifest's URL names a release that does not
+  # exist. The package is built to check the pipeline and the zip.
+  package:
+    name: claude-code package
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Bun is the hub's version (deploy/hub/Dockerfile); it ships in the package.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true
+      # The package the app downloads on demand (wiki/addons/packages.md) and
+      # the manifest the app build embeds, which pins the zip's sha256.
+      - name: Build the claude-code package
+        shell: pwsh
+        env:
+          BASE_URL: https://github.com/${{ github.repository }}/releases/download/ci-${{ github.sha }}
+        run: ./app/windows/installer/build-package-claude-code.ps1 -OutDir packages -BaseUrl $env:BASE_URL
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-manifest
+          path: packages/manifest.json
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: package-claude-code-${{ github.sha }}
+          path: packages/*.zip
+          if-no-files-found: error
+          retention-days: 1
+
   app:
     name: flutter windows app
+    needs: package
     runs-on: windows-latest
-    # The Claude Code bundle is ~290 MB of dependencies, which the installer
-    # compresses too.
     timeout-minutes: 120
     defaults:
       run:
@@ -61,6 +96,15 @@ jobs:
           channel: stable
           flutter-version: 3.47.5
           cache: true
+      # The manifest from the package job goes into the build
+      # (crates/packages/manifest.json), so the zip's sha256 is pinned in the
+      # app and the CLIs.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-manifest
+          path: package-manifest
+      - name: Embed the package manifest
+        run: cp package-manifest/manifest.json crates/packages/manifest.json
       - name: flutter pub get
         working-directory: app
         run: |
@@ -71,15 +115,6 @@ jobs:
       - name: flutter build windows --release
         working-directory: app
         run: flutter build windows --release
-      # The app and scratch-cli find Claude Code as a `claude-code` folder and
-      # `bun\bun.exe` beside the executable, so ship both in the Release folder
-      # the installer packs. Bun is the hub's version (deploy/hub/Dockerfile).
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.2
-      - name: Bundle Claude Code
-        shell: pwsh
-        run: ./app/windows/installer/bundle-claude-code.ps1 -ReleaseDir ./app/build/windows/x64/runner/Release
       - name: Short sha for artifact names
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
@@ -120,6 +155,7 @@ jobs:
 
   cli:
     name: notes cli and scratch-cli (windows)
+    needs: package
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:
@@ -129,6 +165,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The manifest from the package job goes into the build
+      # (crates/packages/manifest.json), so the zip's sha256 is pinned in the
+      # app and the CLIs.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package-manifest
+          path: package-manifest
+      - name: Embed the package manifest
+        run: cp package-manifest/manifest.json crates/packages/manifest.json
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable

@@ -7063,6 +7063,7 @@ dependencies = [
  "jiff",
  "notes_agent_wire",
  "rusqlite",
+ "scratch_packages",
  "serde",
  "serde_json",
  "similar",

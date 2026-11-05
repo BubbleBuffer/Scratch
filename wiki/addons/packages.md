@@ -26,6 +26,10 @@ A package is one zip per platform: `scratch-pkg-<name>-<version>-<platform>.zip`
 
 `Store::state` compares the installed marker with the manifest entry: not installed, current, or update available (version or hash differs). `installed()` lists current versions, `remove(name)` deletes every version. Errors are an enum (`Offline`, `Http`, `SizeMismatch`, `ChecksumMismatch`, `BadArchive`, `DiskFull`, `Unavailable`, ...) with messages that name the state.
 
+## Build and lookup
+
+The `package` job in the release, nightly and windows-build workflows builds the zip and manifest ([Windows installer](../releases/windows-install.md#claude-code-package)); the Windows build embeds the manifest. `vault_agent::claude` finds Claude Code from overrides, then `PATH` and `~/.bun/bin` for Bun, then the installed package, then the legacy bundle.
+
 ## scratch-cli
 
 `scratch-cli packages list [--json]`, `install <name>` (progress lines in 10% steps) and `remove <name>`, with `--data-dir` as for the `app` commands. See [scratch-cli](../integrations/scratch-cli.md).

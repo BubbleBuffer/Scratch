@@ -222,6 +222,7 @@ fn open_agent(
     let claude = vault_agent::claude::detect_installed(
         bun_path.as_deref(),
         claude_code_dir.as_deref(),
+        app_data_dir().as_deref(),
     );
     let config = AgentConfig {
         host_kind: HostKind::Desktop,

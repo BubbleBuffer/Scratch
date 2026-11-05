@@ -605,6 +605,7 @@ impl Agent {
         let claude_detection = claude::detect(
             config.bun_path.as_deref(),
             config.claude_code_dir.as_deref(),
+            Some(&config.data_dir),
         );
         tr.mark("claude::detect");
         let extension = match (

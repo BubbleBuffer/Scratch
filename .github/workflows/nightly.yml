@@ -6,7 +6,8 @@
 # pre-release tagged v<base>-nightly.<YYYYMMDD>, where <base> is the version
 # core of the newest non-nightly release (v0.1.0-prealpha.11 gives 0.1.0).
 #
-# Assets: Scratch-Setup-<base>-nightly.<YYYYMMDD>.exe and SHA256SUMS.txt only
+# Assets: Scratch-Setup-<base>-nightly.<YYYYMMDD>.exe, the Claude Code runtime
+# package scratch-pkg-claude-code-<version>-windows-x64.zip and SHA256SUMS.txt
 # (no APK, no CLI). Nightly releases beyond the newest 7 are deleted with
 # their tags; only tags containing "-nightly." are ever touched.
 #
@@ -91,9 +92,45 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "base $base_tag, last nightly ${last:-none} (${last_sha:-n/a}), main $sha, tag $tag, build $build"
 
+  package:
+    name: claude-code package
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      # Bun is the hub's version (deploy/hub/Dockerfile); it ships in the package.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+          no-cache: true
+      # The package the app downloads on demand (wiki/addons/packages.md) and
+      # the manifest the app build embeds, which pins the zip's sha256.
+      - name: Build the claude-code package
+        shell: pwsh
+        env:
+          BASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ needs.plan.outputs.tag }}
+        run: ./app/windows/installer/build-package-claude-code.ps1 -OutDir packages -BaseUrl $env:BASE_URL
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package-manifest
+          path: packages/manifest.json
+          if-no-files-found: error
+          retention-days: 3
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nightly-package-claude-code
+          path: packages/*.zip
+          if-no-files-found: error
+          retention-days: 3
+
   windows:
     name: windows installer
-    needs: plan
+    needs: [plan, package]
     if: needs.plan.outputs.build == 'true'
     runs-on: windows-latest
     timeout-minutes: 120
@@ -117,9 +154,15 @@ jobs:
           channel: stable
           flutter-version: 3.47.5
           cache: true
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      # The manifest from the package job goes into the build
+      # (crates/packages/manifest.json), so the zip's sha256 is pinned in the
+      # app and the CLIs.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          bun-version: 1.4.2
+          name: package-manifest
+          path: package-manifest
+      - name: Embed the package manifest
+        run: cp package-manifest/manifest.json crates/packages/manifest.json
       - name: Build app and installer
         run: |
           bash scripts/build-windows-installer.sh "${{ needs.plan.outputs.tag }}" "${{ needs.plan.outputs.numeric }}" "${{ needs.plan.outputs.code }}" dist
@@ -132,7 +175,7 @@ jobs:
 
   publish:
     name: publish nightly
-    needs: [plan, windows]
+    needs: [plan, package, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -141,6 +184,10 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nightly-windows
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nightly-package-claude-code
           path: dist
       - name: Create the pre-release
         working-directory: dist

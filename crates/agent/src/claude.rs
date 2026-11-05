@@ -11,9 +11,30 @@ pub struct ClaudeDetection {
     pub ignored_bun_override: Option<PathBuf>,
 }
 
-pub fn detect(bun: Option<&Path>, extension: Option<&Path>) -> ClaudeDetection {
-    let exe = exe_dir().into_iter().collect::<Vec<_>>();
-    detect_roots(bun, extension, &exe)
+/// The runtime package that holds Claude Code and Bun (see `scratch_packages`).
+pub const PACKAGE: &str = "claude-code";
+
+/// The installed Claude Code package folder under `data_dir/packages`, which
+/// holds `claude-code/` and `bun/bun.exe` like the legacy bundle does.
+fn package_root(data_dir: Option<&Path>) -> Option<PathBuf> {
+    scratch_packages::Store::new(data_dir?)
+        .get(PACKAGE)
+        .map(|installed| installed.path)
+}
+
+/// Looks for Claude Code. Order: the explicit `bun` and `extension` and
+/// `NOTES_CLAUDE_CODE_DIR`, Bun on PATH and in `~/.bun/bin`, then the package
+/// installed in `data_dir`, then the legacy bundle beside the executable.
+pub fn detect(
+    bun: Option<&Path>,
+    extension: Option<&Path>,
+    data_dir: Option<&Path>,
+) -> ClaudeDetection {
+    let roots: Vec<PathBuf> = [package_root(data_dir), exe_dir()]
+        .into_iter()
+        .flatten()
+        .collect();
+    detect_roots(bun, extension, &roots)
 }
 
 /// `detect` with the bundle folders `roots` in place of the executable's.
@@ -57,9 +78,14 @@ fn installed_app_dir() -> Option<PathBuf> {
 }
 
 /// A host whose executable is outside the app folder (scratch-cli) finds the
-/// bundle there too: the executable's folder first, then the installed app.
-pub fn detect_installed(bun: Option<&Path>, extension: Option<&Path>) -> ClaudeDetection {
-    let roots: Vec<PathBuf> = [exe_dir(), installed_app_dir()]
+/// legacy bundle there too: the installed package first, then the
+/// executable's folder, then the installed app.
+pub fn detect_installed(
+    bun: Option<&Path>,
+    extension: Option<&Path>,
+    data_dir: Option<&Path>,
+) -> ClaudeDetection {
+    let roots: Vec<PathBuf> = [package_root(data_dir), exe_dir(), installed_app_dir()]
         .into_iter()
         .flatten()
         .collect();
@@ -295,6 +321,43 @@ mod tests {
         let bun_exe = bun.join(if cfg!(windows) { "bun.exe" } else { "bun" });
         std::fs::write(&bun_exe, "fake").unwrap();
         (dir.to_path_buf(), extension, bun_exe)
+    }
+
+    #[test]
+    fn installed_package_beats_the_legacy_bundle_but_not_a_setting() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let data = root.join("data");
+        let compiled_in = root.join("compiled-in");
+        let (legacy, legacy_ext, legacy_bun) = bundle(&root.join("app"));
+
+        // No package yet: the legacy bundle is found.
+        assert_eq!(package_root(Some(&data)), None);
+        assert_eq!(package_root(None), None);
+        let found = detect_with(None, None, None, None, None, &compiled_in, std::slice::from_ref(&legacy));
+        assert_eq!(found.claude_code_dir, Some(legacy_ext));
+        assert_eq!(found.bun_path, Some(legacy_bun));
+
+        // An installed package (a marker in its version folder) goes first.
+        let version = data.join("packages").join(PACKAGE).join("1.0.0");
+        let (_, pkg_ext, pkg_bun) = bundle(&version);
+        std::fs::write(
+            version.join(".package.json"),
+            r#"{"name":"claude-code","version":"1.0.0","sha256":"00"}"#,
+        )
+        .unwrap();
+        let pkg = package_root(Some(&data)).expect("installed package is found");
+        assert_eq!(pkg, version);
+        let roots = [pkg, legacy];
+        let found = detect_with(None, None, None, None, None, &compiled_in, &roots);
+        assert_eq!(found.claude_code_dir, Some(pkg_ext));
+        assert_eq!(found.bun_path, Some(pkg_bun));
+
+        // A saved extension folder still wins.
+        let explicit = root.join("explicit");
+        std::fs::create_dir(&explicit).unwrap();
+        let found = detect_with(None, Some(&explicit), None, None, None, &compiled_in, &roots);
+        assert_eq!(found.claude_code_dir, Some(explicit));
     }
 
     #[test]

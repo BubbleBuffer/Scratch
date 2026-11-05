@@ -16,54 +16,59 @@ Built 2026-10-21 on `lane/win-installer`. The script is [app/windows/installer/s
 - **Apps & features.** An uninstall entry under HKCU: name Scratch, the displayed version (`VersionText`, see below), publisher BubbleBuffer, and the exe's icon.
 - **Upgrade in place.** The AppId GUID is fixed (`1B472506-0E7C-46CD-B530-F256FB709BB5`), so a newer installer replaces the same install. Never change it.
 - **Running app.** If Scratch is open, the installer closes it through the Restart Manager (`CloseApplications=yes`) before replacing files. The Restart Manager does not restart it (`RestartApplications=no`). An interactive install offers "Launch Scratch" on the finish page. A silent one (`/SILENT`, used by the updater) starts Scratch itself at the end, through the second `[Run]` entry (`skipifnotsilent`).
-- **Uninstall.** Removes the program files (the Claude Code bundle included), the shortcuts and `HKCU\Software\Classes\notes` (the `notes://` scheme). The installer writes that key at install time, pointing at the installed `notes.exe`, so links work before the first start; the app also rewrites it on every start ([app state, page links](../app/app-state.md#page-links)). User data in `%LOCALAPPDATA%\Notes` is never touched.
+- **Uninstall.** Removes the program files (a legacy Claude Code bundle included), the shortcuts and `HKCU\Software\Classes\notes` (the `notes://` scheme). The installer writes that key at install time, pointing at the installed `notes.exe`, so links work before the first start; the app also rewrites it on every start ([app state, page links](../app/app-state.md#page-links)). User data in `%LOCALAPPDATA%\Notes` is never touched, downloaded packages (`%LOCALAPPDATA%Notespackages`) included.
 - **Updates.** The app finds new releases on GitHub and installs them with this installer on the user's click. See [Updates](#updates).
 - **Not done.** Unsigned (SmartScreen warns once on first run). No autostart or file associations.
 
-## Claude Code bundle
+## Claude Code package
 
-The Release folder, and so the installer, ships the Claude Code provider, so
-`claude-code/...` models work after a plain install with nothing to configure:
+Claude Code is not in the installer. It is a runtime package that the app and
+`scratch-cli` download on demand ([Runtime packages](../addons/packages.md);
+owner decision 2026-11-02). The package, built per release:
 
-- `claude-code\` — the BubblePaw `claude-code` extension: `package.json`,
-  `bun.lock`, `NOTICE`, `src\` and `node_modules\` with its production
-  dependencies, Claude Code itself among them (`@anthropic-ai/claude-agent-sdk`
+- `scratch-pkg-claude-code-<version>-windows-x64.zip`, attached to the same
+  GitHub release. `<version>` is the content version, `<claude-agent-sdk
+  version>-<first 7 of the BubblePaw-Core commit>`.
+- `claude-code\`: the BubblePaw `claude-code` extension (`package.json`,
+  `bun.lock`, `NOTICE`, `src\`, `node_modules\` with its production
+  dependencies, Claude Code itself among them: `@anthropic-ai/claude-agent-sdk`
   and its `-win32-x64` native package).
-- `bun\bun.exe` — the Bun that runs the extension (1.4.2, the hub's version).
+- `bun\bun.exe`: the Bun that runs the extension (1.4.2, the hub's version).
 
-[app/windows/installer/bundle-claude-code.ps1](../../app/windows/installer/bundle-claude-code.ps1)
-builds it, taking the Release folder as a parameter. Both workflows call it
-right after `flutter build windows --release` and before the installer step:
-the `app` job of [.github/workflows/windows-build.yml](../../.github/workflows/windows-build.yml)
-and the Windows job of [.github/workflows/release.yml](../../.github/workflows/release.yml).
-It copies the extension's `package.json`, `bun.lock`, `NOTICE` and `src\`
-from BubblePaw-Core at the commit `Cargo.lock` pins, then runs
-`bun install --production --frozen-lockfile` in it — the same files and
-command as the hub's image ([deploy/hub/Dockerfile](../../deploy/hub/Dockerfile)).
-The Claude Code CLI is not installed separately: it is one of the extension's
-dependencies. Bun comes from `oven-sh/setup-bun` at 1.4.2 in both workflows,
-so the app ships the version the hub uses. The script checks for
-`claude-code\package.json`, `claude-code\src\main.ts`,
-`claude-code\node_modules\@anthropic-ai\claude-agent-sdk` and
-`bun\bun.exe`, and only then prints `claude-code bundle ok`; otherwise it
-exits non-zero and the build stops before packing an installer without the
-provider.
+[app/windows/installer/build-package-claude-code.ps1](../../app/windows/installer/build-package-claude-code.ps1)
+builds it and writes `manifest.json` (name, version, platform, URL, sha256,
+size) next to the zip. It copies the extension's files from BubblePaw-Core at
+the commit `Cargo.lock` pins and runs `bun install --production
+--frozen-lockfile` in it, the same files and command as the hub's image
+([deploy/hub/Dockerfile](../../deploy/hub/Dockerfile)). Entries are sorted and
+carry fixed timestamps; the script fails below its own checks (required files,
+fewer than 65000 files, because the app refuses zip64).
 
-Size: about 360 MB in the Release folder, which is what an installed app
-grows by. Most of it is Claude Code's dependencies in `node_modules`; the Bun
-binary is the rest. The installer compresses that to about 140 MB
-(`Scratch-Setup-<version>-<sha7>.exe`). `scratch.iss` needs no new entries:
-its one `[Files]` line packs the Release folder recursively, and uninstall
-removes every file it installed, these included (no `uninsneveruninstall`
-flag anywhere), so `claude-code\` and `bun\` go with the rest.
+CI: a `package` job runs before the Windows app build in
+[windows-build.yml](../../.github/workflows/windows-build.yml),
+[release.yml](../../.github/workflows/release.yml) and
+[nightly.yml](../../.github/workflows/nightly.yml). It uploads the manifest
+(artifact `package-manifest`) and the zip. The Windows build downloads the
+manifest and copies it to `crates/packages/manifest.json` before building the
+app and the CLIs, so the zip's sha256 is pinned in the binaries. The release
+and nightly `publish` jobs attach the zip to the release; its URL in the
+manifest is `<release download URL>/<tag>/<zip name>`. windows-build.yml runs
+are not releases: their manifest URL names a release that does not exist, and
+the zip is uploaded as an artifact only on a manual run.
 
-The app finds the bundle without a setting: `crates/agent/src/claude.rs` looks
-for the extension as `claude-code` and Bun as `bun\bun.exe` in the running
-executable's folder, after every explicit choice (an override, then
-`NOTES_CLAUDE_CODE_DIR`, then the app's saved paths in Settings > Agent > Advanced)
-and before the extension location compiled into the binary. `scratch-cli`
-lives outside the app folder, so it also looks in the installed app folder,
-`%LOCALAPPDATA%\Programs\Scratch`. The lookup order is in
+`scripts/build-windows-installer.sh` no longer bundles anything, so the
+Release folder, and the installer, hold only the app. Measured on the windows-build run of 2026-11-02: the installer is 26 MB (it was 143 MB with the bundle); the package zip is 168 MB (about 360 MB unpacked). Existing
+installs keep a legacy `claude-code\` and `bun\` in the app folder until the
+update replaces the folder; the lookup still finds them.
+
+The app finds Claude Code without a setting: `crates/agent/src/claude.rs`
+takes the extension and Bun from, in order, an explicit choice (an override,
+`NOTES_CLAUDE_CODE_DIR`, the app's saved paths in Settings > Agent >
+Advanced; for Bun also `PATH` and `~/.bun/bin`), then the installed package
+(`<data dir>/packages/claude-code/<version>/`), then the legacy bundle in the
+running executable's folder (and, for `scratch-cli`, the installed app folder,
+`%LOCALAPPDATA%\Programs\Scratch`), then the extension location compiled into
+the binary. The lookup order is also in
 [scratch-cli](../integrations/scratch-cli.md#credentials).
 
 ## Updates
@@ -135,13 +140,13 @@ To build locally after a Release build, from `app/`:
 
 Without `/DSourceDir` and `/DOutputDir` it reads `build\windows\x64\runner\Release` and writes to `build\windows\installer`.
 
-A local build has no Claude Code bundle until you add one, with Bun 1.4.2 on `PATH`, from the repository root:
+A local build has no Claude Code package: its manifest is the checked-in empty one, so the app offers no download. To get Claude Code in a local build, set `NOTES_CLAUDE_CODE_DIR` and put Bun on `PATH` (or use Settings > Agent > Advanced), or build the package with Bun 1.4.2 on `PATH`, from the repository root:
 
 ```
-pwsh -File app/windows/installer/bundle-claude-code.ps1 -ReleaseDir app/build/windows/x64/runner/Release
+pwsh -File app/windows/installer/build-package-claude-code.ps1 -OutDir packages -BaseUrl https://example.invalid
 ```
 
-Without that step the app still runs; only `claude-code/...` models report the extension as missing.
+and unpack the zip into `<data dir>/packages/claude-code/<version>/` with a `.package.json` marker (see [Runtime packages](../addons/packages.md)).
 
 ## Not yet verified
 
