@@ -18,7 +18,7 @@ scratch_packages = { path = "../packages" }
 # BubblePaw's SDK and MCP client, from the public BubbleBuffer/BubblePaw-Core
 # repository at tag v0.3.1 (bump the tag to upgrade). The SDK's `web` feature
 # stays off.
-bubblepaw-sdk = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.3.1" }
+bubblepaw-sdk = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.3.0" }
 # The desktop agent's MCP client (servers from `<data dir>/mcp.toml`).
 bubblepaw-mcp = { git = "https://github.com/BubbleBuffer/BubblePaw-Core", tag = "v0.3.1" }
 anyhow = "1"
