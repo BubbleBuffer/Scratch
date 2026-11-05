@@ -37,6 +37,10 @@ class ScriptedSync extends FakeSync {
   void syncNow() => syncNows++;
 }
 
+// The scripted fetches await a native import while settle pumps fake time, so
+// under load the 10 s fetch timeout could pass before the import finished. These
+// tests give the fetch a long timeout; the timeout itself has its own test.
+
 /// Waits until the step shows [title]: one quiet frame can come before a
 /// scripted fetch that awaits a native import has answered.
 Future<void> stepIs(WidgetTester tester, String title) => settleUntil(
@@ -86,7 +90,7 @@ void main() {
       await arrive();
       return gate.future;
     });
-    unawaited(openPageLink(homeContext(tester), PageLink(id)));
+    unawaited(openPageLink(homeContext(tester), PageLink(id), timeout: const Duration(minutes: 10)));
     await settle(tester);
     await stepIs(tester, 'Loading page');
     expect(textOf(tester, 'link-fetch-title'), 'Loading page');
@@ -120,7 +124,7 @@ void main() {
       await arrive();
       return result(PageFetchStatus.fetched);
     });
-    unawaited(openPageLink(homeContext(tester), PageLink(id)));
+    unawaited(openPageLink(homeContext(tester), PageLink(id), timeout: const Duration(minutes: 10)));
     await settle(tester);
     await stepIs(tester, 'Hub unreachable');
     expect(textOf(tester, 'link-fetch-title'), 'Hub unreachable');
@@ -162,7 +166,7 @@ void main() {
       return result(PageFetchStatus.fetched);
     });
     var signedIn = 0;
-    unawaited(fetchLinkedPage(homeContext(tester), PageLink(id), signIn: () async => signedIn++));
+    unawaited(fetchLinkedPage(homeContext(tester), PageLink(id), timeout: const Duration(minutes: 10), signIn: () async => signedIn++));
     await settle(tester);
     await stepIs(tester, 'Sign in needed');
     expect(textOf(tester, 'link-fetch-title'), 'Sign in needed');

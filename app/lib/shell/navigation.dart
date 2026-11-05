@@ -187,7 +187,11 @@ Future<void> openReminder(BuildContext context, String payload) async {
 /// open does. A page this device lacks is asked for from the hub first (a
 /// "Loading page" step, then the page opens and a sync is requested). A page
 /// that is missing everywhere or trashed gets a toast and nothing else changes.
-Future<void> openPageLink(BuildContext context, PageLink link) async {
+Future<void> openPageLink(
+  BuildContext context,
+  PageLink link, {
+  Duration timeout = linkFetchTimeout,
+}) async {
   var title = await _linkedPageTitle(context, link);
   if (!context.mounted) return;
   if (title == null) {
@@ -197,7 +201,7 @@ Future<void> openPageLink(BuildContext context, PageLink link) async {
       return;
     }
     if (!context.mounted) return;
-    final fetch = await fetchLinkedPage(context, link);
+    final fetch = await fetchLinkedPage(context, link, timeout: timeout);
     if (!context.mounted) return;
     switch (fetch) {
       case LinkFetch.cancelled:
