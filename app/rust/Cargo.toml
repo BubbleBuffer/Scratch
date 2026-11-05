@@ -19,6 +19,8 @@ vault_tools = { path = "../../crates/tools" }
 # target: tokio-tungstenite with rustls (ring, no native-tls), verifying with
 # vault_sync::tls (webpki roots plus the certificates the user trusted).
 notes_agent_wire = { path = "../../crates/agent_wire" }
+# On-demand runtime packages (api/packages.rs), on every target.
+scratch_packages = { path = "../../crates/packages" }
 serde = "1"
 serde_json = "1"
 jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
@@ -44,6 +46,7 @@ rustls-platform-verifier = "0.7"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [dev-dependencies]
+tempfile = "3"
 notes_hub = { path = "../../crates/hub" }
 # Test certificates for the hub sockets' TLS trust (agent_remote.rs).
 rcgen = { version = "0.14", default-features = false, features = ["ring", "pem"] }

@@ -352,7 +352,10 @@ class _AgentComposerState extends State<AgentComposer> {
       models: showModel
           ? [
               for (final m in models)
-                kit.KitChoice(id: m, label: store.modelLabel(m)),
+                kit.KitChoice(
+                  id: m,
+                  label: store.modelLabel(m),
+                ),
             ]
           : const [],
       modelId: model,

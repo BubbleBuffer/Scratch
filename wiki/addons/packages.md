@@ -35,3 +35,7 @@ The `package` job in the release, nightly and windows-build workflows builds the
 `scratch-cli packages list [--json]`, `install <name>` (progress lines in 10% steps) and `remove <name>`, with `--data-dir` as for the `app` commands. See [scratch-cli](../integrations/scratch-cli.md).
 
 Tests: `crates/packages/tests/install.rs` (local server: good, bad hash, short body, longer body, interrupted, offline, concurrent, update, same-version rebuild, HTTPS only, path traversal, remove) and `crates/cli/tests/packages.rs`.
+
+## App UI
+
+The Flutter side is the agent add-on's download card, the "Installed packages" settings section and `AgentStore.refreshRuntime()` (see [Agent](agent.md#claude-code-download-runtime-package)). The bridge exposes `packagesList`, `packageInfo`, `packagesPlatform`, `packageInstall` (a stream of `PackageProgress`: phase and bytes) and `packageRemove` ([packages.rs](../../app/rust/src/api/packages.rs)). Installing is always an explicit tap; a failed install shows the Rust error message and Retry, and does not touch the running agent.

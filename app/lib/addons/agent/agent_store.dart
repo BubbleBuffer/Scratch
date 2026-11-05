@@ -55,6 +55,7 @@ import 'agent_event_feed.dart';
 import 'agent_search_source.dart';
 import 'agent_search_vault.dart';
 import 'outline_names.dart';
+import 'packages_store.dart';
 
 export '../../src/rust/api/agent.dart'
     show
@@ -142,6 +143,8 @@ class AgentStore extends ChangeNotifier {
     _key = _configKey();
     _hubKey = _hubConnectionKey();
     unawaited(_loadVaultDefaults());
+    _packagesSub = _packages.installs.listen(_packageInstalled);
+    _packages.addListener(_packagesChanged);
   }
 
   final Vault vault;
@@ -477,14 +480,42 @@ class AgentStore extends ChangeNotifier {
 
   /// The models the open host reports. A chat keeps its current model
   /// available even when the host no longer lists it.
-  List<String> shownModels({String? current}) => [
-    ...allModelIds,
-    if (current != null && !allModelIds.contains(current)) current,
-  ];
+  List<String> shownModels({String? current}) {
+    final ids = allModelIds;
+    return [
+      ...ids,
+      if (offersClaudeCode) claudeCodePlaceholderModel,
+      if (current != null &&
+          !ids.contains(current) &&
+          current != claudeCodePlaceholderModel)
+        current,
+    ];
+  }
 
+  /// Whether the picker lists the "Claude Code, not installed" stand-in:
+  /// on this computer, when the host does not report the provider and the
+  /// package is on offer. Picking it shows the download card.
+  bool get offersClaudeCode {
+    final info = hostInfo;
+    if (host != AgentHost.local || info == null) return false;
+    if (info.providers.contains('claude-code')) return false;
+    final state = _packages.infoOf(claudeCodePackage)?.state;
+    return state == PackageState.notInstalled ||
+        state == PackageState.updateAvailable;
+  }
+
+  /// Whether a picked stand-in stays the chat's model: while it is offered,
+  /// and while the agent is re-opening after the install (host unknown).
+  bool get _placeholderStands =>
+      offersClaudeCode ||
+      (hostInfo == null &&
+          (_packages.installing || _packages.justInstalled(claudeCodePackage)));
+
+  /// The picker's secondary line for model [id] (null: none).
   List<String> get allModelIds => {for (final m in models) m.id}.toList();
 
   String modelLabel(String id) {
+    if (id == claudeCodePlaceholderModel) return 'Claude Code (not installed)';
     if (id.startsWith('claude-code/')) {
       return switch (id.substring('claude-code/'.length)) {
         'opus' => 'Opus (latest)',
@@ -868,7 +899,10 @@ class AgentStore extends ChangeNotifier {
   String? modelOf(String? id) {
     final picked =
         _modelBySession[id ?? ''] ?? (id == null ? null : _prefs[id]?.model);
-    if (picked != null) return picked;
+    if (picked != null &&
+        (picked != claudeCodePlaceholderModel || _placeholderStands)) {
+      return picked;
+    }
     return defaultModel;
   }
 
@@ -1431,6 +1465,56 @@ class AgentStore extends ChangeNotifier {
     }
     if (_agent != null) return Future.value(_agent);
     return _opening ??= _open().whenComplete(() => _opening = null);
+  }
+
+  PackagesStore _packages = PackagesStore.shared;
+  StreamSubscription<String>? _packagesSub;
+
+  /// The runtime packages (the Claude Code download): the pane's card and
+  /// Settings read and drive them through this store.
+  PackagesStore get packages => _packages;
+
+  /// Tests: follow [store] instead of the shared one.
+  @visibleForTesting
+  void usePackages(PackagesStore store) {
+    if (identical(store, _packages)) return;
+    unawaited(_packagesSub?.cancel());
+    _packages.removeListener(_packagesChanged);
+    _packages = store..addListener(_packagesChanged);
+    _packagesSub = store.installs.listen(_packageInstalled);
+  }
+
+  bool _offered = false;
+
+  /// The picker lists the stand-in as the package state comes and goes.
+  void _packagesChanged() {
+    final now = offersClaudeCode;
+    if (now == _offered) return;
+    _offered = now;
+    _notify();
+  }
+
+  void _packageInstalled(String name) {
+    if (name == claudeCodePackage) unawaited(refreshRuntime());
+  }
+
+  /// How many times [refreshRuntime] has finished re-opening the agent (tests).
+  @visibleForTesting
+  int runtimeRefreshes = 0;
+
+  /// Looks for the runtime again after a package was installed: closes the
+  /// agent and opens it, so detection (Claude Code and its models) runs on
+  /// the new files. The settings did not change, so the debounced reopen
+  /// would not run; this one does. Chats and their state stay. A hub agent
+  /// has no local runtime: nothing to do.
+  Future<void> refreshRuntime() async {
+    if (_disposed || (_agent != null && _agentOnHub)) return;
+    _reopen.cancel();
+    await _close(keepState: true);
+    if (_disposed) return;
+    if (enabled) await ensureOpen();
+    runtimeRefreshes++;
+    _notify();
   }
 
   /// An agent on [hub], or on this computer when it is null.
@@ -2114,6 +2198,9 @@ class AgentStore extends ChangeNotifier {
     final id = sessionId ?? openId;
     final t = text.trim();
     if (id == null || t.isEmpty) return null;
+    // The "Claude Code, not installed" stand-in never runs: the download card
+    // stays up and the composer keeps the draft.
+    if (modelOf(id) == claudeCodePlaceholderModel) return null;
     final a = await ensureOpen();
     if (a == null) {
       // Nothing was sent: say so, so the composer keeps the draft.
@@ -2367,6 +2454,8 @@ class AgentStore extends ChangeNotifier {
     unawaited(_relay.close());
     if (_agent != null || _sub != null) unawaited(_close());
     unawaited(_uiActions.close());
+    unawaited(_packagesSub?.cancel());
+    _packages.removeListener(_packagesChanged);
     _stores[vault] = null;
     super.dispose();
   }

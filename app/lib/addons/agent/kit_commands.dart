@@ -43,7 +43,10 @@ class StoreKitCommands implements KitAgentCommands {
     for (final m in store.shownModels(
       current: chatId.isEmpty ? null : store.modelOf(chatId),
     ))
-      kit.KitChoice(id: m, label: store.modelLabel(m)),
+      kit.KitChoice(
+        id: m,
+        label: store.modelLabel(m),
+      ),
   ];
 
   @override
