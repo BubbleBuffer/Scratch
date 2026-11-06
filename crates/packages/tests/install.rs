@@ -327,7 +327,7 @@ fn files_a_removal_left_behind_are_not_an_install_and_go_at_the_next_clean() {
     assert!(store.has_leftovers("claude-code"));
     std::fs::create_dir_all(store.root().join("claude-code/.tmp-extract")).unwrap();
 
-    store.clean_leftovers();
+    store.clean_leftovers("claude-code");
     assert!(!installed.path.exists());
     assert!(!store.has_leftovers("claude-code"));
     assert!(leftovers(&store).is_empty());
@@ -335,7 +335,7 @@ fn files_a_removal_left_behind_are_not_an_install_and_go_at_the_next_clean() {
 
     // An installed version is never touched by the cleaning.
     let again = store.install(&package("1.0.0", &url, &bytes), &mut no_progress).unwrap();
-    store.clean_leftovers();
+    store.clean_leftovers("claude-code");
     assert!(again.path.join("a.txt").exists());
 }
 
@@ -372,7 +372,7 @@ fn remove_with_a_folder_it_cannot_empty_still_removes_the_package() {
     if stuck {
         assert!(store.has_leftovers("claude-code"), "the leftovers are reported");
         std::fs::set_permissions(&sub, std::fs::Permissions::from_mode(0o755)).unwrap();
-        store.clean_leftovers();
+        store.clean_leftovers("claude-code");
         assert!(!store.has_leftovers("claude-code"));
     }
 }

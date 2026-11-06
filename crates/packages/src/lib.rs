@@ -365,18 +365,21 @@ impl Store {
             .any(|e| e.file_name() != LOCK && !e.path().join(MARKER).is_file())
     }
 
-    /// Deletes what no installed version owns in every package folder:
-    /// leftovers of a removal, and temp files of an interrupted install.
-    /// Skips a package while another process installs or removes it. Call it
-    /// before anything loads from the packages folder.
-    pub fn clean_leftovers(&self) {
-        for entry in fs::read_dir(&self.root).into_iter().flatten().flatten() {
-            let dir = entry.path();
-            if dir.is_dir() && !entry.file_name().to_string_lossy().starts_with('.') {
-                if let Some(_lock) = PackageLock::try_acquire(&dir) {
-                    sweep_unowned(&dir);
-                }
-            }
+    /// Deletes what no installed version of `name` owns: leftovers of a
+    /// removal, and temp files of an interrupted install. Does nothing while
+    /// another process installs or removes the package. Call it before
+    /// anything loads from the package folder.
+    pub fn clean_leftovers(&self, name: &str) {
+        let slug = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-';
+        if check_token("name", name, slug).is_err() {
+            return;
+        }
+        let dir = self.root.join(name);
+        if !dir.is_dir() {
+            return;
+        }
+        if let Some(_lock) = PackageLock::try_acquire(&dir) {
+            sweep_unowned(&dir);
         }
     }
 

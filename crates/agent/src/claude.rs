@@ -20,7 +20,7 @@ fn package_root(data_dir: Option<&Path>) -> Option<PathBuf> {
     let store = scratch_packages::Store::new(data_dir?);
     // Files a removal could not delete (Windows, in use) go before anything
     // is loaded from this folder.
-    store.clean_leftovers();
+    store.clean_leftovers(PACKAGE);
     store.get(PACKAGE).map(|installed| installed.path)
 }
 
