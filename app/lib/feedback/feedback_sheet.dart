@@ -97,7 +97,7 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
                         )
                       : const SizedBox.shrink(),
                 ),
-                SelectionToolbarHost(builder: (context, onSelectionChanged) => EditableText(
+                SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
                   key: const ValueKey('feedback-text'),
                   controller: _text,
                   focusNode: _focus,
@@ -111,7 +111,7 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
                   textInputAction: TextInputAction.newline,
                   selectionControls: selectionControlsFor(context),
                   contextMenuBuilder: contextMenuFor(context),
-                  showSelectionHandles: context.mobile,
+                  showSelectionHandles: showHandles,
                   onSelectionChanged: onSelectionChanged,
                   maxLines: null,
                 )),

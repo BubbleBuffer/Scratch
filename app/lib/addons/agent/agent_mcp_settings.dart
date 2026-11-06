@@ -380,7 +380,7 @@ class _LinesFieldState extends State<_LinesField> {
                   ),
                 ),
               ),
-            SelectionToolbarHost(builder: (context, onSelectionChanged) => EditableText(
+            SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
               controller: widget.controller,
               focusNode: _focus,
               style: style,
@@ -393,7 +393,7 @@ class _LinesFieldState extends State<_LinesField> {
               keyboardType: TextInputType.multiline,
               selectionControls: selectionControlsFor(context),
               contextMenuBuilder: contextMenuFor(context),
-              showSelectionHandles: context.mobile,
+              showSelectionHandles: showHandles,
               onSelectionChanged: onSelectionChanged,
             )),
           ],

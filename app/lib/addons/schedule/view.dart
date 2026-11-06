@@ -216,7 +216,7 @@ class _ScheduleTitleState extends State<_ScheduleTitle> {
     if (controller == null) {
       return Text(displayTitle(widget.title), style: style);
     }
-    return SelectionToolbarHost(builder: (context, onSelectionChanged) => EditableText(
+    return SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
       key: const ValueKey('schedule-title'),
       controller: controller,
       focusNode: _focus,
@@ -228,7 +228,7 @@ class _ScheduleTitleState extends State<_ScheduleTitle> {
       maxLines: null,
       selectionControls: selectionControlsFor(context),
       contextMenuBuilder: contextMenuFor(context),
-      showSelectionHandles: context.mobile,
+      showSelectionHandles: showHandles,
       onSelectionChanged: onSelectionChanged,
       onChanged: widget.onChanged,
     ));

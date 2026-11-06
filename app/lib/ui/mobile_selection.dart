@@ -68,15 +68,30 @@ Widget mobileContextMenu(BuildContext context, EditableTextState state) {
 /// Pass the callback to the field's onSelectionChanged.
 class SelectionToolbarHost extends StatefulWidget {
   const SelectionToolbarHost({super.key, required this.builder});
-  final Widget Function(BuildContext context, SelectionChangedCallback onChanged) builder;
+  // showHandles is true only while a range is selected: a caret handle would
+  // keep the field from yielding to the swipe-back gesture, which blocks on
+  // visible handles.
+  final Widget Function(
+    BuildContext context,
+    SelectionChangedCallback onChanged,
+    bool showHandles,
+  ) builder;
 
   @override
   State<SelectionToolbarHost> createState() => _SelectionToolbarHostState();
 }
 
 class _SelectionToolbarHostState extends State<SelectionToolbarHost> {
+  bool _handles = false;
+
   void _changed(TextSelection sel, SelectionChangedCause? cause) {
-    if (!context.mobile || sel.isCollapsed) return;
+    final handles = context.mobile && sel.isValid && !sel.isCollapsed;
+    if (handles != _handles) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _handles = handles);
+      });
+    }
+    if (!handles) return;
     if (cause != SelectionChangedCause.longPress &&
         cause != SelectionChangedCause.doubleTap) {
       return;
@@ -103,5 +118,5 @@ class _SelectionToolbarHostState extends State<SelectionToolbarHost> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.builder(context, _changed);
+  Widget build(BuildContext context) => widget.builder(context, _changed, _handles);
 }

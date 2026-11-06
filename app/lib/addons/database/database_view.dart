@@ -186,7 +186,7 @@ class DatabaseViewState extends State<DatabaseView> {
       builder: (context, _) => Stack(children: [
         if (ctl.text.isEmpty)
           Positioned.fill(child: IgnorePointer(child: Text('Untitled', maxLines: 1, style: style.copyWith(color: c.textTertiary)))),
-        SelectionToolbarHost(builder: (context, onSelectionChanged) => EditableText(
+        SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
           key: const ValueKey('db-title'),
           controller: ctl,
           focusNode: _titleFocus,
@@ -198,7 +198,7 @@ class DatabaseViewState extends State<DatabaseView> {
           maxLines: null,
           selectionControls: selectionControlsFor(context),
           contextMenuBuilder: contextMenuFor(context),
-          showSelectionHandles: context.mobile,
+          showSelectionHandles: showHandles,
           onSelectionChanged: onSelectionChanged,
           onChanged: widget.onTitleChanged,
         )),
@@ -255,7 +255,7 @@ class DatabaseViewState extends State<DatabaseView> {
           child: Stack(children: [
             if (_inlineTitle!.text.isEmpty)
               Positioned.fill(child: IgnorePointer(child: Text('Untitled', style: style.copyWith(color: c.textTertiary)))),
-            SelectionToolbarHost(builder: (context, onSelectionChanged) => EditableText(
+            SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
               key: const ValueKey('db-inline-title'),
               controller: _inlineTitle!,
               focusNode: _titleFocus,
@@ -266,7 +266,7 @@ class DatabaseViewState extends State<DatabaseView> {
               maxLines: 1,
               selectionControls: selectionControlsFor(context),
               contextMenuBuilder: contextMenuFor(context),
-              showSelectionHandles: context.mobile,
+              showSelectionHandles: showHandles,
               onSelectionChanged: onSelectionChanged,
               onChanged: (t) => setState(() {}),
               onSubmitted: (t) => context.app.vault.renamePage(widget.collection, t),

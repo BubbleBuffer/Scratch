@@ -4235,7 +4235,7 @@ class PageEditorState extends State<PageScreen>
                 ),
               ),
             ),
-          SelectionToolbarHost(builder: (context, onSelectionChanged) => EditableText(
+          SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
             key: const ValueKey('page-title'),
             controller: titleCtl,
             focusNode: titleFocus,
@@ -4250,7 +4250,7 @@ class PageEditorState extends State<PageScreen>
             textInputAction: TextInputAction.next,
             selectionControls: selectionControlsFor(context),
             contextMenuBuilder: contextMenuFor(context),
-            showSelectionHandles: context.mobile,
+            showSelectionHandles: showHandles,
             onSelectionChanged: onSelectionChanged,
             onChanged: _onTitleChanged,
             onSubmitted: (_) => _focusFirstBlock(),
