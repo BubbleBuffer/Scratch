@@ -255,12 +255,33 @@ void _agentTests() {
       timeout: const Duration(seconds: 30),
     );
     expect(store.sessions.single.title, 'Say ok');
-    expect(store.paragraphsSeen, greaterThan(0));
     expect(store.streaming, isEmpty);
     expect(find.text('Say ok'), findsWidgets);
     expect(find.text('ok'), findsOneWidget);
     expect(key('agent-empty'), findsNothing);
     expect(buttonLabel(tester, 'agent-send'), 'Send');
+
+    // The first reply can finish while the new chat's event stream is still
+    // being re-bound to it; its paragraphs are then not streamed (the
+    // messages arrive from the stored chat all the same). Once that has
+    // settled, a second reply must stream.
+    await real(tester, store.debugViewScopeSettled);
+    final seen = store.paragraphsSeen;
+    await tester.enterText(key('agent-composer'), 'Say ok');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await settleUntil(
+      tester,
+      () =>
+          (store.state?.messages
+                      .where((m) => m.role == 'assistant' && m.content == 'ok')
+                      .length ??
+                  0) ==
+              2 &&
+          !store.running,
+      timeout: const Duration(seconds: 30),
+    );
+    expect(store.paragraphsSeen, greaterThan(seen));
+    expect(store.streaming, isEmpty);
   });
 
   appTest('a js cell is a collapsed row that opens', (tester) async {

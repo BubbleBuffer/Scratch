@@ -1002,14 +1002,27 @@ class AgentStore extends ChangeNotifier {
 
   void _scheduleViewScope() {
     if (_disposed) return;
-    _viewScope.run(const Duration(milliseconds: 1), () {
-      _scopeWork = _scopeWork.then((_) => _count(_syncViewScope)).catchError((
-        Object e,
-      ) {
-        _subscribedSession = null;
-        AppLog.info('agent viewing subscription: $e');
-      });
+    _viewScope.run(const Duration(milliseconds: 1), _chainViewScope);
+  }
+
+  void _chainViewScope() {
+    _scopeWork = _scopeWork.then((_) => _count(_syncViewScope)).catchError((
+      Object e,
+    ) {
+      _subscribedSession = null;
+      AppLog.info('agent viewing subscription: $e');
     });
+  }
+
+  /// Tests: runs the view subscription sync now (a no-op when the chat on
+  /// screen is already subscribed) and completes once it, and the reload it
+  /// ends with, are done. That reload replaces the open chat's state, so a
+  /// fixture must be seeded after this.
+  @visibleForTesting
+  Future<void> debugViewScopeSettled() async {
+    _viewScope.cancel();
+    _chainViewScope();
+    await _scopeWork;
   }
 
   Future<void> _syncViewScope() async {
