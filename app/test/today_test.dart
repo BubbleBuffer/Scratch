@@ -349,8 +349,19 @@ void main() {
     expect(key('capture-add'), findsOneWidget);
     await tester.enterText(capture, 'A narrow-window task');
     await tester.testTextInput.receiveAction(TextInputAction.done);
-    await settle(tester);
+    // "Added to today's note · Open" stays for 4 s of the fake clock. A full
+    // settle can outlast it: while it waits for the write's follow-up work
+    // under load it keeps pumping time. Look for the link frame by frame.
+    final waited = Stopwatch()..start();
+    while (key('capture-open').evaluate().isEmpty &&
+        waited.elapsed < const Duration(seconds: 30)) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 5)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     expect(key('capture-open'), findsOneWidget);
+    await settle(tester);
   });
 
   appTest(
