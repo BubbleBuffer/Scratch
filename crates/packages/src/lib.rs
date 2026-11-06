@@ -375,9 +375,6 @@ impl Store {
             return;
         }
         let dir = self.root.join(name);
-        if !dir.is_dir() {
-            return;
-        }
         if let Some(_lock) = PackageLock::try_acquire(&dir) {
             sweep_unowned(&dir);
         }
@@ -517,12 +514,16 @@ fn sweep_unowned(dir: &Path) {
 struct PackageLock(File);
 
 impl PackageLock {
-    fn acquire(dir: &Path) -> Result<PackageLock, Error> {
-        let file = fs::OpenOptions::new()
+    fn open(dir: &Path) -> io::Result<File> {
+        fs::OpenOptions::new()
             .create(true)
             .truncate(false)
             .write(true)
-            .open(dir.join(LOCK))?;
+            .open(dir.join(LOCK))
+    }
+
+    fn acquire(dir: &Path) -> Result<PackageLock, Error> {
+        let file = PackageLock::open(dir)?;
         file.lock()?;
         Ok(PackageLock(file))
     }
@@ -531,12 +532,7 @@ impl PackageLock {
 impl PackageLock {
     /// The lock, or None when another process holds it.
     fn try_acquire(dir: &Path) -> Option<PackageLock> {
-        let file = fs::OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(dir.join(LOCK))
-            .ok()?;
+        let file = PackageLock::open(dir).ok()?;
         file.try_lock().ok()?;
         Some(PackageLock(file))
     }
