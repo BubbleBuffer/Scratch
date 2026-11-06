@@ -443,8 +443,7 @@ void main() {
     appTest('select mode from the block sheet: pick blocks, then delete them', (tester) async {
       final s = await pumpApp(tester, mobile: true);
       await openShowcase(tester);
-      await tester.longPress(editableStarting('Bulleted list item'));
-      await settle(tester);
+      await openBlockSheet(tester, editableStarting('Bulleted list item'));
       await tapAndSettle(tester, find.byKey(const ValueKey('sheet-select')));
       // In select mode a cover over the row takes the tap, not the text.
       await tester.tap(editableStarting('Another top-level'), warnIfMissed: false);

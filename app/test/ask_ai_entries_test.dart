@@ -182,8 +182,7 @@ void main() {
         await open(t, id);
         final ed = editor(t, id);
         final n = ed.doc!.flat.firstWhere((n) => n.text.length >= 8);
-        await t.longPress(editableWith(n.text));
-        await settle(t);
+        await openBlockSheet(t, editableWith(n.text));
         await tapAndSettle(t, key('sheet-ask-ai'));
         expect(textOf(t, 'ask-ai-note'), contains('phones always use it'));
         await send(t, 'Explain this');
