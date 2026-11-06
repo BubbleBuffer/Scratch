@@ -174,6 +174,10 @@ class PagesStore extends ChangeNotifier {
     return null;
   }
 
+  /// Starts the document scan if it has not run yet, for readers that show
+  /// only [docComplete] / [docCount] (Home's collapsed "All pages" header).
+  void startDocScan() => _wantDocs(0);
+
   void _wantDocs(int n) {
     if (_inactive) return;
     if (n > _docWanted) _docWanted = n;

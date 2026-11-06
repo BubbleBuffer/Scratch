@@ -444,9 +444,28 @@ void main() {
         expect(store.docComplete, isFalse);
         expect(store.rowAt(0), isNotNull);
 
+        // A reader that shows only the count (collapsed header) starts the
+        // scan too. Whatever it publishes along the way never holds a database
+        // row and never shrinks, so the list cannot jump or lose rows.
+        var last = 0;
+        void watch() {
+          expect(store.docCount, greaterThanOrEqualTo(last));
+          last = store.docCount;
+          for (var i = 0; i < store.docCount; i++) {
+            final d = store.docAt(i)!;
+            expect(rows, isNot(contains(d.id)), reason: 'a database row was listed');
+            expect(d.parent == null || d.parent != db, isTrue);
+          }
+        }
+
+        store.addListener(watch);
+        store.startDocScan();
+        await settle(feed);
+        expect(store.docCount, greaterThan(0), reason: 'the count-only reader ran the scan');
+        store.removeListener(watch);
+        final deferred = vault.loadPageCalls;
         final docs = [for (final d in await allDocs(store, feed)) d.id];
         // The same scan, run eagerly by a second store, makes the same calls.
-        final deferred = vault.loadPageCalls;
         expect(deferred, greaterThan(0), reason: 'unknown parents resolved on demand');
         final eager = PagesStore(vault, feed);
         try {
