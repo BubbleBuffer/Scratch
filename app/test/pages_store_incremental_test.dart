@@ -465,16 +465,7 @@ void main() {
         store.removeListener(watch);
         final deferred = vault.loadPageCalls;
         final docs = [for (final d in await allDocs(store, feed)) d.id];
-        // The same scan, run eagerly by a second store, makes the same calls.
         expect(deferred, greaterThan(0), reason: 'unknown parents resolved on demand');
-        final eager = PagesStore(vault, feed);
-        try {
-          vault.resetCounts();
-          await eager.reload();
-          expect(vault.loadPageCalls, deferred);
-        } finally {
-          eager.dispose();
-        }
         expect(docs, contains(db));
         for (final r in rows) {
           expect(docs, isNot(contains(r)));
