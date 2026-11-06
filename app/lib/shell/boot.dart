@@ -167,7 +167,7 @@ class _NotesAppState extends State<NotesApp> {
       final links = LinkPreviews(file: File('${widget.dataDir}${Platform.pathSeparator}link_previews.json'));
       final app = AppState(vault, ui: ui, links: links, settings: _settings);
       BootTiming.mark('before app.start');
-      await app.start(startReminders: false);
+      await app.start(startReminders: false, deferDocScan: true);
       BootTiming.mark('after app.start');
       AppLog.info('ready pages=${app.pages.count} fresh=$fresh');
       if (!mounted) {

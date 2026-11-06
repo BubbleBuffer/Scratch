@@ -351,6 +351,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     final c = context.colors;
     final expanded = context.app.ui.allPagesExpanded;
+    // The header count needs the scan too; boot no longer runs it.
+    if (!expanded) _pages.startDocScan();
     return [
       SliverToBoxAdapter(
         child: Padding(

@@ -80,6 +80,7 @@ class CountingVault extends Vault {
   CountingVault(super.raw);
 
   int pageCountCalls = 0;
+  int loadPageCalls = 0;
   String? metaGatePage;
   Completer<void>? metaGate;
   Completer<void>? metaStarted;
@@ -95,11 +96,13 @@ class CountingVault extends Vault {
 
   void resetCounts() {
     pageCountCalls = 0;
+    loadPageCalls = 0;
     requests.clear();
   }
 
   @override
   Future<PageData> loadPage(String id) async {
+    loadPageCalls++;
     final page = await super.loadPage(id);
     if (metaGatePage == id) {
       metaGatePage = null;
@@ -385,6 +388,89 @@ void main() {
           label: 'sparse edit',
           cov: Coverage(),
         );
+      } finally {
+        store.dispose();
+        feed.stop();
+        vault.dispose();
+        await dir.delete(recursive: true);
+      }
+    },
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
+  test(
+    'a deferred first reload makes no loadPage call until a document is asked for',
+    () async {
+      Debounce.instant = false;
+      final dir = await Directory.systemTemp.createTemp('notes-pages-deferred-');
+      final vault = CountingVault((await Vault.open(dir.path)).raw);
+      final feed = ChangeFeed(
+        vault,
+        interval: const Duration(hours: 1),
+        wakeDelay: const Duration(hours: 1),
+      );
+      final store = PagesStore(vault, feed);
+      try {
+        // The rows are among the newest pages, their database is not: the
+        // first scan chunk has one parent it cannot classify from its rows.
+        final db = await vault.createPage(title: 'Deferred database');
+        await vault.run((v) => v.makeCollection(page: db), writes: true);
+        final rows = [
+          for (var i = 0; i < 3; i++)
+            await vault.createPage(parent: db, title: 'Deferred row $i'),
+        ];
+        for (var i = 0; i < PagesStore.docScanChunk + 50; i++) {
+          await vault.createPage(title: 'Filler $i');
+        }
+        for (final r in rows) {
+          await vault.apply(r, [edit('newest')]);
+        }
+        await vault.flush();
+        final newest = [
+          for (final r in await vault.listPages(
+            offset: 0,
+            limit: PagesStore.docScanChunk,
+          ))
+            r.id,
+        ];
+        expect(newest, containsAll(rows));
+        expect(newest, isNot(contains(db)));
+        await feed.start();
+        vault.resetCounts();
+
+        await store.reload(scanDocs: false);
+        expect(vault.loadPageCalls, 0, reason: 'boot path makes no loadPage call');
+        expect(store.docCount, 0);
+        expect(store.docComplete, isFalse);
+        expect(store.rowAt(0), isNotNull);
+
+        // A reader that shows only the count (collapsed header) starts the
+        // scan too. Whatever it publishes along the way never holds a database
+        // row and never shrinks, so the list cannot jump or lose rows.
+        var last = 0;
+        void watch() {
+          expect(store.docCount, greaterThanOrEqualTo(last));
+          last = store.docCount;
+          for (var i = 0; i < store.docCount; i++) {
+            final d = store.docAt(i)!;
+            expect(rows, isNot(contains(d.id)), reason: 'a database row was listed');
+            expect(d.parent == null || d.parent != db, isTrue);
+          }
+        }
+
+        store.addListener(watch);
+        store.startDocScan();
+        await settle(feed);
+        expect(store.docCount, greaterThan(0), reason: 'the count-only reader ran the scan');
+        store.removeListener(watch);
+        final deferred = vault.loadPageCalls;
+        final docs = [for (final d in await allDocs(store, feed)) d.id];
+        expect(deferred, greaterThan(0), reason: 'unknown parents resolved on demand');
+        expect(docs, contains(db));
+        for (final r in rows) {
+          expect(docs, isNot(contains(r)));
+        }
+        expect(docs.length, store.count - rows.length);
       } finally {
         store.dispose();
         feed.stop();

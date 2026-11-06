@@ -51,18 +51,23 @@ class PagesStore extends ChangeNotifier {
 
   /// Retries superseded snapshots up to [maxReloadRounds], then defers a full
   /// reload. Concurrent callers share the same request and latest retained state.
-  Future<void> reload() {
+  ///
+  /// With [scanDocs] false the first document scan is left until a reader asks
+  /// for a document ([docAt]); boot uses it so the scan's per-parent
+  /// `loadPage` calls stay off the path to the first frame. A store that
+  /// already holds documents scans anyway, so its list is never left stale.
+  Future<void> reload({bool scanDocs = true}) {
     if (_inactive) return Future<void>.value();
-    return _reloadRequest ??= _reloadUntilCurrent().whenComplete(() {
+    return _reloadRequest ??= _reloadUntilCurrent(scanDocs).whenComplete(() {
       _reloadRequest = null;
     });
   }
 
-  Future<void> _reloadUntilCurrent() async {
+  Future<void> _reloadUntilCurrent(bool scanDocs) async {
     for (var round = 0; round < maxReloadRounds && !_inactive; round++) {
       await vault.flush();
       BootTiming.mark('pages: flush');
-      if (_inactive || await _reloadOnce()) return;
+      if (_inactive || await _reloadOnce(scanDocs: scanDocs)) return;
     }
     if (!_inactive) {
       _needsReload = true;
@@ -73,11 +78,11 @@ class PagesStore extends ChangeNotifier {
   // Feed refreshes make one cancellable attempt; their supersession logic
   // schedules newer batches. Share reads with explicit reloads so their
   // document scans cannot run concurrently against the same mutable cursor.
-  Future<bool> _reloadOnce() => _reloadInFlight ??= _loadPages().whenComplete(() {
+  Future<bool> _reloadOnce({bool scanDocs = true}) => _reloadInFlight ??= _loadPages(scanDocs).whenComplete(() {
     _reloadInFlight = null;
   });
 
-  Future<bool> _loadPages() async {
+  Future<bool> _loadPages(bool scanDocs) async {
     if (_inactive) return false;
     final gen = ++_generation;
     final n = await vault.pageCount();
@@ -102,8 +107,10 @@ class PagesStore extends ChangeNotifier {
     // metadata stale so consumers can refresh it without the pending guard.
     _contentPending.clear();
     notifyListeners();
-    await _scanDocs(gen);
-    BootTiming.mark('pages: _scanDocs');
+    if (scanDocs || _docs.isNotEmpty) {
+      await _scanDocs(gen);
+      BootTiming.mark('pages: _scanDocs');
+    }
     return !_inactive && gen == _generation;
   }
 
@@ -166,6 +173,10 @@ class PagesStore extends ChangeNotifier {
     _wantDocs(i + 60);
     return null;
   }
+
+  /// Starts the document scan if it has not run yet, for readers that show
+  /// only [docComplete] / [docCount] (Home's collapsed "All pages" header).
+  void startDocScan() => _wantDocs(0);
 
   void _wantDocs(int n) {
     if (_inactive) return;
