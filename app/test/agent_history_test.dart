@@ -60,7 +60,6 @@ Future<void> pumpHistoryChat(
   // The chat's view subscription ends with a reload of its stored state; that
   // reload would replace the fixture (an empty list) if it landed after it.
   await real(tester, store.debugViewScopeSettled);
-  await settle(tester);
   store.seedFixture(
     historyChat(id),
     ChatOutline(chapters: const []),
