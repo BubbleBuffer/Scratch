@@ -17,9 +17,11 @@ pub const PACKAGE: &str = "claude-code";
 /// The installed Claude Code package folder under `data_dir/packages`, which
 /// holds `claude-code/` and `bun/bun.exe` like the legacy bundle does.
 fn package_root(data_dir: Option<&Path>) -> Option<PathBuf> {
-    scratch_packages::Store::new(data_dir?)
-        .get(PACKAGE)
-        .map(|installed| installed.path)
+    let store = scratch_packages::Store::new(data_dir?);
+    // Files a removal could not delete (Windows, in use) go before anything
+    // is loaded from this folder.
+    store.clean_leftovers();
+    store.get(PACKAGE).map(|installed| installed.path)
 }
 
 /// Looks for Claude Code. Order: the explicit `bun` and `extension` and

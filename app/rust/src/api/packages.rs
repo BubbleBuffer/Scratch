@@ -123,46 +123,82 @@ pub fn packages_platform() -> String {
 }
 
 /// Downloads, verifies and installs the build's pinned version of `name`,
-/// reporting progress on `sink`. Runs on a worker thread until done. The
-/// error is a message that names the state (offline, checksum, disk full, ...).
+/// reporting progress on `sink`. Runs on a worker thread until done.
+///
+/// A failure (offline, checksum, disk full, ...) goes to Dart as an error on
+/// the stream, with a message that names the state. It must not be this
+/// function's `Err`: for a stream function the bridge drops the return value
+/// on the Dart side, the stream just ends, and the app took that for a
+/// finished install (the card stuck on "Ready").
 pub fn package_install(
     data_dir: String,
     name: String,
     sink: StreamSink<PackageProgress>,
 ) -> Result<PackageInfo, String> {
-    let manifest = Manifest::embedded();
-    let platform = current_platform();
-    let store = store(&data_dir);
-    let package = manifest.find(&name, platform).ok_or_else(|| {
-        scratch_packages::Error::Unavailable {
-            name: name.clone(),
-            platform: platform.to_string(),
-        }
-        .to_string()
-    })?;
-    store
-        .install(package, &mut |progress| {
-            let (phase, done, total) = match progress {
-                Progress::Downloading { done, total } => {
-                    (PackagePhase::Downloading, size(done), size(total))
-                }
-                Progress::Verifying => (PackagePhase::Verifying, 0, 0),
-                Progress::Extracting => (PackagePhase::Extracting, 0, 0),
-                Progress::Installing => (PackagePhase::Installing, 0, 0),
-            };
-            let _ = sink.add(PackageProgress { phase, done, total });
-        })
-        .map_err(|e| e.to_string())?;
-    Ok(info_for(&manifest, &store, platform, &name))
+    Ok(install_reporting(
+        &Manifest::embedded(),
+        &store(&data_dir),
+        current_platform(),
+        &name,
+        &mut |progress| {
+            let _ = sink.add(progress);
+        },
+        &mut |message| {
+            let _ = sink.add_error(message);
+        },
+    ))
 }
 
-/// Removes every installed version of `name`.
-pub fn package_remove(data_dir: String, name: String) -> Result<(), String> {
-    store(&data_dir)
-        .remove(&name)
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+/// Installs `name`; a failure is handed to `fail` (once) and not returned.
+fn install_reporting(
+    manifest: &Manifest,
+    store: &Store,
+    platform: &str,
+    name: &str,
+    report: &mut dyn FnMut(PackageProgress),
+    fail: &mut dyn FnMut(String),
+) -> PackageInfo {
+    let Some(package) = manifest.find(name, platform) else {
+        fail(
+            scratch_packages::Error::Unavailable {
+                name: name.to_string(),
+                platform: platform.to_string(),
+            }
+            .to_string(),
+        );
+        return info_for(manifest, store, platform, name);
+    };
+    let result = store.install(package, &mut |progress| {
+        let (phase, done, total) = match progress {
+            Progress::Downloading { done, total } => {
+                (PackagePhase::Downloading, size(done), size(total))
+            }
+            Progress::Verifying => (PackagePhase::Verifying, 0, 0),
+            Progress::Extracting => (PackagePhase::Extracting, 0, 0),
+            Progress::Installing => (PackagePhase::Installing, 0, 0),
+        };
+        report(PackageProgress { phase, done, total });
+    });
+    if let Err(e) = result {
+        fail(e.to_string());
+    }
+    info_for(manifest, store, platform, name)
 }
+
+/// Removes every installed version of `name`. When a file in use keeps part
+/// of the folder, the package still counts as removed (the leftovers go at
+/// the next start) and the error says so.
+pub fn package_remove(data_dir: String, name: String) -> Result<(), String> {
+    let store = store(&data_dir);
+    store.remove(&name).map_err(|e| e.to_string())?;
+    if store.has_leftovers(&name) {
+        return Err(LEFTOVERS.to_string());
+    }
+    Ok(())
+}
+
+const LEFTOVERS: &str =
+    "Removed. Some files are still in use and will be deleted the next time Scratch starts.";
 
 #[cfg(test)]
 mod tests {
@@ -241,5 +277,41 @@ mod tests {
         package_remove(data.clone(), "claude-code".into()).unwrap();
         assert!(Store::new(dir.path()).installed().is_empty());
         assert!(package_remove(data, "../x".into()).is_err());
+    }
+
+    #[test]
+    fn a_failed_install_goes_to_the_error_channel_not_the_return_value() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::new(dir.path());
+        let mut failures = Vec::new();
+
+        // Not listed for this platform.
+        let info = install_reporting(
+            &Manifest::default(),
+            &store,
+            "windows-x64",
+            "claude-code",
+            &mut |_| {},
+            &mut |m| failures.push(m),
+        );
+        assert_eq!(info.state, PackageState::NotAvailable);
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0].contains("not available"), "{failures:?}");
+
+        // Listed, but not over HTTPS: refused before any network use.
+        let mut insecure = package("1.0.0", 'a');
+        insecure.url = "http://example.invalid/p.zip".into();
+        failures.clear();
+        let info = install_reporting(
+            &Manifest { packages: vec![insecure] },
+            &store,
+            "windows-x64",
+            "claude-code",
+            &mut |_| {},
+            &mut |m| failures.push(m),
+        );
+        assert_eq!(info.state, PackageState::NotInstalled);
+        assert_eq!(failures.len(), 1);
+        assert!(failures[0].contains("not HTTPS"), "{failures:?}");
     }
 }

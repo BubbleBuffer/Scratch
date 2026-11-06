@@ -10,12 +10,18 @@
 //   message that names the state). Stream errors and thrown errors both end
 //   as failed. A finished install announces itself on [installs]; a failed
 //   one does not.
+// - Remove can be wired to the agent runtime that runs from the package:
+//   [removeBlocker] says why Remove is off (a reply is running), [beforeRemove]
+//   stops the runtime before the folder is deleted and [afterRemove] starts
+//   it again once the list is read, so the picker drops the models at once.
 // - No state is kept on disk: the install folder is the truth, read again
 //   after every install and removal.
 
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
+    show AnyhowException;
 
 import '../../core/paths.dart';
 import '../../src/rust/api/packages.dart' as bridge;
@@ -154,6 +160,23 @@ class PackagesStore extends ChangeNotifier {
   Future<void>? _loading;
   bool _disposed = false;
 
+  /// Why Remove is off for a package (plain words), or null when it is on.
+  /// Set by the owner of the runtime that uses the package.
+  String? Function(String name)? removeBlocker;
+
+  /// Runs before the package folder is deleted (stop what runs from it).
+  Future<void> Function(String name)? beforeRemove;
+
+  /// Runs after the folder was deleted and the list read again, also when the
+  /// deletion failed.
+  Future<void> Function(String name)? afterRemove;
+
+  /// Why [name] cannot be removed now, or null.
+  String? removeBlockedReason(String name) => removeBlocker?.call(name);
+
+  /// The blocker's answer changed: rebuild what shows Remove.
+  void removeBlockerChanged() => _notify();
+
   /// Names of packages as their install finishes (not when one fails).
   Stream<String> get installs => _installed.stream;
 
@@ -250,22 +273,41 @@ class PackagesStore extends ChangeNotifier {
     return true;
   }
 
-  /// Removes every installed version of [name]. Does nothing while any
-  /// install runs.
+  /// Removes every installed version of [name]: first stops what runs from
+  /// it ([beforeRemove]), then deletes the folder, then reads the state again
+  /// and lets the runtime start without it ([afterRemove]). Does nothing
+  /// while any install runs or [removeBlocker] gives a reason. The bridge
+  /// throws when files stayed behind: the package counts as removed then and
+  /// the row shows the message.
   Future<void> remove(String name) async {
     if (installing || _removing.contains(name)) return;
+    if (removeBlockedReason(name) != null) return;
     _removing.add(name);
     _ready.remove(name);
     _notify();
     try {
-      await _backend.remove(name);
-      _status.remove(name);
-    } catch (e) {
-      _status[name] = PackageFailed(_message(e));
+      try {
+        await beforeRemove?.call(name);
+      } catch (e) {
+        AppLog.info('package $name: before remove: $e');
+      }
+      try {
+        await _backend.remove(name);
+        _status.remove(name);
+      } catch (e) {
+        _status[name] = PackageFailed(_message(e));
+      }
+      _removing.remove(name);
+      await _refreshOne(name);
+    } finally {
+      _removing.remove(name);
+      try {
+        await afterRemove?.call(name);
+      } catch (e) {
+        AppLog.info('package $name: after remove: $e');
+      }
+      _notify();
     }
-    _removing.remove(name);
-    await _refreshOne(name);
-    _notify();
   }
 
   /// Forgets a failure (the card's error goes away).
@@ -278,7 +320,7 @@ class PackagesStore extends ChangeNotifier {
   /// The error's own text: the bridge throws the message it names the state
   /// in, not a stack of wrappers.
   static String _message(Object e) {
-    var text = '$e'.trim();
+    var text = (e is AnyhowException ? e.message : '$e').trim();
     if (text.startsWith('Exception: ')) text = text.substring(11).trim();
     return text.isEmpty ? 'download failed' : text;
   }

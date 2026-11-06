@@ -60,6 +60,7 @@ class _PackageRow extends StatelessWidget {
     final status = store.statusOf(name);
     final working = status is PackageInstalling;
     final removing = store.isRemoving(name);
+    final blocked = store.removeBlockedReason(name);
     final installed = info.state == PackageState.installed ||
         info.state == PackageState.updateAvailable;
     final download = packageSize(info.downloadBytes.toInt());
@@ -86,11 +87,12 @@ class _PackageRow extends StatelessWidget {
         _ => 'Not installed · $download download',
       };
     }
+    final fullSub = blocked == null || !installed ? sub : '$sub · $blocked';
     final busy = store.installing || removing;
     return SItem(
       key: ValueKey('package-$name'),
       name: packageTitle(name),
-      sub: sub,
+      sub: fullSub,
       error: status is PackageFailed ? status.message : null,
       trailing: [
         if (info.state == PackageState.notInstalled)
@@ -111,7 +113,9 @@ class _PackageRow extends StatelessWidget {
           SButton(
             'Remove',
             key: ValueKey('package-remove-$name'),
-            onTap: busy || working ? null : () => store.remove(name),
+            onTap: busy || working || blocked != null
+                ? null
+                : () => store.remove(name),
           ),
       ],
     );
