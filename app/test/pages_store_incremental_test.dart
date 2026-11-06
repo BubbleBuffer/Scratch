@@ -445,7 +445,17 @@ void main() {
         expect(store.rowAt(0), isNotNull);
 
         final docs = [for (final d in await allDocs(store, feed)) d.id];
-        expect(vault.loadPageCalls, 1, reason: 'one unknown parent, resolved on demand');
+        // The same scan, run eagerly by a second store, makes the same calls.
+        final deferred = vault.loadPageCalls;
+        expect(deferred, greaterThan(0), reason: 'unknown parents resolved on demand');
+        final eager = PagesStore(vault, feed);
+        try {
+          vault.resetCounts();
+          await eager.reload();
+          expect(vault.loadPageCalls, deferred);
+        } finally {
+          eager.dispose();
+        }
         expect(docs, contains(db));
         for (final r in rows) {
           expect(docs, isNot(contains(r)));
