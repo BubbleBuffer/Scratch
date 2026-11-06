@@ -90,10 +90,14 @@ class AppState {
   /// With [startReminders] false the reminder plan is left to
   /// [ReminderStore.start] (boot calls it after Home's first frame); only the
   /// backend's `init` runs here, so a launch tap is known.
-  Future<void> start({bool startReminders = true}) async {
+  ///
+  /// With [deferDocScan] true the "All pages" scan (one `loadPage` per unknown
+  /// parent) waits until Home first asks for a document, so it does not hold
+  /// up the first frame.
+  Future<void> start({bool startReminders = true, bool deferDocScan = false}) async {
     await feed.start();
     BootTiming.mark('feed.start');
-    await pages.reload();
+    await pages.reload(scanDocs: !deferDocScan);
     BootTiming.mark('pages.reload');
     await agenda.reload();
     BootTiming.mark('agenda.reload');
