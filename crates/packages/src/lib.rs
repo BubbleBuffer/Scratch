@@ -548,7 +548,11 @@ fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
         .timeout_recv_response(Some(Duration::from_secs(60)))
-        .timeout_recv_body(Some(Duration::from_secs(120)))
+        // The body limit is a total budget, not an idle limit (ureq 3.5), so it
+        // must cover the slowest download we accept: 30 minutes.
+        .timeout_recv_body(Some(Duration::from_secs(30 * 60)))
+        // A stalled connection still ends quickly: this one restarts per read.
+        .timeout_per_read(Some(Duration::from_secs(60)))
         .build()
         .into()
 }

@@ -24,7 +24,7 @@ A package is one zip per platform: `scratch-pkg-<name>-<version>-<platform>.zip`
 4. Extracts to `.tmp-extract`, refusing paths outside it, symlinks and archives over 4 GiB unpacked, and writes a `.package.json` marker (name, version, sha256).
 5. Renames the folder to `<version>/`, then deletes other versions (best effort: a locked folder on Windows stays until the next install). Until the rename, the old version keeps working.
 
-Timeouts: connecting 20 s, the response head 60 s, the whole body 120 s (ureq), so a hung connection ends as an offline error. The lock is released when the install returns, failed or not, and an installer that dies loses it with the process, so a failed download never blocks Retry. The proxy variables (`HTTPS_PROXY`) are honoured by ureq; a dead proxy is a refused connection and fails like any other offline error.
+Timeouts: connecting 20 s, the response head 60 s, the whole body 30 minutes (a total budget in ureq 3.5, not an idle limit, so it must cover a slow link), and 60 s per transport read, so a stalled connection ends as an offline error within a minute. The lock is released when the install returns, failed or not, and an installer that dies loses it with the process, so a failed download never blocks Retry. The proxy variables (`HTTPS_PROXY`) are honoured by ureq; a dead proxy is a refused connection and fails like any other offline error.
 
 `Store::state` compares the installed marker with the manifest entry: not installed, current, or update available (version or hash differs). `installed()` lists current versions.
 
