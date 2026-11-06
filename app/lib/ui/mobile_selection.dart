@@ -15,7 +15,6 @@ import 'package:flutter/material.dart'
         DefaultMaterialLocalizations,
         Theme,
         ThemeData;
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'selection.dart';
@@ -46,7 +45,7 @@ Widget mobileContextMenu(BuildContext context, EditableTextState state) {
     onPrimary: c.bgPrimary,
     secondary: c.accent,
     onSecondary: c.bgPrimary,
-    error: c.dangerText,
+    error: c.dangerBg,
     onError: c.bgPrimary,
     surface: c.bgElevated,
     onSurface: c.textPrimary,
