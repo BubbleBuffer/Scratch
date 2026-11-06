@@ -33,6 +33,8 @@ Future<void> pumpHistoryChat(
   bool dark = false,
   double width = 900,
   double height = 700,
+  // The golden shots keep their timing: their scrollbar is caught mid-fade.
+  bool settleMount = true,
 }) async {
   await tester.pumpWidget(
     NotesShell(
@@ -57,9 +59,13 @@ Future<void> pumpHistoryChat(
     await settle(tester);
   }
   final id = store.openId!;
-  // The chat's view subscription ends with a reload of its stored state; that
-  // reload would replace the fixture (an empty list) if it landed after it.
-  await real(tester, store.debugViewScopeSettled);
+  if (settleMount) {
+    // The chat's view subscription ends with a reload of its stored state;
+    // that reload would replace the fixture (an empty list) if it landed
+    // after it.
+    await real(tester, store.debugViewScopeSettled);
+    await settle(tester);
+  }
   store.seedFixture(
     historyChat(id),
     ChatOutline(chapters: const []),

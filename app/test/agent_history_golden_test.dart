@@ -41,6 +41,7 @@ void main() {
           dark: dark,
           width: phone ? 375 : 900,
           height: phone ? 760 : 720,
+          settleMount: false,
         );
       }
 
