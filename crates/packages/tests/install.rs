@@ -312,3 +312,87 @@ fn manifest_parse_and_lookup() {
     assert!(Manifest::parse("nope").is_err());
     assert!(Manifest::embedded().packages.is_empty() || Manifest::embedded().packages[0].validate().is_ok());
 }
+
+#[test]
+fn files_a_removal_left_behind_are_not_an_install_and_go_at_the_next_clean() {
+    let bytes = zip_bytes(&[("a.txt", "a")]);
+    let (url, _) = serve(bytes.clone());
+    let dir = tempfile::tempdir().unwrap();
+    let store = store(&dir);
+    let installed = store.install(&package("1.0.0", &url, &bytes), &mut no_progress).unwrap();
+    // What a removal leaves when a file is in use: the version folder with
+    // its files, but no marker.
+    std::fs::remove_file(installed.path.join(".package.json")).unwrap();
+    assert!(store.installed().is_empty(), "no marker: not installed");
+    assert!(store.has_leftovers("claude-code"));
+    std::fs::create_dir_all(store.root().join("claude-code/.tmp-extract")).unwrap();
+
+    store.clean_leftovers("claude-code");
+    assert!(!installed.path.exists());
+    assert!(!store.has_leftovers("claude-code"));
+    assert!(leftovers(&store).is_empty());
+    assert!(store.root().join("claude-code/.lock").exists());
+
+    // An installed version is never touched by the cleaning.
+    let again = store.install(&package("1.0.0", &url, &bytes), &mut no_progress).unwrap();
+    store.clean_leftovers("claude-code");
+    assert!(again.path.join("a.txt").exists());
+}
+
+#[test]
+fn install_replaces_an_unmarked_folder_left_by_a_removal() {
+    let bytes = zip_bytes(&[("a.txt", "a")]);
+    let (url, _) = serve(bytes.clone());
+    let dir = tempfile::tempdir().unwrap();
+    let store = store(&dir);
+    let stale = store.root().join("claude-code/1.0.0");
+    std::fs::create_dir_all(&stale).unwrap();
+    std::fs::write(stale.join("old.bin"), b"x").unwrap();
+    let installed = store.install(&package("1.0.0", &url, &bytes), &mut no_progress).unwrap();
+    assert!(installed.path.join("a.txt").exists());
+    assert!(!installed.path.join("old.bin").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn remove_with_a_folder_it_cannot_empty_still_removes_the_package() {
+    use std::os::unix::fs::PermissionsExt;
+    let bytes = zip_bytes(&[("sub/a.txt", "a")]);
+    let (url, _) = serve(bytes.clone());
+    let dir = tempfile::tempdir().unwrap();
+    let store = store(&dir);
+    let installed = store.install(&package("1.0.0", &url, &bytes), &mut no_progress).unwrap();
+    let sub = installed.path.join("sub");
+    // A read-only folder: its file cannot be unlinked (unless run as root).
+    std::fs::set_permissions(&sub, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let stuck = std::fs::remove_file(sub.join("a.txt")).is_err();
+    let had = store.remove("claude-code").unwrap();
+    assert!(had);
+    assert!(store.installed().is_empty(), "treated as removed");
+    if stuck {
+        assert!(store.has_leftovers("claude-code"), "the leftovers are reported");
+        std::fs::set_permissions(&sub, std::fs::Permissions::from_mode(0o755)).unwrap();
+        store.clean_leftovers("claude-code");
+        assert!(!store.has_leftovers("claude-code"));
+    }
+}
+
+#[test]
+fn a_failed_install_leaves_no_lock_that_blocks_the_retry() {
+    let bytes = zip_bytes(&[("a.txt", "a")]);
+    let dir = tempfile::tempdir().unwrap();
+    let store = store(&dir);
+    // A port nobody listens on: the connection is refused at once.
+    let port = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let dead = package("1.0.0", &format!("http://127.0.0.1:{port}/pkg.zip"), &bytes);
+    assert!(matches!(
+        store.install(&dead, &mut no_progress),
+        Err(Error::Offline(_))
+    ));
+    assert!(store.installed().is_empty());
+    assert_eq!(leftovers(&store), Vec::<String>::new());
+    // The retry takes the lock at once and installs.
+    let (url, _) = serve(bytes.clone());
+    store.install(&package("1.0.0", &url, &bytes), &mut no_progress).unwrap();
+    assert_eq!(store.installed().len(), 1);
+}

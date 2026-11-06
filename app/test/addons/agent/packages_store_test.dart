@@ -1,5 +1,7 @@
 // PackagesStore over a fake backend: the state of each package, one install
 // per package, progress, failure and retry, removal, and the card's rules.
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
+    show AnyhowException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/addons/agent/agent_runtime_card.dart';
 import 'package:notes_app/addons/agent/packages_store.dart';
@@ -109,6 +111,77 @@ void main() {
     expect(await retry, isTrue);
     expect(store.statusOf(_name), isA<PackageIdle>());
     expect(finished, [_name]);
+    store.dispose();
+  });
+
+  test('a bridge error shows its message without the wrapper', () async {
+    final backend = FakePackagesBackend([claudeNotInstalled()]);
+    final store = PackagesStore(backend: backend);
+    await store.refresh();
+    final install = store.install(_name);
+    backend.lastInstall.addError(
+      AnyhowException('download failed, check the connection: refused'),
+    );
+    expect(await install, isFalse);
+    expect(
+      (store.statusOf(_name) as PackageFailed).message,
+      'download failed, check the connection: refused',
+    );
+    store.dispose();
+  });
+
+  test('remove stops the runtime first and starts it after the list', () async {
+    final backend = FakePackagesBackend([claudeInstalled()]);
+    final store = PackagesStore(backend: backend);
+    await store.refresh();
+    final steps = <String>[];
+    backend.onRemove = () => steps.add('delete');
+    store.beforeRemove = (_) async => steps.add('stop');
+    store.afterRemove = (_) async {
+      steps.add('start:${store.infoOf(_name)?.state.name}');
+    };
+    await store.remove(_name);
+    expect(steps, ['stop', 'delete', 'start:notInstalled']);
+    expect(store.isRemoving(_name), isFalse);
+    store.dispose();
+  });
+
+  test('remove does nothing while the blocker gives a reason', () async {
+    final backend = FakePackagesBackend([claudeInstalled()]);
+    final store = PackagesStore(backend: backend);
+    await store.refresh();
+    var hooks = 0;
+    store.beforeRemove = (_) async => hooks++;
+    store.afterRemove = (_) async => hooks++;
+    store.removeBlocker = (_) => 'a reply is running';
+    expect(store.removeBlockedReason(_name), 'a reply is running');
+    await store.remove(_name);
+    expect(backend.removeCalls, isEmpty);
+    expect(hooks, 0);
+    expect(store.infoOf(_name)?.state, PackageState.installed);
+    store.removeBlocker = null;
+    await store.remove(_name);
+    expect(backend.removeCalls, [_name]);
+    store.dispose();
+  });
+
+  test('files left behind: removed, message shown, runtime restarts', () async {
+    final backend = FakePackagesBackend([claudeInstalled()])
+      ..removeThrows = AnyhowException(
+        'Removed. Some files are still in use and will be deleted the next '
+        'time Scratch starts.',
+      );
+    final store = PackagesStore(backend: backend);
+    await store.refresh();
+    var restarted = false;
+    store.afterRemove = (_) async => restarted = true;
+    await store.remove(_name);
+    expect(store.infoOf(_name)?.state, PackageState.notInstalled);
+    expect(
+      (store.statusOf(_name) as PackageFailed).message,
+      startsWith('Removed. Some files are still in use'),
+    );
+    expect(restarted, isTrue);
     store.dispose();
   });
 

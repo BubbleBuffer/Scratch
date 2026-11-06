@@ -24,7 +24,11 @@ A package is one zip per platform: `scratch-pkg-<name>-<version>-<platform>.zip`
 4. Extracts to `.tmp-extract`, refusing paths outside it, symlinks and archives over 4 GiB unpacked, and writes a `.package.json` marker (name, version, sha256).
 5. Renames the folder to `<version>/`, then deletes other versions (best effort: a locked folder on Windows stays until the next install). Until the rename, the old version keeps working.
 
-`Store::state` compares the installed marker with the manifest entry: not installed, current, or update available (version or hash differs). `installed()` lists current versions, `remove(name)` deletes every version. Errors are an enum (`Offline`, `Http`, `SizeMismatch`, `ChecksumMismatch`, `BadArchive`, `DiskFull`, `Unavailable`, ...) with messages that name the state.
+Timeouts: connecting 20 s, the response head 60 s, the whole body 30 minutes (a total budget in ureq 3.5, not an idle limit, so it must cover a slow link), and 60 s per transport read, so a stalled connection ends as an offline error within a minute. The lock is released when the install returns, failed or not, and an installer that dies loses it with the process, so a failed download never blocks Retry. The proxy variables (`HTTPS_PROXY`) are honoured by ureq; a dead proxy is a refused connection and fails like any other offline error.
+
+`Store::state` compares the installed marker with the manifest entry: not installed, current, or update available (version or hash differs). `installed()` lists current versions.
+
+`remove(name)` deletes every version. It deletes each version's `.package.json` marker first, so the package counts as removed at once even when a file in use (on Windows: a runtime still shutting down, a virus scan) keeps its folder; then it deletes the folders, retrying a failed one twice. Folders without a marker are leftovers: `has_leftovers(name)` reports them, and `clean_leftovers(name)` deletes them (and stale `.tmp-*`) if it can lock the package folder. `install` sweeps them under its lock too, and `vault_agent::claude` calls `clean_leftovers("claude-code")` before it looks for Claude Code, so the next app start deletes them before anything loads from that folder. An unmarked folder is never taken for an install. Errors are an enum (`Offline`, `Http`, `SizeMismatch`, `ChecksumMismatch`, `BadArchive`, `DiskFull`, `Unavailable`, ...) with messages that name the state.
 
 ## Build and lookup
 
@@ -39,3 +43,7 @@ Tests: `crates/packages/tests/install.rs` (local server: good, bad hash, short b
 ## App UI
 
 The Flutter side is the agent add-on's download card, the "Installed packages" settings section and `AgentStore.refreshRuntime()` (see [Agent](agent.md#claude-code-download-runtime-package)). The bridge exposes `packagesList`, `packageInfo`, `packagesPlatform`, `packageInstall` (a stream of `PackageProgress`: phase and bytes) and `packageRemove` ([packages.rs](../../app/rust/src/api/packages.rs)). Installing is always an explicit tap; a failed install shows the Rust error message and Retry, and does not touch the running agent.
+
+The install failure travels as an error on the progress stream (`StreamSink::add_error`), never as the function's `Err`: for a stream function the bridge drops the return value on the Dart side, the stream just ends, and the store took that for a finished install (the card stuck on "Ready" after any failed download, found 2026-11-06). `package_install` returns `Ok` after reporting a failure. Test: `app/test/packages_bridge_test.dart` (a failed install over the real bridge ends as failed).
+
+`package_remove` throws "Removed. Some files are still in use and will be deleted the next time Scratch starts." when `has_leftovers` is true after the delete. The package is removed by then; the store shows the text on the row.

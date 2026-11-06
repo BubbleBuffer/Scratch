@@ -3,7 +3,9 @@
 // install does not. The package backend is a fake; the agent is the real
 // core with the fake extension (see agent_test.dart).
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notes_app/addons/agent/agent_store.dart';
 import 'package:notes_app/addons/agent/packages_store.dart';
+import 'package:notes_app/src/rust/api/agent.dart' show AgentEvent;
 
 import 'addons/agent/packages_fakes.dart';
 import 'agent_test.dart' show fakeExtensionSkipReason, openAgentStore;
@@ -56,6 +58,69 @@ void main() {
 
       expect(store.runtimeRefreshes, 0);
       expect(store.hostInfo, isNotNull, reason: 'still the same open agent');
+    });
+
+    appTest('removing claude-code stops the agent first, then re-opens it', (
+      tester,
+    ) async {
+      await pumpApp(tester, mobile: false);
+      final store = await openAgentStore(tester);
+      final backend = FakePackagesBackend([claudeInstalled()]);
+      final packages = PackagesStore(backend: backend);
+      addTearDown(packages.dispose);
+      store.usePackages(packages);
+      await packages.refresh();
+      expect(store.hostInfo, isNotNull);
+      expect(store.runtimeRefreshes, 0);
+
+      // The folder is deleted while nothing runs from it.
+      Object? hostWhenDeleting = 'not called';
+      backend.onRemove = () => hostWhenDeleting = store.hostInfo;
+      final removing = packages.remove(claudeCodePackage);
+      await finishAsync(tester, removing);
+      await settleUntil(tester, () => store.runtimeRefreshes == 1);
+      await settle(tester);
+
+      expect(hostWhenDeleting, isNull, reason: 'the runtime was stopped');
+      expect(store.runtimeRefreshes, 1);
+      expect(store.hostInfo, isNotNull, reason: 'running again');
+      expect(packages.infoOf(claudeCodePackage)?.state,
+          PackageState.notInstalled);
+    });
+
+    appTest('a running reply turns Remove off until it ends', (tester) async {
+      await pumpApp(tester, mobile: false);
+      final store = await openAgentStore(tester);
+      final backend = FakePackagesBackend([claudeInstalled()]);
+      final packages = PackagesStore(backend: backend);
+      addTearDown(packages.dispose);
+      store.usePackages(packages);
+      await packages.refresh();
+      expect(packages.removeBlockedReason(claudeCodePackage), isNull);
+
+      AgentEvent run(String kind) => AgentEvent(
+        kind: kind,
+        sequence: 0,
+        durable: false,
+        sessionId: 'other-chat',
+        runId: 'run-1',
+        createdAt: '2026-11-06T00:00:00Z',
+        isError: false,
+        skipped: 0,
+        json: '{}',
+      );
+
+      store.debugEvent(run('run_started'));
+      expect(
+        packages.removeBlockedReason(claudeCodePackage),
+        AgentStore.removeBlockedWhileRunning,
+      );
+      await packages.remove(claudeCodePackage);
+      expect(backend.removeCalls, isEmpty, reason: 'the reply is not cut off');
+      expect(store.hostInfo, isNotNull, reason: 'the agent stays open');
+
+      store.debugEvent(run('run_finished'));
+      expect(packages.removeBlockedReason(claudeCodePackage), isNull);
     });
 
     appTest('another package finishing does not re-open it', (tester) async {

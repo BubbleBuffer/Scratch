@@ -313,6 +313,14 @@ impl Store {
     }
 
     /// Removes every version of `name`. Returns whether anything was installed.
+    ///
+    /// Every version's marker goes first, so the package counts as removed
+    /// at once, even when a file in use (an antivirus scan, a runtime that is
+    /// still shutting down) keeps its folder on Windows. Such leftovers carry
+    /// no marker; [`Store::has_leftovers`] reports them and
+    /// [`Store::clean_leftovers`] (the next app start) or the next install
+    /// deletes them. A marker that cannot be deleted is an error: the package
+    /// is still installed then.
     pub fn remove(&self, name: &str) -> Result<bool, Error> {
         check_token("name", name, |c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')?;
         let dir = self.root.join(name);
@@ -321,18 +329,55 @@ impl Store {
         }
         let _lock = PackageLock::acquire(&dir)?;
         let had = self.get(name).is_some();
-        for entry in fs::read_dir(&dir)?.flatten() {
-            if entry.file_name() == LOCK {
-                continue;
+        let paths: Vec<PathBuf> = fs::read_dir(&dir)?
+            .flatten()
+            .filter(|e| e.file_name() != LOCK)
+            .map(|e| e.path())
+            .collect();
+        for path in &paths {
+            let marker = path.join(MARKER);
+            if marker.is_file() {
+                fs::remove_file(&marker)?;
             }
-            let path = entry.path();
-            if path.is_dir() {
-                fs::remove_dir_all(&path)?;
-            } else {
-                fs::remove_file(&path)?;
+        }
+        for path in &paths {
+            // A runtime that was just stopped may need a moment to let go.
+            for attempt in 0..3 {
+                sweep(path);
+                if !path.exists() {
+                    break;
+                }
+                if attempt < 2 {
+                    std::thread::sleep(Duration::from_millis(300));
+                }
             }
         }
         Ok(had)
+    }
+
+    /// Whether `name` has files on disk that no installed version owns: what
+    /// a [`Store::remove`] could not delete.
+    pub fn has_leftovers(&self, name: &str) -> bool {
+        fs::read_dir(self.root.join(name))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .any(|e| e.file_name() != LOCK && !e.path().join(MARKER).is_file())
+    }
+
+    /// Deletes what no installed version of `name` owns: leftovers of a
+    /// removal, and temp files of an interrupted install. Does nothing while
+    /// another process installs or removes the package. Call it before
+    /// anything loads from the package folder.
+    pub fn clean_leftovers(&self, name: &str) {
+        let slug = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-';
+        if check_token("name", name, slug).is_err() {
+            return;
+        }
+        let dir = self.root.join(name);
+        if let Some(_lock) = PackageLock::try_acquire(&dir) {
+            sweep_unowned(&dir);
+        }
     }
 
     /// Downloads, verifies and installs `package`. Safe to call from several
@@ -363,6 +408,8 @@ impl Store {
         sweep(&download);
         sweep(&extract);
         sweep(&old);
+        // A folder a removal could not delete would be taken for the target.
+        sweep_unowned(&dir);
 
         let result = self.install_locked(package, &dir, &download, &extract, &old, progress);
         sweep(&download);
@@ -447,18 +494,47 @@ fn sweep(path: &Path) {
     }
 }
 
+/// Deletes what is not an installed version in `dir` (the caller holds the
+/// lock): folders without a marker and `.tmp-*` files.
+fn sweep_unowned(dir: &Path) {
+    for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+        let path = entry.path();
+        let name = entry.file_name();
+        if name == LOCK {
+            continue;
+        }
+        let owned = path.join(MARKER).is_file();
+        if !owned && (path.is_dir() || name.to_string_lossy().starts_with(".tmp")) {
+            sweep(&path);
+        }
+    }
+}
+
 /// Exclusive advisory lock on `<package dir>/.lock`, released on drop.
 struct PackageLock(File);
 
 impl PackageLock {
-    fn acquire(dir: &Path) -> Result<PackageLock, Error> {
-        let file = fs::OpenOptions::new()
+    fn open(dir: &Path) -> io::Result<File> {
+        fs::OpenOptions::new()
             .create(true)
             .truncate(false)
             .write(true)
-            .open(dir.join(LOCK))?;
+            .open(dir.join(LOCK))
+    }
+
+    fn acquire(dir: &Path) -> Result<PackageLock, Error> {
+        let file = PackageLock::open(dir)?;
         file.lock()?;
         Ok(PackageLock(file))
+    }
+}
+
+impl PackageLock {
+    /// The lock, or None when another process holds it.
+    fn try_acquire(dir: &Path) -> Option<PackageLock> {
+        let file = PackageLock::open(dir).ok()?;
+        file.try_lock().ok()?;
+        Some(PackageLock(file))
     }
 }
 
@@ -472,7 +548,11 @@ fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
         .timeout_recv_response(Some(Duration::from_secs(60)))
-        .timeout_recv_body(Some(Duration::from_secs(120)))
+        // The body limit is a total budget, not an idle limit (ureq 3.5), so it
+        // must cover the slowest download we accept: 30 minutes.
+        .timeout_recv_body(Some(Duration::from_secs(30 * 60)))
+        // A stalled connection still ends quickly: this one restarts per read.
+        .timeout_per_read(Some(Duration::from_secs(60)))
         .build()
         .into()
 }

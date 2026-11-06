@@ -56,6 +56,12 @@ class FakePackagesBackend implements PackagesBackend {
   /// A thrown error from `install` itself (before any stream), when set.
   Object? installThrows;
 
+  /// Runs when `remove` is called, before the state changes.
+  void Function()? onRemove;
+
+  /// A thrown error from `remove` after the package is gone (files left).
+  Object? removeThrows;
+
   final installCalls = <String>[];
   final removeCalls = <String>[];
 
@@ -94,11 +100,14 @@ class FakePackagesBackend implements PackagesBackend {
   @override
   Future<void> remove(String name) async {
     removeCalls.add(name);
+    onRemove?.call();
     state[name] = PackageInfo(
       name: name,
       version: state[name]?.version ?? '',
       downloadBytes: state[name]?.downloadBytes ?? 0,
       state: PackageState.notInstalled,
     );
+    final e = removeThrows;
+    if (e != null) throw e;
   }
 }

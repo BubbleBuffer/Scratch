@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `info_for`, `list_for`, `size`, `store`
+// These functions are ignored because they are not marked as `pub`: `info_for`, `install_reporting`, `list_for`, `size`, `store`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Every package this build lists for this platform, plus any other installed
@@ -28,8 +28,13 @@ String packagesPlatform() =>
     RustLib.instance.api.crateApiPackagesPackagesPlatform();
 
 /// Downloads, verifies and installs the build's pinned version of `name`,
-/// reporting progress on `sink`. Runs on a worker thread until done. The
-/// error is a message that names the state (offline, checksum, disk full, ...).
+/// reporting progress on `sink`. Runs on a worker thread until done.
+///
+/// A failure (offline, checksum, disk full, ...) goes to Dart as an error on
+/// the stream, with a message that names the state. It must not be this
+/// function's `Err`: for a stream function the bridge drops the return value
+/// on the Dart side, the stream just ends, and the app took that for a
+/// finished install (the card stuck on "Ready").
 Stream<PackageProgress> packageInstall({
   required String dataDir,
   required String name,
@@ -38,7 +43,9 @@ Stream<PackageProgress> packageInstall({
   name: name,
 );
 
-/// Removes every installed version of `name`.
+/// Removes every installed version of `name`. When a file in use keeps part
+/// of the folder, the package still counts as removed (the leftovers go at
+/// the next start) and the error says so.
 Future<void> packageRemove({required String dataDir, required String name}) =>
     RustLib.instance.api.crateApiPackagesPackageRemove(
       dataDir: dataDir,

@@ -145,6 +145,7 @@ class AgentStore extends ChangeNotifier {
     unawaited(_loadVaultDefaults());
     _packagesSub = _packages.installs.listen(_packageInstalled);
     _packages.addListener(_packagesChanged);
+    _hookRemoval(_packages);
   }
 
   final Vault vault;
@@ -1477,6 +1478,7 @@ class AgentStore extends ChangeNotifier {
       return Future.value(null);
     }
     if (_agent != null) return Future.value(_agent);
+    if (_packageRemoval) return Future.value(null);
     return _opening ??= _open().whenComplete(() => _opening = null);
   }
 
@@ -1493,8 +1495,58 @@ class AgentStore extends ChangeNotifier {
     if (identical(store, _packages)) return;
     unawaited(_packagesSub?.cancel());
     _packages.removeListener(_packagesChanged);
+    _unhookRemoval(_packages);
     _packages = store..addListener(_packagesChanged);
     _packagesSub = store.installs.listen(_packageInstalled);
+    _hookRemoval(store);
+  }
+
+  // Removing the Claude Code package: the agent runtime runs from its folder
+  // (Bun holds the files open), so it is stopped first and started again
+  // after, without the Claude models. A running reply is never cut off:
+  // Remove is off until it ends.
+
+  /// Replies running in any chat, from run_started and run_finished events.
+  final _liveRuns = <String>{};
+  bool _packageRemoval = false;
+
+  void _hookRemoval(PackagesStore store) {
+    store
+      ..removeBlocker = _removeBlocker
+      ..beforeRemove = _packageRemoving
+      ..afterRemove = _packageRemoved;
+  }
+
+  void _unhookRemoval(PackagesStore store) {
+    if (store.removeBlocker == _removeBlocker) store.removeBlocker = null;
+    if (store.beforeRemove == _packageRemoving) store.beforeRemove = null;
+    if (store.afterRemove == _packageRemoved) store.afterRemove = null;
+  }
+
+  /// Whether any chat has a reply running.
+  bool get replyRunning => running || _liveRuns.isNotEmpty;
+
+  /// The words on the Remove row while a reply runs.
+  static const removeBlockedWhileRunning =
+      'Remove is off while a reply is running. Stop it or wait for it to end.';
+
+  String? _removeBlocker(String name) {
+    if (name != claudeCodePackage || _agentOnHub) return null;
+    return replyRunning ? removeBlockedWhileRunning : null;
+  }
+
+  Future<void> _packageRemoving(String name) async {
+    if (name != claudeCodePackage || _agentOnHub || _disposed) return;
+    _packageRemoval = true;
+    _reopen.cancel();
+    // No reply runs (Remove is off then), so nothing is cancelled here.
+    await _close(keepState: true, cancelOpen: false);
+  }
+
+  Future<void> _packageRemoved(String name) async {
+    if (!_packageRemoval) return;
+    _packageRemoval = false;
+    await refreshRuntime();
   }
 
   bool _offered = false;
@@ -2127,6 +2179,13 @@ class AgentStore extends ChangeNotifier {
       return;
     }
     if (e.kind == 'run_started' || e.kind == 'run_finished') {
+      final was = replyRunning;
+      if (e.kind == 'run_started') {
+        _liveRuns.add(e.runId);
+      } else {
+        _liveRuns.remove(e.runId);
+      }
+      if (was != replyRunning) _packages.removeBlockerChanged();
       _reloadList.run(const Duration(milliseconds: 100), refreshSessions);
     }
     if (e.sessionId != openId) return;
@@ -2421,6 +2480,7 @@ class AgentStore extends ChangeNotifier {
     hostInfo = null;
     claudeDetection = null;
     projects = const [];
+    _liveRuns.clear();
     if (!keepState) {
       sessions = const [];
       state = null;
@@ -2469,6 +2529,7 @@ class AgentStore extends ChangeNotifier {
     unawaited(_uiActions.close());
     unawaited(_packagesSub?.cancel());
     _packages.removeListener(_packagesChanged);
+    _unhookRemoval(_packages);
     _stores[vault] = null;
     super.dispose();
   }
