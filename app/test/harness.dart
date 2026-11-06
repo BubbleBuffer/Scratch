@@ -433,14 +433,25 @@ Future<TestVault> _createVault({
 /// Pumps frames and lets bridge calls finish until the app is quiet: no call
 /// in flight, the change feed idle, no store reload scheduled (on the fake
 /// or the real clock) and at least [min] of fake time passed.
-Future<void> settle(WidgetTester tester, {Duration min = Duration.zero}) async {
+///
+/// It first runs one change-feed poll on the real clock. That poll waits for
+/// any poll the app has in flight, and the app's poll can only finish while
+/// frames are pumped, so after pumping frames by hand (a poll may have started
+/// in them) pass [poll] false: the loop below waits for the feed itself.
+Future<void> settle(
+  WidgetTester tester, {
+  Duration min = Duration.zero,
+  bool poll = true,
+}) async {
   var quiet = 0;
   var elapsed = Duration.zero;
   const step = Duration(milliseconds: 50);
   final deadline = Stopwatch()..start();
-  await tester.runAsync(() async {
-    await _current?.app.feed.poll();
-  });
+  if (poll) {
+    await tester.runAsync(() async {
+      await _current?.app.feed.poll();
+    });
+  }
   while (deadline.elapsed < const Duration(seconds: 30)) {
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await tester.pump(step);

@@ -361,7 +361,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
     expect(key('capture-open'), findsOneWidget);
-    await settle(tester);
+    await settle(tester, poll: false);
   });
 
   appTest(
