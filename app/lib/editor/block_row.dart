@@ -404,11 +404,11 @@ class BlockRowState extends State<BlockRow>
       maxLines: null,
       keyboardType: TextInputType.multiline,
       textInputAction: TextInputAction.newline,
-      selectionControls: noteSelectionControls,
+      selectionControls: selectionControlsFor(context),
       rendererIgnoresPointer: true,
       showSelectionHandles: context.mobile,
       enableInteractiveSelection: true,
-      contextMenuBuilder: null,
+      contextMenuBuilder: contextMenuFor(context),
       onChanged: (v) => ed.onChanged(n, ctl.value),
       onSelectionChanged: (sel, cause) => ed.onSelectionChanged(n, sel, cause),
       textHeightBehavior: const TextHeightBehavior(
@@ -473,27 +473,6 @@ class BlockRowState extends State<BlockRow>
 class _Gestures extends TextSelectionGestureDetectorBuilder {
   _Gestures(this.row) : super(delegate: row);
   final BlockRowState row;
-
-  @override
-  void onSingleLongTapStart(LongPressStartDetails details) {
-    if (row.context.mobile) {
-      row.ed.onLongPress(row.node);
-      return;
-    }
-    super.onSingleLongTapStart(details);
-  }
-
-  @override
-  void onSingleLongTapMoveUpdate(LongPressMoveUpdateDetails details) {
-    if (row.context.mobile) return;
-    super.onSingleLongTapMoveUpdate(details);
-  }
-
-  @override
-  void onSingleLongTapEnd(LongPressEndDetails details) {
-    if (row.context.mobile) return;
-    super.onSingleLongTapEnd(details);
-  }
 
   @override
   void onSingleTapUp(TapDragUpDetails details) {

@@ -478,7 +478,7 @@ void main() {
       await showKeyboard(tester);
       final hide = tester.getRect(find.byKey(const ValueKey('kb-hide')));
       expect(hide.right, lessThanOrEqualTo(375));
-      for (final (mode, last) in [('main', 'more'), ('more', 'block-color'), ('format', 'color')]) {
+      for (final (mode, last) in [('main', 'more'), ('more', 'block-menu'), ('format', 'color')]) {
         if (mode != 'main') await tapAndSettle(tester, find.byKey(ValueKey('kb-$mode')));
         expect(tester.getRect(find.byKey(ValueKey('kb-$last'))).right, lessThanOrEqualTo(hide.left), reason: mode);
         if (mode != 'main') await tapAndSettle(tester, find.byKey(const ValueKey('kb-back')));

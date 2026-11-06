@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/models.dart';
+import 'package:notes_app/editor/block_row.dart';
 import 'package:notes_app/editor/model.dart';
 import 'package:notes_app/features/getting_started.dart';
 
@@ -486,42 +487,105 @@ void main() {
       expect((await blockById(tester, s.showcaseId, 'sc03')).text, 'Plain');
     });
 
-    appTest('long press opens the block sheet: move down, turn into, delete', (tester) async {
+    Future<void> openBlockSheetFromToolbar(WidgetTester tester, String block) async {
+      await focusAt(tester, editableWith(block), 0);
+      await showKeyboard(tester);
+      if (find.byKey(const ValueKey('kb-block-menu')).evaluate().isEmpty) {
+        await tester.tap(find.byKey(const ValueKey('kb-more')));
+        await settle(tester);
+      }
+      await tester.tap(find.byKey(const ValueKey('kb-block-menu')));
+      await settle(tester);
+    }
+
+    appTest('long press on text selects a word and shows the toolbar, not the block sheet', (tester) async {
+      await pumpApp(tester, mobile: true);
+      await openShowcase(tester);
+      final h1 = editableWith('Heading 1');
+      await tester.longPressAt(tester.getTopLeft(h1) + const Offset(6, 12));
+      await settle(tester);
+      expect(find.byKey(const ValueKey('sheet-down')), findsNothing);
+      final sel = editState(tester, h1).widget.controller.selection;
+      expect([sel.start, sel.end], [0, 7]);
+      expect(find.text('Copy'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    appTest('long press on the page title selects a word and shows the toolbar', (tester) async {
+      await pumpApp(tester, mobile: true);
+      await openShowcase(tester);
+      final title = find.byKey(const ValueKey('page-title'));
+      await tester.longPressAt(tester.getTopLeft(title) + const Offset(6, 10));
+      await settle(tester);
+      expect(editState(tester, title).widget.controller.selection.isCollapsed, isFalse);
+      expect(find.text('Copy'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    appTest('long press on a block without text opens the block sheet', (tester) async {
+      await pumpApp(tester, mobile: true);
+      await openShowcase(tester);
+      final divider = find.byWidgetPredicate((w) => w is BlockRow && w.node.id == 'sc18');
+      await tester.dragUntilVisible(divider, find.byType(CustomScrollView).last, const Offset(0, -200));
+      await settle(tester);
+      await tester.longPress(divider);
+      await settle(tester);
+      expect(find.byKey(const ValueKey('sheet-down')), findsOneWidget);
+    });
+
+    appTest('the block actions button opens the sheet: move down, turn into, delete', (tester) async {
       final s = await pumpApp(tester, mobile: true);
       await openShowcase(tester);
-      await tester.longPress(editableWith('Heading 1'));
-      await settle(tester);
+      await openBlockSheetFromToolbar(tester, 'Heading 1');
       expect(find.byKey(const ValueKey('sheet-down')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('sheet-down')));
       await settle(tester);
       var ids = (await blocksOf(tester, s.showcaseId)).map((b) => b.id).toList();
       expect(ids.indexOf('sc02'), ids.indexOf('sc03') + 1);
 
-      await tester.longPress(editableWith('Heading 1'));
-      await settle(tester);
+      await openBlockSheetFromToolbar(tester, 'Heading 1');
       await tester.tap(find.byKey(const ValueKey('sheet-turn-into')));
       await settle(tester);
       await tester.tap(find.byKey(const ValueKey('sheet-kind-quote')));
       await settle(tester);
       expect((await blockById(tester, s.showcaseId, 'sc02')).kind, Kinds.quote);
 
-      await tester.longPress(editableWith('Heading 1'));
-      await settle(tester);
+      await openBlockSheetFromToolbar(tester, 'Heading 1');
       await tester.tap(find.byKey(const ValueKey('sheet-delete')));
       await settle(tester);
       ids = (await blocksOf(tester, s.showcaseId)).map((b) => b.id).toList();
       expect(ids.contains('sc02'), isFalse);
     });
 
-    appTest('the sheet closes with the back gesture', (tester) async {
+    appTest('the sheet offers the block colour', (tester) async {
       await pumpApp(tester, mobile: true);
       await openShowcase(tester);
-      await tester.longPress(editableWith('Heading 1'));
-      await settle(tester);
+      await openBlockSheetFromToolbar(tester, 'Heading 1');
+      expect(find.byKey(const ValueKey('sheet-color')), findsOneWidget);
+    });
+
+    appTest('the sheet closes with the back gesture and leaves no block tinted', (tester) async {
+      await pumpApp(tester, mobile: true);
+      await openShowcase(tester);
+      await openBlockSheetFromToolbar(tester, 'Heading 1');
       await tester.binding.handlePopRoute();
       await settle(tester);
       expect(find.byKey(const ValueKey('sheet-down')), findsNothing);
       expect(editableWith('Heading 1'), findsOneWidget);
+      final row = find.byWidgetPredicate((w) => w is BlockRow && w.node.id == 'sc02');
+      expect(tester.state<BlockRowState>(row).ed.selected, isEmpty);
+    });
+  });
+
+  group('desktop long press', () {
+    appTest('a long press on text never opens the block sheet', (tester) async {
+      await pumpApp(tester, mobile: false);
+      await openShowcase(tester);
+      final h1 = editableWith('Heading 1');
+      await tester.longPressAt(tester.getTopLeft(h1) + const Offset(6, 12));
+      await settle(tester);
+      expect(find.byKey(const ValueKey('sheet-down')), findsNothing);
+      expect(find.byKey(const ValueKey('kb-block-menu')), findsNothing);
     });
   });
 }

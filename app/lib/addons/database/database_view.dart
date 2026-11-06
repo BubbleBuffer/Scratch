@@ -186,7 +186,7 @@ class DatabaseViewState extends State<DatabaseView> {
       builder: (context, _) => Stack(children: [
         if (ctl.text.isEmpty)
           Positioned.fill(child: IgnorePointer(child: Text('Untitled', maxLines: 1, style: style.copyWith(color: c.textTertiary)))),
-        EditableText(
+        SelectionToolbarHost(builder: (context, onSelectionChanged) => EditableText(
           key: const ValueKey('db-title'),
           controller: ctl,
           focusNode: _titleFocus,
@@ -196,9 +196,12 @@ class DatabaseViewState extends State<DatabaseView> {
           selectionColor: c.textSelection,
           cursorWidth: 1.5,
           maxLines: null,
-          selectionControls: noteSelectionControls,
+          selectionControls: selectionControlsFor(context),
+          contextMenuBuilder: contextMenuFor(context),
+          showSelectionHandles: context.mobile,
+          onSelectionChanged: onSelectionChanged,
           onChanged: widget.onTitleChanged,
-        ),
+        )),
       ]),
     );
   }
@@ -252,7 +255,7 @@ class DatabaseViewState extends State<DatabaseView> {
           child: Stack(children: [
             if (_inlineTitle!.text.isEmpty)
               Positioned.fill(child: IgnorePointer(child: Text('Untitled', style: style.copyWith(color: c.textTertiary)))),
-            EditableText(
+            SelectionToolbarHost(builder: (context, onSelectionChanged) => EditableText(
               key: const ValueKey('db-inline-title'),
               controller: _inlineTitle!,
               focusNode: _titleFocus,
@@ -261,7 +264,10 @@ class DatabaseViewState extends State<DatabaseView> {
               backgroundCursorColor: c.textTertiary,
               selectionColor: c.textSelection,
               maxLines: 1,
-              selectionControls: noteSelectionControls,
+              selectionControls: selectionControlsFor(context),
+              contextMenuBuilder: contextMenuFor(context),
+              showSelectionHandles: context.mobile,
+              onSelectionChanged: onSelectionChanged,
               onChanged: (t) => setState(() {}),
               onSubmitted: (t) => context.app.vault.renamePage(widget.collection, t),
               onTapOutside: (_) {
@@ -270,7 +276,7 @@ class DatabaseViewState extends State<DatabaseView> {
                   if (_inlineTitle!.text != store.title) context.app.vault.renamePage(widget.collection, _inlineTitle!.text);
                 }
               },
-            ),
+            )),
           ]),
         ),
       ),

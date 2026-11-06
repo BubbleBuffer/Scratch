@@ -291,12 +291,16 @@ class KeyboardToolbar extends StatelessWidget {
     required this.onLink,
     required this.onMention,
     required this.onColor,
+    required this.onBlockMenu,
   });
   final KbMode mode;
   final Set<BMarkKind> active;
   final String kind;
   final bool canUndo, canRedo;
   final VoidCallback onAdd, onTurnInto, onIndent, onOutdent, onUndo, onRedo, onHide, onLink, onMention, onColor;
+
+  /// Opens the block sheet for the focused block (long press selects text).
+  final VoidCallback onBlockMenu;
   final ValueChanged<KbMode> onMode;
   final ValueChanged<String> onKind;
   final ValueChanged<BMarkKind> onMark;
@@ -357,7 +361,7 @@ class KeyboardToolbar extends StatelessWidget {
           btnX(Ix.triangle, () => onKind(Kinds.toggle), 'toggle', on: kind == Kinds.toggle, tip: 'Toggle list'),
           btn(Ico.quote, () => onKind(Kinds.quote), 'quote', on: kind == Kinds.quote, tip: 'Quote'),
           btnX(Ix.mention, onMention, 'mention', tip: 'Mention'),
-          btnX(Ix.color, onColor, 'block-color', tip: 'Block color'),
+          btn(Ico.grip, onBlockMenu, 'block-menu', tip: 'Block actions'),
         ],
       KbMode.main => <Widget>[
           btn(Ico.plus, onAdd, 'add', tip: 'Add block'),
