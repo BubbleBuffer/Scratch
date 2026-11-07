@@ -65,8 +65,7 @@ void main() {
       final node = editor.doc!.flat.firstWhere((n) => n.text.startsWith('Plant garlic'));
       Future<void> menu() async {
         if (mobile) {
-          await tester.longPress(todo);
-          await settle(tester);
+          await openBlockSheet(tester, todo);
           await tapAndSettle(tester, find.byKey(const ValueKey('sheet-set-date')));
         } else {
           editor.openBlockMenu(node, tester.getRect(todo));

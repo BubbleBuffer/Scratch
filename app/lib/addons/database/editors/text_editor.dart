@@ -89,7 +89,7 @@ class _TextBoxState extends State<_TextBox> {
           ? MenuField(controller: _ctl, autofocus: true, placeholder: widget.placeholder, onSubmitted: (_) => Navigator.of(context).maybePop())
           : ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 21, maxHeight: 300),
-              child: EditableText(
+              child: SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
                 key: const ValueKey('cell-editor'),
                 controller: _ctl,
                 focusNode: _focus,
@@ -101,8 +101,11 @@ class _TextBoxState extends State<_TextBox> {
                 cursorWidth: 1.5,
                 maxLines: null,
                 keyboardType: TextInputType.multiline,
-                selectionControls: noteSelectionControls,
-              ),
+                selectionControls: selectionControlsFor(context),
+                contextMenuBuilder: contextMenuFor(context),
+                showSelectionHandles: showHandles,
+                onSelectionChanged: onSelectionChanged,
+              )),
             ),
     );
   }

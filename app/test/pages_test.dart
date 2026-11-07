@@ -443,8 +443,7 @@ void main() {
     appTest('select mode from the block sheet: pick blocks, then delete them', (tester) async {
       final s = await pumpApp(tester, mobile: true);
       await openShowcase(tester);
-      await tester.longPress(editableStarting('Bulleted list item'));
-      await settle(tester);
+      await openBlockSheet(tester, editableStarting('Bulleted list item'));
       await tapAndSettle(tester, find.byKey(const ValueKey('sheet-select')));
       // In select mode a cover over the row takes the tap, not the text.
       await tester.tap(editableStarting('Another top-level'), warnIfMissed: false);
@@ -478,7 +477,7 @@ void main() {
       await showKeyboard(tester);
       final hide = tester.getRect(find.byKey(const ValueKey('kb-hide')));
       expect(hide.right, lessThanOrEqualTo(375));
-      for (final (mode, last) in [('main', 'more'), ('more', 'block-color'), ('format', 'color')]) {
+      for (final (mode, last) in [('main', 'more'), ('more', 'block-menu'), ('format', 'color')]) {
         if (mode != 'main') await tapAndSettle(tester, find.byKey(ValueKey('kb-$mode')));
         expect(tester.getRect(find.byKey(ValueKey('kb-$last'))).right, lessThanOrEqualTo(hide.left), reason: mode);
         if (mode != 'main') await tapAndSettle(tester, find.byKey(const ValueKey('kb-back')));

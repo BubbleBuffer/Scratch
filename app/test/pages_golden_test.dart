@@ -77,8 +77,7 @@ void main() {
         await pumpApp(tester, mobile: mobile, dark: dark);
         await openShowcase(tester);
         if (mobile) {
-          await tester.longPress(editableStarting('Bulleted list item'));
-          await settle(tester);
+          await openBlockSheet(tester, editableStarting('Bulleted list item'));
           await tester.tap(find.byKey(const ValueKey('sheet-select')));
           await settle(tester);
           await tester.tap(editableStarting('Another top-level'));

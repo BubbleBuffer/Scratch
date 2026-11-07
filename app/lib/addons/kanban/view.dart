@@ -759,7 +759,7 @@ class _KanbanTitleState extends State<_KanbanTitle> {
                 ),
               ),
             ),
-          EditableText(
+          SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
             key: const ValueKey('kanban-title'),
             controller: controller,
             focusNode: _focus,
@@ -769,9 +769,12 @@ class _KanbanTitleState extends State<_KanbanTitle> {
             selectionColor: c.textSelection,
             cursorWidth: 1.5,
             maxLines: null,
-            selectionControls: noteSelectionControls,
+            selectionControls: selectionControlsFor(context),
+            contextMenuBuilder: contextMenuFor(context),
+            showSelectionHandles: showHandles,
+            onSelectionChanged: onSelectionChanged,
             onChanged: widget.onChanged,
-          ),
+          )),
         ],
       ),
     );

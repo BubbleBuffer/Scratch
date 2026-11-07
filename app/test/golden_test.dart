@@ -89,8 +89,7 @@ void main() {
         await openShowcase(tester);
         final b = editableStarting('Bulleted list item');
         if (mobile) {
-          await tester.longPress(b);
-          await settle(tester);
+          await openBlockSheet(tester, b);
           await shot('$tag-bottom-sheet');
         } else {
           final g = await tester.createGesture(kind: PointerDeviceKind.mouse);

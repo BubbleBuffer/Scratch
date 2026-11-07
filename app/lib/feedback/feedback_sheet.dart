@@ -10,9 +10,9 @@ import '../ui/buttons.dart';
 import '../ui/fields.dart';
 import '../ui/hover.dart';
 import '../ui/icons.dart';
-import '../ui/selection.dart';
 import '../ui/sheet.dart';
 import '../ui/tokens.dart';
+import '../ui/mobile_selection.dart';
 
 class FeedbackSheet extends StatefulWidget {
   const FeedbackSheet({
@@ -97,7 +97,7 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
                         )
                       : const SizedBox.shrink(),
                 ),
-                EditableText(
+                SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
                   key: const ValueKey('feedback-text'),
                   controller: _text,
                   focusNode: _focus,
@@ -109,9 +109,12 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
                   autofocus: !mobile,
                   keyboardType: TextInputType.multiline,
                   textInputAction: TextInputAction.newline,
-                  selectionControls: noteSelectionControls,
+                  selectionControls: selectionControlsFor(context),
+                  contextMenuBuilder: contextMenuFor(context),
+                  showSelectionHandles: showHandles,
+                  onSelectionChanged: onSelectionChanged,
                   maxLines: null,
-                ),
+                )),
               ],
             ),
           ),

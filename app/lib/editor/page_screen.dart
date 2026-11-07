@@ -4235,7 +4235,7 @@ class PageEditorState extends State<PageScreen>
                 ),
               ),
             ),
-          EditableText(
+          SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
             key: const ValueKey('page-title'),
             controller: titleCtl,
             focusNode: titleFocus,
@@ -4248,10 +4248,13 @@ class PageEditorState extends State<PageScreen>
             maxLines: null,
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
-            selectionControls: noteSelectionControls,
+            selectionControls: selectionControlsFor(context),
+            contextMenuBuilder: contextMenuFor(context),
+            showSelectionHandles: showHandles,
+            onSelectionChanged: onSelectionChanged,
             onChanged: _onTitleChanged,
             onSubmitted: (_) => _focusFirstBlock(),
-          ),
+          )),
         ],
       ),
     );
@@ -4469,6 +4472,9 @@ class PageEditorState extends State<PageScreen>
         onLink: openLink,
         onMention: startMention,
         onColor: () => openColorMenu(anchor),
+        onBlockMenu: () {
+          if (n != null) onLongPress(n);
+        },
       ),
     );
   }

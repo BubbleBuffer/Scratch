@@ -811,6 +811,22 @@ Future<void> focusAt(
   await settle(tester, min: Duration.zero);
 }
 
+/// Opens the block sheet of [block] on mobile the way a phone user does: focus
+/// the block, then press Block actions in the keyboard toolbar (a long press on
+/// text selects a word instead). The simulated keyboard is put away again so
+/// it does not cover the sheet.
+Future<void> openBlockSheet(WidgetTester tester, Finder block) async {
+  await focusAt(tester, block, 0);
+  await showKeyboard(tester);
+  if (find.byKey(const ValueKey('kb-block-menu')).evaluate().isEmpty) {
+    await tester.tap(find.byKey(const ValueKey('kb-more')));
+    await settle(tester);
+  }
+  await tester.tap(find.byKey(const ValueKey('kb-block-menu')));
+  tester.view.viewInsets = FakeViewPadding.zero;
+  await settle(tester);
+}
+
 /// Types [text] at the caret of the focused block, through the text input
 /// connection like a keyboard would.
 Future<void> typeText(WidgetTester tester, String text) async {
