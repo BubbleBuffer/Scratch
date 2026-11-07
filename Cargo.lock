@@ -583,6 +583,27 @@ dependencies = [
 [[package]]
 name = "bubblepaw-core"
 version = "0.2.1"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "chrono",
+ "fs2",
+ "jsonschema",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio",
+ "tracing",
+ "uuid",
+ "zstd 0.13.3",
+]
+
+[[package]]
+name = "bubblepaw-core"
+version = "0.2.1"
 source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.1#f3603685a040196617f1fb894978493fbe992349"
 dependencies = [
  "anyhow",
@@ -604,18 +625,45 @@ dependencies = [
 [[package]]
 name = "bubblepaw-mcp"
 version = "0.2.1"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.1#f3603685a040196617f1fb894978493fbe992349"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
- "bubblepaw-core",
- "bubblepaw-process",
+ "bubblepaw-core 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0)",
+ "bubblepaw-process 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0)",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "tokio",
+]
+
+[[package]]
+name = "bubblepaw-mcp"
+version = "0.2.1"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.1#f3603685a040196617f1fb894978493fbe992349"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "bubblepaw-core 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.1)",
+ "bubblepaw-process 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.1)",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio",
+]
+
+[[package]]
+name = "bubblepaw-process"
+version = "0.2.1"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
+dependencies = [
+ "libc",
+ "tokio",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -631,14 +679,14 @@ dependencies = [
 [[package]]
 name = "bubblepaw-runner"
 version = "0.2.1"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.1#f3603685a040196617f1fb894978493fbe992349"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
- "bubblepaw-core",
- "bubblepaw-mcp",
- "bubblepaw-process",
+ "bubblepaw-core 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0)",
+ "bubblepaw-mcp 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0)",
+ "bubblepaw-process 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0)",
  "chrono",
  "clap",
  "fs2",
@@ -658,7 +706,6 @@ dependencies = [
  "tiktoken-rs",
  "tokio",
  "toml 0.8.23",
- "toml_edit 0.22.27",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -668,10 +715,10 @@ dependencies = [
 [[package]]
 name = "bubblepaw-sdk"
 version = "0.2.1"
-source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.1#f3603685a040196617f1fb894978493fbe992349"
+source = "git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0#fe245edaedfaf13afaad7b24ed0a8574df8d5880"
 dependencies = [
  "anyhow",
- "bubblepaw-core",
+ "bubblepaw-core 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.0)",
  "bubblepaw-runner",
  "tokio",
 ]
@@ -3736,7 +3783,7 @@ dependencies = [
  "notes_agent_wire",
  "openidconnect",
  "pulldown-cmark",
- "rand 0.8.8",
+ "rand 0.10.3",
  "reqwest 0.12.28",
  "rsa",
  "serde",
@@ -5775,9 +5822,9 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "similar"
-version = "3.2.0"
+version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f66ca1f7aca2474dc10c942eb22feffc897735f54cd1db90138c2fddb490987"
+checksum = "d2f8bec09ae8fae0f4f265a4559a9334be3929d8504e9b536df0a41302bd1733"
 dependencies = [
  "bstr",
 ]
@@ -7026,9 +7073,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.28.0"
+version = "1.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cc1186384beb7dd8eedea376413fd654937285ea6c9cfbb928dc3043ea4b606"
+checksum = "4a0e2d11620c50695fe12bbbfde96b3477fe606e7284c22d505c12ce51214514"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
@@ -7058,7 +7105,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bubblepaw-mcp",
+ "bubblepaw-mcp 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.1)",
  "bubblepaw-sdk",
  "chrono",
  "futures-core",
@@ -7131,7 +7178,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
- "bubblepaw-core",
+ "bubblepaw-core 0.2.1 (git+https://github.com/BubbleBuffer/BubblePaw-Core?tag=v0.3.1)",
  "chrono",
  "notes_hub",
  "rusqlite",
