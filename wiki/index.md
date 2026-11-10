@@ -32,5 +32,5 @@ One section per component, each with its own index. Every page is reachable from
 - [Integrations](integrations/index.md): Connections to AI assistants and the agent, and note sharing.
 - [Releases](releases/index.md): Where code and CI live, and how Android and Windows builds are made and published.
 - [Decisions](decisions/index.md): Decisions that shape what's built, one line each with its date.
-- [Prototypes](prototypes/index.md): Historical. The Tauri and Flutter bake-off prototypes: what each is, how it is built and tested, and its known gaps.
+- [Prototypes](prototypes/index.md): Historical. The Flutter bake-off prototype: what it is, how it is built and tested, and its known gaps.
 <!-- /wiki:children -->

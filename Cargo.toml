@@ -1,8 +1,8 @@
 # One workspace, one target/ directory for every Rust crate in the repo
-# (the core and the prototypes' Rust parts), so dependencies build once.
+# (the core and the app's Rust parts), so dependencies build once.
 [workspace]
 resolver = "2"
-members = ["crates/*", "prototypes/tauri/src-tauri", "app/rust"]
+members = ["crates/*", "app/rust"]
 
 [workspace.package]
 edition = "2021"

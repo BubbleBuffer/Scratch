@@ -201,7 +201,7 @@ pub(crate) fn random_hex() -> Result<String> {
 }
 
 /// Lowercase hex of `bytes`.
-pub(crate) fn hex_encode(bytes: &[u8]) -> String {
+pub fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|x| format!("{x:02x}")).collect()
 }
 
@@ -231,12 +231,7 @@ pub(crate) fn random_u64() -> Result<u64> {
     Ok(u64::from_le_bytes(b))
 }
 
-pub(crate) fn now_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
-}
+pub(crate) use vault_core::wall_now_ms as now_ms;
 
 #[cfg(test)]
 mod tests {

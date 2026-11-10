@@ -13,7 +13,6 @@ reviews:
     - "!app/rust/src/frb_generated.rs"
     - "!app/linux/flutter/generated_plugin*"
     - "!app/windows/flutter/generated_plugin*"
-    - "!prototypes/tauri/src-tauri/gen/**"
   path_instructions:
     - path: ".github/workflows/release.yml"
       instructions: >-

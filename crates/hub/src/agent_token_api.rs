@@ -25,6 +25,7 @@ use vault_sync::DEVICE_HEADER;
 use crate::agent_tokens::{
     AgentScope, AgentToken, AgentTokenError, DEFAULT_EXPIRY_DAYS, EXPIRY_CHOICES_DAYS,
 };
+use crate::web::now_ms;
 use crate::AppState;
 
 fn no_store(mut r: Response) -> Response {
@@ -89,13 +90,6 @@ fn store_error(e: &AgentTokenError) -> Response {
             error(StatusCode::SERVICE_UNAVAILABLE, "tokens_unavailable")
         }
     }
-}
-
-fn now_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
-        .unwrap_or(0)
 }
 
 /// `GET /agent-tokens`.

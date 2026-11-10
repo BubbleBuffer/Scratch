@@ -5,7 +5,7 @@
 //   pull and are created only if the vault still has no pages then.
 // - Built with `--dart-define=SEED_BENCH=true`, a new vault is instead the
 //   bench vault: 10,000 generated pages, a 2,000-block "Big page" and the
-//   showcase page (for measure.ps1).
+//   showcase page.
 // - Built with `--dart-define=SEED_TASKS=<rows>`, a new vault also gets the
 //   "Tasks" database with that many rows (seed_tasks).
 // - The core's writer is flushed whenever the app may be killed.
@@ -23,7 +23,6 @@ import '../core/link_previews.dart';
 import '../core/models.dart';
 import '../core/paths.dart';
 import '../core/vault.dart';
-import '../features/bakeoff.dart';
 import '../features/settings/settings_screen.dart' show appVersion;
 import '../features/settings/settings_store.dart';
 import '../features/sync/sync_control.dart';
@@ -235,7 +234,6 @@ class _NotesAppState extends State<NotesApp> {
 
   Future<void> _seedBench(String root) async {
     setState(() => _seeding = true);
-    final sw = Stopwatch()..start();
     final timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
       final p = NotesVault.seedProgress(root: root);
       if (mounted) setState(() => _seeded = p);
@@ -245,7 +243,6 @@ class _NotesAppState extends State<NotesApp> {
     } finally {
       timer.cancel();
     }
-    Bakeoff.instance.log('seeded pages=$benchPages ms=${sw.elapsedMilliseconds}');
   }
 
   @override

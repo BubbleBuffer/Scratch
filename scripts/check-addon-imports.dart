@@ -21,8 +21,6 @@ const legacyDirs = [
   'lib/blocks/',
   'lib/editor/',
   'lib/features/',
-  'lib/properties/',
-  'lib/views/',
 ];
 
 void main(List<String> args) {

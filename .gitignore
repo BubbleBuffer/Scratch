@@ -10,7 +10,6 @@ build/
 
 **/.idea/
 *.iml
-prototypes/tauri/dist/
 
 # Personal agent, editor and tool folders (scripts/check-private-strings.sh fails on them)
 .claude/

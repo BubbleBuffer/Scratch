@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
@@ -99,7 +99,7 @@ impl KeyAuth {
     pub fn challenge(&self) -> Result<[u8; 32]> {
         let mut nonce = [0u8; 32];
         getrandom::fill(&mut nonce[..16]).map_err(|e| SyncError::Io(format!("random: {e}")))?;
-        nonce[16..24].copy_from_slice(&now_ms().to_be_bytes());
+        nonce[16..24].copy_from_slice(&(crate::now_ms() as u64).to_be_bytes());
         let mut mac = self.mac();
         mac.update(&nonce[..24]);
         nonce[24..].copy_from_slice(&mac.finalize().into_bytes()[..8]);
@@ -116,7 +116,7 @@ impl KeyAuth {
         }
         let issued = issued_ms(nonce);
         let ttl = lock(&self.ttls).0.as_millis() as u64;
-        let now = now_ms();
+        let now = crate::now_ms() as u64;
         issued <= now + NONCE_SKEW_MS && now.saturating_sub(issued) < ttl
     }
 
@@ -124,7 +124,7 @@ impl KeyAuth {
     /// false if it was used already (a replay).
     pub fn use_nonce(&self, nonce: &[u8; 32]) -> Result<bool> {
         let ttl = lock(&self.ttls).0.as_millis() as u64;
-        let now = now_ms();
+        let now = crate::now_ms() as u64;
         let mut t = lock(&self.tables);
         if t.used.contains_key(nonce) {
             return Ok(false);
@@ -190,13 +190,6 @@ impl KeyAuth {
         t.sessions.clear();
         t.used.clear();
     }
-}
-
-fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
 }
 
 fn issued_ms(nonce: &[u8; 32]) -> u64 {

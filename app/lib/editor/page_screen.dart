@@ -24,7 +24,6 @@ import '../blocks/heading.dart';
 import '../shell/page_stack.dart';
 import '../addons/agent/api.dart';
 import '../features/ai/ask_ai.dart';
-import '../features/bakeoff.dart';
 import '../features/backlinks/backlinks.dart';
 import '../addons/database/api.dart' show PageChildrenView, PageProperties;
 import '../registry/note_type_registry.dart';
@@ -158,8 +157,6 @@ class PageEditorState extends State<PageScreen>
   final scroll = ScrollController();
   final stackKey = GlobalKey();
   final listKey = GlobalKey();
-  double _loadMs = 0;
-  bool _reportedOpen = false;
   bool _scrolled = false;
   Timer? _renameTimer;
   Timer? _blockHighlightTimer;
@@ -263,7 +260,6 @@ class PageEditorState extends State<PageScreen>
     super.initState();
     _editorFocus = EditorFocus.forApp(context.app);
     titleCtl.addListener(_scheduleEditorFocus);
-    if (!preview && !widget.embedded) Bakeoff.instance.screen = 'page';
     _pages = context.read<PageStore>();
     _meta = context.read<PagesStore>();
     final vault = context.app.vault;
@@ -489,7 +485,6 @@ class PageEditorState extends State<PageScreen>
       debugPrint('load failed: $e');
       return;
     }
-    _loadMs = p.loadUs / 1000.0;
     if (!preview) _meta.adopt(p);
     final d = Doc.fromPage(p);
     d.isOpen = isOpen;
@@ -705,7 +700,6 @@ class PageEditorState extends State<PageScreen>
     _embeddedParentScroll?.removeListener(_embeddedScrollChanged);
     if (_embedTitles != null) removeEmbedTitleResolver(_embedTitles!);
     _blockHighlightTimer?.cancel();
-    if (!preview && !widget.embedded) Bakeoff.instance.screen = 'list';
     _saveNow();
     _meta.removeListener(_onMeta);
     for (final c in _ctl.values) {
@@ -1069,7 +1063,6 @@ class PageEditorState extends State<PageScreen>
       focusedId = n.id;
       if (!selectMode) selected.clear();
       if (menuBlockId != null) menuBlockId = null;
-      Bakeoff.instance.log('focus kind=${n.kind} index=${n.flatIndex}');
       _safeSetState();
     } else if (focusedId == n.id) {
       focusedId = null;
@@ -1350,7 +1343,6 @@ class PageEditorState extends State<PageScreen>
   // Text changes.
 
   void onChanged(Node n, TextEditingValue v) {
-    Bakeoff.instance.textChanged();
     final c = ctl(n);
     final old = n.text;
     final oldMarks = n.marks;
@@ -3519,45 +3511,6 @@ class PageEditorState extends State<PageScreen>
     final d = doc;
     if (widget.embedded) _scheduleEmbeddedOverlay();
 
-    if (d != null &&
-        !_reportedOpen &&
-        !widget.navigationPreview &&
-        !widget.embedded) {
-      _reportedOpen = true;
-      Bakeoff.instance.pageBlocksBuilt(d.flat.length, _loadMs);
-      // Log the layout once the route has finished sliding in, so the
-      // coordinates are where the text rests (measure.ps1 taps them).
-      final anim = ModalRoute.of(context)?.animation;
-      void logLayout() {
-        if (!mounted) return;
-        final box = listKey.currentContext?.findRenderObject() as RenderBox?;
-        if (box == null) return;
-        final dpr = mq.devicePixelRatio;
-        final o = box.localToGlobal(Offset.zero);
-        final g = _geo(box.size.width, mobile);
-        Bakeoff.instance.log(
-          'layout page text-x=${((o.dx + g.textLeft + 150) * dpr).round()} '
-          'text-y=${((o.dy + box.size.height * 0.45) * dpr).round()} '
-          'list-top=${(o.dy * dpr).round()} list-bottom=${((o.dy + box.size.height) * dpr).round()}',
-        );
-      }
-
-      void afterFrame() =>
-          SchedulerBinding.instance.addPostFrameCallback((_) => logLayout());
-      if (anim == null || anim.isCompleted) {
-        afterFrame();
-      } else {
-        late final AnimationStatusListener l;
-        l = (st) {
-          if (st == AnimationStatus.completed) {
-            anim.removeStatusListener(l);
-            afterFrame();
-          }
-        };
-        anim.addStatusListener(l);
-      }
-    }
-
     final body = Focus(
       focusNode: _pageFocus,
       child: Listener(
@@ -4042,10 +3995,6 @@ class PageEditorState extends State<PageScreen>
                 true);
         return NotificationListener<ScrollNotification>(
           onNotification: (s) {
-            if (s is ScrollStartNotification) {
-              Bakeoff.instance.scrollStarted('page');
-            }
-            if (s is ScrollEndNotification) Bakeoff.instance.scrollEnded();
             if (s.metrics.axis == Axis.vertical) {
               final sc = s.metrics.pixels > 0;
               if (sc != _scrolled) setState(() => _scrolled = sc);

@@ -1,4 +1,4 @@
-// The "Bake-off showcase" page (the Bake-off spec in the internal wiki; wiki/prototypes/flutter.md): one block of
+// The "Bake-off showcase" page: one block of
 // every built-in kind, some inline styles and a nested list. Created with the
 // bench seed (SEED_BENCH) and by the tests; not part of a normal vault.
 

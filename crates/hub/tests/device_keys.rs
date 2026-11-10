@@ -32,6 +32,7 @@ use sha2::{Digest, Sha256};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
 use url::Url;
+use vault_sync::hex_encode as hex;
 use vault_core::{new_id, Vault};
 use vault_sync::device_key::{session_proof, DeviceKey};
 use vault_sync::{origin_of, DeviceSession};
@@ -443,10 +444,6 @@ impl Env {
             Err(other) => panic!("{other}"),
         }
     }
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn param(u: &Url, k: &str) -> Option<String> {
