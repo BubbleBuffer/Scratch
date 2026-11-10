@@ -29,6 +29,7 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use crate::web::now_ms;
 use vault_core::sha256_hex;
 use vault_sync::ct_eq;
 
@@ -465,13 +466,6 @@ fn random_hex(n: usize) -> Result<String> {
     let mut b = vec![0u8; n];
     getrandom::fill(&mut b).map_err(|e| AgentTokenError::Io(format!("random: {e}")))?;
     Ok(b.iter().map(|x| format!("{x:02x}")).collect())
-}
-
-fn now_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
-        .unwrap_or(0)
 }
 
 /// Writes `bytes` to a new temp file beside `path`, then renames it over

@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use vault_sync::hex_encode as hex;
 
 /// The public repository whose releases are offered.
 pub const RELEASES_URL: &str =
@@ -194,10 +195,6 @@ pub fn parse_sha256sums(text: &str) -> HashMap<String, String> {
         sums.insert(name.to_owned(), hash.to_ascii_lowercase());
     }
     sums
-}
-
-pub fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 pub fn sha256_file(path: &Path) -> io::Result<String> {

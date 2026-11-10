@@ -67,7 +67,7 @@ pub use conflict_settings::{CONFLICT_LOG_RETENTION_DAYS, CONFLICT_LOG_RETENTION_
 pub use agent_defaults::{
     AgentDefaults, AGENT_RUNNER_HUB, AGENT_RUNNER_THIS_DEVICE, AGENT_TOOL_SETS,
 };
-pub use ids::{is_page_id, new_id, node_record_id, schedule_occurrence_id};
+pub use ids::{is_page_id, new_id, node_record_id, schedule_occurrence_id, wall_now_ms};
 pub use mdio::normalize_markdown;
 pub use triage::{TriageAction, TriageCandidate, TriageProposal, Repointed, TRIAGE_LINK, TRIAGE_TAG, TRIAGE_ACCEPTED, TRIAGE_DISMISSED, TRIAGE_PENDING};
 pub use nodes::{DeviceProject, DeviceRecord, DEVICE_ACTIVITY_INTERVAL_MS, RUNNER_ONLINE_WINDOW_MS};

@@ -20,10 +20,6 @@ pub(crate) const JOURNAL_RULE: &str = "journal";
 /// Text edited on both sides: the block takes one side's own content.
 pub(crate) const TEXT_RULE: &str = "later-text-wins";
 
-fn now_ms() -> i64 {
-    chrono::Utc::now().timestamp_millis()
-}
-
 pub(crate) fn before_state(doc: &PageDoc) -> Option<BeforeState> {
     doc.meta().trashed.map(|at| BeforeState::Trashed { at })
 }
@@ -238,7 +234,7 @@ fn record(page: &str, scope: ConflictScope, sides: Vec<ConflictSide>) -> Result<
         id: event_id(&scope, &sides)?,
         format: 2,
         block: scope.anchor_id().to_owned(),
-        time_ms: now_ms(),
+        time_ms: crate::wall_now_ms(),
         scope,
         sides,
         status: ConflictStatus::Pending,

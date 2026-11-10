@@ -36,15 +36,21 @@ impl crate::Vault {
     }
 }
 
+/// Milliseconds since the Unix epoch on the system clock, ignoring the test
+/// clock. The one wall-clock reader for every crate in the workspace.
+pub fn wall_now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
+        .unwrap_or(0)
+}
+
 fn read_clock(clock: &mut ClockState) -> i64 {
     if let Some(next) = clock.next {
         clock.next = Some(next.checked_add(1).expect("test clock exhausted"));
         return next;
     }
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
+    wall_now_ms()
 }
 
 pub(crate) fn now_ms() -> i64 {

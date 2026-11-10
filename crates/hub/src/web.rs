@@ -49,12 +49,7 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|p| p.into_inner())
 }
 
-pub(crate) fn now_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
-        .unwrap_or(0)
-}
+pub(crate) use vault_core::wall_now_ms as now_ms;
 
 pub(crate) fn random_hex(bytes: usize) -> Result<String, String> {
     let mut b = vec![0u8; bytes];

@@ -16,7 +16,6 @@
 //! `done`), `failed`, `cancelled` or `interrupted` (the node restarted while
 //! the job ran; it is not queued again).
 
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use vault_core::{PageId, PageSummary, PropValue, Sort, Vault};
@@ -81,13 +80,7 @@ pub enum End {
     Interrupted,
 }
 
-/// Milliseconds since the Unix epoch.
-pub fn now_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or_default()
-}
+pub use vault_core::wall_now_ms as now_ms;
 
 fn api_status(stored: &str) -> String {
     match stored {
