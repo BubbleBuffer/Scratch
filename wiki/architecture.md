@@ -88,7 +88,7 @@ These are the behaviours the design depends on. Each one is worth a test, and li
 - Rebuilding the index from the documents gives the same search results.
 - A page survives the round trip through its markdown mirror.
 - Two devices that edit offline converge after syncing.
-- An add-on imports no other add-on except through a declared dependency's `api.dart`.
+- An add-on has no undeclared imports: it reaches another add-on only through the `api.dart` of a dependency it declares.
 - A tool behaves the same from the MCP endpoints, the built-in agent and the app.
 - A vault from the previous release opens in the next one.
 
@@ -98,4 +98,11 @@ The code is being brought to a smaller baseline. These changes are planned and n
 
 - **Tools become a registry of operations only.** Each tool is defined once (name, input, behaviour, description). The command-line tool, the chat-outline store and the memory rules move out of `crates/tools`, and the job and task records move out of `crates/mcp`.
 - **The app calls named operations.** Callers stop using `Vault.run` and `Vault.raw` directly, so the app and agents use the same operations.
-- **Removed:** the `database` page type and the older view store (views become view blocks only), the purge envelope as a separate sync format, hidden tool aliases, the second hub binary (`vault-hub` in `crates/sync`), the `legacy` add-on, and `prototypes/`.
+- **Three concepts: page, property, type.** Every page has one type, and "Page" is the default. A type is defined vault-wide: its properties and defaults, a body template, which editor opens it, its renderings (full page, card, row or chip) and how it shows its children. A type travels with the page. No parent owns a schema; a parent may set the default type for new children. Types are built in or come from add-ons.
+- **Task is a built-in type.** To-do blocks stay blocks until promoted to a Task page.
+- **A view is a typed page.** Its properties are the source and the layout, and any page may open as a view of its children. Pages are the only view store.
+- **A card is the card rendering of an embedded page.** Embedding is one block kind. A search card is an embedded Search page.
+- **Inline views are child pages,** hidden from the page tree and from search until opened or moved. A view inside a view renders as a compact summary, one level deep.
+- **An add-on ships types with their renderings,** in place of separate page types, view layouts and card renderers.
+- **One-time vault conversion.** Existing `database` pages, older views and `view` blocks are converted once in the hub vault. The app ships no migration code for it.
+- **Removed:** the `database` page type, the older view store, the `view` and `query` block kinds, the kanban page type, the purge envelope as a separate sync format, hidden tool aliases, the second hub binary (`vault-hub` in `crates/sync`), the `legacy` add-on, and `prototypes/`.
