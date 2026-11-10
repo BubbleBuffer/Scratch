@@ -7,8 +7,6 @@
 # the fast Flutter test tier.
 #
 # Skipped on purpose:
-#   - notes-tauri (prototypes/tauri): a bake-off prototype that needs the GTK
-#     and WebKitGTK dev packages; the private gate excludes it too.
 #   - Flutter goldens: their baselines are rendered on Windows (the compacted-history
 #     goldens are Linux baselines and have their own step below).
 #   - rustfmt is report-only and clippy warnings do not fail the job (see
@@ -58,9 +56,9 @@ jobs:
       # Lints are reported as warnings, not denied: the private gate has no
       # clippy step and the tree has open clippy warnings.
       - name: cargo clippy
-        run: cargo clippy --workspace --exclude notes-tauri --all-targets --locked
+        run: cargo clippy --workspace --all-targets --locked
       - name: cargo test --workspace
-        run: cargo test --workspace --locked --exclude notes-tauri --no-fail-fast
+        run: cargo test --workspace --locked --no-fail-fast
 
   flutter:
     name: flutter

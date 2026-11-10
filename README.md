@@ -77,7 +77,7 @@ You need stable Rust, Flutter 3.47.5 and `flutter_rust_bridge_codegen` 2.13.0. W
 
 ```sh
 cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
-cargo test --workspace --locked --exclude notes-tauri    # Rust tests
+cargo test --workspace --locked    # Rust tests
 
 cd app && flutter pub get
 flutter build windows --release                          # Windows app
