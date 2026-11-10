@@ -831,7 +831,7 @@ class _PageTreeTile extends StatelessWidget {
         ),
       );
     }
-    context.watch<PagesStore>();
+    final pages = context.watch<PagesStore>();
     final ancestors = pages.ancestors(p.id);
     final patch = p.parent == null
         ? spacePatch(
