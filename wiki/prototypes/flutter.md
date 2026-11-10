@@ -32,7 +32,6 @@ covers: []
 
 - `flutter test` runs the editor widget tests and the golden tests on a `MemoryBackend` seeded like the real vault.
 - Golden screenshots are written to `prototypes/flutter/screenshots` (since moved to [app/screenshots](../../app/screenshots) and regenerated) at 1440×900 and 375×812, light and dark, with real fonts. The Android screencaps there come from a headless emulator.
-- `measure.ps1` opens "Big page" using the `big-index` and `row-h` fields of the `BAKEOFF layout dpr` line, because the showcase is now the first row.
 
 ## Known gaps
 

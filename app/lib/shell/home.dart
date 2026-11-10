@@ -11,7 +11,6 @@ import '../core/models.dart';
 import '../core/paths.dart';
 import '../registry/addon_registry.dart';
 import 'addons.dart';
-import '../features/bakeoff.dart';
 import '../features/today_view.dart';
 import '../features/today_day_note.dart';
 import '../features/today_date_strip.dart';
@@ -63,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
   late final PageLinkListener _pageLinks = PageLinkListener(
     (link) => openPageLink(context, link),
   );
-  bool _layoutLogged = false;
 
   /// Mobile: the side panels (page tree and agent chat) beside Home.
   final _panels = GlobalKey<MobileHomePanelsState>();
@@ -77,13 +75,6 @@ class _HomeScreenState extends State<HomeScreen> {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       BootTiming.mark('home first frame');
-      final s = widget.startedAtUs;
-      final ms = s == null
-          ? -1
-          : (clockNow().microsecondsSinceEpoch - s) / 1000.0;
-      Bakeoff.instance.log(
-        'list-visible ms-since-main=${ms.toStringAsFixed(0)} pages=${_pages.count}',
-      );
       final reminders = _reminders;
       final launchTap = reminders.hasPendingTap;
       reminders.bind(
@@ -191,39 +182,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _open(String id, String title) => openPage(context, id, title);
 
-  void _logLayout(MediaQueryData mq, PagesStore pages) {
-    if (_layoutLogged || pages.count == 0 || !Bakeoff.enabled) return;
-    _layoutLogged = true;
-    // Tap targets for measure.ps1, in physical pixels.
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      final list = _listKey.currentContext?.findRenderObject() as RenderBox?;
-      final row = _firstRowKey.currentContext?.findRenderObject() as RenderBox?;
-      if (list == null || row == null) return;
-      final dpr = mq.devicePixelRatio;
-      final lt = list.localToGlobal(Offset.zero);
-      final rt = row.localToGlobal(Offset.zero);
-      var big = -1;
-      for (var i = 0; i < 20; i++) {
-        if (pages.rowAt(i)?.title == 'Big page') {
-          big = i;
-          break;
-        }
-      }
-      Bakeoff.instance.log(
-        'layout dpr=$dpr first-row-x=${((rt.dx + row.size.width / 2) * dpr).round()} '
-        'first-row-y=${((rt.dy + row.size.height / 2) * dpr).round()} row-h=${(row.size.height * dpr).round()} '
-        'big-index=$big '
-        'list-top=${(lt.dy * dpr).round()} list-bottom=${((lt.dy + list.size.height) * dpr).round()} '
-        'screen-w=${(mq.size.width * dpr).round()} screen-h=${(mq.size.height * dpr).round()}',
-      );
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
-    final pages = context.watch<PagesStore>();
-    _logLayout(mq, pages);
+    context.watch<PagesStore>();
     return context.mobile ? _mobile(context, mq) : _desktop(context);
   }
 
@@ -319,10 +281,6 @@ class _HomeScreenState extends State<HomeScreen> {
       NotificationListener(
         onNotification: (s) {
           if (s.metrics.axis != Axis.vertical) return false;
-          if (s is ScrollStartNotification) {
-            Bakeoff.instance.scrollStarted('list');
-          }
-          if (s is ScrollEndNotification) Bakeoff.instance.scrollEnded();
           return false;
         },
         child: CustomScrollView(
@@ -873,7 +831,7 @@ class _PageTreeTile extends StatelessWidget {
         ),
       );
     }
-    final pages = context.watch<PagesStore>();
+    context.watch<PagesStore>();
     final ancestors = pages.ancestors(p.id);
     final patch = p.parent == null
         ? spacePatch(

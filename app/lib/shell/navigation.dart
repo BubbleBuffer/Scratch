@@ -9,7 +9,6 @@ import 'package:flutter/widgets.dart';
 
 import '../core/page_link.dart';
 import '../editor/page_screen.dart';
-import '../features/bakeoff.dart';
 import '../state/app_state.dart';
 import '../state/page_store.dart';
 import '../features/settings/settings_store.dart';
@@ -86,7 +85,6 @@ Future<void> openPage(
       ..lastPage = id
       ..changed();
     tree.visit(id);
-    Bakeoff.instance.pageOpenStart(title);
     final route = MobilePageHistoryRoute(entry, motion);
     await nav.push(route);
     // A later Home entry may have replaced this history already.
@@ -119,7 +117,6 @@ Future<void> openPage(
   ui
     ..lastPage = id
     ..changed();
-  Bakeoff.instance.pageOpenStart(title);
   await nav.push(
     pageRoute(
       (_) => PageScreen(

@@ -6,7 +6,6 @@ import 'package:flutter/widgets.dart';
 
 import 'core/clock.dart';
 import 'core/paths.dart';
-import 'features/bakeoff.dart';
 import 'feedback/log_buffer.dart';
 import 'shell/boot.dart';
 import 'src/rust/frb_generated.dart';
@@ -23,7 +22,6 @@ Future<void> main() async {
   BootTiming.mark('after RustLib.init');
   installErrorHooks();
   AppLog.info('start');
-  Bakeoff.instance.init(logDir: dir);
   runApp(NotesApp(dataDir: dir, startedAtUs: startedAtUs));
   WidgetsBinding.instance.addPostFrameCallback((_) => BootTiming.mark('first frame'));
   BootTiming.logSlowFrames();

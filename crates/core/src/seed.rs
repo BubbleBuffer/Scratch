@@ -1,4 +1,4 @@
-//! Test vaults for the bake-off and benchmarks.
+//! Test vaults for benchmarks.
 
 use std::fs;
 
