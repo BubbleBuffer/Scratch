@@ -56,4 +56,4 @@ The proof signs `relay_proof_hash("scratch/session/v1", viewer, origin, nonce, k
   Against theft of the whole device, the key file needs a passphrase held in OS storage: DPAPI on Windows, a Keystore-wrapped secret on Android. The app has no secure-storage package yet.
 - **The vault device id isn't in the signed transcript.** It's bound on the hub side, through the entry that links that vault id to the public key. That's enough, because the hub accepts a key only for the vault id it was registered with.
 - **The proof borrows the `viewer` role**, since v0.1.0 knows only `host` and `viewer`. A role-free proof in the library would be cleaner.
-- **`bubblebuffer-link` is not used**; the LAN and Tailscale path stays plain HTTP (`sync-state.md`).
+- **`bubblebuffer-link` is not used**; the LAN and Tailscale path stays plain HTTP (`vault-sync.md`).
