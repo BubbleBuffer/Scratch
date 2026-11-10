@@ -10,7 +10,7 @@ realizes: ["[[integrations/agent]]"]
 
 # Hub server (state)
 
-Build step 4a of the [agent plan](../integrations/agent.md), built 2026-10-08 in [crates/hub](../../crates/hub) (package `notes_hub`, binary `notes-hub`). It runs the same hub as the desktop ([Sync (state)](sync-state.md)) on a server: axum on tokio, plain HTTP inside the container, with Caddy in front terminating TLS. Devices get their token from an OIDC login instead of `--pair`. Since step 4b it also runs the BubblePaw agent ([Agent](../integrations/agent.md)) over its vault replica and serves it at `GET /agent/ws`.
+Build step 4a of the [agent plan](../integrations/agent.md), built 2026-10-08 in [crates/hub](../../crates/hub) (package `notes_hub`, binary `notes-hub`). It runs the same hub as the desktop ([Sync](vault-sync.md)) on a server: axum on tokio, plain HTTP inside the container, with Caddy in front terminating TLS. Devices get their token from an OIDC login instead of `--pair`. Since step 4b it also runs the BubblePaw agent ([Agent](../integrations/agent.md)) over its vault replica and serves it at `GET /agent/ws`.
 
 ## Running it
 
@@ -95,7 +95,7 @@ Operator steps for signing in are in [Provider sign-in](hub-deploy.md#provider-s
 | `GET /s/<token>`, `GET /s/<token>/a/<attachment>` | A share link and its page's attachments: public, or private (web session); snapshot or live; 410 once revoked. |
 | `GET /shares?page=<id>`, `GET /shares?all=1`, `POST /shares`, `DELETE /shares/{id}` | List (one page or all), create (idempotent, 200 `existing` for a reused link) and revoke share links: device token and `X-Device`, or a web session with the hub's own `Origin`. Agent tokens are refused. A browser `GET /shares` with a session is the Shared links page. |
 | `GET /icon.png` | The app icon, for preview cards. |
-| `/sync`, `/push`, `/changes`, `/blobs/<id>` | The sync protocol, unchanged ([Sync (state)](sync-state.md#protocol)). Paths outside the explicit hub routes fall through to `Hub::handle` on a blocking thread, with the body streamed through a sync reader only after the token check. |
+| `/sync`, `/push`, `/changes`, `/blobs/<id>` | The sync protocol, unchanged ([Sync](vault-sync.md#protocol)). Paths outside the explicit hub routes fall through to `Hub::handle` on a blocking thread, with the body streamed through a sync reader only after the token check. |
 | `GET /auth/start?device=<id>&name=<label>&redirect=<uri>[&state=<s>]` | Starts a login (below). |
 | `GET /auth/callback?code&state` | The issuer's redirect back. |
 | `POST /auth/redeem` `{code, device[, pubkey, key_id]}` | Trades a one-time code for `{token, label, account}`. `account` is the signed-in user's email from the verified ID token, or its `sub` when there is none (added 2026-10-11; the deployed hub does not send it yet, so the app shows its fallback). A bad, used, expired or other-device code gets 400 `{"error": "invalid_code"}`. With `pubkey` and `key_id` the token is key-bound from the start ([Device keys](device-keys.md)); a malformed or half-given key gets 400 `invalid_key`. |
@@ -222,7 +222,7 @@ Outside agents, and the app's Ask AI and Agent-assigned tasks (through a signed-
 - Viewer and share pages are sent with a strict CSP (no scripts on share pages, the viewer's one script by nonce, `frame-ancestors 'none'`), `noindex` and no-referrer. Share tokens are 192 random bits; a token reaches only its page and that page's attachments ([Sharing](../integrations/sharing.md)).
 - The OIDC HTTP client follows no redirects (as `openidconnect` requires) and times out after 15 s.
 - The token for a login is written at the callback. If its code is never redeemed, the entry stays until the device logs in again or is unpaired.
-- **Clients behind TLS-inspecting proxies.** The app trusts a hub certificate the device cannot verify only after the user trusts it in Settings. Sync, the agent socket (`/agent/ws`) and the host relay (`/host/ws`) all use that one trust ([Trusted certificates](sync-state.md#trusted-certificates-2026-10-19)). The trusted issuing CA is an anchor for that hub's origin only, with full hostname and validity checks, so a proxy that re-mints the hub's leaf keeps working. The hub itself needs no change.
+- **Clients behind TLS-inspecting proxies.** The app trusts a hub certificate the device cannot verify only after the user trusts it in Settings. Sync, the agent socket (`/agent/ws`) and the host relay (`/host/ws`) all use that one trust ([Trusted certificates](vault-sync.md#trusted-certificates)). The trusted issuing CA is an anchor for that hub's origin only, with full hostname and validity checks, so a proxy that re-mints the hub's leaf keeps working. The hub itself needs no change.
 - An email in `allowed_users` matches whether or not the issuer marks it verified (Authentik sends `email_verified: false` by default). Prefer `allowed_groups` or a `sub`: an email match is only safe while nobody else can set that email in Authentik (no self-enrollment or editable emails).
 
 ## Tests

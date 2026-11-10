@@ -7,11 +7,11 @@ status: current
 
 # Sync and Hub
 
-These pages describe how devices share a vault: the local-first sync model, the built sync, the Hub server and how it is deployed, and the Android agent that reaches the vault through the Hub.
+These pages describe how devices share a vault: the local-first sync model, the sync protocol and client, the Hub server and how it is deployed, and the Android agent that reaches the vault through the Hub.
 
 <!-- wiki:children -->
 - [Sync and storage](sync-and-storage.md): Local-first sync with CRDTs, attachments by hash, page history and cold history storage.
-- [Sync (state)](sync-state.md): The built sync (vault_sync + core hooks): hub server, binary protocol, token pairing, delta sync by version vectors, conflicts, purges, lazy blobs, numbers.
+- [Vault sync](vault-sync.md): The built sync (vault_sync + core hooks): hub server, binary protocol, device pairing, delta sync by version vectors, trusted certificates, conflicts and purges.
 - [Hub server (state)](hub.md): notes-hub, the server hub: sync over axum behind Caddy, device tokens from an Authentik (OIDC) login, the agent at /agent/ws (JSON-RPC over WebSocket); config, routes, protocol, security.
 - [Device keys](device-keys.md): each device holds an Ed25519 key (bubblebuffer-device-key); the hub binds it to the device token, and sync, sockets and hub calls run on 1-hour sessions bought with a signed challenge; pairing links carry one-time codes. Agent tokens and MCP OAuth stay.
 - [Hub deployment](hub-deploy.md): Local amd64 container build and deploy kit; Authentik, the existing Caddy network, provider sign-ins, backup and rollback.
