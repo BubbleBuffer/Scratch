@@ -32,6 +32,7 @@ import '../../src/rust/api/agent.dart'
         LegacyCard;
 import 'agent_store.dart';
 import 'agent_transcript.dart';
+import '../../ui/tokens.dart';
 
 /// The id of the hairline entry.
 const historyBoundaryId = 'history-boundary';
@@ -166,7 +167,7 @@ CompactedEntries compactedEntries({
   required Map<String, String> segmentOf,
   required HistoryController controller,
   required Widget Function(ChatItem) itemView,
-  double gap = 14,
+  double gap = AgentLayout.rowGap,
 }) {
   // Which segment key each item belongs to: a turn through its messages, a
   // bubble through its own message. Anything else (a run note, a reply still

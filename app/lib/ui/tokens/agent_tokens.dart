@@ -15,8 +15,10 @@ abstract final class AgentLayout {
   /// The chat column: the transcript's width plus its side room.
   static const double columnRoom = 64;
 
-  /// The gap between transcript rows.
-  static const double rowGap = 14;
+  /// The gap between transcript rows: the kit's outline list puts
+  /// `Space.lg` under each row, and the plain list matches it so a message
+  /// keeps its place when an outline arrives.
+  static const double rowGap = 16;
 
   /// A notice in the middle of an empty or signed-out chat.
   static const double notice = 460;

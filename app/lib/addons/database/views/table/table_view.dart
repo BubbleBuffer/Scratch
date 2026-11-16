@@ -506,7 +506,8 @@ class _TableRowState extends State<_TableRow> {
         // size it), so their wrapped height is measured here.
         SizedBox(width: frozenW, height: _frozenHeight(context, h)),
         for (var i = widget.frozen; i < cols.length; i++) cell(i),
-        if (!context.touch) const Gap(Space.xxl),
+        // The header's add-property column.
+        if (!context.touch) const Gap(Db.addColumn),
       ],
     );
     final rowColor = _hover

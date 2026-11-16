@@ -16,6 +16,13 @@ import 'addon_panels.dart';
 import 'navigation.dart';
 import 'page_stack.dart';
 
+/// The size class of a window [width] wide. The wide frame (the sidebar
+/// beside the page pile) needs more room than bb_ui's medium width, so the
+/// shell counts a window narrower than [ShellLayout.compactBelow] as compact.
+SizeClass shellSizeClass(double width) => width < ShellLayout.compactBelow
+    ? SizeClass.compact
+    : SizeClass.forWidth(width);
+
 class NotesShell extends StatefulWidget {
   const NotesShell({
     super.key,
@@ -108,10 +115,7 @@ class _NotesShellState extends State<NotesShell> {
             ),
           ),
         );
-        app = SizeClassScope(
-          sizeClass: SizeClass.forWidth(width),
-          child: app,
-        );
+        app = SizeClassScope(sizeClass: shellSizeClass(width), child: app);
         app = PageStackScope(stack: _stack, child: app);
         if (widget.wrap != null) app = widget.wrap!(app);
         return app;

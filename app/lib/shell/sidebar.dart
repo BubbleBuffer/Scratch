@@ -1174,7 +1174,7 @@ class _TreeRowViewState extends State<_TreeRowView> {
                       const Gap(Space.hair),
                     ] else if (widget.showToggle)
                       // A leaf keeps the chevron's room so icons line up.
-                      const Gap(Space.xl)
+                      Gap(IconSize.lg.px + Space.hair)
                     else
                       const Gap(Space.xxs),
                     icon,

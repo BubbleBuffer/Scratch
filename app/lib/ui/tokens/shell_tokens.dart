@@ -5,6 +5,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
+/// The app frame: below this window width the shell uses the compact
+/// layout (stack navigation and the bottom dock); the sidebar and the page
+/// pile need the room.
+abstract final class ShellLayout {
+  static const double compactBelow = 768;
+}
+
 /// Where a toast floats: this far above the bottom of the window, clear of
 /// a compact screen's bottom bar.
 abstract final class ToastPlacement {

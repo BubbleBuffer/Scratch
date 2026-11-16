@@ -168,7 +168,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
     // The row gap sits above the item inside its slot (none above the first).
     return switched == null || item == null || at < 0
         ? null
-        : TranscriptAnchor(item, -(switched.y - (at == 0 ? 0 : 14)));
+        : TranscriptAnchor(item, -(switched.y - (at == 0 ? 0 : AgentLayout.rowGap)));
   }
 
   /// The compacted transcript: summary cards, the hairline and the live end.
@@ -195,14 +195,14 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
     final entry = switched == null ? null : built.entryOf[switched.id];
     bool card(String? id) => id != null && id.startsWith('history-');
     double? gapBefore(String? previous, String id) =>
-        card(previous) || card(id) ? 24 : null;
+        card(previous) || card(id) ? Space.xl : null;
     if (switched != null && entry != null) {
       // A card opens at its top; a message where it was, the gap above it
       // being part of its slot.
       final at = built.entries.indexWhere((e) => e.id == entry);
       final gap = at <= 0
           ? 0.0
-          : gapBefore(built.entries[at - 1].id, entry) ?? 14.0;
+          : gapBefore(built.entries[at - 1].id, entry) ?? AgentLayout.rowGap;
       initial = TranscriptAnchor(entry, card(entry) ? 0 : -(switched.y - gap));
     }
     return TranscriptList(
