@@ -12,30 +12,40 @@ Scratch's design tokens and notes-free UI primitives come from [BubbleBuffer/bb-
 
 ## What comes from the kit
 
-- `bb_tokens`: `tokens.dart` (`AppColors`, `TypeScale`, `Layout`, `Radii`, `Motion`, `FormFactor`, `AppTheme`, the font family names).
-- `bb_ui`: buttons, fields, hover, menus, `AppTooltip`, `Ico` and the Lucide glyphs, lines, marked list, modal, sheet, routes, picker sheet, reference chip, selection handles, `FoldableStackCard`, and the settings controls.
+- `bb_tokens`: `tokens.dart` (`AppColors`, the scales `Space`, `ControlSize`, `IconSize`, `Stroke`, `Alpha`, `Widths`, `Heights`, `Sizes`, `Weight`, `TypeScale` roles, `Layout`, `Radii`, `Motion`; `Density` and `Metrics`, `SizeClass` and `SizeClassScope`, `AppTheme`, the font family names).
+- `bb_ui`: buttons, fields, hover, menus, `AppTooltip`, `Ico` and the Lucide glyphs, lines, `Gap` and `AdaptiveLayout`, marked list, modal, sheet, routes, picker sheet, reference chip, selection handles, `FoldableStackCard`, and the settings controls.
 
 The old files stay in place as one-line re-exports, so imports and call sites are unchanged:
 
-- `app/lib/ui/`: `buttons`, `fields`, `hover`, `icons`, `lines`, `lucide`, `marked_list`, `menu`, `modal`, `picker_sheet`, `reference_chip`, `routes`, `selection`, `sheet`, `stack_card`, `tokens`, `tooltip`.
+- `app/lib/ui/`: `buttons`, `fields`, `hover`, `icons`, `layout`, `lines`, `lucide`, `marked_list`, `menu`, `modal`, `picker_sheet`, `reference_chip`, `routes`, `selection`, `sheet`, `stack_card`, `tokens`, `tooltip`.
 - `app/lib/features/settings/controls.dart` (from `package:bb_ui/settings_controls.dart`).
 
 Two pieces stay in Scratch:
 
-- `ui/tokens.dart` also re-exports the app clock (`clockNow` from `core/clock.dart`).
+- `ui/tokens.dart` also re-exports the app clock (`clockNow` from `core/clock.dart`) and Scratch's own token libraries (below).
 - The tooltip's command shortcuts: the kit's `AppTooltip.commandShortcuts` is a lookup the app sets. `commandRegistry` (`registry/command_registry.dart`) points it at itself when it is created, so tooltips show the same shortcuts as before. `test/ui/app_tooltip_test.dart` covers this through the registry.
 
 The fonts stay bundled in Scratch (`app/pubspec.yaml`); the kit names the same families. Everything else in `ui/` is Scratch's own (note previews, embeds, page icons, boards, databases, emoji picker, toasts and the rest).
 
+## Design tokens, density and size classes (bb-ui 0.8)
+
+No widget writes a number for spacing, sizes, type, strokes, opacity, colour or durations; it reads a token. The [bb_lints](https://github.com/BubbleBuffer/bb-ui/tree/main/packages/bb_lints) analyzer plugin enforces this: `app/analysis_options.yaml` enables it, and CI runs `dart analyze --fatal-infos` in `app/` (not `flutter analyze`, which does not report plugin diagnostics, and without `lib`/`test` arguments, which skip plugins). A raw value is suppressed only on its line with a reason: icon glyph geometry, the QR matrix and the calico art.
+
+- Shared values come from bb_tokens: `Space`, `ControlSize`, `IconSize`, `Stroke`, `Alpha`, `Radii`, `Widths`, `Heights`, `Sizes`, `Motion`, the type roles (`context.type.ui`, `.item`, `.uiSmall`...) and `Weight`.
+- Scratch's own values have names in `app/lib/ui/tokens/` (exported by `ui/tokens.dart`; the lint accepts raw values in `*_tokens.dart` files): `shell_tokens` (pile, home, compact dock and tree, sidebar, toasts, search, feedback), `editor_tokens` (block rhythm, handles, columns, headings, block parts, page chrome and header, editor menus), `inline_tokens` (inline marks and chips), `today_tokens`, `calendar_tokens`, `settings_tokens` (the settings family, sync, trash, QR), `agent_tokens`, `panel_tokens`, `picker_tokens`, `board_tokens`, `space_tokens`, `type_tokens`, `glyph_tokens`, `art_tokens` and the colours: `block_color_tokens` (block palette), `color_tokens` (image overlays, cover swatches). The database's are in `ui/database/db_tokens.dart`.
+- The shell (`shell/app_shell.dart`) sets the `Density` from the platform (`Density.forPlatform`: touch on Android and iOS, pointer on desktop; `NotesShell.density` overrides it in tests) and a `SizeClassScope` from the window width. The kit's `BbThemeScope` takes the same density.
+- `context.mobile` is gone. Layout decisions (the compact home and its dock, stack navigation, sheets instead of popovers, full screens instead of panels, stacked rows, gutters) read `context.sizeClass.isCompact`; sizes, hover, long presses, the soft keyboard's toolbar and native text selection read `context.touch` or `context.metrics`. A narrow desktop window gets the compact layout with pointer sizes; a tablet the wide layout with touch sizes. `BlockContext` has `touch` and `compact`.
+- Text-bearing rows and buttons take a minimum height, not a fixed one.
+
 ## The pin
 
-`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui's `v0.7.2` tag. Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
+`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui commit `1e3863a` (bb-ui 0.8, branch `claude/modest-mendel-d4av4y`; re-pin to the `v0.8.0` tag once it is released). Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
 
 ```yaml
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/bb-ui
-      ref: v0.7.2
+      ref: 1e3863ac3c9a0123fb5e502e890005701423a586
       path: packages/bb_ui
 ```
 
@@ -51,7 +61,7 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The chat pane's packages
 
-The agent chat's outline and the Agent chat pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit `v0.17.3` (commit `e19afa44`). `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent chat pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit 0.20.0 (commit `88db604`, agent-kit pull request #70; re-pin to the `v0.20.0` tag's commit once it is released). `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
 
 ## The chat outline
 
