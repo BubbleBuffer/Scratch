@@ -31,7 +31,7 @@ Future<void> openCalendar(BuildContext context, {DateTime? day}) async {
     pageRoute(
       (_) => const VaultCalendarScreen(),
       motion: Motion.of(context),
-      slide: context.touch,
+      slide: context.sizeClass.isCompact,
       settings: const RouteSettings(name: calendarRouteName),
     ),
   );
@@ -254,7 +254,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
               child: Row(
                 children: [
                   SizedBox(
-                    width: 100,
+                    width: CalendarScreen.shortcutKey,
                     child: Text(
                       pair.$1,
                       style: ts(
@@ -391,7 +391,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
               ),
               const Gap(Space.md),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 360),
+                constraints: const BoxConstraints(maxHeight: CalendarScreen.shortcutList),
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
@@ -429,7 +429,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     if (_store == null) return const SizedBox.shrink();
-    final mobile = context.touch;
+    final mobile = context.sizeClass.isCompact;
     final compactDesktop = !mobile && MediaQuery.sizeOf(context).width < 1120;
     final c = context.colors;
     final title = _period == VaultCalendarPeriod.day
@@ -450,7 +450,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              height: 6,
+              height: PageChrome.band,
               color: spaceColor(
                 'sun',
                 c.dark ? Brightness.dark : Brightness.light,
@@ -462,7 +462,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                 children: [
                   IconBtn(
                     Ico.chevronLeft,
-                    size: mobile ? ControlSize.xl : ControlSize.sm,
+                    size: context.touch ? ControlSize.xl : ControlSize.sm,
                     semanticLabel: 'Back to Pages',
                     onTap: () => Navigator.of(context).maybePop(),
                   ),
@@ -561,7 +561,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                 children: [
                   if (!mobile && _categories)
                     SizedBox(
-                      width: 225,
+                      width: CalendarScreen.categories,
                       child: Container(
                         decoration: BoxDecoration(
                           border: Border(right: BorderSide(color: c.border)),
@@ -609,8 +609,8 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
             selected: _period == period,
             onTap: () => _view(period),
             padding: EdgeInsets.symmetric(horizontal: context.touch ? Space.sm : Space.md),
-            child: SizedBox(
-              height: context.touch ? 44 : 30,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: (context.touch ? ControlSize.xl : ControlSize.md).height),
               child: Center(
                 child: Text(
                   period.name[0].toUpperCase() + period.name.substring(1),
@@ -668,7 +668,8 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
         selected: _selected,
         store: _store!,
         onSelected: (anchor, day) {
-          if (context.touch) {
+          // A compact screen lists the day under the month.
+          if (context.sizeClass.isCompact) {
             _select(day);
           } else {
             unawaited(_dayPopup(anchor, day));
@@ -684,15 +685,15 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
           }
         },
       );
-      if (!context.touch) return month;
+      if (!context.sizeClass.isCompact) return month;
       return Column(
         children: [
-          SizedBox(height: 310, child: month),
+          SizedBox(height: CalendarScreen.compactMonth, child: month),
           Expanded(child: _phoneAgenda()),
         ],
       );
     }
-    if (context.touch) {
+    if (context.sizeClass.isCompact) {
       return GestureDetector(
         onHorizontalDragEnd: (details) {
           if (details.primaryVelocity!.abs() > 100) {
@@ -728,7 +729,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
       children: [
         Expanded(child: grid),
         SizedBox(
-          width: 270,
+          width: CalendarScreen.dayPanel,
           child: Container(
             padding: const EdgeInsets.all(Space.lg),
             decoration: BoxDecoration(
@@ -802,8 +803,8 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                 return Hover(
                   onTap: () => _select(day),
                   selected: sameDay(day, _selected),
-                  child: SizedBox(
-                    height: 62,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: CalendarScreen.weekDay),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -830,7 +831,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                                 child: _CalendarDot(
                                   item: item,
                                   settings: _store!.settings,
-                                  size: 4,
+                                  size: CalendarMonth.smallDot,
                                 ),
                               ),
                           ],
@@ -847,7 +848,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
   );
 
   Widget _phoneAgenda() => SingleChildScrollView(
-    padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, 80),
+    padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, CalendarScreen.endPadding),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -913,7 +914,7 @@ class _CalendarDot extends StatelessWidget {
   const _CalendarDot({
     required this.item,
     required this.settings,
-    this.size = 8,
+    this.size = CalendarMonth.dot,
   });
   final AgendaItem item;
   final CalendarSettings settings;
@@ -936,7 +937,7 @@ Widget _calendarDrag(BuildContext context, AgendaItem item, Widget child) {
     feedback: DefaultTextStyle(
       style: ts(context.type.uiSmall, context.colors.textPrimary),
       child: Container(
-        width: 170,
+        width: CalendarScreen.dragged,
         padding: const EdgeInsets.all(Space.sm),
         decoration: BoxDecoration(
           color: context.colors.bgPrimary,
@@ -980,14 +981,14 @@ class _CalendarChip extends StatelessWidget {
             ? Border.all(color: context.colors.threadStrong)
             : null,
         padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-        child: SizedBox(
-          height: 22,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: CalendarMonth.chip),
           child: Row(
             children: [
               if (item.kind == AgendaKind.task && checkbox)
                 StacksCheckbox(
                   checked: item.done,
-                  size: 12,
+                  size: CalendarMonth.chipCheck,
                   onChanged: (_) => onToggle(),
                 )
               else
@@ -1157,7 +1158,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
 
   @override
   Widget build(BuildContext context) {
-    _cellHeight = context.touch ? 60 : 124;
+    _cellHeight = context.sizeClass.isCompact ? CalendarMonth.cellCompact : CalendarMonth.cell;
     if (!_ready) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scroll.hasClients) return;
@@ -1173,7 +1174,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
       child: Column(
         children: [
           SizedBox(
-            height: 29,
+            height: CalendarMonth.weekdays,
             child: Row(
               children: [
                 for (final name in weekdays)
@@ -1198,7 +1199,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
               slivers: [
                 for (var n = 0; n < _count; n++)
                   ..._monthSlivers(context, calendarMonth(_first, n)),
-                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                const SliverToBoxAdapter(child: SizedBox(height: CalendarMonth.end)),
               ],
             ),
           ),
@@ -1235,7 +1236,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
     ),
   ];
   Widget _dayCell(BuildContext context, DateTime day, DateTime month) {
-    final mobile = context.touch;
+    final mobile = context.sizeClass.isCompact;
     final items = widget.store.onDay(day);
     final selected = sameDay(day, widget.selected);
     final today = sameDay(day, clockNow());
@@ -1272,7 +1273,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: mobile ? 39 : 32,
+                    height: mobile ? CalendarMonth.numberRowCompact : CalendarMonth.numberRow,
                     child: Row(
                       mainAxisAlignment: mobile
                           ? MainAxisAlignment.center
@@ -1291,8 +1292,8 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                         ],
                         Container(
                           alignment: Alignment.center,
-                          width: mobile ? 30 : 26,
-                          height: mobile ? 30 : 24,
+                          width: mobile ? CalendarMonth.dayCompact : CalendarMonth.dayWidth,
+                          height: mobile ? CalendarMonth.dayCompact : CalendarMonth.dayHeight,
                           decoration: BoxDecoration(
                             color: today
                                 ? context.colors.accent
@@ -1330,7 +1331,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                             child: _CalendarDot(
                               item: item,
                               settings: widget.store.settings,
-                              size: 4,
+                              size: CalendarMonth.smallDot,
                             ),
                           ),
                       ],
@@ -1433,7 +1434,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
           padding: const EdgeInsets.symmetric(horizontal: Space.lg),
           child: Row(
             children: [
-              const Gap(80),
+              const Gap(CalendarTimeGrid.hourColumn),
               for (final day in widget.days)
                 Expanded(
                   child: Hover(
@@ -1449,8 +1450,8 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                           ),
                           const Gap(Space.xs),
                           Container(
-                            width: 27,
-                            height: 27,
+                            width: CalendarTimeGrid.headerDay,
+                            height: CalendarTimeGrid.headerDay,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
@@ -1480,12 +1481,12 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
               bottom: BorderSide(color: c.border),
             ),
           ),
-          constraints: const BoxConstraints(minHeight: 58, maxHeight: 107),
+          constraints: const BoxConstraints(minHeight: CalendarTimeGrid.allDayMin, maxHeight: CalendarTimeGrid.allDayMax),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 80,
+                width: CalendarTimeGrid.hourColumn,
                 child: Padding(
                   padding: const EdgeInsets.only(top: Space.sm),
                   child: Text(
@@ -1527,7 +1528,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                             if (!widget.store.onDay(day).any((i) => !i.hasTime))
                               Hover(
                                 onTap: () => widget.onCreate(day, null),
-                                child: const SizedBox(height: 40),
+                                child: const SizedBox(height: CalendarTimeGrid.emptyAllDay),
                               ),
                           ],
                         ),
@@ -1544,28 +1545,28 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
             controller: _scroll,
             padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
             child: SizedBox(
-              height: 1440,
+              height: CalendarTimeGrid.hours,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    width: 80,
+                    width: CalendarTimeGrid.hourColumn,
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
                         for (var hour = 0; hour < 24; hour++)
                           Positioned(
-                            top: hour * 60.0 + (hour == 0 ? 2 : -7),
-                            right: 9,
+                            top: hour * CalendarTimeGrid.hour + (hour == 0 ? CalendarTimeGrid.firstLabelDrop : -CalendarTimeGrid.labelLift),
+                            right: CalendarTimeGrid.labelRight,
                             child: Text(
                               '${hour.toString().padLeft(2, '0')}:00',
-                              style: ts(context.type.micro, c.textTertiary, weight: Weight.regular).copyWith(fontFamily: monoFamily),
+                              style: ts(context.type.micro, c.textTertiary, weight: Weight.regular, mono: true),
                             ),
                           ),
                         if (widget.days.any((d) => sameDay(d, now)))
                           Positioned(
                             key: const ValueKey('calendar-now-label'),
-                            top: minute - 8.0,
+                            top: minute - CalendarTimeGrid.nowLift,
                             left: 0,
                             child: ColoredBox(
                               color: c.bgPrimary,
@@ -1600,8 +1601,8 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                               children: [
                                 for (var hour = 0; hour < 24; hour++)
                                   Positioned(
-                                    top: hour * 60.0,
-                                    height: 60,
+                                    top: hour * CalendarTimeGrid.hour,
+                                    height: CalendarTimeGrid.hour,
                                     left: 0,
                                     right: 0,
                                     child: DragTarget<Object>(
@@ -1657,10 +1658,10 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                                         constraints.maxWidth *
                                             segment.lane /
                                             segment.lanes +
-                                        3,
+                                        CalendarTimeGrid.blockInset,
                                     width: math.max(
                                       1,
-                                      constraints.maxWidth / segment.lanes - 6,
+                                      constraints.maxWidth / segment.lanes - 2 * CalendarTimeGrid.blockInset,
                                     ),
                                     child: _timedBlock(context, segment),
                                   ),
@@ -1672,7 +1673,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                                     right: 0,
                                     child: IgnorePointer(
                                       child: Container(
-                                        height: 2,
+                                        height: Stroke.bold,
                                         color: c.accentText,
                                       ),
                                     ),
@@ -1865,8 +1866,8 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
                           child: Hover(
                             onTap: () => Navigator.of(context).pop(day),
                             selected: sameDay(day, widget.selected),
-                            child: SizedBox(
-                              height: 34,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: CalendarScreen.jumpDay),
                               child: Center(
                                 child: Text(
                                   '${day.day}',
@@ -1888,7 +1889,7 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
             ),
           const Gap(Space.md),
           FieldFrame(
-            height: 40,
+            height: CalendarScreen.jumpField,
             child: PlainField(
               key: const ValueKey('calendar-jump-date'),
               controller: _text,

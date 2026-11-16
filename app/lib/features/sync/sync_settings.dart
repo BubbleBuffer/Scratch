@@ -786,7 +786,7 @@ class TrustedCertificatesSettings extends StatelessWidget {
                   key: ValueKey('cert-pin-$origin'),
                   padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.sm, Space.sm),
                   child: Row(children: [
-                    SIcon(Sx.shieldCheck, size: 17, color: c.textSecondary),
+                    SIcon(Sx.shieldCheck, size: IconSize.md, color: c.textSecondary),
                     const Gap(Space.md),
                     Expanded(
                       child: Hover(

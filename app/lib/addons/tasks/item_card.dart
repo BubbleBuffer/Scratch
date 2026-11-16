@@ -124,7 +124,7 @@ class ShortItemCard extends StatelessWidget {
                 : 'Complete ${item.title}',
             child: StacksCheckbox(
               checked: item.done,
-              size: 18,
+              size: IconSize.md.px,
               onChanged: busy || onToggle == null ? null : (_) => onToggle!(),
             ),
           )
@@ -176,8 +176,8 @@ class ShortItemCard extends StatelessWidget {
                             ? onToggle
                             : null,
                         child: SizedBox(
-                          width: compact ? 44 : 26,
-                          height: compact ? 44 : 24,
+                          width: compact ? Layout.minTapTarget : CalendarScreen.rowCheck,
+                          height: compact ? Layout.minTapTarget : CalendarScreen.rowCheckHeight,
                           child: Center(child: leading),
                         ),
                       ),
@@ -212,7 +212,7 @@ class ShortItemCard extends StatelessWidget {
                         ],
                         const Gap(Space.lg),
                         ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 160),
+                          constraints: const BoxConstraints(maxWidth: CalendarScreen.rowSource),
                           child: sourceWidget,
                         ),
                       ] else ...[
@@ -249,7 +249,7 @@ class ShortItemCard extends StatelessWidget {
               top: 0,
               bottom: 0,
               child: IgnorePointer(
-                child: ColoredBox(color: edge, child: const SizedBox(width: 3)),
+                child: ColoredBox(color: edge, child: const SizedBox(width: Stroke.seam)),
               ),
             ),
           ],
@@ -285,11 +285,11 @@ class _ItemSourceState extends State<_ItemSource> {
         final rect = globalRectOf(this.context);
         final width = MediaQuery.sizeOf(context).width;
         return Positioned(
-          left: rect.left.clamp(8.0, (width - 258).clamp(8.0, width)),
-          top: rect.bottom + 6,
+          left: rect.left.clamp(Space.sm, (width - CalendarScreen.details - Space.sm).clamp(Space.sm, width)),
+          top: rect.bottom + Space.xs,
           child: IgnorePointer(
             child: MenuSurface(
-              width: 250,
+              width: CalendarScreen.details,
               padding: const EdgeInsets.all(Space.md),
               child: Text(
                 widget.details,
@@ -319,7 +319,7 @@ class _ItemSourceState extends State<_ItemSource> {
                     style: ts(context.type.ui, c.textSecondary),
                   ),
                 ),
-                width: 320,
+                width: Widths.dialog,
                 shrink: true,
               );
             },
@@ -329,8 +329,8 @@ class _ItemSourceState extends State<_ItemSource> {
               children: [
                 if (widget.task)
                   Container(
-                    width: 6,
-                    height: 6,
+                    width: CalendarScreen.detailsDot,
+                    height: CalendarScreen.detailsDot,
                     decoration: BoxDecoration(
                       color: widget.color,
                       shape: BoxShape.circle,

@@ -128,10 +128,10 @@ class _TaskTitleDatesState extends State<TaskTitleDates> {
       context,
       globalRectOf(anchorContext),
       (popoverContext) => ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 320),
+        constraints: const BoxConstraints(maxHeight: CalendarScreen.datesMenu),
         child: SingleChildScrollView(
           child: MenuList(
-            width: 220,
+            width: Widths.popover,
             children: [
               for (final date in others)
                 MenuItem(
@@ -171,7 +171,7 @@ class _TaskTitleDatesState extends State<TaskTitleDates> {
             child: Hover(
               key: const ValueKey('note-title-date'),
               onTap: () => unawaited(openCalendar(context, day: date)),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: Radii.pill,
               background: c.bgSecondary,
               border: Border.all(color: c.border),
               child: Padding(

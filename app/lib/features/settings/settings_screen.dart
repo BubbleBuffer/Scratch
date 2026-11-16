@@ -62,7 +62,7 @@ enum SettingsSection {
   ];
 }
 
-Widget sectionIcon(SettingsSection s, Color color, double size) =>
+Widget sectionIcon(SettingsSection s, Color color, IconSize size) =>
     SIcon(s.icon, size: size, color: color);
 
 Widget sectionBody(SettingsSection s) => switch (s) {
@@ -93,10 +93,10 @@ class _SyncAndDevicesBody extends StatelessWidget {
   }
 }
 
-/// Opens settings at [section]. With none, a phone opens the list of
-/// pages and a computer opens General.
+/// Opens settings at [section]. With none, a compact screen opens the list
+/// of pages and a wider one opens General.
 Future<void> showSettings(BuildContext context, {SettingsSection? section}) {
-  if (context.touch) {
+  if (context.sizeClass.isCompact) {
     if (section == null) {
       return Navigator.of(context).push(
         pageRoute(
@@ -141,55 +141,12 @@ class _SettingsJump extends InheritedWidget {
 // ---------------------------------------------------------------------------
 // Frames
 
-/// A desktop modal panel: centred, [width] x [height] at most (and 100 px
-/// smaller than the window), over the overlay colour. A [shrink] panel is
-/// as tall as its content up to that. Escape closes it.
+/// A modal panel: centred, [width] x [height] at most (and smaller than the
+/// window), over the overlay colour. A [shrink] panel is as tall as its
+/// content up to that. Escape closes it. bb_ui's [showModalPanel].
 Future<T?> showPanel<T>(BuildContext context, WidgetBuilder builder,
-        {double width = 720, double height = 640, bool shrink = false}) =>
-    Navigator.of(context).push(
-        _PanelRoute<T>(builder: builder, width: width, height: height, shrink: shrink, barrier: context.colors.overlay, duration: Motion.of(context).fast));
-
-class _PanelRoute<T> extends PopupRoute<T> {
-  _PanelRoute({required this.builder, required this.width, required this.height, required this.shrink, required this.barrier, required this.duration});
-  final WidgetBuilder builder;
-  final double width, height;
-  final bool shrink;
-  final Color barrier;
-  final Duration duration;
-
-  @override
-  Color? get barrierColor => barrier;
-  @override
-  bool get barrierDismissible => true;
-  @override
-  String? get barrierLabel => 'Close';
-  @override
-  Duration get transitionDuration => duration;
-
-  @override
-  Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
-    final size = MediaQuery.sizeOf(context);
-    final w = (size.width - 100).clamp(320.0, width);
-    final h = (size.height - 100).clamp(320.0, height);
-    return Center(
-      child: CallbackShortcuts(
-        bindings: {const SingleActivator(LogicalKeyboardKey.escape): () => Navigator.of(context).maybePop()},
-        child: Focus(
-          autofocus: true,
-          child: ConstrainedBox(
-            constraints: shrink ? BoxConstraints(maxWidth: w, minWidth: w, maxHeight: h) : BoxConstraints.tight(Size(w, h)),
-            child: MenuSurface(child: builder(context)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget buildTransitions(
-          BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) =>
-      FadeTransition(opacity: animation, child: child);
-}
+        {double width = Widths.content, double height = Heights.dialog, bool shrink = false}) =>
+    showModalPanel<T>(context, builder, width: width, height: height, shrink: shrink);
 
 /// Mobile: a full-screen page with a back button and [title].
 Future<void> pushSettingsPage(BuildContext context, String title, Widget body, {Key? key}) =>
@@ -252,10 +209,10 @@ class MobileSettingsScaffold extends StatelessWidget {
                         child: Semantics(
                           button: true,
                           label: 'Back to $title',
-                          child: SizedBox(
-                            height: 44,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: SettingsFrame.topBar),
                             child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              SIcon(Sx.chevronLeft, size: 20, color: c.textSecondary),
+                              SIcon(Sx.chevronLeft, size: IconSize.lg, color: c.textSecondary),
                               const Gap(Space.hair),
                               Text(title, style: ts(context.type.title, c.textSecondary, weight: Weight.semibold)),
                             ]),
@@ -277,7 +234,7 @@ class MobileSettingsScaffold extends StatelessWidget {
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(padded ? Layout.gutter : 0, Space.sm, padded ? Layout.gutter : 0, mq.padding.bottom + 48),
+              padding: EdgeInsets.fromLTRB(padded ? Layout.gutter : 0, Space.sm, padded ? Layout.gutter : 0, mq.padding.bottom + SettingsFrame.endPadding),
               child: body,
             ),
           ),
@@ -327,7 +284,7 @@ class _SettingsModalState extends State<SettingsModal> {
     }
     return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
-        width: 236,
+        width: SettingsFrame.sidebar,
         decoration: BoxDecoration(
           color: c.bgSecondary,
           border: Border(right: BorderSide(color: c.border)),
@@ -355,7 +312,7 @@ class _SettingsModalState extends State<SettingsModal> {
             child: Align(
               alignment: Alignment.topLeft,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
+                constraints: const BoxConstraints(maxWidth: SettingsFrame.column),
                 child: _SettingsJump(
                   go: (s) => setState(() => _section = s),
                   child: KeyedSubtree(
@@ -405,7 +362,7 @@ class _NavItem extends StatelessWidget {
           radius: Radii.md,
           border: selected ? Border.all(color: c.border) : null,
           child: Container(
-            constraints: const BoxConstraints(minHeight: 32),
+            constraints: const BoxConstraints(minHeight: SettingsFrame.navRow),
             decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(color: selected ? c.accent : kTransparent, width: Stroke.seam),
@@ -413,7 +370,7 @@ class _NavItem extends StatelessWidget {
             ),
             padding: const EdgeInsets.fromLTRB(Space.sm, Space.xs, Space.md, Space.xs),
             child: Row(children: [
-              sectionIcon(section, selected ? c.iconPrimary : c.iconSecondary, 16),
+              sectionIcon(section, selected ? c.iconPrimary : c.iconSecondary, IconSize.sm),
               const Gap(Space.md),
               Expanded(
                 child: Text(section.label,
@@ -434,7 +391,7 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-        height: 18,
+        constraints: const BoxConstraints(minHeight: SettingsFrame.badge),
         alignment: Alignment.center,
         decoration: BoxDecoration(color: context.colors.attnBg, borderRadius: Radii.pill),
         child: Text(text, style: ts(context.type.caption, context.colors.textPrimary, weight: Weight.display)),
@@ -490,16 +447,16 @@ class SettingsPage extends StatelessWidget {
         lift: 0,
         padding: const EdgeInsets.symmetric(horizontal: Layout.gutter),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
+          constraints: const BoxConstraints(minHeight: SettingsFrame.listRow),
           child: Row(children: [
-            sectionIcon(s, c.iconSecondary, 20),
+            sectionIcon(s, c.iconSecondary, IconSize.lg),
             const Gap(Space.lg),
             Expanded(child: Text(s.label, style: ts(context.type.ui, c.textPrimary))),
             if (_value(context, s) case final v?) ...[
               Text(v, style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
               const Gap(Space.xs),
             ],
-            SIcon(Sx.chevronRight, size: 16, color: c.iconTertiary),
+            SIcon(Sx.chevronRight, color: c.iconTertiary),
           ]),
         ),
       ));
@@ -536,7 +493,7 @@ class GeneralBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppSettings.of(context);
-    final m = context.touch;
+    final m = context.sizeClass.isCompact;
     final phone = defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
     return SPage(
@@ -749,7 +706,9 @@ class _VaultBodyState extends State<VaultBody> {
     final s = AppSettings.of(context);
     final root = context.app.vault.root;
     final pending = s.vaultPath != null && s.vaultPath != root ? s.vaultPath : null;
-    final desktop = !context.touch;
+    // Folders and mounts are for a computer's file system.
+    final desktop = defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS;
     return SPage(
       title: 'Storage',
       intro:

@@ -23,13 +23,13 @@ import '../../ui/ui.dart';
 
 extension SettingsColors on AppColors {
   /// The switch's "on" colour (the moss space colour).
-  Color get moss => dark ? const Color(0xFF8FA392) : const Color(0xFF697A6B);
+  Color get moss => dark ? SettingsInk.mossDark : SettingsInk.moss;
 
   /// Text for destructive actions and errors.
-  Color get dangerText => dark ? const Color(0xFFF2B8B0) : const Color(0xFF8A3027);
+  Color get dangerText => dark ? SettingsInk.dangerDark : SettingsInk.danger;
 
   /// The left rule of a warning notice.
-  Color get warnRule => const Color(0xFFC9A24C);
+  Color get warnRule => SettingsInk.warnRule;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,15 +83,15 @@ enum Sx {
 }
 
 class SIcon extends StatelessWidget {
-  const SIcon(this.icon, {super.key, this.size = 16, required this.color, this.stroke = 1.6});
+  const SIcon(this.icon, {super.key, this.size = IconSize.sm, required this.color, this.stroke = SettingsIcon.stroke});
   final Sx icon;
-  final double size;
+  final IconSize size;
   final Color color;
   final double stroke;
 
   @override
   Widget build(BuildContext context) =>
-      LucideIcon(lucideWeight(icon.glyph, size, stroke), size: size, color: color);
+      LucideIcon(lucideWeight(icon.glyph, size.px, stroke), size: size.px, color: color);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ InlineSpan sRich(String text, TextStyle style) {
   if (parts.length == 1) return TextSpan(text: text, style: style);
   return TextSpan(style: style, children: [
     for (var i = 0; i < parts.length; i++)
-      TextSpan(text: parts[i], style: i.isOdd ? style.copyWith(fontWeight: FontWeight.w700) : null),
+      TextSpan(text: parts[i], style: i.isOdd ? weightedRun(style, Weight.bold) : null),
   ]);
 }
 
@@ -138,7 +138,7 @@ class SPage extends StatelessWidget {
       if (intro != null) ...[
         const Gap(Space.sm),
         ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
+          constraints: const BoxConstraints(maxWidth: SettingsSize.intro),
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text.rich(sRich(intro!, ts(context.type.body, c.textSecondary))),
@@ -287,7 +287,7 @@ class _SRowState extends State<SRow> {
   Widget build(BuildContext context) {
     final w = widget;
     final open = _pinned || _peek;
-    final fade = w.disabled ? .62 : 1.0;
+    final fade = w.disabled ? SettingsSize.disabledFade : 1.0;
     final head = Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: Space.xs, runSpacing: Space.xxs, children: [
       Opacity(opacity: fade, child: Text(w.label, style: sLabel(context))),
       if (w.help != null)
@@ -310,7 +310,7 @@ class _SRowState extends State<SRow> {
         Opacity(
           opacity: fade,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+            constraints: const BoxConstraints(maxWidth: SettingsSize.description),
             child: Text.rich(sRich(w.desc!, sDesc(context))),
           ),
         ),
@@ -382,7 +382,7 @@ class _HelpButtonState extends State<_HelpButton> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final s = context.touch ? 28.0 : 22.0;
+    final s = context.touch ? SettingsSize.helpButtonTouch : SettingsSize.helpButton;
     return Semantics(
       button: true,
       expanded: widget.open,
@@ -412,7 +412,7 @@ class _HelpButtonState extends State<_HelpButton> {
                 border: _focus.hasFocus ? Border.all(color: c.focus, width: Stroke.bold) : null,
               ),
               alignment: Alignment.center,
-              child: SIcon(Sx.info, size: 15, color: widget.open ? c.textPrimary : c.textTertiary),
+              child: SIcon(Sx.info, color: widget.open ? c.textPrimary : c.textTertiary),
             ),
           ),
         ),
@@ -432,7 +432,7 @@ class _HelpNote extends StatelessWidget {
     final style = ts(context.type.ui, c.textSecondary, weight: Weight.regular);
     return Container(
       margin: const EdgeInsets.only(top: Space.sm),
-      constraints: const BoxConstraints(maxWidth: 540),
+      constraints: const BoxConstraints(maxWidth: SettingsSize.help),
       padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, Space.sm),
       decoration: BoxDecoration(
         color: c.bgSecondary,
@@ -446,7 +446,7 @@ class _HelpNote extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text.rich(TextSpan(style: style, children: [
-          TextSpan(text: 'When to change it: ', style: style.copyWith(fontWeight: FontWeight.w700, color: c.textPrimary)),
+          TextSpan(text: 'When to change it: ', style: weightedRun(style, Weight.bold).copyWith(color: c.textPrimary)),
           TextSpan(text: help),
         ])),
         if (extra != null) ...[const Gap(Space.xs), Text(extra!, style: style)],
@@ -467,7 +467,7 @@ class SReason extends StatelessWidget {
     final c = context.colors;
     final style = ts(context.type.ui, c.accentText, weight: Weight.semibold);
     return Row(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-      Padding(padding: const EdgeInsets.only(top: Space.hair), child: SIcon(Sx.lock, size: 13, color: c.accentText)),
+      Padding(padding: const EdgeInsets.only(top: Space.hair), child: SIcon(Sx.lock, size: IconSize.xs, color: c.accentText)),
       const Gap(Space.xs),
       Flexible(
         child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: Space.sm, children: [
@@ -543,7 +543,7 @@ class SLinkLine extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Switch.
 
-/// The square family switch: 40x22 (46x26 on a phone), moss when on.
+/// The square family switch: 40x22 (46x26 by touch), moss when on.
 class SSwitch extends StatelessWidget {
   const SSwitch({super.key, required this.value, required this.onChanged, this.label});
   final bool value;
@@ -554,8 +554,11 @@ class SSwitch extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final m = context.touch;
-    final w = m ? 46.0 : 40.0, h = m ? 26.0 : 22.0, k = m ? 20.0 : 16.0;
-    final travel = m ? 20.0 : 18.0;
+    final w = m ? SettingsSwitch.widthTouch : SettingsSwitch.width;
+    final h = m ? SettingsSwitch.heightTouch : SettingsSwitch.height;
+    final k = m ? SettingsSwitch.knobTouch : SettingsSwitch.knob;
+    final travel = m ? SettingsSwitch.travelTouch : SettingsSwitch.travel;
+    const inset = SettingsSwitch.inset;
     final motion = Motion.of(context);
     final on = value;
     return Semantics(
@@ -582,20 +585,15 @@ class SSwitch extends StatelessWidget {
                 AnimatedPositioned(
                   duration: motion.fast,
                   curve: Motion.easing,
-                  left: on ? 2 + travel : 2,
-                  top: (h - 2 - k) / 2,
+                  left: on ? inset + travel : inset,
+                  top: (h - inset - k) / 2,
                   child: Container(
                     width: k,
                     height: k,
                     decoration: BoxDecoration(
                       color: c.bgPrimary,
                       border: Border.all(color: on ? c.moss : c.borderStrong),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(Radii.sm),
-                        topRight: Radius.circular(Radii.sm),
-                        bottomRight: Radius.circular(Radii.sm),
-                        bottomLeft: Radius.circular(Radii.sm),
-                      ),
+                      borderRadius: SettingsSwitch.knobCorners,
                     ),
                   ),
                 ),
@@ -625,7 +623,7 @@ class SButton extends StatelessWidget {
     final c = context.colors;
     final off = onTap == null;
     final fg = switch (kind) {
-      SButtonKind.primary => const Color(0xFF282A2F),
+      SButtonKind.primary => c.onAccent,
       SButtonKind.quiet => c.textSecondary,
       SButtonKind.danger => c.dangerText,
       SButtonKind.normal => c.textPrimary,
@@ -648,11 +646,11 @@ class SButton extends StatelessWidget {
           border: kind == SButtonKind.quiet || kind == SButtonKind.primary ? null : Border.all(color: c.borderStrong),
           lift: 0,
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: context.touch ? 40 : 34),
+            constraints: BoxConstraints(minHeight: context.touch ? SettingsSize.controlTouch : SettingsSize.control),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                if (icon != null) ...[SIcon(icon!, size: 15, color: fg), const Gap(Space.xs)],
+                if (icon != null) ...[SIcon(icon!, color: fg), const Gap(Space.xs)],
                 Text(label, style: ts(context.type.ui, fg, weight: Weight.bold)),
               ]),
             ),
@@ -673,7 +671,7 @@ class SIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final s = context.touch ? 40.0 : 32.0;
+    final s = context.touch ? SettingsSize.iconButtonTouch : SettingsSize.iconButton;
     return Semantics(
       button: true,
       label: label,
@@ -687,7 +685,7 @@ class SIconButton extends StatelessWidget {
           child: SizedBox(
             width: s,
             height: s,
-            child: Center(child: SIcon(icon, size: 16, color: danger ? c.dangerText : c.textSecondary)),
+            child: Center(child: SIcon(icon, color: danger ? c.dangerText : c.textSecondary)),
           ),
         ),
       ),
@@ -708,7 +706,7 @@ class SSelect<T> extends StatelessWidget {
     required this.labelOf,
     required this.onChanged,
     this.title,
-    this.minWidth = 180,
+    this.minWidth = SettingsSize.select,
   });
   final T value;
   final List<T> options;
@@ -738,13 +736,13 @@ class SSelect<T> extends StatelessWidget {
       picked = await showPopover<T>(
         context,
         rect,
-        (ctx) => MenuList(width: rect.width < 220 ? 220 : rect.width, children: [
+        (ctx) => MenuList(width: rect.width < Widths.popover ? Widths.popover : rect.width, children: [
           for (final o in options)
             MenuItem(
               key: ValueKey('option-${labelOf(o)}'),
               label: labelOf(o),
               onTap: () => Navigator.of(ctx).pop(o),
-              trailing: o == value ? SIcon(Sx.check, size: 15, color: ctx.colors.iconPrimary) : null,
+              trailing: o == value ? SIcon(Sx.check, color: ctx.colors.iconPrimary) : null,
             ),
         ]),
       );
@@ -769,13 +767,13 @@ class SSelect<T> extends StatelessWidget {
             border: Border.all(color: c.borderStrong),
             lift: 0,
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: context.touch ? 40 : 34, minWidth: minWidth),
+              constraints: BoxConstraints(minHeight: context.touch ? SettingsSize.controlTouch : SettingsSize.control, minWidth: minWidth),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.sm, Space.sm),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Flexible(child: Text(labelOf(value), overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.textPrimary))),
                   const Gap(Space.sm),
-                  SIcon(Sx.chevronDown, size: 15, color: c.textTertiary),
+                  SIcon(Sx.chevronDown, color: c.textTertiary),
                 ]),
               ),
             ),
@@ -884,12 +882,12 @@ class _ChoiceCard<T> extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(checked ? Space.md : Space.lg, Space.md, checked ? Space.md : Space.lg, Space.md),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              if (choice.icon != null) ...[SIcon(choice.icon!, size: 16, color: c.textSecondary), const Gap(Space.sm)],
+              if (choice.icon != null) ...[SIcon(choice.icon!, color: c.textSecondary), const Gap(Space.sm)],
               Expanded(child: Text(choice.title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold))),
               const Gap(Space.sm),
               Container(
-                width: 16,
-                height: 16,
+                width: SettingsSize.radio,
+                height: SettingsSize.radio,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: c.bgPrimary,
@@ -977,7 +975,7 @@ class _STextFieldState extends State<STextField> {
     return GestureDetector(
       onTap: _focus.requestFocus,
       child: Container(
-        constraints: BoxConstraints(minHeight: m ? 40 : 36),
+        constraints: BoxConstraints(minHeight: m ? SettingsSize.controlTouch : SettingsSize.field),
         padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
         decoration: BoxDecoration(
           color: c.bgPrimary,
@@ -1079,8 +1077,8 @@ class SItem extends StatelessWidget {
       child: Row(children: [
         if (icon != null) ...[
           Container(
-            width: 32,
-            height: 32,
+            width: SettingsSize.tile,
+            height: SettingsSize.tile,
             decoration: BoxDecoration(
               color: c.bgSecondary,
               borderRadius: const BorderRadius.only(
@@ -1091,7 +1089,7 @@ class SItem extends StatelessWidget {
               ),
             ),
             alignment: Alignment.center,
-            child: SIcon(icon!, size: 16, color: c.textSecondary),
+            child: SIcon(icon!, color: c.textSecondary),
           ),
           const Gap(Space.md),
         ],
@@ -1165,7 +1163,7 @@ class SStatus extends StatelessWidget {
         border: kind == SStatusKind.off ? Border.all(color: c.border) : null,
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+        Container(width: SettingsSize.statusDot, height: SettingsSize.statusDot, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
         const Gap(Space.xs),
         Text(label, style: ts(context.type.uiSmall, kind == SStatusKind.off ? c.textSecondary : c.textPrimary, weight: Weight.bold)),
       ]),
@@ -1203,7 +1201,7 @@ class SEmpty extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.xl),
       decoration: BoxDecoration(color: c.bgSecondary, borderRadius: Radii.field),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SIcon(icon, size: 22, color: c.textTertiary),
+        SIcon(icon, size: IconSize.xl, color: c.textTertiary),
         const Gap(Space.sm),
         Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
         const Gap(Space.xxs),
@@ -1277,8 +1275,8 @@ class SStatusCard extends StatelessWidget {
       decoration: BoxDecoration(color: c.bgSecondary, borderRadius: Radii.panel, border: Border.all(color: c.border)),
       child: Row(children: [
         Container(
-          width: 40,
-          height: 40,
+          width: SettingsSize.checkTile,
+          height: SettingsSize.checkTile,
           decoration: BoxDecoration(
             color: ok ? c.okBg : c.bgPrimary,
             border: ok ? null : Border.all(color: c.border),
@@ -1290,7 +1288,7 @@ class SStatusCard extends StatelessWidget {
             ),
           ),
           alignment: Alignment.center,
-          child: SIcon(icon, size: 19, color: ok ? c.textPrimary : c.textTertiary),
+          child: SIcon(icon, size: IconSize.lg, color: ok ? c.textPrimary : c.textTertiary),
         ),
         const Gap(Space.lg),
         Expanded(
@@ -1341,7 +1339,7 @@ class _SAdvancedState extends State<SAdvanced> {
               AnimatedRotation(
                 turns: _open ? .25 : 0,
                 duration: Motion.of(context).fast,
-                child: SIcon(Sx.chevronRight, size: 15, color: c.textTertiary),
+                child: SIcon(Sx.chevronRight, color: c.textTertiary),
               ),
               const Gap(Space.xs),
               Text(widget.title, style: tsDisplay(context.type.title, c.textSecondary, weight: Weight.semibold)),
@@ -1386,7 +1384,7 @@ class _SCopyLineState extends State<SCopyLine> {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      constraints: const BoxConstraints(minHeight: 36),
+      constraints: const BoxConstraints(minHeight: SettingsSize.field),
       padding: const EdgeInsets.fromLTRB(Space.md, Space.hair, Space.hair, Space.hair),
       decoration: BoxDecoration(color: c.bgSecondary, borderRadius: Radii.field, border: Border.all(color: c.border)),
       child: Row(children: [
@@ -1449,11 +1447,11 @@ class SPanel extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.lg),
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               Container(
-                width: 32,
-                height: 32,
+                width: SettingsSize.tile,
+                height: SettingsSize.tile,
                 decoration: BoxDecoration(color: c.bgSecondary, borderRadius: BorderRadius.circular(Radii.lg)),
                 alignment: Alignment.center,
-                child: SIcon(icon, size: 16, color: c.textSecondary),
+                child: SIcon(icon, color: c.textSecondary),
               ),
               const Gap(Space.md),
               Expanded(
@@ -1469,7 +1467,7 @@ class SPanel extends StatelessWidget {
               AnimatedRotation(
                 turns: open ? .5 : 0,
                 duration: Motion.of(context).fast,
-                child: SIcon(Sx.chevronDown, size: 16, color: c.textTertiary),
+                child: SIcon(Sx.chevronDown, color: c.textTertiary),
               ),
             ]),
           ),

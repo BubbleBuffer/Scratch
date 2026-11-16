@@ -420,7 +420,7 @@ class _TimelineViewState extends State<TimelineView> {
     final c = context.colors;
     final s = entryStart(e), f = entryEnd(e);
     final (ds, de) = _drag[e.page.id] ?? (0.0, 0.0);
-    final left = (s - _origin) * _dw + ds + 2;
+    final left = (s - _origin) * _dw + ds + DbTimeline.barInset / 2;
     final width = math.max(_dw * DbTimeline.minBarShare, (f - s + 1) * _dw + de - ds - DbTimeline.barInset);
     final title = displayTitle(e.page.title, firstLine: untitledLine(context, e.page));
     final narrow = width < 120;

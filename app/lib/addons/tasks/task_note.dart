@@ -148,12 +148,12 @@ class _TaskNoteState extends State<TaskNote> {
       return Column(
         children: [
           ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: context.touch ? 280 : 340),
+            constraints: BoxConstraints(maxHeight: context.sizeClass.isCompact ? CalendarScreen.noteHeaderTouch : CalendarScreen.noteHeader),
             child: SingleChildScrollView(
               child: Align(
                 alignment: Alignment.center,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
+                  constraints: const BoxConstraints(maxWidth: Widths.content),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.xl, Space.md),
                     child: data != null && _calendars != null
@@ -190,7 +190,7 @@ class _TaskNoteState extends State<TaskNote> {
             if (data.checkbox)
               StacksCheckbox(
                 checked: data.done,
-                size: 16,
+                size: IconSize.sm.px,
                 onChanged: _busy ? null : (_) => _toggle(),
               )
             else

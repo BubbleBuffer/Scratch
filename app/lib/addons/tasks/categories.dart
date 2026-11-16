@@ -10,8 +10,8 @@ Future<void> showCalendarCategories(BuildContext context) =>
       context,
       (_) =>
           CalendarCategoriesPanel(vault: const AddonServices().vault(context)),
-      desktopWidth: 410,
-      desktopHeight: 640,
+      desktopWidth: Widths.form,
+      desktopHeight: Heights.dialog,
       shrink: false,
       sheetHeightFactor: .82,
     );
@@ -249,8 +249,8 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                   ),
                   _heading(context, 'My calendars'),
                   for (final c in settings.calendars)
-                    SizedBox(
-                      height: 44,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: ControlSize.xl.height),
                       child: Row(
                         children: [
                           SpaceDot(c.color),
@@ -301,8 +301,8 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                       ),
                     ),
                   for (final db in _databases)
-                    SizedBox(
-                      height: 44,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: ControlSize.xl.height),
                       child: Row(
                         children: [
                           PageIcon(
@@ -333,7 +333,8 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                               ),
                             ),
                           ),
-                          const Gap(Space.xxxl),
+                          // The room of the Today toggle and the menu button.
+                          Gap(Sizes.switchWidth + 2 * Space.xs + ControlSize.sm.height),
                         ],
                       ),
                     ),
@@ -439,12 +440,12 @@ class _CalendarEditorState extends State<_CalendarEditor> {
                   onTap: () => setState(() => _color = color),
                   selected: _color == color,
                   child: SizedBox(
-                    width: 36,
-                    height: 36,
+                    width: CalendarScreen.colorChoice,
+                    height: CalendarScreen.colorChoice,
                     child: Center(
                       child: Container(
-                        width: 26,
-                        height: 26,
+                        width: CalendarScreen.colorSwatch,
+                        height: CalendarScreen.colorSwatch,
                         decoration: BoxDecoration(
                           color: spaceColor(
                             color,
