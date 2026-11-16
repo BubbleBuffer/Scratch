@@ -17,7 +17,7 @@ DateTime Function(int ms) versionTimeOf = DateTime.fromMillisecondsSinceEpoch;
 
 /// Shows page [pageId]'s version history.
 Future<void> showVersionHistory(BuildContext context, String pageId) async {
-  if (context.mobile) {
+  if (context.touch) {
     await pushScreen<void>(context, (_) => HistoryPanel(key: const ValueKey('history-panel'), pageId: pageId),
         name: '/history');
     return;
@@ -93,7 +93,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final list = _list(context);
     final preview = _previewView(context);
     if (m) {
@@ -113,8 +113,8 @@ class _HistoryPanelState extends State<HistoryPanel> {
         decoration: BoxDecoration(color: c.bgSecondary, border: Border(right: BorderSide(color: c.borderSubtle))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('Version history', style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
+            padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.sm),
+            child: Text('Version history', style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display)),
           ),
           Expanded(child: list),
         ]),
@@ -124,17 +124,17 @@ class _HistoryPanelState extends State<HistoryPanel> {
           Expanded(child: preview),
           Container(
             height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: Space.lg),
             decoration: BoxDecoration(border: Border(top: BorderSide(color: c.borderSubtle))),
             child: Row(children: [
               Expanded(
                 child: Text(_error ?? _caption(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: ts(context.type.uiSmall, _error != null ? c.inlineCodeText : c.textTertiary, weight: 400)),
+                    style: ts(context.type.uiSmall, _error != null ? c.inlineCodeText : c.textTertiary, weight: Weight.regular)),
               ),
               DialogButton(key: const ValueKey('history-cancel'), label: 'Cancel', onTap: () => Navigator.of(context).pop()),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               _restoreButton(context),
             ]),
           ),
@@ -156,7 +156,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
       key: const ValueKey('history-restore'),
       label: 'Restore version',
       filled: true,
-      height: context.mobile ? 32 : null,
+      height: context.touch ? 32 : null,
       onTap: can ? _restore : null,
     );
   }
@@ -167,7 +167,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
     final v = _versions;
     if (v == null) return const SizedBox.shrink();
     if (v.isEmpty) {
-      return Center(child: Text(_error ?? 'No versions yet', style: ts(ty.ui, c.textTertiary, weight: 400)));
+      return Center(child: Text(_error ?? 'No versions yet', style: ts(ty.ui, c.textTertiary, weight: Weight.regular)));
     }
     final rows = <Widget>[];
     String? day;
@@ -177,12 +177,12 @@ class _HistoryPanelState extends State<HistoryPanel> {
       if (d != day) {
         day = d;
         rows.add(Padding(
-          padding: EdgeInsets.fromLTRB(context.mobile ? Layout.gutter : 16, 10, 16, 4),
+          padding: EdgeInsets.fromLTRB(context.touch ? Layout.gutter : Space.lg, Space.md, Space.lg, Space.xxs),
           child: Text(d, style: ts(ty.uiSmall, c.textTertiary)),
         ));
       }
       rows.add(Padding(
-        padding: EdgeInsets.symmetric(horizontal: context.mobile ? 0 : 8, vertical: 1),
+        padding: EdgeInsets.symmetric(horizontal: context.touch ? 0 : Space.sm, vertical: Space.hair),
         child: PanelRow(
           key: ValueKey('history-version-$i'),
           selected: i == _selected,
@@ -191,15 +191,15 @@ class _HistoryPanelState extends State<HistoryPanel> {
             height: 48,
             child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(i == 0 ? '${_time(t)}  ·  Current' : _time(t),
-                  style: ts(ty.ui, c.textPrimary, weight: i == _selected ? 600 : 500)),
+                  style: ts(ty.ui, c.textPrimary, weight: i == _selected ? Weight.semibold : Weight.medium)),
               Text('${v[i].summary} · ${_device(v[i].device)}',
-                  maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(ty.uiSmall, c.textTertiary, weight: 400)),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)),
             ]),
           ),
         ),
       ));
     }
-    return ListView(padding: const EdgeInsets.only(bottom: 8), children: rows);
+    return ListView(padding: const EdgeInsets.only(bottom: Space.sm), children: rows);
   }
 
   String _device(String d) {

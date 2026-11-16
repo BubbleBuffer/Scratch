@@ -66,7 +66,7 @@ Widget computedFilterValue(FilterValueArgs a) => MenuField(
         _ => a.value.text,
       },
       placeholder: 'Type a value…',
-      autofocus: !a.context.mobile,
+      autofocus: !a.context.touch,
       onChanged: (s) => a.onChanged(s.isEmpty
           ? const PropValue(kind: ValueKind.empty, text: '', number: 0, startMs: 0, hasTime: false, checked: false, ids: [])
           : PropValue(kind: ValueKind.text, text: s, number: 0, startMs: 0, hasTime: false, checked: false, ids: const [])),

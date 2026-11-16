@@ -10,6 +10,7 @@ import 'embed_block.dart';
 import 'note_type_registry.dart';
 import 'property_registry.dart';
 import 'view_registry.dart';
+import '../ui/tokens.dart';
 
 export 'note_drag_payload.dart';
 
@@ -75,7 +76,7 @@ class NoteTitleChips extends StatelessWidget {
       if (chip != null) chips.add(chip);
     }
     if (chips.isEmpty) return const SizedBox.shrink();
-    return Wrap(spacing: 8, runSpacing: 6, children: chips);
+    return Wrap(spacing: Space.sm, runSpacing: Space.xs, children: chips);
   }
 }
 

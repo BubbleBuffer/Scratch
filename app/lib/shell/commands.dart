@@ -36,7 +36,7 @@ void registerShellCommands(CommandRegistry r) {
         SingleActivator(LogicalKeyboardKey.keyP, control: true),
       ],
       run: (context) {
-        if (context.mobile) {
+        if (context.touch) {
           goHome(context);
           searchRequest.value++;
         } else {

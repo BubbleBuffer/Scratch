@@ -47,7 +47,7 @@ Widget formulaSettings(BuildContext context, CollectionStore store, PropDef d, F
   return settingsRow(context, 'Formula',
       key: const ValueKey('prop-formula'),
       value: f.isEmpty ? 'Empty' : f,
-      leading: DbIcon(DbIco.formula, size: context.mobile ? 22 : 20, color: context.colors.iconPrimary),
+      leading: DbIcon(DbIco.formula, size: context.touch ? 22 : 20, color: context.colors.iconPrimary),
       onTap: (rect) => editFormula(context, rect, store, d, save));
 }
 
@@ -101,14 +101,14 @@ class _FormulaEditorState extends State<FormulaEditor> {
             key: const ValueKey('formula-field'),
             controller: _ctl,
             placeholder: 'Type a formula…',
-            autofocus: !context.mobile,
+            autofocus: !context.touch,
             onSubmitted: (_) => _done(),
           ),
         ),
-        const SizedBox(width: 6),
+        const Gap(Space.xs),
         PrimaryButton(key: const ValueKey('formula-done'), label: 'Done', onTap: _done),
       ]),
-      const SizedBox(height: 4),
+      const Gap(Space.xxs),
       Flexible(
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [

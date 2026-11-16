@@ -124,7 +124,7 @@ class _McpServersSettingsState extends State<McpServersSettings> {
                 ),
               if (note != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: Space.sm),
                   child: Text(
                     note,
                     key: const ValueKey('agent-mcp-note'),
@@ -361,14 +361,14 @@ class _LinesFieldState extends State<_LinesField> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final style = ts(
-      TypeSpec(context.mobile ? 14 : 13, 20, 400),
+      context.type.code,
       c.textPrimary,
       mono: true,
     );
     return GestureDetector(
       onTap: _focus.requestFocus,
       child: FieldFrame(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
         child: Stack(
           children: [
             if (widget.controller.text.isEmpty)

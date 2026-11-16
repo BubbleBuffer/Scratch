@@ -37,7 +37,7 @@ VoidCallback showQueryToast(
         alignment: Alignment.bottomCenter,
         child: MenuSurface(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
             child: Row(
               key: const ValueKey('query-toast'),
               mainAxisSize: MainAxisSize.min,
@@ -49,7 +49,7 @@ VoidCallback showQueryToast(
                   ),
                 ),
                 if (undo != null) ...[
-                  const SizedBox(width: 16),
+                  const Gap(Space.lg),
                   TextBtn(
                     'Undo',
                     key: const ValueKey('query-toast-undo'),

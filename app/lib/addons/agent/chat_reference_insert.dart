@@ -78,12 +78,12 @@ class _ChatReferenceInsertState extends State<ChatReferenceInsert> {
     key: ValueKey('chatref-pick-${widget.block.node.id}'),
     onTap: _choosing ? null : _pick,
     radius: Radii.md,
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.md),
     background: context.colors.bgSecondary,
     child: Row(
       children: [
         Icon20(Ico.comment, color: context.colors.iconSecondary),
-        const SizedBox(width: 8),
+        const Gap(Space.sm),
         Expanded(
           child: Text(
             _choosing ? 'Choose a chat reference…' : 'Choose a chat reference',

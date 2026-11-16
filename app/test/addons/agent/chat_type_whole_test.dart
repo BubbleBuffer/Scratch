@@ -63,7 +63,7 @@ ChatReferenceSnapshot _snapshot({List<OutlineChapter>? chapters}) =>
 
 Widget _app(Widget child) => AppTheme(
   colors: AppColors.light,
-  formFactor: FormFactor.desktop,
+  density: Density.pointer,
   child: WidgetsApp(
     color: AppColors.light.bgPrimary,
     pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(

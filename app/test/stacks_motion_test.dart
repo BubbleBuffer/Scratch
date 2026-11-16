@@ -10,7 +10,7 @@ Widget fixture(Widget child, {bool reduced = false}) => MediaQuery(
   data: MediaQueryData(size: const Size(800, 600), disableAnimations: reduced),
   child: AppTheme(
     colors: AppColors.light,
-    formFactor: FormFactor.desktop,
+    density: Density.pointer,
     child: Directionality(
       textDirection: TextDirection.ltr,
       child: FocusScope(child: Center(child: child)),
@@ -22,17 +22,20 @@ void main() {
   test(
     'display type preserves condensed and weight axes with optical sizing',
     () {
-      Map<String, double> axes(double size, {int? weight}) => {
+      Map<String, double> axes(TypeSpec spec, {Weight weight = Weight.display}) => {
         for (final axis in tsDisplay(
-          TypeSpec(size, size, 640),
+          spec,
           AppColors.light.textPrimary,
           weight: weight,
         ).fontVariations!)
           axis.axis: axis.value,
       };
-      expect(axes(44), {'opsz': 44, 'wdth': 90, 'wght': 640});
-      expect(axes(10), {'opsz': 12, 'wdth': 90, 'wght': 640});
-      expect(axes(110, weight: 700), {'opsz': 96, 'wdth': 90, 'wght': 700});
+      expect(axes(NumeralSize.lg.spec), {'opsz': 44, 'wdth': 90, 'wght': 640});
+      expect(axes(TypeScale.pointer.micro), {'opsz': 12, 'wdth': 90, 'wght': 640});
+      expect(
+        axes(TypeScale.pointer.display, weight: Weight.bold),
+        {'opsz': 32, 'wdth': 90, 'wght': 700},
+      );
     },
   );
   testWidgets('motion follows the device reduced-animation preference', (
@@ -74,7 +77,7 @@ void main() {
         builder: (context) {
           route = pageRoute<void>(
             (_) => const SizedBox(),
-            mobile: mobile,
+            slide: mobile,
             motion: Motion.of(context),
           ) as PageRouteBuilder<void>;
           return const SizedBox();

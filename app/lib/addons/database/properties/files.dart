@@ -68,11 +68,11 @@ class FilesCell extends StatelessWidget {
             Container(
               key: ValueKey('file-chip-$id'),
               height: small ? 18 : 20,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+              padding: const EdgeInsets.symmetric(horizontal: Space.xs),
               decoration: BoxDecoration(color: tag.bg, borderRadius: BorderRadius.circular(Radii.sm)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 DbIcon(DbIco.files, size: small ? 12 : 14, color: context.colors.iconSecondary),
-                const SizedBox(width: 4),
+                const Gap(Space.xxs),
                 Flexible(
                   child: Text(AttachmentNames.of(id),
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: style.copyWith(height: 1.2)),
@@ -81,7 +81,7 @@ class FilesCell extends StatelessWidget {
             ),
         ];
         if (wrap || mode == CellMode.page || mode == CellMode.card) {
-          return Wrap(spacing: 6, runSpacing: 6, children: chips);
+          return Wrap(spacing: Space.xs, runSpacing: Space.xs, children: chips);
         }
         return ClipRect(
           child: OverflowBox(
@@ -125,7 +125,7 @@ class _FilesEditorState extends State<_FilesEditor> {
             key: ValueKey('file-item-$id'),
             label: AttachmentNames.of(id),
             leading: DbIcon(DbIco.files, size: 18, color: c.iconSecondary),
-            trailing: Icon20(Ico.close, size: 14, color: c.iconTertiary),
+            trailing: Icon20(Ico.close, size: IconSize.xs, color: c.iconTertiary),
             onTap: () => _set([...ids]..remove(id)),
           ),
         if (ids.isNotEmpty) const MenuSeparator(),

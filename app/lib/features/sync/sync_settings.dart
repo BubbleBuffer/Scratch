@@ -115,13 +115,13 @@ class SyncStatusCard extends StatelessWidget {
       ),
       if (sync.untrustedCertificate)
         const Padding(
-          padding: EdgeInsets.only(top: 12),
+          padding: EdgeInsets.only(top: Space.md),
           child: SyncCertificateProblem(messageKey: ValueKey('connect-error')),
         )
       else if (message != null)
         Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Text(message, key: const ValueKey('connect-error'), style: tsRaw(13, 18, 400, c.dangerText)),
+          padding: const EdgeInsets.only(top: Space.md),
+          child: Text(message, key: const ValueKey('connect-error'), style: ts(context.type.ui, c.dangerText, weight: Weight.regular)),
         ),
     ]);
   }
@@ -281,7 +281,7 @@ class _HubSignInSettingsState extends State<HubSignInSettings> {
                   onSubmitted: (_) => _signIn(),
                 ),
               ),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               SButton('Sign in', key: const ValueKey('hub-sign-in'), kind: SButtonKind.primary, onTap: _signIn),
             ]),
           ),
@@ -449,12 +449,12 @@ class _ConnectSettingsState extends State<ConnectSettings> {
             ),
             if (_error != null)
               Padding(
-                padding: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.only(top: Space.md),
                 child: isUntrustedCertificateError(_error)
                     ? _failedCertificate(context)
-                    : Text(_error!, style: tsRaw(13, 18, 400, c.dangerText)),
+                    : Text(_error!, style: ts(context.type.ui, c.dangerText, weight: Weight.regular)),
               ),
-            const SizedBox(height: 10),
+            const Gap(Space.md),
             Align(
               alignment: Alignment.centerLeft,
               child: SButton(
@@ -610,7 +610,7 @@ class _HubSettingsState extends State<HubSettings> {
                     onSubmitted: (v) => setHubAddress(sync, s, v.trim()),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const Gap(Space.sm),
                 SButton('Apply', key: const ValueKey('hub-address-apply'), onTap: () => setHubAddress(sync, s, _addr.text.trim())),
               ]),
             ),
@@ -737,19 +737,18 @@ class TrustedCertificatesSettings extends StatelessWidget {
   /// host as the title.
   Widget _pinSummary(BuildContext context, String origin, PinnedCertificate pin) {
     final c = context.colors;
-    final m = context.mobile;
     final host = serverHostOf(origin);
     final name = pin.issuerName;
     final cn = name.cn;
     final org = [?name.o, ?name.ou].join(' · ');
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(cn ?? host,
-          key: ValueKey('cert-pin-title-$origin'), style: tsRaw(m ? 15 : 14, 19, 680, c.textPrimary)),
+          key: ValueKey('cert-pin-title-$origin'), style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold)),
       if (cn != null && org.isNotEmpty) ...[
-        const SizedBox(height: 2),
+        const Gap(Space.hair),
         Text(org, key: ValueKey('cert-pin-org-$origin'), style: sHint(context)),
       ],
-      const SizedBox(height: 2),
+      const Gap(Space.hair),
       Text.rich(
         key: ValueKey('cert-pin-detail-$origin'),
         TextSpan(children: [
@@ -775,7 +774,7 @@ class TrustedCertificatesSettings extends StatelessWidget {
         SBlock(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 10),
+              padding: const EdgeInsets.only(top: Space.xxs, bottom: Space.md),
               child: Text(
                 'Hub certificates with an issuer this device doesn’t know, trusted on this device only.',
                 style: sDesc(context),
@@ -785,20 +784,20 @@ class TrustedCertificatesSettings extends StatelessWidget {
               for (final (origin, pin) in pins.entries)
                 Padding(
                   key: ValueKey('cert-pin-$origin'),
-                  padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                  padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.sm, Space.sm),
                   child: Row(children: [
                     SIcon(Sx.shieldCheck, size: 17, color: c.textSecondary),
-                    const SizedBox(width: 12),
+                    const Gap(Space.md),
                     Expanded(
                       child: Hover(
                         key: ValueKey('cert-pin-open-$origin'),
                         onTap: () => _open(context, origin, pin),
                         radius: Radii.md,
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: Space.xxs, vertical: Space.xxs),
                         child: _pinSummary(context, origin, pin),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const Gap(Space.sm),
                     SButton(
                       'Revoke',
                       key: ValueKey('cert-pin-revoke-$origin'),
@@ -820,11 +819,11 @@ class TrustedCertificatesSettings extends StatelessWidget {
 
 /// Opens "Add a device"; [token] skips the naming step (screenshots).
 Future<void> showAddDevice(BuildContext context, {String? token}) {
-  if (context.mobile) return pushSettingsPage(context, 'Add a device', AddDeviceView(initialToken: token));
+  if (context.touch) return pushSettingsPage(context, 'Add a device', AddDeviceView(initialToken: token));
   return showPanel(
     context,
     (_) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(40, 32, 40, 32), child: AddDeviceView(initialToken: token)),
+        padding: const EdgeInsets.fromLTRB(Space.xxxl, Space.xxl, Space.xxxl, Space.xxl), child: AddDeviceView(initialToken: token)),
     width: 560,
     height: 760,
     shrink: true,
@@ -895,13 +894,13 @@ class _AddDeviceViewState extends State<AddDeviceView> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final sync = context.watch<SyncStore>();
-    final body = m ? tsRaw(15, 21, 400, c.textSecondary) : tsRaw(14, 20, 400, c.textSecondary);
+    final body = m ? ts(context.type.ui, c.textSecondary, weight: Weight.regular) : ts(context.type.ui, c.textSecondary, weight: Weight.regular);
     final token = _token;
     final children = <Widget>[
       if (!m) ...[
-        Text('Add a device', style: tsRaw(20, 26, 600, c.textPrimary)),
+        Text('Add a device', style: ts(context.type.h3, c.textPrimary)),
         const SizedBox(height: 8),
       ],
     ];
@@ -918,7 +917,7 @@ class _AddDeviceViewState extends State<AddDeviceView> {
         ),
         if (_error != null) ...[
           const SizedBox(height: 8),
-          Text(_error!, style: tsRaw(13, 18, 400, c.inlineCodeText)),
+          Text(_error!, style: ts(context.type.ui, c.inlineCodeText, weight: Weight.regular)),
         ],
         const SizedBox(height: 16),
         Row(children: [PrimaryButton(key: const ValueKey('create-pairing'), label: 'Create pairing code', onTap: _create)]),
@@ -933,7 +932,7 @@ class _AddDeviceViewState extends State<AddDeviceView> {
         Center(
           child: Container(
             key: const ValueKey('pairing-qr'),
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(Space.xxs),
             decoration: BoxDecoration(
               color: const Color(0xFFFFFFFF),
               borderRadius: BorderRadius.circular(Radii.md),
@@ -945,12 +944,12 @@ class _AddDeviceViewState extends State<AddDeviceView> {
         const SizedBox(height: 20),
         if (!sync.hosting)
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: Space.md),
             child: Text('The hub is off. Turn it on in Sync and devices so the device can connect.',
-                style: tsRaw(13, 18, 400, c.inlineCodeText)),
+                style: ts(context.type.ui, c.inlineCodeText, weight: Weight.regular)),
           ),
         Row(children: [
-          Expanded(child: Text('Hub address', style: tsRaw(12, 16, 500, c.textSecondary))),
+          Expanded(child: Text('Hub address', style: ts(context.type.uiSmall, c.textSecondary))),
           if (_urls.length > 1)
             SelectButton<String>(
               key: const ValueKey('pair-url-select'),
@@ -964,11 +963,11 @@ class _AddDeviceViewState extends State<AddDeviceView> {
         const SizedBox(height: 6),
         CopyableText(url, textKey: const ValueKey('pair-url')),
         const SizedBox(height: 12),
-        Text('Token', style: tsRaw(12, 16, 500, c.textSecondary)),
+        Text('Token', style: ts(context.type.uiSmall, c.textSecondary)),
         const SizedBox(height: 6),
         CopyableText(token, textKey: const ValueKey('pair-token')),
         const SizedBox(height: 12),
-        Text('Pairing code (address and token)', style: tsRaw(12, 16, 500, c.textSecondary)),
+        Text('Pairing code (address and token)', style: ts(context.type.uiSmall, c.textSecondary)),
         const SizedBox(height: 6),
         CopyableText(code, textKey: const ValueKey('pair-code')),
         const SizedBox(height: 20),

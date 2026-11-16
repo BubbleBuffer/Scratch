@@ -156,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _focusSearch() {
     if (!mounted) return;
-    if (context.mobile) {
+    if (context.touch) {
       _openSearch();
     } else {
       final previousEnd = _scroll.hasClients
@@ -224,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final mq = MediaQuery.of(context);
     final pages = context.watch<PagesStore>();
     _logLayout(mq, pages);
-    return context.mobile ? _mobile(context, mq) : _desktop(context);
+    return context.touch ? _mobile(context, mq) : _desktop(context);
   }
 
   // ---- shared pieces ----
@@ -265,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final content = Row(
       children: [
         PageIcon(icon: r?.icon, size: mobile ? 22 : 20, color: c.iconSecondary),
-        SizedBox(width: mobile ? 12 : 8),
+        Gap(mobile ? 12 : 8),
         Expanded(
           child: Text(
             label?.text ?? '',
@@ -277,8 +277,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         if (sub != null) ...[
-          const SizedBox(width: 12),
-          Text(sub, style: ts(ty.uiSmall, c.textTertiary, weight: 400)),
+          const Gap(Space.md),
+          Text(sub, style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)),
         ],
       ],
     );
@@ -286,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
       key: i == 0 ? _firstRowKey : (id == null ? null : ValueKey('row-$id')),
       onTap: id == null ? null : () => _open(id, title ?? ''),
       borderRadius: Radii.ctl,
-      padding: EdgeInsets.symmetric(horizontal: mobile ? 18 : 8),
+      padding: EdgeInsets.symmetric(horizontal: mobile ? Space.lg : Space.sm),
       child: Semantics(button: id != null, child: content),
     );
   }
@@ -297,11 +297,11 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: EdgeInsets.symmetric(horizontal: gutter),
       sliver: SliverFixedExtentList(
         itemExtent: hits != null
-            ? SearchResultRow.extent(mobile)
+            ? SearchResultRow.extent(context.metrics)
             : (mobile ? Layout.listRowHeight : 36),
         delegate: SliverChildBuilderDelegate(
           (context, i) => Padding(
-            padding: EdgeInsets.symmetric(vertical: mobile ? 0 : 2),
+            padding: EdgeInsets.symmetric(vertical: mobile ? 0 : Space.hair),
             child: hits != null
                 ? SearchResultRow(
                     hit: hits[i],
@@ -338,8 +338,8 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const TodayDayNote(),
-        const SizedBox(height: 20),
-        TodayCapture(mobile: context.mobile),
+        const Gap(Space.xl),
+        TodayCapture(mobile: context.touch),
       ],
     ),
   );
@@ -358,9 +358,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Padding(
           padding: EdgeInsets.fromLTRB(
             gutter + (mobile ? 18 : 8),
-            24,
+            Space.xl,
             gutter + (mobile ? 18 : 8),
-            8,
+            Space.sm,
           ),
           child: Hover(
             key: const ValueKey('all-pages-toggle'),
@@ -369,15 +369,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 ..allPagesExpanded = !expanded
                 ..changed();
             }),
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: Space.sm),
             child: Row(
               children: [
                 Icon20(
                   expanded ? Ico.chevronDown : Ico.chevronRight,
-                  size: 14,
+                  size: IconSize.xs,
                   color: c.iconTertiary,
                 ),
-                const SizedBox(width: 8),
+                const Gap(Space.sm),
                 Text(
                   'All pages${_countLabel == null ? '' : ' · $_countLabel'}',
                   style: ts(context.type.ui, c.textSecondary),
@@ -394,7 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
               gutter + (mobile ? 18 : 8),
               0,
               gutter + (mobile ? 18 : 8),
-              8,
+              Space.sm,
             ),
             child: _searchField(),
           ),
@@ -418,19 +418,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(
                   height: Layout.topbarHeight,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.md),
                     child: Row(
                       children: [
                         const SidebarReopenButton(),
                         const CollapsedFeedbackButton(),
-                        Icon20(Ico.home, size: 16, color: c.iconSecondary),
-                        const SizedBox(width: 6),
+                        Icon20(Ico.home, size: IconSize.sm, color: c.iconSecondary),
+                        const Gap(Space.xs),
                         Text(
                           'Today',
                           style: ts(
                             context.type.ui,
                             c.textPrimary,
-                            weight: 400,
+                            weight: Weight.regular,
                           ),
                         ),
                         const Spacer(),
@@ -440,7 +440,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  padding: EdgeInsets.symmetric(horizontal: Space.xl),
                   child: TodayDateStrip(),
                 ),
                 Expanded(
@@ -451,7 +451,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       return _scrollView([
                         SliverToBoxAdapter(
                           child: Padding(
-                            padding: EdgeInsets.fromLTRB(gutter, 30, gutter, 0),
+                            padding: EdgeInsets.fromLTRB(gutter, Space.xxl, gutter, 0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [_organizer(context)],
@@ -502,7 +502,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               children: [
                 const Padding(
-                  padding: EdgeInsets.fromLTRB(10, 4, 10, 0),
+                  padding: EdgeInsets.fromLTRB(Space.md, Space.xxs, Space.md, 0),
                   child: TodayDateStrip(),
                 ),
                 Expanded(child: _mobileHome(context)),
@@ -519,19 +519,19 @@ class _HomeScreenState extends State<HomeScreen> {
     return _scrollView([
       SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 8, 0),
+          padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.sm, 0),
           child: Row(
             children: [
               const CalicoMark(key: ValueKey('home-mark'), size: 26),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               Expanded(
                 child: Text(
                   'Today',
-                  style: ts(context.type.ui, c.textPrimary, weight: 600),
+                  style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold),
                 ),
               ),
               const SizedBox(height: 44, child: Center(child: SyncIndicator())),
-              const SizedBox(width: 10),
+              const Gap(Space.md),
             ],
           ),
         ),
@@ -539,7 +539,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const SliverToBoxAdapter(child: ConflictHomeSection()),
       SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+          padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [_organizer(context)],
@@ -622,7 +622,7 @@ class ShellMobileFrame extends StatelessWidget {
                           width: 48,
                           height: 48,
                           child: Center(
-                            child: Icon20(Ico.plus, size: 23, color: c.onAccent),
+                            child: Icon20(Ico.plus, size: IconSize.xl, color: c.onAccent),
                           ),
                         ),
                       ),
@@ -684,17 +684,12 @@ class _MobileDock extends StatelessWidget {
                 children: [
                   Icon20(
                     icon,
-                    size: 20,
+                    size: IconSize.lg,
                     color: destinationId == id ? c.accentText : c.iconSecondary,
                   ),
                   Text(
                     label,
-                    style: tsRaw(
-                      11,
-                      14,
-                      500,
-                      destinationId == id ? c.accentText : c.textSecondary,
-                    ),
+                    style: ts(context.type.caption, destinationId == id ? c.accentText : c.textSecondary, weight: Weight.medium),
                   ),
                 ],
               ),
@@ -703,7 +698,7 @@ class _MobileDock extends StatelessWidget {
         );
     return Container(
       key: const ValueKey('mobile-dock'),
-      padding: EdgeInsets.fromLTRB(10, 8, 10, mq.padding.bottom + 8),
+      padding: EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, mq.padding.bottom + 8),
       decoration: BoxDecoration(
         color: c.bgPrimary,
         border: Border(top: BorderSide(color: c.border)),
@@ -719,7 +714,7 @@ class _MobileDock extends StatelessWidget {
               entry.label,
               () => entry.open(context),
             ),
-          const SizedBox(width: 6),
+          const Gap(Space.xs),
           Expanded(
             child: Semantics(
               button: true,
@@ -730,7 +725,7 @@ class _MobileDock extends StatelessWidget {
                 borderRadius: BorderRadius.circular(22),
                 child: Container(
                   height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: Space.md),
                   decoration: BoxDecoration(
                     color: c.bgSecondary,
                     borderRadius: BorderRadius.circular(22),
@@ -738,8 +733,8 @@ class _MobileDock extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon20(Ico.search, size: 18, color: c.iconTertiary),
-                      const SizedBox(width: 6),
+                      Icon20(Ico.search, size: IconSize.md, color: c.iconTertiary),
+                      const Gap(Space.xs),
                       Expanded(
                         child: Text(
                           'Search',
@@ -780,33 +775,33 @@ class MobilePages extends StatelessWidget {
       color: c.desk,
       child: ListView(
         key: const ValueKey('pages-list'),
-        padding: const EdgeInsets.only(top: 10, bottom: 80),
+        padding: const EdgeInsets.only(top: Space.md, bottom: 80),
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+            padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.md),
             child: Text(
               'Pages',
-              style: tsDisplay(const TypeSpec(28, 32, 640), c.textPrimary),
+              style: tsDisplay(context.type.h1, c.textPrimary, weight: Weight.display),
             ),
           ),
           if (favorites.isNotEmpty) ...[
             const _PagesSection('Favorites'),
             for (final r in tree.favoriteRows())
               _PageTreeTile(row: r, fav: true),
-            const SizedBox(height: 8),
+            const Gap(Space.sm),
             const _PagesSection('Pages'),
           ],
           for (final r in rows) _PageTreeTile(row: r),
           if (top != null && top.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
               child: Text(
                 'No pages yet.',
                 style: ts(context.type.body, c.textSecondary),
               ),
             ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
             child: Container(height: 1, color: c.border),
           ),
           _PagesAction(
@@ -838,8 +833,8 @@ class _PagesSection extends StatelessWidget {
   final String label;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 8, 18, 4),
-    child: Text(label, style: tsRaw(13, 18, 700, context.colors.textSecondary)),
+    padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xxs),
+    child: Text(label, style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.bold)),
   );
 }
 
@@ -860,14 +855,14 @@ class _PageTreeTile extends StatelessWidget {
     if (row.placeholder) {
       return Padding(
         key: ValueKey('${scope}empty-${p.id}'),
-        padding: EdgeInsets.only(left: indent + 44, right: 18),
+        padding: EdgeInsets.only(left: indent + 44, right: Space.lg),
         child: SizedBox(
           height: 48,
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
               'No pages inside',
-              style: ts(context.type.ui, c.textTertiary, weight: 400),
+              style: ts(context.type.ui, c.textTertiary, weight: Weight.regular),
             ),
           ),
         ),
@@ -891,7 +886,7 @@ class _PageTreeTile extends StatelessWidget {
       key: ValueKey('$scope${p.id}'),
       onTap: () => openPage(context, p.id, p.title),
       borderRadius: Radii.ctl,
-      padding: EdgeInsets.only(left: indent, right: 18),
+      padding: EdgeInsets.only(left: indent, right: Space.lg),
       child: SizedBox(
         height: 52,
         child: Row(
@@ -912,7 +907,7 @@ class _PageTreeTile extends StatelessWidget {
                     child: Center(
                       child: Icon20(
                         expanded ? Ico.chevronDown : Ico.chevronRight,
-                        size: 16,
+                        size: IconSize.sm,
                         color: c.iconSecondary,
                       ),
                     ),
@@ -920,7 +915,7 @@ class _PageTreeTile extends StatelessWidget {
                 ),
               )
             else
-              const SizedBox(width: 44),
+              const Gap(Space.xxxl),
             SpaceIconTile(
               icon: p.icon,
               patch: patch,
@@ -928,7 +923,7 @@ class _PageTreeTile extends StatelessWidget {
               glyphSize: 18,
               color: c.iconSecondary,
             ),
-            const SizedBox(width: 12),
+            const Gap(Space.md),
             Expanded(
               child: PageLabel(
                 id: p.id,
@@ -968,7 +963,7 @@ class _PagesAction extends StatelessWidget {
         onTap: onTap,
         borderRadius: Radii.ctl,
         // Icons line up with the page icons above.
-        padding: const EdgeInsets.only(left: 8 + 44, right: 18),
+        padding: const EdgeInsets.only(left: 8 + 44, right: Space.lg),
         child: SizedBox(
           height: 52,
           child: Row(
@@ -977,11 +972,11 @@ class _PagesAction extends StatelessWidget {
                 width: 26,
                 child: Center(
                   child: icon != null
-                      ? Icon20(icon!, size: 22, color: c.iconSecondary)
+                      ? Icon20(icon!, size: IconSize.xl, color: c.iconSecondary)
                       : IconX(iconX!, size: 22, color: c.iconSecondary),
                 ),
               ),
-              const SizedBox(width: 12),
+              const Gap(Space.md),
               Expanded(
                 child: Text(label, style: ts(context.type.body, c.textPrimary)),
               ),

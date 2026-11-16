@@ -91,16 +91,16 @@ class ChatReferenceCard extends StatelessWidget {
         children: [
           if (r.summary.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: Space.sm),
               child: Text(r.summary, style: ts(ty.ui, c.textSecondary)),
             ),
           if (r.displayDecision != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: Space.sm),
               child: DecisionLine(r.displayDecision!, boxed: true),
             ),
           if (r.sections.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const Gap(Space.xxs),
             MarkedList(
               divided: true,
               rows: [
@@ -114,11 +114,11 @@ class ChatReferenceCard extends StatelessWidget {
                     colour: _edgeColour(context, s.colour),
                     small: true,
                     oneLine: true,
-                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    padding: const EdgeInsets.symmetric(vertical: Space.xxs),
                   ),
               ],
             ),
-            const SizedBox(height: 8),
+            const Gap(Space.sm),
           ],
         ],
       ),
@@ -182,7 +182,7 @@ class ChatReferenceChip extends StatelessWidget {
 }
 
 Widget _unavailable(BuildContext context) => Padding(
-  padding: const EdgeInsets.only(top: 2, bottom: 4),
+  padding: const EdgeInsets.only(top: Space.hair, bottom: Space.xxs),
   child: Text(
     'chat unavailable',
     style: ts(context.type.uiSmall, context.colors.textTertiary),

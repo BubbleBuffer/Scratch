@@ -165,7 +165,7 @@ class BlockRowState extends State<BlockRow>
     super.build(context);
     final c = context.colors;
     final ty = context.type;
-    final mobile = context.mobile;
+    final mobile = context.touch;
     final n = node;
     final type = blockRegistry.of(n.kind);
     final geo = widget.geo;
@@ -203,7 +203,7 @@ class BlockRowState extends State<BlockRow>
       box = type.decorate?.call(b, text) ?? text;
       // 28 px for one line of body text: 24 + 2 + 2 on desktop, 22 + 3 + 3 on mobile.
       box = Padding(
-        padding: EdgeInsets.symmetric(vertical: mobile ? 3 : 2),
+        padding: EdgeInsets.symmetric(vertical: mobile ? Space.xxs : Space.hair),
         child: box,
       );
     }
@@ -338,7 +338,7 @@ class BlockRowState extends State<BlockRow>
             width: 18,
             height: 24,
             child: Center(
-              child: Icon20(Ico.plus, size: 16, color: c.iconTertiary),
+              child: Icon20(Ico.plus, size: IconSize.sm, color: c.iconTertiary),
             ),
           ),
         ),
@@ -360,7 +360,7 @@ class BlockRowState extends State<BlockRow>
               width: 18,
               height: 24,
               child: Center(
-                child: Icon20(Ico.grip, size: 16, color: c.iconTertiary),
+                child: Icon20(Ico.grip, size: IconSize.sm, color: c.iconTertiary),
               ),
             ),
           ),
@@ -406,7 +406,7 @@ class BlockRowState extends State<BlockRow>
       textInputAction: TextInputAction.newline,
       selectionControls: selectionControlsFor(context),
       rendererIgnoresPointer: true,
-      showSelectionHandles: context.mobile,
+      showSelectionHandles: context.touch,
       enableInteractiveSelection: true,
       contextMenuBuilder: contextMenuFor(context),
       onChanged: (v) => ed.onChanged(n, ctl.value),

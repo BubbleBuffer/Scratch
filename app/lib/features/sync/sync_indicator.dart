@@ -42,7 +42,7 @@ class SyncIndicator extends StatelessWidget {
     if (phase == SyncPhase.off) return const SizedBox.shrink();
     return SyncIndicatorView(
       phase: phase,
-      showLabel: showLabel ?? !context.mobile,
+      showLabel: showLabel ?? !context.touch,
       onTap: (anchor) => showSyncDetails(context, anchor, phase, message),
     );
   }
@@ -58,7 +58,7 @@ class SyncIndicatorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final error = phase == SyncPhase.error;
     final color = error ? c.inlineCodeText : c.iconTertiary;
     return Builder(
@@ -69,15 +69,15 @@ class SyncIndicatorView extends StatelessWidget {
           key: const ValueKey('sync-indicator'),
           onTap: onTap == null ? null : () => onTap!(globalRectOf(b)),
           radius: Radii.md,
-          padding: EdgeInsets.symmetric(horizontal: showLabel ? 6 : 0),
+          padding: EdgeInsets.symmetric(horizontal: showLabel ? Space.xs : 0),
           child: SizedBox(
             height: m ? 44 : 28,
             width: showLabel ? null : (m ? 44 : 28),
             child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
               SyncIcon(phaseIcon(phase), size: m ? 22 : 18, color: color),
               if (showLabel) ...[
-                const SizedBox(width: 6),
-                Text(phaseLabel(phase), style: ts(context.type.ui, error ? c.inlineCodeText : c.textTertiary, weight: 400)),
+                const Gap(Space.xs),
+                Text(phaseLabel(phase), style: ts(context.type.ui, error ? c.inlineCodeText : c.textTertiary, weight: Weight.regular)),
               ],
             ]),
           ),
@@ -92,7 +92,7 @@ Future<void> showSyncDetails(BuildContext context, Rect anchor, SyncPhase phase,
   final sync = context.read<SyncStore>();
   Widget details(BuildContext ctx) {
     final c = ctx.colors;
-    final m = ctx.mobile;
+    final m = ctx.touch;
     final lines = <String>[];
     if (sync.connected) {
       lines.add('Hub: ${sync.hubUrl}');
@@ -102,33 +102,33 @@ Future<void> showSyncDetails(BuildContext context, Rect anchor, SyncPhase phase,
     if (sync.hosting) lines.add('Serving this vault on ${sync.hubAddress}');
     final cert = sync.untrustedCertificate;
     return Padding(
-      padding: EdgeInsets.fromLTRB(m ? Layout.gutter : 8, 4, m ? Layout.gutter : 8, 8),
+      padding: EdgeInsets.fromLTRB(m ? Layout.gutter : Space.sm, Space.xxs, m ? Layout.gutter : Space.sm, Space.sm),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
           SyncIcon(phaseIcon(phase), size: 18, color: phase == SyncPhase.error ? c.inlineCodeText : c.iconSecondary),
-          const SizedBox(width: 8),
+          const Gap(Space.sm),
           Text(phaseLabel(phase), style: ts(ctx.type.ui, c.textPrimary)),
         ]),
         if (cert) ...[
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           SyncCertificateProblem(
             messageKey: const ValueKey('sync-error-message'),
             onView: () => Navigator.of(ctx).pop('cert-view'),
             onTrust: () => Navigator.of(ctx).pop('cert-trust'),
           ),
         ] else if (message != null) ...[
-          const SizedBox(height: 8),
-          Text(message, key: const ValueKey('sync-error-message'), style: tsRaw(13, 18, 400, c.textSecondary)),
+          const Gap(Space.sm),
+          Text(message, key: const ValueKey('sync-error-message'), style: ts(context.type.ui, c.textSecondary, weight: Weight.regular)),
         ],
         for (final l in lines) ...[
           const SizedBox(height: 6),
-          Text(l, style: tsRaw(13, 18, 400, c.textTertiary)),
+          Text(l, style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
         ],
       ]),
     );
   }
 
-  final action = context.mobile
+  final action = context.touch
       ? await showSheet<String>(
           context,
           (ctx) => SheetSurface(children: [

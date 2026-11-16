@@ -88,7 +88,7 @@ class LayoutGrid extends StatelessWidget {
       final fg = sel ? c.accent : c.textSecondary;
       return Expanded(
         child: Padding(
-          padding: const EdgeInsets.all(3),
+          padding: const EdgeInsets.all(Space.xxs),
           child: Hover(
             key: ValueKey('layout-${k.name}'),
             onTap: () => onPick(k),
@@ -96,13 +96,13 @@ class LayoutGrid extends StatelessWidget {
             child: Container(
               height: 62,
               decoration: BoxDecoration(
-                border: Border.all(color: sel ? c.accent : c.border, width: sel ? 1.5 : 1),
+                border: Border.all(color: sel ? c.accent : c.border, width: sel ? Stroke.regular : Stroke.hair),
                 borderRadius: BorderRadius.circular(Radii.md),
               ),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 DbIcon(layoutIcon(k), size: 20, color: fg),
-                const SizedBox(height: 6),
-                Text(viewLabel(k), style: ts(context.type.uiSmall, fg, weight: sel ? 600 : 400)),
+                const Gap(Space.xs),
+                Text(viewLabel(k), style: ts(context.type.uiSmall, fg, weight: sel ? Weight.semibold : Weight.regular)),
               ]),
             ),
           ),
@@ -149,7 +149,7 @@ Future<void> showViewMenu(BuildContext anchor, DbController ctl, ViewDef v) {
     globalRectOf(anchor),
     (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-        padding: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.only(bottom: Space.xxs),
         child: MenuField(
           key: const ValueKey('view-name'),
           controller: name,
@@ -162,7 +162,7 @@ Future<void> showViewMenu(BuildContext anchor, DbController ctl, ViewDef v) {
         dbItem(ctx, viewLabel(k), layoutIcon(k),
             key: ValueKey('view-layout-${k.name}'),
             selected: k == v.kind,
-            trailing: k == v.kind ? Icon20(Ico.check, size: 16, color: ctx.colors.accent) : null, onTap: () {
+            trailing: k == v.kind ? Icon20(Ico.check, size: IconSize.sm, color: ctx.colors.accent) : null, onTap: () {
           Navigator.of(ctx).pop();
           final cur = store.views.where((x) => x.id == v.id).firstOrNull ?? v;
           changeLayout(store, cur, k);
@@ -295,11 +295,11 @@ class _ViewSettingsState extends State<ViewSettings> {
     final group = store.groupDef;
     return _col([
       Padding(
-        padding: const EdgeInsets.fromLTRB(2, 2, 2, 6),
-        child: Text('View settings', style: ts(context.type.ui, context.colors.textPrimary, weight: 600)),
+        padding: const EdgeInsets.fromLTRB(Space.hair, Space.hair, Space.hair, Space.xs),
+        child: Text('View settings', style: ts(context.type.ui, context.colors.textPrimary, weight: Weight.semibold)),
       ),
       Padding(
-        padding: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.only(bottom: Space.xxs),
         child: MenuField(
           key: const ValueKey('settings-name'),
           controller: _name,
@@ -342,7 +342,7 @@ class _ViewSettingsState extends State<ViewSettings> {
           trailing: menuValue(context, _agendaLoaded ? agendaSettingsLabel(store.schema, _agenda) : '…'),
           onTap: () => setState(() => page = _Page.agenda)),
       // Desktop opens every row as a sheet; the setting stays in the config.
-      if (context.mobile)
+      if (context.touch)
         dbItem(context, 'Open pages in', DbIco.peekSide,
           key: const ValueKey('settings-open-in'),
           trailing: menuValue(context, _openLabel(v.cfg.openIn(v.kind))),
@@ -384,7 +384,7 @@ class _ViewSettingsState extends State<ViewSettings> {
         menuBack(context, 'Layout', () => setState(() => page = _Page.main)),
         LayoutGrid(current: v.kind, onPick: (k) => changeLayout(store, v, k)),
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+          padding: const EdgeInsets.fromLTRB(Space.xxs, Space.sm, Space.xxs, Space.xxs),
           child: Text(_layoutHelp[v.kind] ?? '', style: ts(context.type.uiSmall, context.colors.textTertiary)),
         ),
         ..._layoutOptions(context, v),
@@ -406,7 +406,7 @@ class _ViewSettingsState extends State<ViewSettings> {
             ? null
             : DbIconBtn(visible ? DbIco.eye : DbIco.eyeOff,
                 key: ValueKey('toggle-${d.name}'),
-                size: 24,
+                size: ControlSize.xs,
                 color: visible ? c.iconSecondary : c.iconTertiary,
                 label: visible ? 'Hide' : 'Show',
                 onTap: () => store.updateView(v.copyWith(
@@ -465,7 +465,7 @@ class _ViewSettingsState extends State<ViewSettings> {
       for (final d in candidates)
         dbItem(context, d.name, propIcon(d),
             key: ValueKey('group-by-${d.name}'),
-            trailing: v.groupBy == d.key ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+            trailing: v.groupBy == d.key ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
             onTap: () => store.updateView(v.copyWith(groupBy: d.key))),
       if (store.groupDef != null) ...[
         const MenuSeparator(),
@@ -501,21 +501,21 @@ class _ViewSettingsState extends State<ViewSettings> {
       for (final role in AgendaRole.values)
         dbItem(context, role == AgendaRole.auto ? agendaSettingsLabel(store.schema, const AgendaSettings(role: AgendaRole.auto)) : agendaRoleLabel(role), null,
           key: ValueKey('agenda-role-${role.name}'),
-          trailing: _agenda.role == role ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+          trailing: _agenda.role == role ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
           onTap: !_agendaLoaded || _agendaSaving ? null : () => _saveAgenda(AgendaSettings(role: role, dateProp: _agenda.dateProp))),
       const MenuSeparator(),
       const MenuHeader('Date property'),
       dbItem(context, 'First date property', DbIco.date,
           key: const ValueKey('agenda-date-first'),
           trailing: _agenda.dateProp == null || !dates.any((p) => p.key == _agenda.dateProp)
-              ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+              ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
           onTap: !_agendaLoaded || _agendaSaving ? null : () => _saveAgenda(AgendaSettings(role: _agenda.role))),
       for (final prop in dates)
         dbItem(context, prop.name, DbIco.date,
           key: ValueKey('agenda-date-${prop.key}'),
-          trailing: _agenda.dateProp == prop.key ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+          trailing: _agenda.dateProp == prop.key ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
           onTap: !_agendaLoaded || _agendaSaving ? null : () => _saveAgenda(AgendaSettings(role: _agenda.role, dateProp: prop.key))),
-      if (_agendaError != null) Padding(padding: const EdgeInsets.all(8), child: Text(_agendaError!, style: ts(context.type.uiSmall, c.inlineCodeText))),
+      if (_agendaError != null) Padding(padding: const EdgeInsets.all(Space.sm), child: Text(_agendaError!, style: ts(context.type.uiSmall, c.inlineCodeText))),
     ]);
   }
 
@@ -531,7 +531,7 @@ class _ViewSettingsState extends State<ViewSettings> {
       ])
         dbItem(context, _openLabel(o), icon,
             key: ValueKey('open-in-${o.name}'),
-            trailing: o == cur ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+            trailing: o == cur ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
             onTap: () => store.updateConfig(v, (c) => c.openInValue = o)),
     ]);
   }

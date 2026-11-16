@@ -100,10 +100,10 @@ class _DbIconPainter extends CustomPainter {
         canvas.drawRRect(RRect.fromLTRBR(l, t, r, b, Radius.circular(rad)), paint ?? p);
     void dot(double x, double y, double r) => canvas.drawCircle(Offset(x, y), r, fill);
     void circle(double x, double y, double r) => canvas.drawCircle(Offset(x, y), r, p);
-    void text(String s, double fontSize, {int weight = 500}) {
+    void text(String s, double fontSize, {Weight weight = Weight.medium}) {
       final tp = TextPainter(
         textDirection: TextDirection.ltr,
-        text: TextSpan(text: s, style: TextStyle(fontFamily: sansFamily, fontSize: fontSize, color: color, fontWeight: fw(weight))),
+        text: TextSpan(text: s, style: TextStyle(fontFamily: sansFamily, fontSize: fontSize, color: color, fontWeight: weight.fontWeight)),
       )..layout();
       tp.paint(canvas, Offset(10 - tp.width / 2, 10 - tp.height / 2));
     }
@@ -132,7 +132,7 @@ class _DbIconPainter extends CustomPainter {
 
     switch (icon) {
       case DbIco.title:
-        text('Aa', 11.5, weight: 600);
+        text('Aa', 11.5, weight: Weight.semibold);
       case DbIco.text:
         line(4, 5.5, 16, 5.5);
         line(4, 10, 16, 10);

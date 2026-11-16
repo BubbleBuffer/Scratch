@@ -161,7 +161,7 @@ class _TaskTitleDatesState extends State<TaskTitleDates> {
     final label = _label(date, timed: taskPage && (_task?.hasTime ?? false));
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: Space.md),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -175,12 +175,12 @@ class _TaskTitleDatesState extends State<TaskTitleDates> {
               background: c.bgSecondary,
               border: Border.all(color: c.border),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xs),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon20(Ico.clock, size: 16, color: c.iconSecondary),
-                    const SizedBox(width: 6),
+                    Icon20(Ico.clock, size: IconSize.sm, color: c.iconSecondary),
+                    const Gap(Space.xs),
                     Text(
                       label,
                       style: ts(context.type.uiSmall, c.textSecondary),

@@ -21,7 +21,7 @@ void main() {
         data: const MediaQueryData(size: Size(1440, 900)),
         child: AppTheme(
           colors: AppColors.light,
-          formFactor: FormFactor.desktop,
+          density: Density.pointer,
           child: Directionality(
             textDirection: TextDirection.ltr,
             child: PageStackChrome(

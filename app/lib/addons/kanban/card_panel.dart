@@ -133,7 +133,7 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
             ),
           },
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.xl, Space.xl),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -153,20 +153,20 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                   child: Text(
                     widget.title,
                     key: const ValueKey('kanban-panel-title'),
-                    style: tsDisplay(const TypeSpec(22, 28, 700), c.textPrimary),
+                    style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.bold),
                   ),
                 ),
                 if (widget.firstLine.trim().isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.only(top: 6),
+                    padding: const EdgeInsets.only(top: Space.xs),
                     child: Text(
                       widget.firstLine.trim(),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: ts(const TypeSpec(14, 20, 400), c.textSecondary),
+                      style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
                     ),
                   ),
-                const SizedBox(height: 16),
+                const Gap(Space.lg),
                 _Prop(
                   label: 'Status',
                   child: _ChoiceRow(
@@ -177,7 +177,7 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                     child: Text(
                       widget.status,
                       key: const ValueKey('kanban-panel-status'),
-                      style: ts(const TypeSpec(14, 20, 400), c.textPrimary),
+                      style: ts(context.type.ui, c.textPrimary, weight: Weight.regular),
                     ),
                   ),
                 ),
@@ -197,16 +197,16 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                               ? Text(
                                   'Not assigned',
                                   style: ts(
-                                    const TypeSpec(14, 20, 400),
+                                    context.type.ui,
                                     c.textSecondary,
-                                  ),
+                                   weight: Weight.regular),
                                 )
                               : RunnerChip(assignment: a),
                         );
                       },
                     ),
                   ),
-                const SizedBox(height: 16),
+                const Gap(Space.lg),
                 if (runners != null)
                   ListenableBuilder(
                     listenable: runners,
@@ -236,7 +236,7 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                       onOpenSession: widget.onOpenSession,
                     ),
                   ),
-                const SizedBox(height: 8),
+                const Gap(Space.sm),
                 SecondaryButton(
                   key: const ValueKey('kanban-panel-open-note'),
                   label: 'Open note',
@@ -320,7 +320,7 @@ class _RunActionsState extends State<_RunActions> {
         Text(
           widget.question ?? '',
           key: const ValueKey('kanban-panel-question'),
-          style: ts(const TypeSpec(14, 20, 400), c.textPrimary),
+          style: ts(context.type.ui, c.textPrimary, weight: Weight.regular),
         ),
       );
       children.add(
@@ -384,7 +384,7 @@ class _RunActionsState extends State<_RunActions> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final child in children)
-          Padding(padding: const EdgeInsets.only(bottom: 8), child: child),
+          Padding(padding: const EdgeInsets.only(bottom: Space.sm), child: child),
       ],
     );
   }
@@ -398,7 +398,7 @@ class _Prop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.only(bottom: Space.md),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -406,7 +406,7 @@ class _Prop extends StatelessWidget {
           width: 72,
           child: Text(
             label,
-            style: ts(const TypeSpec(12.5, 20, 600), context.colors.textSecondary),
+            style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.semibold),
           ),
         ),
         Expanded(child: child),
@@ -486,14 +486,14 @@ class _ChoiceRowState extends State<_ChoiceRow> {
               borderRadius: Radii.field,
               border: Border.all(
                 color: _highlight ? c.focus : const Color(0x00000000),
-                width: 2,
+                width: Stroke.bold,
               ),
             ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _activate,
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                padding: const EdgeInsets.symmetric(vertical: Space.hair, horizontal: Space.xxs),
                 child: visual,
               ),
             ),

@@ -282,7 +282,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final hits = _query.hits;
     Widget note(String s) => Padding(
       padding: const EdgeInsets.all(Layout.gutter),
-      child: Text(s, style: ts(ty.ui, c.textTertiary, weight: 400)),
+      child: Text(s, style: ts(ty.ui, c.textTertiary, weight: Weight.regular)),
     );
     return ColoredBox(
       color: c.bgPrimary,
@@ -292,7 +292,7 @@ class _SearchScreenState extends State<SearchScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(Layout.gutter - 4, 8, 6, 8),
+              padding: const EdgeInsets.fromLTRB(Layout.gutter - 4, Space.sm, Space.xs, Space.sm),
               child: Row(
                 children: [
                   Expanded(
@@ -307,7 +307,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   TextBtn(
                     'Cancel',
                     key: const ValueKey('search-cancel'),
-                    height: 40,
+                    size: ControlSize.xl,
                     color: c.textSecondary,
                     onTap: () => Navigator.of(context).maybePop(),
                   ),
@@ -319,7 +319,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 Layout.gutter,
                 0,
                 Layout.gutter,
-                8,
+                Space.sm,
               ),
               child: SearchTypeChips(
                 active: _query.activeTypes,
@@ -333,7 +333,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ? note('No results')
                   : SearchResultsList(
                       sections: groupSearchHits(hits),
-                      mobile: true,
+                      showActive: false,
                       terms: _query.terms,
                       padding: EdgeInsets.only(bottom: mq.padding.bottom + 8),
                       onPick: _pick,

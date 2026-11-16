@@ -21,7 +21,7 @@ class SpaceDot extends StatelessWidget {
             height: 8,
             decoration: BoxDecoration(
               color: color,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(Radii.sm),
             ),
           );
   }

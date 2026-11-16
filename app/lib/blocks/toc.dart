@@ -21,10 +21,10 @@ int headingLevel(Node n) => switch (n.kind) {
 Widget _body(BlockContext b) {
   final c = b.colors;
   final heads = [for (final n in b.host.readingOrder) if (headingLevel(n) > 0) n];
-  final style = tsRaw(14, 18.2, 400, c.textSecondary);
+  final style = ts(b.type.ui, c.textSecondary, weight: Weight.regular);
   if (heads.isEmpty) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: Space.xs),
       child: Text('Add headings to create a table of contents.', style: style.copyWith(color: c.textTertiary)),
     );
   }
@@ -38,7 +38,7 @@ Widget _body(BlockContext b) {
         child: Container(
           height: 30,
           alignment: Alignment.centerLeft,
-          padding: EdgeInsets.only(left: 2 + 24.0 * (headingLevel(h) - top), right: 2),
+          padding: EdgeInsets.only(left: 2 + 24.0 * (headingLevel(h) - top), right: Space.hair),
           child: Container(
             decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.divider))),
             child: Text(h.text.isEmpty ? 'Untitled' : h.text,

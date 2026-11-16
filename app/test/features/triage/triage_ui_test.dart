@@ -171,7 +171,7 @@ Future<void> _mount(
   await tester.pumpWidget(
     AppTheme(
       colors: AppColors.light,
-      formFactor: mobile ? FormFactor.mobile : FormFactor.desktop,
+      density: mobile ? Density.touch : Density.pointer,
       child: WidgetsApp(
         color: const Color(0xFFFFFFFF),
         onGenerateRoute: (_) => PageRouteBuilder<void>(

@@ -48,7 +48,7 @@ class _RowCardState extends State<RowCard> {
     final c = context.colors;
     final a = widget.args;
     final r = widget.row;
-    final m = context.mobile;
+    final m = context.touch;
     final group = a.view.groupBy;
     final props = [
       for (final d in a.store.visibleProps(a.view))
@@ -56,7 +56,7 @@ class _RowCardState extends State<RowCard> {
     ];
     final bg = c.bgPrimary;
     final title = ts(
-      m ? const TypeSpec(15, 20, 500) : const TypeSpec(14, 20, 500),
+      m ? context.type.ui : context.type.ui,
       c.textPrimary,
     );
     return Hover(
@@ -85,7 +85,7 @@ class _RowCardState extends State<RowCard> {
                   content: widget.contentPreview,
                 ),
               Padding(
-                padding: EdgeInsets.fromLTRB(10, m ? 10 : 8, 10, m ? 10 : 8),
+                padding: EdgeInsets.fromLTRB(Space.md, m ? Space.md : Space.sm, Space.md, m ? Space.md : Space.sm),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -99,7 +99,7 @@ class _RowCardState extends State<RowCard> {
                     ),
                     for (final d in props)
                       Padding(
-                        padding: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.only(top: Space.xs),
                         child: valueOf(
                           context,
                           d,

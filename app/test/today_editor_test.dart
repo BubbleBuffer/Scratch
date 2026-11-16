@@ -82,7 +82,7 @@ void main() {
       expect(saved.marks.where((m) => m.kind == BMarkKind.date).single.url, '2026-10-08');
       final controller = editState(tester, todo).widget.controller as RichController;
       expect(controller.dateChips, isTrue);
-      expect(controller.buildTextSpan(context: tester.element(todo), style: ts(TypeScale.desktop.body, AppColors.light.textPrimary), withComposing: false).children!
+      expect(controller.buildTextSpan(context: tester.element(todo), style: ts(TypeScale.pointer.body, AppColors.light.textPrimary), withComposing: false).children!
           .whereType<TextSpan>().map((s) => s.semanticsLabel), contains('Thursday'));
       await focusAt(tester, todo, 5);
       expect(controller.dateChips, isFalse);

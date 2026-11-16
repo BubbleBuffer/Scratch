@@ -20,7 +20,7 @@ String nextOptionColor(List<SelectOption> options) => tagColors[1 + options.leng
 Future<void> editOptions(EditArgs a) => showOverCell<void>(
       a.context,
       a.anchor,
-      (ctx) => ctx.mobile ? OptionPicker(args: a) : Padding(padding: const EdgeInsets.all(6), child: OptionPicker(args: a)),
+      (ctx) => ctx.touch ? OptionPicker(args: a) : Padding(padding: const EdgeInsets.all(Space.xs), child: OptionPicker(args: a)),
       width: a.anchor.width < 300 ? 300 : a.anchor.width,
     );
 
@@ -133,24 +133,24 @@ class _OptionPickerState extends State<OptionPicker> {
             onTap: () => _pick(o.id),
             radius: Radii.md,
             selected: selected.contains(o.id),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
             child: SizedBox(
-              height: context.mobile ? 44 : 28,
+              height: context.touch ? 44 : 28,
               child: Row(children: [
                 ReorderableDragStartListener(
                   index: i,
                   child: MouseRegion(
                     cursor: SystemMouseCursors.grab,
-                    child: SizedBox(width: 18, child: Icon20(Ico.grip, size: 14, color: c.iconTertiary)),
+                    child: SizedBox(width: 18, child: Icon20(Ico.grip, size: IconSize.xs, color: c.iconTertiary)),
                   ),
                 ),
-                const SizedBox(width: 4),
+                const Gap(Space.xxs),
                 Expanded(child: Align(alignment: Alignment.centerLeft, child: Pill(o.name, color: o.color, status: status,
                     group: status ? statusGroupOf(def, o.id) : null))),
                 IconBtn(Ico.more,
                     key: ValueKey('opt-more-${o.name}'),
-                    size: 22,
-                    glyph: 16,
+                    size: ControlSize.xs,
+                    glyph: IconSize.sm,
                     onTap: () => _editOption(rowCtx, o),
                     semanticLabel: 'Edit option'),
               ]),
@@ -183,13 +183,13 @@ class _OptionPickerState extends State<OptionPicker> {
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
         constraints: const BoxConstraints(minHeight: 34),
-        padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+        padding: const EdgeInsets.fromLTRB(Space.xs, Space.xxs, Space.xs, Space.xxs),
         decoration: BoxDecoration(
           color: c.bgSecondary,
           borderRadius: Radii.field,
           border: Border.all(color: c.borderTranslucent),
         ),
-        child: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        child: Wrap(spacing: Space.xs, runSpacing: Space.xxs, crossAxisAlignment: WrapCrossAlignment.center, children: [
           for (final id in selected)
             if (def.option(id) case final o?)
               Row(mainAxisSize: MainAxisSize.min, children: [
@@ -198,8 +198,8 @@ class _OptionPickerState extends State<OptionPicker> {
                 if (multi)
                   Hover(
                     onTap: () => _pick(id),
-                    radius: 3,
-                    child: Icon20(Ico.close, size: 14, color: c.iconTertiary),
+                    radius: Radii.sm,
+                    child: Icon20(Ico.close, size: IconSize.xs, color: c.iconTertiary),
                   ),
               ]),
           ConstrainedBox(
@@ -209,8 +209,8 @@ class _OptionPickerState extends State<OptionPicker> {
                 key: const ValueKey('option-query'),
                 controller: _query,
                 focusNode: _queryFocus,
-                autofocus: !context.mobile,
-                style: ts(ty.ui, c.textPrimary, weight: 400),
+                autofocus: !context.touch,
+                style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
                 placeholder: selected.isEmpty ? 'Search for an option…' : '',
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (s) {
@@ -226,11 +226,11 @@ class _OptionPickerState extends State<OptionPicker> {
           ),
         ]),
       ),
-      const SizedBox(height: 6),
+      const Gap(Space.xs),
       Padding(
-        padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
+        padding: const EdgeInsets.fromLTRB(Space.xxs, Space.hair, Space.xxs, Space.xxs),
         child: Text('Select an option or create one',
-            style: ts(ty.uiSmall, c.textTertiary, weight: 400)),
+            style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)),
       ),
       Flexible(child: SingleChildScrollView(child: list)),
       if (q.isNotEmpty && !exact)
@@ -238,11 +238,11 @@ class _OptionPickerState extends State<OptionPicker> {
           key: const ValueKey('option-create'),
           onTap: () => _create(_query.text.trim()),
           radius: Radii.md,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: Space.sm),
           child: SizedBox(
-            height: context.mobile ? 44 : 28,
+            height: context.touch ? 44 : 28,
             child: Row(children: [
-              Text('Create ', style: ts(ty.ui, c.textSecondary, weight: 400)),
+              Text('Create ', style: ts(ty.ui, c.textSecondary, weight: Weight.regular)),
               Flexible(child: Pill(_query.text.trim(), color: nextOptionColor(def.options), status: status)),
             ]),
           ),
@@ -285,7 +285,7 @@ class _OptionEditorState extends State<OptionEditor> {
     final c = context.colors;
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         MenuField(key: const ValueKey('option-name'), controller: _name, onSubmitted: (_) => _done()),
-        const SizedBox(height: 4),
+        const Gap(Space.xxs),
         dbItem(context, 'Delete', null,
             key: const ValueKey('option-delete'),
             ico: Ico.trash,
@@ -301,11 +301,11 @@ class _OptionEditorState extends State<OptionEditor> {
               height: 18,
               decoration: BoxDecoration(
                 color: c.tag(col).bg,
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(Radii.sm),
                 border: Border.all(color: c.borderTranslucent),
               ),
             ),
-            trailing: col == color ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+            trailing: col == color ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
             onTap: () {
               setState(() => color = col);
               _done();

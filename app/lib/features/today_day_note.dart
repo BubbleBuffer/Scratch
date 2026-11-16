@@ -236,7 +236,7 @@ class _DayNoteState extends State<_DayNote> {
               child: Text(
                 'Note · ${weekdays[widget.day.weekday - 1].substring(0, 3)} '
                 '${widget.day.day} ${months[widget.day.month - 1].substring(0, 3)}',
-                style: tsRaw(13, 20, 500, c.textSecondary),
+                style: ts(context.type.ui, c.textSecondary),
               ),
             ),
             if (page != null)
@@ -248,7 +248,7 @@ class _DayNoteState extends State<_DayNote> {
               ),
           ],
         ),
-        const SizedBox(height: 10),
+        const Gap(Space.md),
         if (_loading)
           Text('Loading…', style: ts(context.type.uiSmall, c.textTertiary))
         else if (page != null)
@@ -266,8 +266,8 @@ class _DayNoteState extends State<_DayNote> {
         else
           Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: context.mobile ? 18 : 30,
-              vertical: 10,
+              horizontal: context.touch ? Space.lg : Space.xxl,
+              vertical: Space.md,
             ),
             child: PlainField(
               key: const ValueKey('today-note-start'),

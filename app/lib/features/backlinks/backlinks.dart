@@ -114,10 +114,10 @@ class _BacklinksBarState extends State<BacklinksBar> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 4),
+          padding: const EdgeInsets.only(left: Space.hair, bottom: Space.xxs),
           child: Text(
             'Linked from',
-            style: ts(context.type.uiSmall, c.textTertiary, weight: 500),
+            style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.medium),
           ),
         ),
         for (final r in shown)
@@ -125,14 +125,14 @@ class _BacklinksBarState extends State<BacklinksBar> {
             key: ValueKey('backlink-${r.id}'),
             radius: Radii.sm,
             onTap: () => openPage(context, r.id, r.title, stack: true),
-            padding: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.symmetric(horizontal: Space.hair),
             child: SizedBox(
               height: 26,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   PageIcon(icon: r.icon, size: 16, color: c.iconSecondary),
-                  const SizedBox(width: 6),
+                  const Gap(Space.xs),
                   Flexible(
                     child: Container(
                       decoration: BoxDecoration(
@@ -141,7 +141,7 @@ class _BacklinksBarState extends State<BacklinksBar> {
                       child: PageLabel(
                         id: r.id,
                         title: r.title,
-                        style: tsRaw(14, 18, 500, c.textPrimary),
+                        style: ts(context.type.ui, c.textPrimary),
                       ),
                     ),
                   ),
@@ -153,7 +153,7 @@ class _BacklinksBarState extends State<BacklinksBar> {
           TextBtn(
             _all ? 'Show less' : '${_rows.length - 3} more',
             key: const ValueKey('backlinks-more'),
-            height: 24,
+            size: ControlSize.xs,
             color: c.textTertiary,
             onTap: () => setState(() => _all = !_all),
           ),
@@ -161,7 +161,7 @@ class _BacklinksBarState extends State<BacklinksBar> {
     );
     return Padding(
       key: const ValueKey('backlinks'),
-      padding: EdgeInsets.only(left: widget.left, top: 24, bottom: 8),
+      padding: EdgeInsets.only(left: widget.left, top: Space.xl, bottom: Space.sm),
       child: Align(
         alignment: Alignment.topLeft,
         child: SizedBox(
@@ -171,7 +171,7 @@ class _BacklinksBarState extends State<BacklinksBar> {
             mainAxisSize: MainAxisSize.min,
             children: [
               HLine(color: c.divider),
-              const SizedBox(height: 10),
+              const Gap(Space.md),
               list,
             ],
           ),

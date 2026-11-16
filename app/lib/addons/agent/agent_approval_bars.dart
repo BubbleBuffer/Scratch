@@ -33,7 +33,7 @@ class AgentApprovalBars extends StatelessWidget {
         children: [
           for (var i = 0; i < pending.length; i++)
             Padding(
-              padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
+              padding: EdgeInsets.only(top: i == 0 ? 0 : Space.xs),
               child: ApprovalBar(
                 key: ValueKey('agent-approval-${pending[i].id}'),
                 approval: kitApproval(pending[i]),

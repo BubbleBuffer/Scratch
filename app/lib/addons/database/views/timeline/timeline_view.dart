@@ -68,7 +68,7 @@ Future<void> _pickZoom(BuildContext ctx, Rect rect, ViewArgs a) async {
             key: ValueKey('zoom-${z.name}'),
             label: _zoomLabel(z),
             trailing: a.view.cfg.zoom == z
-                ? Icon20(Ico.check, size: 16, color: c.colors.iconPrimary)
+                ? Icon20(Ico.check, size: IconSize.sm, color: c.colors.iconPrimary)
                 : null,
             onTap: () => Navigator.of(c).pop(z),
           ),
@@ -184,7 +184,7 @@ class _TimelineViewState extends State<TimelineView> {
     final c = context.colors;
     if (key == null || a.store.def(key) == null) {
       return Padding(
-        padding: EdgeInsets.fromLTRB(a.gutter, 24, a.gutter, 24),
+        padding: EdgeInsets.fromLTRB(a.gutter, Space.xl, a.gutter, Space.xl),
         child: Builder(
           builder: (b) => ChipBtn(
             key: const ValueKey('timeline-pick-date'),
@@ -216,7 +216,7 @@ class _TimelineViewState extends State<TimelineView> {
           final s = x.startMs.compareTo(y.startMs);
           return s != 0 ? s : x.page.title.compareTo(y.page.title);
         });
-    final m = context.mobile;
+    final m = context.touch;
     const rowH = 36.0;
 
     return LayoutBuilder(
@@ -236,8 +236,8 @@ class _TimelineViewState extends State<TimelineView> {
         final toolbar = Padding(
           padding: EdgeInsets.fromLTRB(
             a.inline ? a.gutter : a.gutter,
-            4,
-            a.inline ? 8 : a.gutter,
+            Space.xxs,
+            a.inline ? Space.sm : a.gutter,
             0,
           ),
           child: SizedBox(
@@ -247,7 +247,7 @@ class _TimelineViewState extends State<TimelineView> {
                 Text(
                   '${monthName(firstDay.month)} ${firstDay.year}',
                   key: const ValueKey('timeline-month'),
-                  style: ts(context.type.ui, c.textPrimary, weight: 600),
+                  style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold),
                 ),
                 const Spacer(),
                 Builder(
@@ -255,7 +255,7 @@ class _TimelineViewState extends State<TimelineView> {
                     key: const ValueKey('timeline-zoom'),
                     onTap: () => _pickZoom(b, globalRectOf(b), a),
                     radius: Radii.md,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.xs),
                     child: SizedBox(
                       height: 24,
                       child: Row(
@@ -266,13 +266,13 @@ class _TimelineViewState extends State<TimelineView> {
                             style: ts(
                               context.type.ui,
                               c.textTertiary,
-                              weight: 400,
+                              weight: Weight.regular,
                             ),
                           ),
-                          const SizedBox(width: 2),
+                          const Gap(Space.hair),
                           Icon20(
                             Ico.chevronDown,
-                            size: 14,
+                            size: IconSize.xs,
                             color: c.iconTertiary,
                           ),
                         ],
@@ -282,8 +282,8 @@ class _TimelineViewState extends State<TimelineView> {
                 ),
                 IconBtn(
                   Ico.chevronLeft,
-                  size: 24,
-                  glyph: 16,
+                  size: ControlSize.xs,
+                  glyph: IconSize.sm,
                   color: c.iconSecondary,
                   semanticLabel: 'Earlier',
                   onTap: () => _page(-1),
@@ -291,14 +291,14 @@ class _TimelineViewState extends State<TimelineView> {
                 TextBtn(
                   'Today',
                   key: const ValueKey('timeline-today'),
-                  height: 24,
+                  size: ControlSize.xs,
                   color: c.textSecondary,
                   onTap: _jumpToday,
                 ),
                 IconBtn(
                   Ico.chevronRight,
-                  size: 24,
-                  glyph: 16,
+                  size: ControlSize.xs,
+                  glyph: IconSize.sm,
                   color: c.iconSecondary,
                   semanticLabel: 'Later',
                   onTap: () => _page(1),
@@ -428,13 +428,13 @@ class _TimelineViewState extends State<TimelineView> {
       mainAxisSize: MainAxisSize.min,
       children: [
         PageIcon(icon: e.page.icon, size: 16, color: c.iconSecondary),
-        const SizedBox(width: 6),
+        const Gap(Space.xs),
         Flexible(
           child: Text(
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: tsRaw(14, 20, 500, c.textPrimary),
+            style: ts(context.type.ui, c.textPrimary),
           ),
         ),
       ],
@@ -485,7 +485,7 @@ class _TimelineViewState extends State<TimelineView> {
               }),
               onHorizontalDragEnd: (_) => _end(e),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                 decoration: BoxDecoration(
                   color: eventPillFill(c, a.store.resolvedSpaceColor),
                   borderRadius: Radii.pill,

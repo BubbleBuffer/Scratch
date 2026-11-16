@@ -31,10 +31,10 @@ Widget _decorate(BlockContext b, Widget text) {
       borderRadius: Radii.panel,
     ),
     padding: EdgeInsets.fromLTRB(
-      12,
-      b.mobile ? 12 : 16,
-      16,
-      b.mobile ? 12 : 16,
+      Space.md,
+      b.mobile ? Space.md : Space.lg,
+      Space.lg,
+      b.mobile ? Space.md : Space.lg,
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,7 +66,7 @@ Widget _decorate(BlockContext b, Widget text) {
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const Gap(Space.sm),
         Expanded(child: text),
       ],
     ),
@@ -84,7 +84,7 @@ Widget _decorate(BlockContext b, Widget text) {
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: patch.fill,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(Radii.sm),
             ),
           ),
         ),

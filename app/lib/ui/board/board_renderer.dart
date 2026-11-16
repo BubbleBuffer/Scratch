@@ -266,10 +266,10 @@ class _BoardRendererState extends State<BoardRenderer> {
             hoverShadow: c.seamHover,
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                10,
-                context.mobile ? 10 : 8,
-                10,
-                context.mobile ? 10 : 8,
+                Space.md,
+                context.touch ? Space.md : Space.sm,
+                Space.md,
+                context.touch ? Space.md : Space.sm,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,15 +278,15 @@ class _BoardRendererState extends State<BoardRenderer> {
                   Text(
                     displayTitle(card.title, firstLine: firstLine),
                     style: ts(
-                      context.mobile
-                          ? const TypeSpec(15, 20, 500)
-                          : const TypeSpec(14, 20, 500),
+                      context.touch
+                          ? context.type.ui
+                          : context.type.ui,
                       c.textPrimary,
                     ),
                   ),
                   for (final peek in card.peek)
                     Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: Space.xs),
                       child: Text(
                         peek,
                         style: ts(context.type.ui, c.textSecondary),
@@ -352,7 +352,7 @@ class _BoardRendererState extends State<BoardRenderer> {
         padding: EdgeInsets.only(
           left: widget.gutter,
           right: widget.gutter,
-          top: 4,
+          top: Space.xxs,
         ),
         child: widget.inline
             ? row
@@ -637,7 +637,7 @@ class _BoardColumnState extends State<_BoardColumn> {
     final n = math.max(0, source.cardCount(g.id));
     final lazy = !b.widget.inline && n > 40;
     final count = b.widget.inline ? math.min(n, _limit) : n;
-    final m = context.mobile;
+    final m = context.touch;
     final label = g.keyLabel;
 
     Widget card(int i) {
@@ -657,13 +657,13 @@ class _BoardColumnState extends State<_BoardColumn> {
           ? LongPressDraggable<BoardCardDrag>(
               data: data,
               feedback: feedback,
-              childWhenDragging: Opacity(opacity: 0.35, child: body),
+              childWhenDragging: Opacity(opacity: Alpha.wash, child: body),
               child: body,
             )
           : Draggable<BoardCardDrag>(
               data: data,
               feedback: feedback,
-              childWhenDragging: Opacity(opacity: 0.35, child: body),
+              childWhenDragging: Opacity(opacity: Alpha.wash, child: body),
               child: body,
             );
       return DragTarget<BoardCardDrag>(
@@ -672,7 +672,7 @@ class _BoardColumnState extends State<_BoardColumn> {
         onAcceptWithDetails: (d) =>
             b._drop(d.data, g.id, _afterFor(i, d.data.cardId)),
         builder: (context, cand, _) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: Space.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -680,10 +680,10 @@ class _BoardColumnState extends State<_BoardColumn> {
               if (cand.isNotEmpty)
                 Container(
                   height: 3,
-                  margin: const EdgeInsets.only(bottom: 5),
+                  margin: const EdgeInsets.only(bottom: Space.xs),
                   decoration: BoxDecoration(
-                    color: c.accent.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(2),
+                    color: c.accent.withValues(alpha: Alpha.muted),
+                    borderRadius: BorderRadius.circular(Radii.sm),
                   ),
                 ),
               drag,
@@ -700,7 +700,7 @@ class _BoardColumnState extends State<_BoardColumn> {
         height: m ? 44 : 34,
         child: Row(
           children: [
-            const SizedBox(width: 2),
+            const Gap(Space.hair),
             Expanded(
               child: Row(
                 children: [
@@ -723,17 +723,17 @@ class _BoardColumnState extends State<_BoardColumn> {
                         style: ts(
                           context.type.ui,
                           g.color ?? c.textPrimary,
-                          weight: 500,
+                          weight: Weight.medium,
                         ),
                       ),
                     ),
-                  const SizedBox(width: 8),
+                  const Gap(Space.sm),
                   Text(
                     '${g.count}',
                     style: ts(
-                      m ? const TypeSpec(15, 20, 400) : context.type.ui,
+                      m ? context.type.ui : context.type.ui,
                       c.textTertiary,
-                      weight: 400,
+                      weight: Weight.regular,
                     ),
                   ),
                 ],
@@ -744,8 +744,8 @@ class _BoardColumnState extends State<_BoardColumn> {
                 IconBtn(
                   Ico.chevronLeft,
                   key: ValueKey('board-column-left-${g.id}'),
-                  size: 24,
-                  glyph: 16,
+                  size: ControlSize.xs,
+                  glyph: IconSize.sm,
                   color: c.iconTertiary,
                   semanticLabel: 'Move column left',
                   onTap: () => b._moveColumn(g.id, -1),
@@ -753,8 +753,8 @@ class _BoardColumnState extends State<_BoardColumn> {
                 IconBtn(
                   Ico.chevronRight,
                   key: ValueKey('board-column-right-${g.id}'),
-                  size: 24,
-                  glyph: 16,
+                  size: ControlSize.xs,
+                  glyph: IconSize.sm,
                   color: c.iconTertiary,
                   semanticLabel: 'Move column right',
                   onTap: () => b._moveColumn(g.id, 1),
@@ -767,8 +767,8 @@ class _BoardColumnState extends State<_BoardColumn> {
                   builder: (bc) => IconBtn(
                     Ico.more,
                     key: ValueKey('group-menu-$label'),
-                    size: 24,
-                    glyph: 16,
+                    size: ControlSize.xs,
+                    glyph: IconSize.sm,
                     color: c.iconTertiary,
                     semanticLabel: 'Group options',
                     onTap: () => _groupMenu(bc),
@@ -777,8 +777,8 @@ class _BoardColumnState extends State<_BoardColumn> {
               IconBtn(
                 Ico.plus,
                 key: ValueKey('group-add-$label'),
-                size: 24,
-                glyph: 16,
+                size: ControlSize.xs,
+                glyph: IconSize.sm,
                 color: c.iconTertiary,
                 semanticLabel: b.widget.addCardLabel,
                 onTap: () => source.addCard(context, g.id),
@@ -806,10 +806,10 @@ class _BoardColumnState extends State<_BoardColumn> {
           if (_dropEnd)
             Container(
               height: 3,
-              margin: const EdgeInsets.only(bottom: 5),
+              margin: const EdgeInsets.only(bottom: Space.xs),
               decoration: BoxDecoration(
-                color: c.accent.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(2),
+                color: c.accent.withValues(alpha: Alpha.muted),
+                borderRadius: BorderRadius.circular(Radii.sm),
               ),
             ),
           if (b.widget.inline && n > count)
@@ -861,7 +861,7 @@ class _BoardColumnState extends State<_BoardColumn> {
     return Container(
       key: ValueKey('board-col-$label'),
       width: widget.width,
-      padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
+      padding: const EdgeInsets.fromLTRB(Space.sm, Space.hair, Space.sm, Space.xs),
       decoration: BoxDecoration(
         color: tint,
         borderRadius: BorderRadius.circular(Radii.lg),
@@ -952,19 +952,19 @@ class _BoardAddButton extends StatelessWidget {
     return Hover(
       onTap: onTap,
       radius: Radii.sm,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       child: SizedBox(
         height: height,
         child: Row(
           children: [
-            Icon20(Ico.plus, size: 14, color: c.iconTertiary),
-            const SizedBox(width: 6),
+            Icon20(Ico.plus, size: IconSize.xs, color: c.iconTertiary),
+            const Gap(Space.xs),
             Text(
               label,
               style: ts(
-                context.mobile ? const TypeSpec(15, 20, 400) : context.type.ui,
+                context.touch ? context.type.ui : context.type.ui,
                 c.textTertiary,
-                weight: 400,
+                weight: Weight.regular,
               ),
             ),
           ],
@@ -986,16 +986,16 @@ class _BoardLoadMore extends StatelessWidget {
       key: const ValueKey('load-more'),
       onTap: onTap,
       radius: Radii.sm,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       child: SizedBox(
         height: 33,
         child: Row(
           children: [
-            Icon20(Ico.arrowDown, size: 14, color: c.iconTertiary),
-            const SizedBox(width: 6),
+            Icon20(Ico.arrowDown, size: IconSize.xs, color: c.iconTertiary),
+            const Gap(Space.xs),
             Text(
               'Load more',
-              style: ts(context.type.ui, c.textTertiary, weight: 400),
+              style: ts(context.type.ui, c.textTertiary, weight: Weight.regular),
             ),
           ],
         ),

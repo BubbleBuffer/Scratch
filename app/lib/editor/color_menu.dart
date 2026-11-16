@@ -20,7 +20,7 @@ class ColorMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = sheet || context.mobile;
+    final m = sheet || context.touch;
     Widget swatch(String name, bool bg) {
       final base = name == 'default' ? null : name;
       return Container(
@@ -34,7 +34,7 @@ class ColorMenu extends StatelessWidget {
         ),
         child: bg
             ? null
-            : Text('A', style: tsRaw(m ? 16 : 14, 18, 500, base == null ? c.textPrimary : paletteText(base, c)!)),
+            : Text('A', style: ts(context.type.item, base == null ? c.textPrimary : paletteText(base, c)!)),
       );
     }
 
@@ -46,14 +46,14 @@ class ColorMenu extends StatelessWidget {
         key: ValueKey('color-$value'),
         onTap: () => onPick(value),
         radius: Radii.md,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: Space.sm),
         child: SizedBox(
           height: m ? 44 : 28,
           child: Row(children: [
             swatch(name, bg),
-            SizedBox(width: m ? 12 : 8),
-            Expanded(child: Text(label, style: ts(m ? context.type.body : context.type.ui, c.textPrimary, weight: 400))),
-            if (on) Icon20(Ico.check, size: 16, color: c.iconPrimary),
+            Gap(m ? 12 : 8),
+            Expanded(child: Text(label, style: ts(m ? context.type.body : context.type.ui, c.textPrimary, weight: Weight.regular))),
+            if (on) Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary),
           ]),
         ),
       );
@@ -72,7 +72,7 @@ class ColorMenu extends StatelessWidget {
     }
     return MenuSurface(
       width: 220,
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(Space.xs),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 420),
         child: SingleChildScrollView(

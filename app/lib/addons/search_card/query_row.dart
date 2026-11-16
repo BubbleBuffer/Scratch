@@ -93,7 +93,7 @@ class _FocusFrameState extends State<FocusFrame> {
           borderRadius: widget.borderRadius,
           border: Border.all(
             color: _focused ? context.colors.focus : context.colors.focus.withAlpha(0),
-            width: 2,
+            width: Stroke.bold,
           ),
         ),
         child: widget.child,
@@ -134,7 +134,7 @@ class QueryRowTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final ty = context.type;
-    final mobile = context.mobile;
+    final mobile = context.touch;
     final snippet = hit.snippet.trim();
     final tick = onTick;
     final leading = tick != null
@@ -159,11 +159,11 @@ class QueryRowTile extends StatelessWidget {
         child: SizedBox(
           height: mobile ? 52 : 40,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: Space.md),
             child: Row(
               children: [
                 SizedBox(width: 22, child: Center(child: leading)),
-                const SizedBox(width: 10),
+                const Gap(Space.md),
                 // flex 0: the title takes its own width, so the snippet's
                 // Expanded gets the rest and sits at the row's end.
                 Flexible(
@@ -176,11 +176,11 @@ class QueryRowTile extends StatelessWidget {
                   ),
                 ),
                 if (statusLabel != null) ...[
-                  const SizedBox(width: 8),
+                  const Gap(Space.sm),
                   QueryStatusPill(label: statusLabel!),
                 ],
                 if (snippet.isNotEmpty) ...[
-                  const SizedBox(width: 10),
+                  const Gap(Space.md),
                   Expanded(
                     child: Text(
                       snippet,
@@ -211,7 +211,7 @@ class QueryStatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.hair),
       decoration: BoxDecoration(
         color: c.bgSecondary,
         borderRadius: BorderRadius.circular(999),
@@ -232,11 +232,11 @@ class QueryEmptyLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.md),
       child: Row(
         children: [
-          Icon20(Ico.search, size: 16, color: c.textTertiary),
-          const SizedBox(width: 8),
+          Icon20(Ico.search, size: IconSize.sm, color: c.textTertiary),
+          const Gap(Space.sm),
           Expanded(
             child: Text(text, style: ts(context.type.body, c.textTertiary)),
           ),
@@ -261,7 +261,7 @@ class QueryCountBadge extends StatelessWidget {
       style: ts(
         context.type.uiSmall,
         total == 0 ? c.textTertiary : c.textSecondary,
-        weight: 600,
+        weight: Weight.semibold,
       ),
     );
   }

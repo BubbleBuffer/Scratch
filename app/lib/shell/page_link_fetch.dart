@@ -56,7 +56,7 @@ Future<LinkFetch> fetchLinkedPage(
     signIn: signIn,
     onDone: (r) => Navigator.of(ctx).pop(r),
   );
-  final result = context.mobile
+  final result = context.touch
       ? await showSheet<LinkFetch>(
           context,
           (ctx) => SheetSurface(children: [body(ctx)]),
@@ -216,7 +216,7 @@ class _LinkFetchPanelState extends State<LinkFetchPanel> {
     };
     final note = _step == _Step.signedOut ? _message : null;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+      padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.xl, Space.lg),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -224,9 +224,9 @@ class _LinkFetchPanelState extends State<LinkFetchPanel> {
           Text(
             title,
             key: const ValueKey('link-fetch-title'),
-            style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary),
+            style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display),
           ),
-          const SizedBox(height: 10),
+          const Gap(Space.md),
           if (_step == _Step.certificate)
             SyncCertificateProblem(
               messageKey: const ValueKey('link-fetch-message'),
@@ -238,17 +238,17 @@ class _LinkFetchPanelState extends State<LinkFetchPanel> {
             Text(
               detail,
               key: const ValueKey('link-fetch-message'),
-              style: tsRaw(13, 18, 400, c.textSecondary),
+              style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
             ),
           if (note != null) ...[
-            const SizedBox(height: 6),
+            const Gap(Space.xs),
             Text(
               note,
               key: const ValueKey('link-fetch-note'),
-              style: tsRaw(12, 16, 400, c.inlineCodeText),
+              style: ts(context.type.uiSmall, c.inlineCodeText, weight: Weight.regular),
             ),
           ],
-          const SizedBox(height: 14),
+          const Gap(Space.lg),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -259,7 +259,7 @@ class _LinkFetchPanelState extends State<LinkFetchPanel> {
                 color: c.textSecondary,
               ),
               if (_step == _Step.offline || _step == _Step.failed) ...[
-                const SizedBox(width: 8),
+                const Gap(Space.sm),
                 PrimaryButton(
                   key: const ValueKey('link-fetch-retry'),
                   label: 'Retry',
@@ -267,7 +267,7 @@ class _LinkFetchPanelState extends State<LinkFetchPanel> {
                 ),
               ],
               if (_step == _Step.signedOut) ...[
-                const SizedBox(width: 8),
+                const Gap(Space.sm),
                 PrimaryButton(
                   key: const ValueKey('link-fetch-sign-in'),
                   label: 'Sign in',

@@ -42,7 +42,7 @@ class AiSettingsBody extends StatelessWidget {
             intro:
                 'The name each computer that runs tasks has in the vault. The Run on menu on the kanban board shows it.',
             children: [
-              const SizedBox(height: 12),
+              const Gap(Space.md),
               _RunnerNames(store: store),
             ],
           ),
@@ -50,7 +50,7 @@ class AiSettingsBody extends StatelessWidget {
             title: 'Recent tasks',
             intro: 'Ask AI requests from all your devices.',
             children: [
-              const SizedBox(height: 12),
+              const Gap(Space.md),
               _TaskList(store: store),
             ],
           ),
@@ -190,7 +190,7 @@ class _RunnerNamesState extends State<_RunnerNames> {
                 key: ValueKey('runner-name-${r.id}'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: tsRaw(14, 19, 680, c.textPrimary),
+                style: ts(context.type.ui, c.textPrimary, weight: Weight.bold),
               ),
         trailing: [
           if (editing)

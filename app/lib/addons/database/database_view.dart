@@ -129,7 +129,7 @@ class DatabaseViewState extends State<DatabaseView> {
 
   double _gutter(double width) {
     if (widget.inline) return widget.left;
-    if (context.mobile) return Layout.gutter;
+    if (context.touch) return Layout.gutter;
     return width >= 900 ? 96 : 48;
   }
 
@@ -155,14 +155,14 @@ class DatabaseViewState extends State<DatabaseView> {
               final g = _gutter(box.maxWidth);
               final v = store.view;
               return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Padding(padding: EdgeInsets.fromLTRB(g, context.mobile ? 16 : 12, g, 0), child: _pageTitle(context)),
-                SizedBox(height: context.mobile ? 12 : 10),
+                Padding(padding: EdgeInsets.fromLTRB(g, context.touch ? Space.lg : Space.md, g, 0), child: _pageTitle(context)),
+                Gap(context.touch ? Space.md : Space.md),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: g - (context.mobile ? 0 : 0)),
-                  child: context.mobile ? _mobileBar(context) : _tabsBar(context, box.maxWidth - 2 * g),
+                  padding: EdgeInsets.symmetric(horizontal: g - (context.touch ? 0 : 0)),
+                  child: context.touch ? _mobileBar(context) : _tabsBar(context, box.maxWidth - 2 * g),
                 ),
                 if (v != null) _rulesBar(context, v, g),
-                const SizedBox(height: 4),
+                const Gap(Space.xxs),
                 Expanded(child: _body(context, g)),
               ]);
             }),
@@ -178,7 +178,7 @@ class DatabaseViewState extends State<DatabaseView> {
 
   Widget _pageTitle(BuildContext context) {
     final c = context.colors;
-    final style = tsDisplay(context.mobile ? const TypeSpec(28, 34, 700) : const TypeSpec(32, 40, 700), c.textPrimary);
+    final style = tsDisplay(context.touch ? context.type.h1 : context.type.display, c.textPrimary);
     final ctl = widget.title;
     if (ctl == null) return Text(_displayName(context), style: style);
     return ListenableBuilder(
@@ -217,10 +217,10 @@ class DatabaseViewState extends State<DatabaseView> {
     final v = store.view;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
       Padding(
-        padding: EdgeInsets.only(left: widget.left, right: 8),
+        padding: EdgeInsets.only(left: widget.left, right: Space.sm),
         child: SizedBox(
           width: w,
-          child: context.mobile ? _mobileBar(context) : _tabsBar(context, w),
+          child: context.touch ? _mobileBar(context) : _tabsBar(context, w),
         ),
       ),
       if (v != null) _rulesBar(context, v, widget.left),
@@ -239,17 +239,17 @@ class DatabaseViewState extends State<DatabaseView> {
     final v = store.view;
     _inlineTitle ??= TextEditingController(text: store.title);
     if (!_titleFocus.hasFocus && _inlineTitle!.text != store.title && store.loaded) _inlineTitle!.text = store.title;
-    final style = tsRaw(context.mobile ? 18 : 20, 28, 700, c.textPrimary);
+    final style = ts(context.type.h3, c.textPrimary, weight: Weight.bold);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
       Padding(
-        padding: EdgeInsets.only(left: widget.left, right: 8),
+        padding: EdgeInsets.only(left: widget.left, right: Space.sm),
         child: SizedBox(
           width: w,
-          child: context.mobile ? _mobileBar(context) : _tabsBar(context, w),
+          child: context.touch ? _mobileBar(context) : _tabsBar(context, w),
         ),
       ),
       Padding(
-        padding: EdgeInsets.only(left: widget.left, top: 6, bottom: 2),
+        padding: EdgeInsets.only(left: widget.left, top: Space.xs, bottom: Space.hair),
         child: SizedBox(
           width: w,
           child: Stack(children: [
@@ -306,7 +306,7 @@ class DatabaseViewState extends State<DatabaseView> {
 
   double _tabWidth(BuildContext context, ViewDef v) {
     final tp = TextPainter(
-      text: TextSpan(text: v.name, style: ts(context.type.ui, context.colors.textPrimary, weight: 500)),
+      text: TextSpan(text: v.name, style: ts(context.type.ui, context.colors.textPrimary, weight: Weight.medium)),
       textDirection: TextDirection.ltr,
       maxLines: 1,
     )..layout(maxWidth: 220);
@@ -355,12 +355,12 @@ class DatabaseViewState extends State<DatabaseView> {
                   key: const ValueKey('tabs-more'),
                   onTap: () => _moreViews(b, rest),
                   radius: 16,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                   child: SizedBox(
                     height: 32,
                     child: Center(
                       child: Text(
-                              '${rest.length} more…', style: ts(context.type.ui, context.colors.textTertiary, weight: 400)),
+                              '${rest.length} more…', style: ts(context.type.ui, context.colors.textTertiary, weight: Weight.regular)),
                     ),
                   ),
                 ),
@@ -370,13 +370,13 @@ class DatabaseViewState extends State<DatabaseView> {
                 key: const ValueKey('add-view'),
                 onTap: addListView,
                 radius: 16,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                 child: SizedBox(
                   height: 32,
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon20(Ico.plus, size: 14, color: context.colors.iconTertiary),
-                    const SizedBox(width: 4),
-                    Text('Add view', style: ts(context.type.ui, context.colors.textTertiary, weight: 400)),
+                    Icon20(Ico.plus, size: IconSize.xs, color: context.colors.iconTertiary),
+                    const Gap(Space.xxs),
+                    Text('Add view', style: ts(context.type.ui, context.colors.textTertiary, weight: Weight.regular)),
                   ]),
                 ),
               )
@@ -384,8 +384,8 @@ class DatabaseViewState extends State<DatabaseView> {
               Builder(
                 builder: (b) => IconBtn(Ico.plus,
                     key: const ValueKey('add-view'),
-                    size: 28,
-                    glyph: 16,
+                    size: ControlSize.sm,
+                    glyph: IconSize.sm,
                     semanticLabel: 'Add a view',
                     color: context.colors.iconTertiary,
                     onTap: () => showAddView(b, store)),
@@ -402,23 +402,23 @@ class DatabaseViewState extends State<DatabaseView> {
     final c = context.colors;
     final fg = active ? c.textPrimary : c.textSecondary;
     return Padding(
-      padding: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.only(right: Space.xxs),
       child: Builder(
         builder: (b) => Hover(
           key: ValueKey('tab-${v.name}'),
           onTap: () => active ? showViewMenu(b, ctl, v) : store.selectView(v.id),
           selected: active,
           radius: 16,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: Space.md),
           child: SizedBox(
             height: 32,
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               DbIcon(layoutIcon(v.kind), size: 16, color: active ? c.iconPrimary : c.iconSecondary),
-              const SizedBox(width: 6),
+              const Gap(Space.xs),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 220),
                 child: Text(v.name,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, fg, weight: active ? 600 : 500)),
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, fg, weight: active ? Weight.semibold : Weight.medium)),
               ),
             ]),
           ),
@@ -455,7 +455,7 @@ class DatabaseViewState extends State<DatabaseView> {
             color: hasFilter ? c.accent : c.iconTertiary,
             onTap: () => filterButton(b, store)),
       ),
-      const SizedBox(width: 2),
+      const Gap(Space.hair),
       Builder(
         builder: (b) => DbIconBtn(DbIco.sort,
             key: const ValueKey('db-sort'),
@@ -463,14 +463,14 @@ class DatabaseViewState extends State<DatabaseView> {
             color: hasSort ? c.accent : c.iconTertiary,
             onTap: () => sortButton(b, store)),
       ),
-      const SizedBox(width: 2),
+      const Gap(Space.hair),
       if (_searching)
         SizedBox(
           width: 150,
           height: 28,
           child: Row(children: [
-            Icon20(Ico.search, size: 16, color: c.iconTertiary),
-            const SizedBox(width: 6),
+            Icon20(Ico.search, size: IconSize.sm, color: c.iconTertiary),
+            const Gap(Space.xs),
             Expanded(
               child: PlainField(
                 key: const ValueKey('db-search-field'),
@@ -478,11 +478,11 @@ class DatabaseViewState extends State<DatabaseView> {
                 focusNode: _searchFocus,
                 autofocus: true,
                 placeholder: 'Type to search…',
-                style: ts(context.type.ui, c.textPrimary, weight: 400),
+                style: ts(context.type.ui, c.textPrimary, weight: Weight.regular),
                 onChanged: store.setSearch,
               ),
             ),
-            IconBtn(Ico.close, size: 20, glyph: 12, color: c.iconTertiary, semanticLabel: 'Clear search', onTap: () {
+            IconBtn(Ico.close, size: ControlSize.xs, glyph: IconSize.xs, color: c.iconTertiary, semanticLabel: 'Clear search', onTap: () {
               _search.clear();
               store.setSearch('');
               setState(() => _searching = false);
@@ -492,17 +492,17 @@ class DatabaseViewState extends State<DatabaseView> {
       else
         IconBtn(Ico.search,
             key: const ValueKey('db-search'),
-            size: 28,
-            glyph: 16,
+            size: ControlSize.sm,
+            glyph: IconSize.sm,
             color: c.iconTertiary,
             semanticLabel: 'Search',
             onTap: () => setState(() => _searching = true)),
-      const SizedBox(width: 2),
+      const Gap(Space.hair),
       Builder(
         builder: (b) => DbIconBtn(DbIco.sliders,
             key: const ValueKey('db-settings'), label: 'View settings', color: c.iconTertiary, onTap: () => showViewSettings(b, ctl)),
       ),
-      const SizedBox(width: 8),
+      const Gap(Space.sm),
       _newButton(context),
     ]);
   }
@@ -523,18 +523,18 @@ class DatabaseViewState extends State<DatabaseView> {
               onTap: () => ctl.newRow(context),
               radius: 0,
               hoverColor: c.bgHover,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Center(child: Text('New', style: ts(context.type.ui, ink, weight: 700))),
+              padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+              child: Center(child: Text('New', style: ts(context.type.ui, ink, weight: Weight.bold))),
             ),
-            Container(width: 1, height: 28, color: c.onAccent.withValues(alpha: .2)),
+            Container(width: 1, height: 28, color: c.onAccent.withValues(alpha: Alpha.tint)),
             Builder(
               builder: (b) => Hover(
                 key: const ValueKey('db-new-menu'),
                 onTap: () => showTemplates(b),
                 radius: 0,
                 hoverColor: c.bgHover,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Center(child: Icon20(Ico.chevronDown, size: 14, color: ink)),
+                padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
+                child: Center(child: Icon20(Ico.chevronDown, size: IconSize.xs, color: ink)),
               ),
             ),
           ]),
@@ -569,7 +569,7 @@ class DatabaseViewState extends State<DatabaseView> {
     if (n == 0 && v.sorts.isEmpty) return const SizedBox.shrink();
     final c = context.colors;
     return Padding(
-      padding: EdgeInsets.fromLTRB(g, 4, g, 4),
+      padding: EdgeInsets.fromLTRB(g, Space.xxs, g, Space.xxs),
       child: SizedBox(
         height: 30,
         child: SingleChildScrollView(
@@ -587,11 +587,11 @@ class DatabaseViewState extends State<DatabaseView> {
                 ),
               ),
             if (v.sorts.isNotEmpty && n > 0)
-              Container(width: 1, height: 16, margin: const EdgeInsets.symmetric(horizontal: 8), color: c.divider),
+              Container(width: 1, height: 16, margin: const EdgeInsets.symmetric(horizontal: Space.sm), color: c.divider),
             if (rules != null)
               for (var i = 0; i < rules.length; i++)
                 Padding(
-                  padding: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.only(right: Space.xs),
                   child: KeyedSubtree(
                     key: ruleChipKey(store, i),
                     child: Builder(
@@ -669,18 +669,18 @@ class DatabaseViewState extends State<DatabaseView> {
               onTap: () => showViewsSheet(context),
               selected: true,
               radius: 18,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: Space.md),
               child: SizedBox(
                 height: 36,
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   DbIcon(layoutIcon(v.kind), size: 18, color: c.iconPrimary),
-                  const SizedBox(width: 8),
+                  const Gap(Space.sm),
                   Flexible(
                     child: Text(v.name,
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(15, 20, 600, c.textPrimary)),
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.title, c.textPrimary, weight: Weight.semibold)),
                   ),
-                  const SizedBox(width: 6),
-                  Icon20(Ico.chevronDown, size: 16, color: c.iconTertiary),
+                  const Gap(Space.xs),
+                  Icon20(Ico.chevronDown, size: IconSize.sm, color: c.iconTertiary),
                 ]),
               ),
             ),
@@ -688,16 +688,16 @@ class DatabaseViewState extends State<DatabaseView> {
         ),
         IconBtn(Ico.search,
             key: const ValueKey('db-search'),
-            size: 40,
-            glyph: 20,
+            size: ControlSize.xl,
+            glyph: IconSize.lg,
             color: c.iconSecondary,
             semanticLabel: 'Search',
             onTap: () => _mobileSearch(context)),
         Builder(
           builder: (b) => DbIconBtn(DbIco.filter,
               key: const ValueKey('db-filter'),
-              size: 40,
-              glyph: 20,
+              size: ControlSize.xl,
+              glyph: IconSize.lg,
               label: 'Filter',
               color: Filters.count(v?.filter) > 0 ? c.accent : c.iconSecondary,
               onTap: () => filterButton(b, store)),
@@ -705,8 +705,8 @@ class DatabaseViewState extends State<DatabaseView> {
         Builder(
           builder: (b) => DbIconBtn(DbIco.sliders,
               key: const ValueKey('db-settings'),
-              size: 40,
-              glyph: 20,
+              size: ControlSize.xl,
+              glyph: IconSize.lg,
               label: 'View settings',
               color: c.iconSecondary,
               onTap: () => showViewSettings(b, ctl)),
@@ -719,7 +719,7 @@ class DatabaseViewState extends State<DatabaseView> {
         context,
         (ctx) => SheetSurface(children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(Layout.gutter, 0, Layout.gutter, 12),
+            padding: const EdgeInsets.fromLTRB(Layout.gutter, 0, Layout.gutter, Space.md),
             child: SearchField(
               controller: _search,
               focusNode: _searchFocus,
@@ -789,17 +789,17 @@ class _ViewsSheet extends StatelessWidget {
         boxShadow: c.shadowMenu,
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
         Center(
           child: Container(
-              width: 36, height: 4, decoration: BoxDecoration(color: c.borderStrong, borderRadius: BorderRadius.circular(2))),
+              width: 36, height: 4, decoration: BoxDecoration(color: c.borderStrong, borderRadius: BorderRadius.circular(Radii.sm))),
         ),
         SizedBox(
           height: 52,
           child: Stack(children: [
             Center(
               child: Text('${views.length} ${views.length == 1 ? 'view' : 'views'}',
-                  style: tsRaw(16, 22, 600, c.textPrimary)),
+                  style: ts(context.type.title, c.textPrimary, weight: Weight.semibold)),
             ),
             Positioned(
               right: 8,
@@ -807,15 +807,15 @@ class _ViewsSheet extends StatelessWidget {
               bottom: 0,
               child: Center(
                 child: TextBtn('Done',
-                    key: const ValueKey('views-done'), height: 40, color: c.accent, onTap: () => Navigator.of(context).pop()),
+                    key: const ValueKey('views-done'), size: ControlSize.xl, color: c.accent, onTap: () => Navigator.of(context).pop()),
               ),
             ),
           ]),
         ),
-        const SizedBox(height: 16),
+        const Gap(Space.lg),
         Flexible(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: Space.lg),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Container(
                 decoration: BoxDecoration(color: c.bgPrimary, borderRadius: Radii.panel),
@@ -832,24 +832,24 @@ class _ViewsSheet extends StatelessWidget {
                         Navigator.of(context).pop();
                       },
                       onLongPress: () => showViewMenu(context, db.ctl, views[i]),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
                       child: SizedBox(
                         height: 45,
                         child: Row(children: [
                           DbIcon(layoutIcon(views[i].kind), size: 18, color: c.iconPrimary),
-                          const SizedBox(width: 14),
+                          const Gap(Space.lg),
                           Expanded(
                             child: Text(views[i].name,
-                                maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(17, 22, 400, c.textPrimary)),
+                                maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.body, c.textPrimary)),
                           ),
-                          if (views[i].id == active?.id) Icon20(Ico.check, size: 18, color: c.accent),
+                          if (views[i].id == active?.id) Icon20(Ico.check, size: IconSize.md, color: c.accent),
                         ]),
                       ),
                     ),
                   ],
                 ]),
               ),
-              const SizedBox(height: 16),
+              const Gap(Space.lg),
               Container(
                 decoration: BoxDecoration(color: c.bgPrimary, borderRadius: Radii.panel),
                 clipBehavior: Clip.antiAlias,
@@ -865,13 +865,13 @@ class _ViewsSheet extends StatelessWidget {
                         showAddView(b, store);
                       }
                     },
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.lg),
                     child: SizedBox(
                       height: 45,
                       child: Row(children: [
-                        Icon20(Ico.plus, size: 18, color: c.accent),
-                        const SizedBox(width: 14),
-                        Text('Add view', style: tsRaw(17, 22, 400, c.accentText)),
+                        Icon20(Ico.plus, size: IconSize.md, color: c.accent),
+                        const Gap(Space.lg),
+                        Text('Add view', style: ts(context.type.body, c.accentText)),
                       ]),
                     ),
                   ),

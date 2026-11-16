@@ -128,7 +128,7 @@ class _TemplateTopState extends State<_TemplateTop> {
   }
 
   Widget _pad(Widget w) => Padding(
-    padding: EdgeInsets.only(left: widget.left, bottom: 8),
+    padding: EdgeInsets.only(left: widget.left, bottom: Space.sm),
     child: Align(
       alignment: Alignment.topLeft,
       child: SizedBox(width: widget.width, child: w),
@@ -143,16 +143,16 @@ class _TemplateTopState extends State<_TemplateTop> {
     Widget action(String key, String label, VoidCallback onTap) => Hover(
       key: ValueKey(key),
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: Space.xs, vertical: Space.xxs),
       child: Text(
         label,
-        style: ts(context.type.uiSmall, c.textSecondary, weight: 500),
+        style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.medium),
       ),
     );
     return Container(
       key: const ValueKey('template-banner'),
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      margin: const EdgeInsets.only(top: Space.xxs),
+      padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
       decoration: BoxDecoration(
         color: c.bgSecondary,
         borderRadius: BorderRadius.circular(Radii.md),
@@ -160,7 +160,7 @@ class _TemplateTopState extends State<_TemplateTop> {
       child: Row(
         children: [
           DbIcon(DbIco.template, size: 16, color: c.iconSecondary),
-          const SizedBox(width: 8),
+          const Gap(Space.sm),
           Expanded(
             child: Text(
               isDefault
@@ -318,15 +318,15 @@ class _PageStartersState extends State<PageStarters> {
       onTap: onTap,
     );
     return Padding(
-      padding: EdgeInsets.only(left: widget.left, top: 2, bottom: 10),
+      padding: EdgeInsets.only(left: widget.left, top: Space.hair, bottom: Space.md),
       child: Align(
         alignment: Alignment.topLeft,
         child: SizedBox(
           width: widget.width,
           child: Wrap(
             key: const ValueKey('page-starters'),
-            spacing: 6,
-            runSpacing: 6,
+            spacing: Space.xs,
+            runSpacing: Space.xs,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               chip('start-blank', 'Blank', DbIco.text, widget.onBlank),
@@ -347,20 +347,20 @@ class _PageStartersState extends State<PageStarters> {
                     key: const ValueKey('template-add'),
                     onTap: _newTemplate,
                     radius: Radii.md,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                     child: SizedBox(
                       height: 26,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon20(Ico.plus, size: 14, color: c.iconTertiary),
-                          const SizedBox(width: 4),
+                          Icon20(Ico.plus, size: IconSize.xs, color: c.iconTertiary),
+                          const Gap(Space.xxs),
                           Text(
                             'Template',
                             style: ts(
                               context.type.uiSmall,
                               c.textTertiary,
-                              weight: 500,
+                              weight: Weight.medium,
                             ),
                           ),
                         ],
@@ -415,28 +415,28 @@ Future<void> showTemplateMenu(
             if (isDefault)
               Text(
                 'DEFAULT',
-                style: tsRaw(10, 12, 600, ctx.colors.textTertiary),
+                style: ts(ctx.type.micro, ctx.colors.textTertiary),
               ),
             if (!isDefault)
               DbIconBtn(
                 DbIco.pin,
                 key: ValueKey('template-set-default-$name'),
-                size: 22,
-                glyph: 14,
+                size: ControlSize.xs,
+                glyph: IconSize.xs,
                 label: 'Set as default',
                 onTap: () {
                   close();
                   setDefault(t.id);
                 },
               ),
-            const SizedBox(width: 4),
+            const Gap(Space.xxs),
             DbIconBtn(
               DbIco.edit,
               key: ValueKey(
                 isDefault ? 'template-edit' : 'template-edit-$name',
               ),
-              size: 22,
-              glyph: 14,
+              size: ControlSize.xs,
+              glyph: IconSize.xs,
               label: 'Edit template',
               onTap: () {
                 close();

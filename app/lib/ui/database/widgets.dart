@@ -27,7 +27,7 @@ class Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final st = status && group != null
         ? TagStyle(switch (group!) {
             StatusGroup.todo => c.bgSecondary,
@@ -35,11 +35,10 @@ class Pill extends StatelessWidget {
             StatusGroup.complete => c.okBg,
           }, c.textPrimary)
         : c.tag(color);
-    const size = 12.0;
     final h = small ? 18.0 : 22.0;
     return Container(
       height: h,
-      padding: EdgeInsets.symmetric(horizontal: small ? 6 : (m ? 8 : 6)),
+      padding: EdgeInsets.symmetric(horizontal: small ? Space.xs : (m ? Space.sm : Space.xs)),
       decoration: BoxDecoration(color: st.bg, borderRadius: Radii.pill),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         if (status) ...[
@@ -47,13 +46,13 @@ class Pill extends StatelessWidget {
               width: small ? 6 : 8,
               height: small ? 6 : 8,
               decoration: BoxDecoration(color: c.tone(color), shape: BoxShape.circle)),
-          SizedBox(width: small ? 4 : 5),
+          Gap(small ? 4 : 5),
         ],
         Flexible(
           child: Text(label.isEmpty ? ' ' : label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: tsRaw(size, h, 600, st.text)),
+              style: ts(context.type.uiSmall, st.text, weight: Weight.semibold)),
         ),
       ]),
     );
@@ -76,10 +75,11 @@ class DbCheckbox extends StatelessWidget {
 /// A square button with a database icon.
 class DbIconBtn extends StatelessWidget {
   const DbIconBtn(this.icon,
-      {super.key, this.onTap, this.size = 28, this.glyph = 16, this.color, this.selected = false, this.label});
+      {super.key, this.onTap, this.size = ControlSize.sm, this.glyph = IconSize.sm, this.color, this.selected = false, this.label});
   final DbIco icon;
   final VoidCallback? onTap;
-  final double size, glyph;
+  final ControlSize size;
+  final IconSize glyph;
   final Color? color;
   final bool selected;
   final String? label;
@@ -95,9 +95,9 @@ class DbIconBtn extends StatelessWidget {
         radius: Radii.md,
         selected: selected,
         child: SizedBox(
-            width: size,
-            height: size,
-            child: Center(child: DbIcon(icon, size: glyph, color: color ?? (selected ? c.accent : c.iconSecondary)))),
+            width: size.height,
+            height: size.height,
+            child: Center(child: DbIcon(icon, size: glyph.px, color: color ?? (selected ? c.accent : c.iconSecondary)))),
       ),
     );
   }
@@ -113,7 +113,7 @@ MenuItem dbItem(BuildContext context, String label, DbIco? icon,
       icon: ico,
       leading: icon == null
           ? null
-          : DbIcon(icon, size: context.mobile ? 22 : 20, color: danger ? context.colors.inlineCodeText : context.colors.iconPrimary),
+          : DbIcon(icon, size: context.touch ? 22 : 20, color: danger ? context.colors.inlineCodeText : context.colors.iconPrimary),
       trailing: trailing,
       selected: selected,
       danger: danger,
@@ -126,9 +126,9 @@ Widget menuValue(BuildContext context, String value, {bool chevron = true}) {
     ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 140),
       child: Text(value,
-          maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.textTertiary, weight: 400)),
+          maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
     ),
-    if (chevron) ...[const SizedBox(width: 2), Icon20(Ico.chevronRight, size: 16, color: c.iconTertiary)],
+    if (chevron) ...[const Gap(Space.hair), Icon20(Ico.chevronRight, size: IconSize.sm, color: c.iconTertiary)],
   ]);
 }
 
@@ -178,17 +178,17 @@ class _MenuFieldState extends State<MenuField> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     return FieldFrame(
       height: m ? 36 : 28,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.symmetric(horizontal: Space.xs),
       child: Row(children: [
-        if (widget.leading != null) ...[widget.leading!, const SizedBox(width: 6)],
+        if (widget.leading != null) ...[widget.leading!, const Gap(Space.xs)],
         Expanded(
           child: PlainField(
             controller: _ctl,
             focusNode: _focus,
-            style: ts(m ? context.type.body : context.type.ui, c.textPrimary, weight: 400),
+            style: ts(m ? context.type.body : context.type.ui, c.textPrimary, weight: Weight.regular),
             placeholder: widget.placeholder,
             onChanged: widget.onChanged,
             onSubmitted: widget.onSubmitted,
@@ -213,10 +213,10 @@ class Toggle extends StatelessWidget {
       duration: Motion.of(context).fast,
       width: 26,
       height: 14,
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(Space.hair),
       decoration: BoxDecoration(
         color: on ? c.accent : (c.dark ? const Color(0x33FFFFFF) : const Color(0x29000000)),
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(Radii.md),
       ),
       alignment: on ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -228,11 +228,11 @@ class Toggle extends StatelessWidget {
 /// Shows [content] as a popover under [anchor] (desktop) or in a bottom
 /// sheet (mobile). Completes with what it pops.
 Future<T?> showPanel<T>(BuildContext context, Rect anchor, WidgetBuilder content, {double width = 265}) {
-  if (context.mobile) {
+  if (context.touch) {
     return showSheet<T>(
       context,
       (ctx) => SheetSurface(children: [
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: content(ctx)),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: Space.md), child: content(ctx)),
       ]),
     );
   }
@@ -241,7 +241,7 @@ Future<T?> showPanel<T>(BuildContext context, Rect anchor, WidgetBuilder content
     anchor,
     (ctx) => MenuSurface(
       width: width,
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(Space.xs),
       child: content(ctx),
     ),
   );
@@ -250,7 +250,7 @@ Future<T?> showPanel<T>(BuildContext context, Rect anchor, WidgetBuilder content
 /// Shows [content] over [anchor] (a cell editor): desktop only, at the
 /// cell's top-left, at least the cell's width.
 Future<T?> showOverCell<T>(BuildContext context, Rect anchor, WidgetBuilder content, {double? width}) {
-  if (context.mobile) return showPanel<T>(context, anchor, content);
+  if (context.touch) return showPanel<T>(context, anchor, content);
   return Navigator.of(context).push(_OverCellRoute<T>(anchor, width, content, Motion.of(context).fast));
 }
 
@@ -337,19 +337,19 @@ class ChipBtn extends StatelessWidget {
       onTap: onTap,
       radius: radius,
       selected: active,
-      selectedColor: c.accent.withValues(alpha: c.dark ? 0.16 : 0.07),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      selectedColor: c.accent.withValues(alpha: c.dark ? Alpha.tint : Alpha.tint),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       child: Container(
         height: height,
         decoration: active ? null : null,
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (icon != null) ...[DbIcon(icon!, size: 14, color: fg), const SizedBox(width: 4)],
+          if (icon != null) ...[DbIcon(icon!, size: 14, color: fg), const Gap(Space.xxs)],
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 220),
             child: Text(label,
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.uiSmall, fg, weight: 500)),
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.uiSmall, fg, weight: Weight.medium)),
           ),
-          if (chevron) ...[const SizedBox(width: 2), Icon20(Ico.chevronDown, size: 12, color: fg)],
+          if (chevron) ...[const Gap(Space.hair), Icon20(Ico.chevronDown, size: IconSize.xs, color: fg)],
         ]),
       ),
     );
@@ -360,11 +360,11 @@ class ChipBtn extends StatelessWidget {
 Widget menuBack(BuildContext context, String title, VoidCallback onBack) {
   final c = context.colors;
   return Padding(
-    padding: const EdgeInsets.only(bottom: 4),
+    padding: const EdgeInsets.only(bottom: Space.xxs),
     child: Row(children: [
-      IconBtn(Ico.chevronLeft, onTap: onBack, size: 24, glyph: 16, semanticLabel: 'Back'),
-      const SizedBox(width: 4),
-      Expanded(child: Text(title, style: ts(context.type.ui, c.textPrimary, weight: 600))),
+      IconBtn(Ico.chevronLeft, onTap: onBack, size: ControlSize.xs, glyph: IconSize.sm, semanticLabel: 'Back'),
+      const Gap(Space.xxs),
+      Expanded(child: Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold))),
     ]),
   );
 }

@@ -61,7 +61,7 @@ class _ToastState extends State<_Toast> {
           alignment: Alignment.bottomCenter,
           child: Container(
             key: ValueKey(widget.name),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
             decoration: BoxDecoration(
               color: c.textPrimary,
               borderRadius: Radii.panel,

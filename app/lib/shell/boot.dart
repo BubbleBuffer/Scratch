@@ -323,11 +323,11 @@ class _Boot extends StatelessWidget {
     if (error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(Space.xl),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text('Could not open the vault:\n$error', style: ts(ty.ui, c.textPrimary)),
             if (onUseDefault != null) ...[
-              const SizedBox(height: 12),
+              const Gap(Space.md),
               TextBtn('Open the default vault instead', onTap: onUseDefault),
             ],
           ]),
@@ -344,12 +344,12 @@ class _Boot extends StatelessWidget {
         width: 280,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(updatingIndex ? 'Updating search index' : 'Creating the bench vault', style: ts(ty.h3, c.textPrimary)),
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           Text(frac < 1 ? '$done of $total pages' : 'Building the index…',
-              style: ts(ty.ui, c.textSecondary, weight: 400)),
-          const SizedBox(height: 16),
+              style: ts(ty.ui, c.textSecondary, weight: Weight.regular)),
+          const Gap(Space.lg),
           ClipRRect(
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(Radii.sm),
             child: SizedBox(
               height: 4,
               child: Stack(children: [

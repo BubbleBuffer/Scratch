@@ -16,7 +16,7 @@ class ChatSettingsButton extends StatelessWidget {
 
   Future<void> _open(BuildContext context) async {
     Widget panel(BuildContext _) => ChatSettingsPanel(store: store);
-    if (context.mobile) {
+    if (context.touch) {
       await showSheet<void>(
         context,
         (ctx) => SheetSurface(
@@ -47,7 +47,7 @@ class ChatSettingsButton extends StatelessWidget {
           child: Center(
             child: Icon20(
               Ico.settings,
-              size: 16,
+              size: IconSize.sm,
               color: context.colors.iconTertiary,
             ),
           ),
@@ -78,16 +78,16 @@ class ChatSettingsPanel extends StatelessWidget {
         }
 
         return Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(Space.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
                 'Chat settings',
-                style: ts(context.type.uiSmall, c.textPrimary, weight: 600),
+                style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.semibold),
               ),
-              const SizedBox(height: 10),
+              const Gap(Space.md),
               Row(
                 children: [
                   Expanded(
@@ -99,7 +99,7 @@ class ChatSettingsPanel extends StatelessWidget {
                   _Segments(compacted: compacted, onChanged: pick),
                 ],
               ),
-              const SizedBox(height: 10),
+              const Gap(Space.md),
               Text(
                 _description,
                 style: ts(context.type.uiSmall, c.textTertiary),
@@ -131,7 +131,7 @@ class _Segments extends StatelessWidget {
             radius: Radii.sm,
             hoverColor: on ? kTransparent : null,
             background: on ? c.bgPrimary : null,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: Space.md),
             child: SizedBox(
               height: 26,
               child: Center(
@@ -141,7 +141,7 @@ class _Segments extends StatelessWidget {
                     style: ts(
                       context.type.uiSmall,
                       on ? c.textPrimary : c.textSecondary,
-                      weight: on ? 600 : 400,
+                      weight: on ? Weight.semibold : Weight.regular,
                     ),
                     children: [
                       if (trial != null)
@@ -157,7 +157,7 @@ class _Segments extends StatelessWidget {
           ),
         );
     return Container(
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(Space.hair),
       decoration: BoxDecoration(
         color: c.bgSecondary,
         borderRadius: BorderRadius.circular(Radii.md + 2),

@@ -54,7 +54,7 @@ class Breadcrumbs extends StatelessWidget {
       final patch = patchFor(key);
       final id = key == 'crumb-current' ? pageId : key.substring(6);
       final label = pageLabelOf(context, id, title);
-      final style = ts(ty.ui, c.textPrimary, weight: onTap == null ? 700 : 400);
+      final style = ts(ty.ui, c.textPrimary, weight: onTap == null ? Weight.bold : Weight.regular);
       final glyph = database && (icon == null || icon.isEmpty)
           ? patch == null
                 ? DbIcon(DbIco.database, size: 16, color: c.iconSecondary)
@@ -79,14 +79,14 @@ class Breadcrumbs extends StatelessWidget {
         key: ValueKey(key),
         radius: Radii.sm,
         onTap: onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
         child: SizedBox(
           height: 24,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               glyph,
-              const SizedBox(width: 6),
+              const Gap(Space.xs),
               ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxWidth),
                 child: Text(
@@ -105,8 +105,8 @@ class Breadcrumbs extends StatelessWidget {
     }
 
     Widget slash() => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 1),
-      child: Text('/', style: ts(ty.ui, c.textTertiary, weight: 400)),
+      padding: const EdgeInsets.symmetric(horizontal: Space.hair),
+      child: Text('/', style: ts(ty.ui, c.textTertiary, weight: Weight.regular)),
     );
 
     final out = <Widget>[];
@@ -125,8 +125,8 @@ class Breadcrumbs extends StatelessWidget {
       if (collapsed && i == 0) {
         out.add(
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text('…', style: ts(ty.ui, c.textTertiary, weight: 400)),
+            padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+            child: Text('…', style: ts(ty.ui, c.textTertiary, weight: Weight.regular)),
           ),
         );
         out.add(slash());

@@ -355,7 +355,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
           ? 'The agent is off. Turn it on in Settings > AI.'
           : store.openError;
       final pad = widget.panel ? 12.0 : 32.0;
-      final padding = EdgeInsets.fromLTRB(pad, widget.panel ? 14 : 28, pad, 16);
+      final padding = EdgeInsets.fromLTRB(pad, widget.panel ? Space.lg : Space.xxl, pad, Space.lg);
       final Widget body = signIn
           ? Center(
               child: Padding(
@@ -371,7 +371,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
                         textAlign: TextAlign.center,
                         style: ts(context.type.body, c.textSecondary),
                       ),
-                      const SizedBox(height: 16),
+                      const Gap(Space.lg),
                       PrimaryButton(
                         key: const ValueKey('agent-sign-in'),
                         label: 'Sign in',
@@ -481,7 +481,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               (store.hostInfo?.projects ?? false) &&
               store.state?.session.projectId != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              padding: const EdgeInsets.fromLTRB(Space.xl, Space.md, Space.xl, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: SelectButton<String>(
@@ -506,7 +506,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               store.compactedFor == store.openId &&
               hasHistoryCards(store.compacted))
             Padding(
-              padding: EdgeInsets.fromLTRB(pad, 4, pad, 0),
+              padding: EdgeInsets.fromLTRB(pad, Space.xxs, pad, 0),
               child: Align(
                 alignment: Alignment.centerRight,
                 child: ChatSettingsButton(store: store),

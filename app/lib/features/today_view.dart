@@ -179,7 +179,7 @@ class _TodayViewState extends State<TodayView> {
 
   Widget _card(AgendaItem item, AgendaStore store, {bool overdue = false}) =>
       Padding(
-        padding: const EdgeInsets.only(bottom: 3),
+        padding: const EdgeInsets.only(bottom: Space.xxs),
         child: ShortItemCard(
           key: ValueKey('today-item-${AgendaStore.itemKey(item)}'),
           item: _presentationItem(item),
@@ -213,17 +213,17 @@ class _TodayViewState extends State<TodayView> {
         key: key,
         onTap: toggle,
         lift: 0,
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: Space.xs),
         child: Row(
           children: [
             Icon20(
               open ? Ico.chevronDown : Ico.chevronRight,
-              size: 14,
+              size: IconSize.xs,
               color: c.iconSecondary,
             ),
-            const SizedBox(width: 4),
-            Text('$label · ', style: tsRaw(12, 18, 600, c.textSecondary)),
-            Text('$count', style: tsRaw(12, 18, 400, c.textTertiary)),
+            const Gap(Space.xxs),
+            Text('$label · ', style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.semibold)),
+            Text('$count', style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.regular)),
           ],
         ),
       ),
@@ -303,24 +303,24 @@ class _TodayViewState extends State<TodayView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.includeStrip) const TodayDateStrip(),
-        const SizedBox(height: 14),
+        const Gap(Space.lg),
         Row(
           children: [
             Expanded(
               child: Wrap(
-                spacing: 10,
+                spacing: Space.md,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     shortDay,
                     key: const ValueKey('today-selected-heading'),
                     style: tsDisplay(
-                      const TypeSpec(21, 25, 640),
+                      context.type.h3,
                       c.textPrimary,
-                    ),
+                     weight: Weight.display),
                   ),
                   if (store.isToday)
-                    Text('Today', style: tsRaw(12, 18, 500, c.accentText)),
+                    Text('Today', style: ts(context.type.uiSmall, c.accentText)),
                 ],
               ),
             ),
@@ -333,7 +333,7 @@ class _TodayViewState extends State<TodayView> {
               ),
           ],
         ),
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
         if (store.loading && store.items.isEmpty)
           Text(
             'Loading…',
@@ -387,12 +387,12 @@ class _TodayViewState extends State<TodayView> {
                 color: c.accentText,
               ),
             ),
-          const SizedBox(height: 6),
+          const Gap(Space.xs),
         ],
         for (final item in shownOpen) _card(item, store),
         if (!store.loading && selected.isEmpty && done.isEmpty)
           Padding(
-            padding: const EdgeInsets.fromLTRB(0, 6, 0, 16),
+            padding: const EdgeInsets.fromLTRB(0, Space.xs, 0, Space.lg),
             child: Text(
               'Nothing scheduled',
               key: const ValueKey('today-empty'),
@@ -410,11 +410,11 @@ class _TodayViewState extends State<TodayView> {
             )
           else
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: Space.xs),
               child: Text(
                 'Done · ${done.length}',
                 key: const ValueKey('today-done'),
-                style: tsRaw(12, 18, 600, c.textSecondary),
+                style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.semibold),
               ),
             ),
           for (final item in shownDone) _card(item, store),
@@ -440,9 +440,9 @@ class _TodayViewState extends State<TodayView> {
             ),
           ),
         if (widget.note != null) ...[
-          const SizedBox(height: 14),
+          const Gap(Space.lg),
           Container(height: 1, color: c.border),
-          const SizedBox(height: 14),
+          const Gap(Space.lg),
           widget.note!,
         ],
       ],

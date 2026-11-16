@@ -116,7 +116,7 @@ class FeedbackController {
   }
 
   Future<T?> _showSheet<T>(BuildContext context, WidgetBuilder builder) =>
-      context.mobile
+      context.touch
       ? showSheet<T>(context, builder)
       : showModalPanel<T>(context, builder, width: 560, shrink: true);
 

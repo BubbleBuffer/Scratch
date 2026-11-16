@@ -18,7 +18,7 @@ Widget themed(Widget child, {bool reduced = false}) => MediaQuery(
   data: MediaQueryData(disableAnimations: reduced),
   child: AppTheme(
     colors: AppColors.light,
-    formFactor: FormFactor.desktop,
+    density: Density.pointer,
     child: Directionality(
       textDirection: TextDirection.ltr,
       child: Center(child: child),

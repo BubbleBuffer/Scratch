@@ -35,15 +35,15 @@ class ScratchUserMessage extends StatelessWidget {
     return Hover(
       key: key,
       onTap: onTap,
-      radius: 14,
+      radius: Radii.sheet,
       border: Border.all(color: c.borderSubtle),
       background: c.bgPrimary,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon20(icon, size: 12, color: c.iconTertiary),
-          const SizedBox(width: 5),
+          Icon20(icon, size: IconSize.xs, color: c.iconTertiary),
+          const Gap(Space.xs),
           ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: (availableWidth - 35).clamp(0.0, 200.0).toDouble(),
@@ -70,7 +70,7 @@ class ScratchUserMessage extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.sm),
           decoration: BoxDecoration(
             color: c.bgSecondary,
             borderRadius: Radii.panel,
@@ -84,8 +84,8 @@ class ScratchUserMessage extends StatelessWidget {
                   selection != null) ...[
                 LayoutBuilder(
                   builder: (context, bounds) => Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
+                    spacing: Space.xxs,
+                    runSpacing: Space.xxs,
                     children: [
                       for (final page in message.context?.pages ?? [])
                         _chip(
@@ -131,7 +131,7 @@ class ScratchUserMessage extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 6),
+                const Gap(Space.xs),
               ],
               Text(message.text, style: ts(context.type.body, c.textPrimary)),
             ],

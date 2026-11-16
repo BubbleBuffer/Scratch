@@ -7,6 +7,7 @@ export 'fields.dart';
 export 'format.dart';
 export 'hover.dart';
 export 'icons.dart';
+export 'layout.dart';
 export 'lines.dart';
 export 'marked_list.dart';
 export 'menu.dart';

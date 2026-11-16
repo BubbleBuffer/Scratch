@@ -112,11 +112,11 @@ class _CardCoverState extends State<CardCover> {
       child = Image.file(File(p!.image!), fit: BoxFit.cover, width: double.infinity, height: widget.height, cacheHeight: (widget.height * 2).round());
     } else if (widget.content && p != null && p.lines.isNotEmpty) {
       child = Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+        padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, 0),
         child: Text(p.lines.join('\n'),
             maxLines: (widget.height / 16).floor(),
             overflow: TextOverflow.clip,
-            style: tsRaw(10, 15, 400, c.textSecondary)),
+            style: ts(context.type.caption, c.textSecondary)),
       );
     } else {
       child = const SizedBox.expand();

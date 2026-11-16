@@ -248,7 +248,7 @@ Future<void> openChatReference(
   }
   // Only the visible presentation takes the span. The dock is hidden while
   // the full Agent route exists, so references opened there target the screen.
-  final mobile = context.mobile;
+  final mobile = context.touch;
   final screen =
       mobile ||
       PageStackScope.of(context).routes

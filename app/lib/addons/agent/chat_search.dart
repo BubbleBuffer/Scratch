@@ -90,7 +90,7 @@ Future<void> openChatHit(
   // The presentation an anchored open uses: the full Agent screen on a phone
   // or while its route is open, else the dock.
   final screen =
-      context.mobile ||
+      context.touch ||
       PageStackScope.of(context).routes
           .any((route) => route.settings.name == agentRouteName);
   await store.openSession(target.sessionId);

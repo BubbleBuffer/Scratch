@@ -65,38 +65,38 @@ class _AgentScreenState extends State<AgentScreen> {
       color: c.desk,
       child: Row(
         children: [
-          if (!context.mobile) const Sidebar(agentOpen: true),
+          if (!context.touch) const Sidebar(agentOpen: true),
           Expanded(
             child: Column(
               children: [
                 SizedBox(
                   height: Layout.topbarHeight,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.md),
                     child: Row(
                       children: [
-                        if (!context.mobile) const SidebarReopenButton(),
-                        if (!context.mobile) const CollapsedFeedbackButton(),
-                        Icon20(Ico.comment, size: 16, color: c.iconSecondary),
-                        const SizedBox(width: 6),
+                        if (!context.touch) const SidebarReopenButton(),
+                        if (!context.touch) const CollapsedFeedbackButton(),
+                        Icon20(Ico.comment, size: IconSize.sm, color: c.iconSecondary),
+                        const Gap(Space.xs),
                         Text(
                           'Agent',
                           style: ts(
                             context.type.ui,
                             c.textPrimary,
-                            weight: 400,
+                            weight: Weight.regular,
                           ),
                         ),
                         const Spacer(),
                         // Phones have no chat list: New chat lives here.
-                        if (context.mobile && hubAgentPlatform)
+                        if (context.touch && hubAgentPlatform)
                           ListenableBuilder(
                             listenable: store,
                             builder: (context, _) => IconBtn(
                               Ico.compose,
                               key: const ValueKey('agent-new-chat-mobile'),
-                              size: 44,
-                              glyph: 22,
+                              size: ControlSize.xl,
+                              glyph: IconSize.xl,
                               semanticLabel: 'New chat',
                               onTap: store.enabled && !store.requiresHubSignIn
                                   ? () => store.newChat()
@@ -110,18 +110,18 @@ class _AgentScreenState extends State<AgentScreen> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.md),
                     child: ListenableBuilder(
                       listenable: store,
                       builder: (context, _) => Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (!context.mobile) ...[
+                          if (!context.touch) ...[
                             SizedBox(
                               width: 248,
                               child: _SessionList(store: store),
                             ),
-                            const SizedBox(width: 12),
+                            const Gap(Space.md),
                           ],
                           Expanded(
                             child: ScratchChatPane(
@@ -243,24 +243,24 @@ class _SessionListState extends State<_SessionList> {
           placeholder: 'Filter chats',
           onChanged: store.setFilter,
         ),
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
         SecondaryButton(
           key: const ValueKey('agent-new-chat'),
           label: 'New chat',
-          height: 34,
+          size: ControlSize.lg,
           onTap: store.enabled ? () => store.newChat() : null,
         ),
-        const SizedBox(height: 10),
+        const Gap(Space.md),
         Expanded(
           child: list.isEmpty
               ? Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                  padding: const EdgeInsets.fromLTRB(Space.sm, Space.xxs, Space.sm, 0),
                   child: Text(
                     store.sessions.isEmpty
                         ? 'No chats yet.'
                         : 'No chat matches.',
                     key: const ValueKey('agent-no-chats'),
-                    style: tsRaw(13, 18, 400, c.textTertiary),
+                    style: ts(context.type.ui, c.textTertiary, weight: Weight.regular),
                   ),
                 )
               : ListView(
@@ -320,14 +320,14 @@ class _SessionRowState extends State<_SessionRow> {
         : AgentStore.of(context.app)
               .displaySessionTitle(widget.session.id, widget.session.title);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.only(bottom: Space.hair),
       child: Hover(
         onTap: widget.onTap,
         selected: widget.selected || widget.menuOpen,
         selectedColor: c.bgPressed,
         radius: Radii.md,
         onHoverChanged: (v) => setState(() => _hover = v),
-        padding: const EdgeInsets.only(left: 10, right: 4),
+        padding: const EdgeInsets.only(left: Space.md, right: Space.xxs),
         child: SizedBox(
           height: 32,
           child: Row(
@@ -340,7 +340,7 @@ class _SessionRowState extends State<_SessionRow> {
                   style: ts(
                     context.type.ui,
                     c.textPrimary,
-                    weight: widget.selected ? 700 : 400,
+                    weight: widget.selected ? Weight.bold : Weight.regular,
                   ),
                 ),
               ),
@@ -349,8 +349,8 @@ class _SessionRowState extends State<_SessionRow> {
                   builder: (row) => IconBtn(
                     Ico.more,
                     key: ValueKey('agent-session-menu-${widget.session.id}'),
-                    size: 24,
-                    glyph: 16,
+                    size: ControlSize.xs,
+                    glyph: IconSize.sm,
                     semanticLabel: 'Chat actions',
                     onTap: () => widget.onMenu(row),
                   ),
@@ -379,7 +379,7 @@ class _RenameRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.only(bottom: Space.hair),
       child: CallbackShortcuts(
         bindings: {const SingleActivator(LogicalKeyboardKey.escape): onCancel},
         child: FieldFrame(
@@ -388,7 +388,7 @@ class _RenameRow extends StatelessWidget {
             key: const ValueKey('agent-rename-field'),
             controller: controller,
             focusNode: focusNode,
-            style: ts(context.type.ui, c.textPrimary, weight: 400),
+            style: ts(context.type.ui, c.textPrimary, weight: Weight.regular),
             placeholder: 'Chat name',
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => onSubmit(),

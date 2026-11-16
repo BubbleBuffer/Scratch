@@ -161,11 +161,11 @@ class CertificateProblem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(title, key: messageKey, style: tsRaw(13, 18, 600, c.inlineCodeText)),
-        const SizedBox(height: 4),
-        Text(body, style: tsRaw(13, 18, 400, c.textSecondary)),
-        const SizedBox(height: 10),
-        Wrap(spacing: 4, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        Text(title, key: messageKey, style: ts(context.type.ui, c.inlineCodeText, weight: Weight.semibold)),
+        const Gap(Space.xxs),
+        Text(body, style: ts(context.type.ui, c.textSecondary, weight: Weight.regular)),
+        const Gap(Space.md),
+        Wrap(spacing: Space.xxs, runSpacing: Space.xs, crossAxisAlignment: WrapCrossAlignment.center, children: [
           OutlineButton(key: const ValueKey('cert-view'), label: 'View certificate', onTap: onView),
           IntrinsicWidth(child: TextBtn('Trust certificate', key: const ValueKey('cert-trust'), onTap: onTrust, color: c.textSecondary)),
         ]),
@@ -212,25 +212,25 @@ class _TrustConfirm extends StatelessWidget {
     final c = context.colors;
     final ty = context.type;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      padding: const EdgeInsets.fromLTRB(Space.xl, Space.xl, Space.xl, Space.lg),
       child: Column(
         key: const ValueKey('cert-trust-confirm'),
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Trust this certificate?', textAlign: TextAlign.center, style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
-          const SizedBox(height: 6),
+          Text('Trust this certificate?', textAlign: TextAlign.center, style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display)),
+          const Gap(Space.xs),
           Text(
             trustConfirmText(host, issuer),
             key: const ValueKey('cert-confirm-text'),
             textAlign: TextAlign.center,
-            style: ts(ty.uiSmall, c.textSecondary, weight: 400),
+            style: ts(ty.uiSmall, c.textSecondary, weight: Weight.regular),
           ),
-          const SizedBox(height: 12),
+          const Gap(Space.md),
           FingerprintBox(fingerprint, textKey: const ValueKey('cert-confirm-fingerprint'), copy: false),
-          const SizedBox(height: 16),
+          const Gap(Space.lg),
           DialogButton(key: const ValueKey('confirm-ok'), label: 'Trust', color: c.accent, filled: true, onTap: () => onDone(true)),
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           DialogButton(key: const ValueKey('confirm-cancel'), label: 'Cancel', onTap: () => onDone(false)),
         ],
       ),
@@ -280,7 +280,7 @@ class _FingerprintBoxState extends State<FingerprintBox> {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: EdgeInsets.fromLTRB(10, 6, widget.copy ? 4 : 10, 6),
+      padding: EdgeInsets.fromLTRB(Space.md, Space.xs, widget.copy ? Space.xxs : Space.md, Space.xs),
       decoration: BoxDecoration(color: c.bgSecondary, borderRadius: Radii.field, border: Border.all(color: c.borderSubtle)),
       child: Row(children: [
         Expanded(
@@ -288,11 +288,11 @@ class _FingerprintBoxState extends State<FingerprintBox> {
             focusNode: _focus,
             selectionControls: noteSelectionControls,
             // Eight pairs per line, so lines break between pairs, never inside one.
-            child: Text(widget.text.replaceAllMapped(RegExp(r'((?:[0-9A-F]{2}:){8})'), (m) => '${m[1]}\n'), key: widget.textKey, style: ts(const TypeSpec(13, 19, 400), c.textPrimary, mono: true)),
+            child: Text(widget.text.replaceAllMapped(RegExp(r'((?:[0-9A-F]{2}:){8})'), (m) => '${m[1]}\n'), key: widget.textKey, style: ts(context.type.code, c.textPrimary, mono: true)),
           ),
         ),
         if (widget.copy) ...[
-          const SizedBox(width: 8),
+          const Gap(Space.sm),
           TextBtn(_copied ? 'Copied' : 'Copy', key: const ValueKey('cert-copy'), onTap: _copy, color: c.textSecondary),
         ],
       ]),
@@ -323,10 +323,10 @@ Future<void> showCertificate(
     onTrust: onTrust,
     onRevoke: onRevoke,
   );
-  if (context.mobile) return pushSettingsPage(context, 'Certificate', view);
+  if (context.touch) return pushSettingsPage(context, 'Certificate', view);
   return showPanel(
     context,
-    (_) => SingleChildScrollView(padding: const EdgeInsets.fromLTRB(40, 32, 40, 32), child: view),
+    (_) => SingleChildScrollView(padding: const EdgeInsets.fromLTRB(Space.xxxl, Space.xxl, Space.xxxl, Space.xxl), child: view),
     width: 560,
     height: 760,
     shrink: true,
@@ -378,7 +378,7 @@ class _CertificateViewState extends State<CertificateView> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final w = widget;
     final now = w.nowMs ?? clockNow().millisecondsSinceEpoch;
     final status = switch (w.status) {
@@ -396,18 +396,18 @@ class _CertificateViewState extends State<CertificateView> {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (!m) ...[
-          Text('Certificate', style: tsRaw(20, 26, 600, c.textPrimary)),
-          const SizedBox(height: 16),
+          Text('Certificate', style: ts(context.type.h3, c.textPrimary)),
+          const Gap(Space.lg),
         ],
-        Text(w.host, key: const ValueKey('cert-host'), style: tsRaw(m ? 17 : 16, 22, 600, c.textPrimary)),
-        const SizedBox(height: 2),
+        Text(w.host, key: const ValueKey('cert-host'), style: ts(context.type.body, c.textPrimary, weight: Weight.semibold)),
+        const Gap(Space.hair),
         Text(status,
             key: const ValueKey('cert-status'),
-            style: tsRaw(m ? 15 : 14, 20, 400, trusted ? c.textSecondary : c.inlineCodeText)),
-        const SizedBox(height: 16),
+            style: ts(context.type.ui, trusted ? c.textSecondary : c.inlineCodeText, weight: Weight.regular)),
+        const Gap(Space.lg),
         if (leaf != null) CertFields(leaf, nowMs: now, keyPrefix: 'cert-leaf'),
         if (w.chain.isNotEmpty) ...[
-          const SizedBox(height: 20),
+          const Gap(Space.xl),
           const SettingsHeading('Chain'),
           for (var i = 0; i < w.chain.length; i++) ...[
             _ChainRow(
@@ -418,13 +418,13 @@ class _CertificateViewState extends State<CertificateView> {
             ),
             if (_open.contains(i))
               Padding(
-                padding: const EdgeInsets.fromLTRB(26, 4, 0, 12),
+                padding: const EdgeInsets.fromLTRB(Space.xl, Space.xxs, 0, Space.md),
                 child: CertFields(w.chain[i], nowMs: now, keyPrefix: 'cert-chain-$i'),
               ),
             HLine(color: c.borderSubtle),
           ],
         ],
-        const SizedBox(height: 20),
+        const Gap(Space.xl),
         Row(children: [
           if (trusted && w.onRevoke != null)
             OutlineButton(
@@ -455,7 +455,7 @@ class _ChainRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final name = cert.subject.isEmpty ? 'Certificate ${index + 1}' : cert.subject;
     return Semantics(
       button: true,
@@ -464,18 +464,18 @@ class _ChainRow extends StatelessWidget {
         key: ValueKey('cert-chain-row-$index'),
         onTap: onTap,
         radius: Radii.md,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: m ? 44 : 36),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: Space.sm),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Icon20(open ? Ico.chevronDown : Ico.chevronRight, size: 16, color: c.iconSecondary),
+                padding: const EdgeInsets.only(top: Space.hair),
+                child: Icon20(open ? Ico.chevronDown : Ico.chevronRight, size: IconSize.sm, color: c.iconSecondary),
               ),
-              const SizedBox(width: 6),
-              Expanded(child: Text(name, style: tsRaw(m ? 15 : 14, 20, 500, c.textPrimary))),
+              const Gap(Space.xs),
+              Expanded(child: Text(name, style: ts(context.type.ui, c.textPrimary))),
             ]),
           ),
         ),
@@ -495,9 +495,8 @@ class CertFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
-    final value = tsRaw(m ? 15 : 14, 20, 400, c.textPrimary);
-    final mono = ts(const TypeSpec(13, 19, 400), c.textPrimary, mono: true);
+    final value = ts(context.type.ui, c.textPrimary, weight: Weight.regular);
+    final mono = ts(context.type.code, c.textPrimary, mono: true);
     final expired = cert.expiredAt(nowMs);
     final rows = <(String, String, Widget)>[
       if (cert.subject.isNotEmpty) ('Subject', 'subject', Text(cert.subject, style: value)),
@@ -509,7 +508,7 @@ class CertFields extends StatelessWidget {
           'until',
           Text(
             expired ? '${formatCertDate(cert.notAfterMs)} · Expired' : formatCertDate(cert.notAfterMs),
-            style: expired ? tsRaw(m ? 15 : 14, 20, 600, c.inlineCodeText) : value,
+            style: expired ? ts(context.type.ui, c.inlineCodeText, weight: Weight.semibold) : value,
           ),
         ),
       ('SHA-256 fingerprint', 'sha256', FingerprintBox(formatFingerprint(cert.sha256), textKey: ValueKey('$keyPrefix-sha256-text'))),
@@ -522,21 +521,21 @@ class CertFields extends StatelessWidget {
         for (final (label, id, v) in rows)
           Padding(
             key: ValueKey('$keyPrefix-$id'),
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(vertical: Space.xs),
             child: wide
                 ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     SizedBox(
                       width: 150,
                       child: Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(label, style: tsRaw(13, 18, 500, c.textSecondary)),
+                        padding: const EdgeInsets.only(top: Space.hair),
+                        child: Text(label, style: ts(context.type.ui, c.textSecondary)),
                       ),
                     ),
                     Expanded(child: v),
                   ])
                 : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    Text(label, style: tsRaw(m ? 13 : 12, 16, 500, c.textSecondary)),
-                    const SizedBox(height: 4),
+                    Text(label, style: ts(context.type.uiSmall, c.textSecondary)),
+                    const Gap(Space.xxs),
                     v,
                   ]),
           ),

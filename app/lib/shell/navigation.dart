@@ -56,7 +56,7 @@ Future<void> openPage(
 }) async {
   final nav =
       PageStackScope.maybeOf(context)?.navigator ?? Navigator.of(context);
-  final mobile = context.mobile;
+  final mobile = context.touch;
   final motion = Motion.of(context);
   final pages = context.read<PageStore>();
   final tree = context.read<TreeStore>();
@@ -129,7 +129,7 @@ Future<void> openPage(
         initialBlock: initialBlock,
       ),
       motion: motion,
-      mobile: mobile,
+      slide: mobile,
       desktopSheet: !mobile,
       settings: RouteSettings(name: '/page', arguments: id),
     ),

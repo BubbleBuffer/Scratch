@@ -66,9 +66,9 @@ class _ChatReferencePickerState extends State<ChatReferencePicker> {
         header: Padding(
           padding: const EdgeInsets.fromLTRB(
             Layout.gutter,
-            14,
+            Space.lg,
             Layout.gutter,
-            8,
+            Space.sm,
           ),
           child: Text('Chat reference', style: tsDisplay(ty.h3, c.textPrimary)),
         ),
@@ -195,7 +195,7 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(Space.lg),
     child: Text(text, style: ts(ty.ui, c.textTertiary)),
   );
 }

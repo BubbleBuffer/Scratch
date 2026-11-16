@@ -13,16 +13,19 @@ import 'color_menu.dart';
 
 /// A block type's icon: its [Ico], or its short text ("H1").
 class KindIcon extends StatelessWidget {
-  const KindIcon(this.type, {super.key, this.size = 20, this.color});
+  const KindIcon(this.type, {super.key, this.size, this.color});
   final BlockType type;
-  final double size;
+
+  /// The icon's box; [IconSize.lg] by default.
+  final double? size;
   final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final size = this.size ?? IconSize.lg.px;
     final col = color ?? context.colors.iconPrimary;
     final ico = type.icon;
-    if (ico != null) return Icon20(ico, size: size, color: col);
+    if (ico != null) return icoAt(ico, size, col);
     final ix = type.iconX;
     if (ix != null) return IconX(ix, size: size, color: col);
     final t = type.iconText ?? '?';
@@ -35,9 +38,9 @@ class KindIcon extends StatelessWidget {
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (toggle) IconX(Ix.triangle, size: size * 0.45, color: col),
+            if (toggle) IconX(Ix.triangle, size: size * LetterMark.triangle, color: col),
             Text(toggle ? t.substring(1) : t,
-                maxLines: 1, softWrap: false, style: tsRaw(size * (toggle ? 0.5 : 0.6), size * 0.7, 600, col)),
+                maxLines: 1, softWrap: false, style: letterMarkStyle(size, col, toggle: toggle)),
           ]),
         ),
       ),
@@ -72,11 +75,11 @@ class SlashMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final ty = context.type;
     return MenuSurface(
       width: m ? null : 324,
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(Space.xs),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxHeight - 12),
         child: SingleChildScrollView(
@@ -93,11 +96,11 @@ class SlashMenu extends StatelessWidget {
                 MenuItem(
                   key: ValueKey('slash-${types[i].kind}'),
                   label: types[i].menuLabel,
-                  leading: KindIcon(types[i], size: m ? 22 : 20),
+                  leading: KindIcon(types[i], size: context.metrics.icon.px),
                   selected: i == active,
                   onTap: () => onPick(types[i].kind),
                   onHover: () => onHover(i),
-                  trailing: Text(types[i].shortcut, style: ts(ty.uiSmall, c.textTertiary, weight: 400)),
+                  trailing: Text(types[i].shortcut, style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)),
                 ),
               ],
             ],
@@ -141,7 +144,7 @@ class SelectionToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    Widget glyph(String s, BMarkKind k, {FontStyle? style, TextDecoration? deco, int weight = 600}) {
+    Widget glyph(String s, BMarkKind k, {FontStyle? style, TextDecoration? deco, Weight weight = Weight.semibold}) {
       final on = active.contains(k);
       return Hover(
         key: ValueKey('fmt-${k.name}'),
@@ -152,7 +155,7 @@ class SelectionToolbar extends StatelessWidget {
           height: 28,
           child: Center(
             child: Text(s,
-                style: tsRaw(15, 20, weight, on ? c.accentText : c.iconPrimary)
+                style: ts(context.type.ui, on ? c.accentText : c.iconPrimary, weight: weight)
                     .copyWith(fontStyle: style, decoration: deco, decorationColor: on ? c.accentText : c.iconPrimary)),
           ),
         ),
@@ -161,10 +164,10 @@ class SelectionToolbar extends StatelessWidget {
 
     return Container(
       height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
       decoration: BoxDecoration(
         color: c.bgElevated,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(Radii.lg),
         boxShadow: c.shadowMenu,
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -172,13 +175,13 @@ class SelectionToolbar extends StatelessWidget {
           key: const ValueKey('fmt-turn-into'),
           onTap: onTurnInto,
           radius: Radii.sm,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+          padding: const EdgeInsets.symmetric(horizontal: Space.xs),
           child: SizedBox(
             height: 28,
             child: Row(children: [
-              Text(blockRegistry.of(kind).label, style: ts(TypeScale.desktop.ui, c.textPrimary)),
-              const SizedBox(width: 4),
-              Icon20(Ico.chevronDown, size: 12, color: c.iconTertiary),
+              Text(blockRegistry.of(kind).label, style: ts(TypeScale.pointer.ui, c.textPrimary)),
+              const Gap(Space.xxs),
+              Icon20(Ico.chevronDown, size: IconSize.xs, color: c.iconTertiary),
             ]),
           ),
         ),
@@ -186,15 +189,15 @@ class SelectionToolbar extends StatelessWidget {
         IconBtn(Ico.link,
             key: const ValueKey('fmt-link'),
             onTap: onLink,
-            glyph: 16,
+            glyph: IconSize.sm,
             radius: Radii.sm,
             semanticLabel: active.contains(BMarkKind.link) ? 'Edit link' : 'Add link',
             color: active.contains(BMarkKind.link) ? c.accent : c.iconPrimary),
         const VLine(),
-        glyph('B', BMarkKind.bold, weight: 700),
-        glyph('i', BMarkKind.italic, style: FontStyle.italic, weight: 500),
-        glyph('U', BMarkKind.underline, deco: TextDecoration.underline, weight: 500),
-        glyph('S', BMarkKind.strike, deco: TextDecoration.lineThrough, weight: 500),
+        glyph('B', BMarkKind.bold, weight: Weight.bold),
+        glyph('i', BMarkKind.italic, style: FontStyle.italic, weight: Weight.medium),
+        glyph('U', BMarkKind.underline, deco: TextDecoration.underline, weight: Weight.medium),
+        glyph('S', BMarkKind.strike, deco: TextDecoration.lineThrough, weight: Weight.medium),
         Semantics(
           button: true,
           label: 'Code',
@@ -209,7 +212,7 @@ class SelectionToolbar extends StatelessWidget {
                 height: 28,
                 child: Center(
                     child: Icon20(Ico.code,
-                        size: 16, color: active.contains(BMarkKind.code) ? c.accent : c.iconPrimary)),
+                        size: IconSize.sm, color: active.contains(BMarkKind.code) ? c.accent : c.iconPrimary)),
               ),
             ),
           ),
@@ -221,15 +224,15 @@ class SelectionToolbar extends StatelessWidget {
               key: const ValueKey('fmt-color'),
               onTap: () => onColor!(anchor),
               radius: Radii.sm,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
               child: SizedBox(
                 height: 28,
                 child: Row(children: [
                   Text('A',
-                      style: tsRaw(15, 20, 500, c.iconPrimary)
+                      style: ts(context.type.ui, c.iconPrimary)
                           .copyWith(decoration: TextDecoration.underline, decorationColor: c.iconPrimary)),
-                  const SizedBox(width: 2),
-                  Icon20(Ico.chevronDown, size: 12, color: c.iconTertiary),
+                  const Gap(Space.hair),
+                  Icon20(Ico.chevronDown, size: IconSize.xs, color: c.iconTertiary),
                 ]),
               ),
             ),
@@ -254,7 +257,7 @@ class SelectionToolbar extends StatelessWidget {
           IconBtn(Ico.comment,
               key: const ValueKey('fmt-ask-agent'),
               onTap: onAskAgent,
-              glyph: 16,
+              glyph: IconSize.sm,
               radius: Radii.sm,
               semanticLabel: 'Ask agent'),
       ]),
@@ -325,15 +328,15 @@ class KeyboardToolbar extends StatelessWidget {
     }
 
     Widget btn(Ico i, VoidCallback? onTap, String key, {bool on = false, String? tip}) => box(
-        key, Icon20(i, size: 22, color: onTap == null ? c.textDisabled : c.iconSecondary), onTap, on: on, tip: tip);
+        key, Icon20(i, size: IconSize.xl, color: onTap == null ? c.textDisabled : c.iconSecondary), onTap, on: on, tip: tip);
     Widget btnX(Ix i, VoidCallback? onTap, String key, {bool on = false, String? tip}) => box(
         key, IconX(i, size: 22, color: onTap == null ? c.textDisabled : c.iconSecondary), onTap, on: on, tip: tip);
-    Widget glyph(String s, BMarkKind k, {FontStyle? style, TextDecoration? deco, int weight = 600}) {
+    Widget glyph(String s, BMarkKind k, {FontStyle? style, TextDecoration? deco, Weight weight = Weight.semibold}) {
       final on = active.contains(k);
       return box(
         k.name,
         Text(s,
-            style: tsRaw(18, 22, weight, on ? c.textPrimary : c.iconSecondary)
+            style: ts(TypeScale.touch.h3, on ? c.textPrimary : c.iconSecondary, weight: weight)
                 .copyWith(fontStyle: style, decoration: deco, decorationColor: c.iconSecondary)),
         () => onMark(k),
         on: on,
@@ -343,10 +346,10 @@ class KeyboardToolbar extends StatelessWidget {
     final items = switch (mode) {
       KbMode.format => <Widget>[
           btn(Ico.chevronLeft, () => onMode(KbMode.main), 'back', tip: 'Back'),
-          glyph('B', BMarkKind.bold, weight: 700),
-          glyph('i', BMarkKind.italic, style: FontStyle.italic, weight: 500),
-          glyph('U', BMarkKind.underline, deco: TextDecoration.underline, weight: 500),
-          glyph('S', BMarkKind.strike, deco: TextDecoration.lineThrough, weight: 500),
+          glyph('B', BMarkKind.bold, weight: Weight.bold),
+          glyph('i', BMarkKind.italic, style: FontStyle.italic, weight: Weight.medium),
+          glyph('U', BMarkKind.underline, deco: TextDecoration.underline, weight: Weight.medium),
+          glyph('S', BMarkKind.strike, deco: TextDecoration.lineThrough, weight: Weight.medium),
           btn(Ico.code, () => onMark(BMarkKind.code), 'code', on: active.contains(BMarkKind.code), tip: 'Code'),
           btn(Ico.link, onLink, 'link',
               on: active.contains(BMarkKind.link), tip: active.contains(BMarkKind.link) ? 'Edit link' : 'Add link'),
@@ -365,7 +368,7 @@ class KeyboardToolbar extends StatelessWidget {
         ],
       KbMode.main => <Widget>[
           btn(Ico.plus, onAdd, 'add', tip: 'Add block'),
-          box('format', Text('Aa', style: tsRaw(17, 22, 500, c.iconSecondary)), () => onMode(KbMode.format)),
+          box('format', Text('Aa', style: ts(context.type.body, c.iconSecondary, weight: Weight.medium)), () => onMode(KbMode.format)),
           btn(Ico.turnInto, onTurnInto, 'turn-into', tip: 'Turn into'),
           btn(Ico.todo, () => onKind(Kinds.todo), 'todo', on: kind == Kinds.todo, tip: 'To-do list'),
           btn(Ico.bullets, () => onKind(Kinds.bulleted), 'bullets', on: kind == Kinds.bulleted, tip: 'Bulleted list'),
@@ -385,7 +388,7 @@ class KeyboardToolbar extends StatelessWidget {
         Expanded(
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.symmetric(horizontal: Space.hair),
             children: items,
           ),
         ),
@@ -393,8 +396,8 @@ class KeyboardToolbar extends StatelessWidget {
         IconBtn(Ico.keyboardHide,
             key: const ValueKey('kb-hide'),
             onTap: onHide,
-            size: 44,
-            glyph: 22,
+            size: ControlSize.xl,
+            glyph: IconSize.xl,
             radius: Radii.md,
             color: c.iconSecondary,
             semanticLabel: 'Hide keyboard'),
@@ -466,14 +469,14 @@ class _BlockMenuState extends State<BlockMenu> {
             icon: Ico.turnInto,
             label: 'Turn into',
             onTap: () => setState(() => _sub = 1),
-            trailing: Icon20(Ico.chevronRight, size: 16, color: c.iconTertiary)),
+            trailing: Icon20(Ico.chevronRight, size: IconSize.sm, color: c.iconTertiary)),
       if (type.colorable || widget.count > 1)
         MenuItem(
             key: const ValueKey('menu-color'),
             leading: IconX(Ix.color, size: 20, color: c.iconPrimary),
             label: 'Color',
             onTap: () => setState(() => _sub = 2),
-            trailing: Icon20(Ico.chevronRight, size: 16, color: c.iconTertiary)),
+            trailing: Icon20(Ico.chevronRight, size: IconSize.sm, color: c.iconTertiary)),
       if (widget.kind == Kinds.todo && widget.count == 1)
         MenuItem(key: const ValueKey('menu-set-date'), icon: Ico.clock, label: 'Set date',
             onTap: () => widget.onAction(BlockAction.setDate)),
@@ -489,13 +492,13 @@ class _BlockMenuState extends State<BlockMenu> {
           icon: Ico.link,
           label: 'Copy',
           onTap: () => widget.onAction(BlockAction.copy),
-          trailing: Text(shortcutHint('Ctrl+C'), style: ts(context.type.uiSmall, c.textTertiary, weight: 400))),
+          trailing: Text(shortcutHint('Ctrl+C'), style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.regular))),
       MenuItem(
           key: const ValueKey('menu-duplicate'),
           icon: Ico.duplicate,
           label: 'Duplicate',
           onTap: () => widget.onAction(BlockAction.duplicate),
-          trailing: Text(shortcutHint('Ctrl+D'), style: ts(context.type.uiSmall, c.textTertiary, weight: 400))),
+          trailing: Text(shortcutHint('Ctrl+D'), style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.regular))),
       MenuItem(
           key: const ValueKey('menu-up'),
           icon: Ico.arrowUp,
@@ -512,7 +515,7 @@ class _BlockMenuState extends State<BlockMenu> {
           icon: Ico.trash,
           label: 'Delete',
           onTap: () => widget.onAction(BlockAction.delete),
-          trailing: Text('Del', style: ts(context.type.uiSmall, c.textTertiary, weight: 400))),
+          trailing: Text('Del', style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.regular))),
     ]);
   }
 }
@@ -560,7 +563,7 @@ class _BlockSheetState extends State<BlockSheet> {
             for (final t in blockRegistry.turnIntoTypes)
               SheetItem(
                 key: ValueKey('sheet-kind-${t.kind}'),
-                leading: KindIcon(t, size: 22, color: c.iconPrimary),
+                leading: KindIcon(t, size: IconSize.xl.px, color: c.iconPrimary),
                 label: t.label,
                 selected: t.kind == widget.kind,
                 onTap: () => pop(SheetResult(BlockAction.turnInto, t.kind)),
@@ -620,7 +623,7 @@ class _BlockSheetState extends State<BlockSheet> {
                 icon: Ico.link,
                 label: 'Copy',
                 onTap: () => pop(const SheetResult(BlockAction.copy))),
-            Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: HLine(color: c.borderSubtle)),
+            Padding(padding: const EdgeInsets.symmetric(vertical: Space.xxs), child: HLine(color: c.borderSubtle)),
             SheetItem(
                 key: const ValueKey('sheet-delete'),
                 icon: Ico.trash,
@@ -661,10 +664,10 @@ class _LinkBoxState extends State<LinkBox> {
     final ty = context.type;
     return MenuSurface(
       width: 320,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(Space.sm),
       child: Container(
         height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: Space.sm),
         decoration: BoxDecoration(
           color: c.bgHover,
           borderRadius: BorderRadius.circular(Radii.md),
@@ -676,7 +679,7 @@ class _LinkBoxState extends State<LinkBox> {
           controller: _ctl,
           focusNode: _focus,
           autofocus: true,
-          style: ts(ty.ui, c.textPrimary, weight: 400),
+          style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
           placeholder: 'Paste link',
           onSubmitted: (v) => widget.onDone(v.trim()),
         ),

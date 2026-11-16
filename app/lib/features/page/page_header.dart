@@ -61,7 +61,7 @@ class _PageHeaderState extends State<PageHeader> {
   Future<void> _pickIcon(BuildContext anchor) async {
     final e = await showEmojiPicker(
       anchor,
-      anchor: context.mobile ? null : globalRectOf(anchor),
+      anchor: context.touch ? null : globalRectOf(anchor),
       removable: widget.icon != null,
     );
     if (e == null) return;
@@ -72,7 +72,7 @@ class _PageHeaderState extends State<PageHeader> {
     final r = await showCoverPicker(
       anchor,
       pageId: widget.pageId,
-      anchor: context.mobile ? null : globalRectOf(anchor),
+      anchor: context.touch ? null : globalRectOf(anchor),
       hasCover: widget.cover != null,
     );
     if (r == null) return;
@@ -82,7 +82,7 @@ class _PageHeaderState extends State<PageHeader> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final mobile = context.mobile;
+    final mobile = context.touch;
     final icon = widget.icon;
     final cover = widget.cover;
     const iconSize = 64.0;
@@ -134,17 +134,17 @@ class _PageHeaderState extends State<PageHeader> {
         key: ValueKey(key),
         radius: Radii.md,
         onTap: () => onTap(anchor),
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
         child: SizedBox(
           height: 28,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconX(ix, size: 16, color: c.iconTertiary),
-              const SizedBox(width: 6),
+              const Gap(Space.xs),
               Text(
                 label,
-                style: ts(context.type.ui, c.textTertiary, weight: 400),
+                style: ts(context.type.ui, c.textTertiary, weight: Weight.regular),
               ),
             ],
           ),
@@ -308,19 +308,19 @@ class _CoverState extends State<_Cover> {
       key: ValueKey(key),
       onTap: onTap,
       radius: 0,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       child: SizedBox(
         height: 26,
         child: Center(
-          child: Text(label, style: tsRaw(12, 16, 400, c.textSecondary)),
+          child: Text(label, style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular)),
         ),
       ),
     );
     // Desktop: on hover. Mobile: a tap on the cover shows (and hides) them.
     final show = !widget.readOnly && (_hover || _repositioning);
     return MouseRegion(
-      onEnter: context.mobile ? null : (_) => setState(() => _hover = true),
-      onExit: context.mobile ? null : (_) => setState(() => _hover = false),
+      onEnter: context.touch ? null : (_) => setState(() => _hover = true),
+      onExit: context.touch ? null : (_) => setState(() => _hover = false),
       child: SizedBox(
         height: widget.height,
         child: Stack(
@@ -339,7 +339,7 @@ class _CoverState extends State<_Cover> {
                   child: image,
                 ),
               )
-            else if (context.mobile)
+            else if (context.touch)
               GestureDetector(
                 key: const ValueKey('cover-tap'),
                 behavior: HitTestBehavior.opaque,
@@ -353,8 +353,8 @@ class _CoverState extends State<_Cover> {
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                      horizontal: Space.md,
+                      vertical: Space.xs,
                     ),
                     decoration: BoxDecoration(
                       color: const Color(0x99000000),
@@ -362,14 +362,14 @@ class _CoverState extends State<_Cover> {
                     ),
                     child: Text(
                       'Drag image to reposition',
-                      style: tsRaw(14, 20, 500, const Color(0xFFFFFFFF)),
+                      style: ts(context.type.ui, const Color(0xFFFFFFFF)),
                     ),
                   ),
                 ),
               ),
             if (show)
               Positioned(
-                right: context.mobile
+                right: context.touch
                     ? 12
                     : (widget.width - widget.textRight).clamp(
                         12.0,

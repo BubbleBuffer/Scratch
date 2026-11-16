@@ -70,7 +70,7 @@ class _EmbedDocumentState extends State<EmbedDocument>
           ),
         );
         body = Padding(
-          padding: EdgeInsets.symmetric(vertical: context.mobile ? 3 : 2),
+          padding: EdgeInsets.symmetric(vertical: context.touch ? Space.xxs : Space.hair),
           child: type.decorate?.call(b, text) ?? text,
         );
       } else if ((node.target == null || node.target!.isEmpty) &&
@@ -91,8 +91,8 @@ class _EmbedDocumentState extends State<EmbedDocument>
           Container(
             key: _blockKeys.putIfAbsent(node.id, GlobalKey.new),
             margin: EdgeInsets.only(
-              top: type.topMargin(context.mobile) + 2,
-              bottom: 2,
+              top: type.topMargin(context.touch) + 2,
+              bottom: Space.hair,
             ),
             padding: const EdgeInsets.symmetric(
               horizontal: Layout.blockPaddingX,

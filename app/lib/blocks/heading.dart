@@ -79,7 +79,7 @@ Widget decorateHeadingProgress(BlockContext b, Widget text) {
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const Gap(Space.md),
         SizedBox(
           width: (box.maxWidth * .32).clamp(0, 220),
           child: ConfettiBurst(
@@ -104,13 +104,13 @@ Widget decorateHeadingProgress(BlockContext b, Widget text) {
             ),
           ),
         ),
-        const SizedBox(width: 10),
+        const Gap(Space.md),
         Text(
           progress.done == progress.total
               ? 'All done'
               : '${progress.done} of ${progress.total}',
           key: ValueKey('heading-progress-${b.node.id}'),
-          style: tsRaw(13, 18, 400, b.colors.textSecondary),
+          style: ts(context.type.ui, b.colors.textSecondary, weight: Weight.regular),
         ),
       ],
     ),

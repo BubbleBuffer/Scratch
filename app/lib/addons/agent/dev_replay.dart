@@ -223,7 +223,7 @@ class _ReplaySpeedPickerState extends State<_ReplaySpeedPicker> {
   Widget build(BuildContext context) => PickerSheet(
     header: const SheetHeader('Replay chat live'),
     list: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: Space.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -231,12 +231,12 @@ class _ReplaySpeedPickerState extends State<_ReplaySpeedPicker> {
             widget.name,
             style: ts(context.type.ui, context.colors.textPrimary),
           ),
-          const SizedBox(height: 12),
+          const Gap(Space.md),
           Text(
             'Delay in milliseconds',
             style: ts(context.type.ui, context.colors.textSecondary),
           ),
-          const SizedBox(height: 6),
+          const Gap(Space.xs),
           InputBox(
             child: PlainField(
               key: const ValueKey('replay-delay'),
@@ -247,7 +247,7 @@ class _ReplaySpeedPickerState extends State<_ReplaySpeedPicker> {
               onSubmitted: (_) => _start(),
             ),
           ),
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           Text(
             _error ?? 'Each paragraph and the gap between user messages use this delay.',
             style: ts(context.type.ui, context.colors.textSecondary),
@@ -265,7 +265,7 @@ class ReplayControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     key: const ValueKey('replay-controls'),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.xs),
     child: Row(
       children: [
         Expanded(

@@ -46,7 +46,7 @@ Widget _decorate(BlockContext b, Widget text) {
         height: b.lineHeight,
         child: Center(child: box),
       ),
-      const SizedBox(width: todoTextGap - inset),
+      const Gap(todoTextGap - inset),
       Expanded(child: text),
     ],
   );

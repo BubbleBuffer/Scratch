@@ -72,7 +72,7 @@ class ShortItemCard extends StatelessWidget {
       style: ts(
         context.type.ui,
         titleColor,
-        weight: 600,
+        weight: Weight.semibold,
       ).copyWith(decoration: item.done ? TextDecoration.lineThrough : null),
     );
     final time = dateLabel;
@@ -80,8 +80,8 @@ class ShortItemCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (item.hasTime && !overdue && !showDate) ...[
-          Icon20(Ico.clock, size: 12, color: c.iconTertiary),
-          const SizedBox(width: 4),
+          Icon20(Ico.clock, size: IconSize.xs, color: c.iconTertiary),
+          const Gap(Space.xxs),
         ],
         Flexible(
           child: Text(
@@ -107,7 +107,7 @@ class ShortItemCard extends StatelessWidget {
     );
     final agent = item.assignee == 'agent'
         ? Padding(
-            padding: const EdgeInsets.only(left: 6),
+            padding: const EdgeInsets.only(left: Space.xs),
             child: Text(
               'Agent',
               key: const ValueKey('short-item-agent'),
@@ -134,7 +134,7 @@ class ShortItemCard extends StatelessWidget {
         ? PageIcon(icon: item.icon, size: 18, color: c.iconTertiary)
         : Icon20(
             item.hasTime ? Ico.clock : Ico.todo,
-            size: 18,
+            size: IconSize.md,
             color: c.iconTertiary,
           );
     return Semantics(
@@ -149,10 +149,10 @@ class ShortItemCard extends StatelessWidget {
               background: c.bgPrimary,
               border: Border.all(color: c.borderSubtle),
               lift: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
               child: LayoutBuilder(
                 builder: (context, box) {
-                  final compact = context.mobile;
+                  final compact = context.touch;
                   final narrowMeta = box.maxWidth < 400
                       ? Text(
                           time,
@@ -181,7 +181,7 @@ class ShortItemCard extends StatelessWidget {
                           child: Center(child: leading),
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const Gap(Space.xxs),
                       if (compact)
                         Expanded(
                           child: Column(
@@ -189,12 +189,12 @@ class ShortItemCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               title,
-                              const SizedBox(height: 2),
+                              const Gap(Space.hair),
                               Row(
                                 children: [
                                   if (time.isNotEmpty) ...[
                                     meta,
-                                    const SizedBox(width: 10),
+                                    const Gap(Space.md),
                                   ],
                                   Flexible(child: sourceWidget),
                                   agent,
@@ -207,10 +207,10 @@ class ShortItemCard extends StatelessWidget {
                         Expanded(child: title),
                         agent,
                         if (time.isNotEmpty) ...[
-                          const SizedBox(width: 12),
+                          const Gap(Space.md),
                           meta,
                         ],
-                        const SizedBox(width: 16),
+                        const Gap(Space.lg),
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 160),
                           child: sourceWidget,
@@ -220,14 +220,14 @@ class ShortItemCard extends StatelessWidget {
                         if (item.assignee == 'agent')
                           Flexible(flex: 3, fit: FlexFit.loose, child: agent),
                         if (time.isNotEmpty) ...[
-                          const SizedBox(width: 12),
+                          const Gap(Space.md),
                           Flexible(
                             flex: 3,
                             fit: FlexFit.loose,
                             child: narrowMeta,
                           ),
                         ],
-                        const SizedBox(width: 16),
+                        const Gap(Space.lg),
                         Flexible(
                           flex: 4,
                           fit: FlexFit.loose,
@@ -290,7 +290,7 @@ class _ItemSourceState extends State<_ItemSource> {
           child: IgnorePointer(
             child: MenuSurface(
               width: 250,
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(Space.md),
               child: Text(
                 widget.details,
                 style: ts(context.type.uiSmall, c.textSecondary),
@@ -301,7 +301,7 @@ class _ItemSourceState extends State<_ItemSource> {
       },
       child: MouseRegion(
         onEnter: (_) {
-          if (!context.mobile) _portal.show();
+          if (!context.touch) _portal.show();
         },
         onExit: (_) => _portal.hide(),
         child: Semantics(
@@ -313,7 +313,7 @@ class _ItemSourceState extends State<_ItemSource> {
               showModalPanel<void>(
                 context,
                 (_) => Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(Space.lg),
                   child: Text(
                     widget.details,
                     style: ts(context.type.ui, c.textSecondary),
@@ -339,8 +339,8 @@ class _ItemSourceState extends State<_ItemSource> {
                 else if (widget.database)
                   DbIcon(DbIco.database, size: 12, color: c.iconTertiary)
                 else
-                  Icon20(Ico.page, size: 12, color: c.iconTertiary),
-                const SizedBox(width: 5),
+                  Icon20(Ico.page, size: IconSize.xs, color: c.iconTertiary),
+                const Gap(Space.xs),
                 Flexible(
                   child: Text(
                     widget.label,

@@ -269,7 +269,7 @@ TextSpan markedSpan(
         decoration: decos.isEmpty ? null : TextDecoration.combine(decos),
         decorationColor: link
             ? c.accentText
-            : (mention ? c.textSecondary.withValues(alpha: 0.6) : null),
+            : (mention ? c.textSecondary.withValues(alpha: Alpha.muted) : null),
         decorationThickness: link || mention ? 1 : null,
         color: code
             ? c.inlineCodeText
@@ -543,7 +543,7 @@ class MarkPainter extends CustomPainter {
         canvas.drawRRect(
           RRect.fromRectAndRadius(
             Rect.fromLTRB(r.left - 2, r.top + 1, r.right + 2, r.bottom - 1),
-            const Radius.circular(4),
+            const Radius.circular(Radii.sm),
           ),
           paint,
         );
@@ -583,7 +583,7 @@ class MarkPainter extends CustomPainter {
         queryChipWidth(label, base, textScaler),
         tp.height + 2,
       );
-      final rrect = RRect.fromRectAndRadius(chip, const Radius.circular(6));
+      final rrect = RRect.fromRectAndRadius(chip, const Radius.circular(Radii.md));
       canvas.drawRRect(rrect, Paint()..color = colors.bgSecondary);
       canvas.drawRRect(
         rrect,
@@ -602,7 +602,7 @@ class MarkPainter extends CustomPainter {
           _queryIcon,
         ),
         colors.textTertiary,
-        stroke: 1.3,
+        stroke: Stroke.regular,
       );
       tp.paint(
         canvas,
@@ -702,7 +702,7 @@ class MarkPainter extends CustomPainter {
         tp.height + 2 * _chipPaddingY,
       );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(chip, const Radius.circular(4)),
+        RRect.fromRectAndRadius(chip, const Radius.circular(Radii.sm)),
         Paint()..color = tag.bg,
       );
       tp.paint(
@@ -753,7 +753,7 @@ class MarkPainter extends CustomPainter {
         tp.paint(canvas, r.center - Offset(tp.width / 2, tp.height / 2));
         tp.dispose();
       } else {
-        paintIco(canvas, Ico.page, r, colors.iconSecondary, stroke: 1.3);
+        paintIco(canvas, Ico.page, r, colors.iconSecondary, stroke: Stroke.regular);
       }
     }
   }

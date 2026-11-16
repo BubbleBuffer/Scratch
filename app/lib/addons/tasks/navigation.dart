@@ -32,7 +32,7 @@ Future<String?> showTaskComposer(
     },
   );
   final String? id;
-  if (context.mobile) {
+  if (context.touch) {
     id = await showSheet<String>(
       context,
       (routeContext) => Padding(

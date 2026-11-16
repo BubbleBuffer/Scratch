@@ -129,24 +129,24 @@ class _SharedLinksBodyState extends State<SharedLinksBody> {
       children: [
         if (_error != null)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: Space.sm),
             child: Text(
               _error!,
               key: const ValueKey('shared-links-error'),
-              style: tsRaw(12, 16, 400, c.inlineCodeText),
+              style: ts(context.type.uiSmall, c.inlineCodeText, weight: Weight.regular),
             ),
           ),
         if (links == null && _error == null)
           Text(
             'Loading links…',
             key: const ValueKey('shared-links-loading'),
-            style: tsRaw(12, 16, 400, c.textSecondary),
+            style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular),
           )
         else if (links != null && links.isEmpty)
           Text(
             'No shared links yet. Share a note from its menu.',
             key: const ValueKey('shared-links-empty'),
-            style: tsRaw(13, 18, 400, c.textSecondary),
+            style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
           )
         else if (links != null)
           for (final s in links)

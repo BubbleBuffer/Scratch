@@ -30,11 +30,11 @@ final mobileSelectionControls = MobileSelectionControls();
 
 /// The selection controls for a field: native on mobile, the kit's otherwise.
 TextSelectionControls selectionControlsFor(BuildContext context) =>
-    context.mobile ? mobileSelectionControls : noteSelectionControls;
+    context.touch ? mobileSelectionControls : noteSelectionControls;
 
 /// The context menu for a field: the stock toolbar on mobile, none otherwise.
 EditableTextContextMenuBuilder? contextMenuFor(BuildContext context) =>
-    context.mobile ? mobileContextMenu : null;
+    context.touch ? mobileContextMenu : null;
 
 /// The stock selection toolbar for [state], in the app's colours.
 Widget mobileContextMenu(BuildContext context, EditableTextState state) {
@@ -85,7 +85,7 @@ class _SelectionToolbarHostState extends State<SelectionToolbarHost> {
   bool _handles = false;
 
   void _changed(TextSelection sel, SelectionChangedCause? cause) {
-    final handles = context.mobile && sel.isValid && !sel.isCollapsed;
+    final handles = context.touch && sel.isValid && !sel.isCollapsed;
     if (handles != _handles) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _handles = handles);

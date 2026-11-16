@@ -63,7 +63,7 @@ bool _standsInForSidebar(BuildContext context) {
       (routePage is String ? routePage : null)) {
     return false;
   }
-  return !context.mobile && tree.sidebarCollapsed;
+  return !context.touch && tree.sidebarCollapsed;
 }
 
 /// Semantic label for the feedback buttons. Their visible tooltip is AppTooltip
@@ -83,7 +83,7 @@ class SidebarReopenButton extends StatelessWidget {
     final tree = context.watch<TreeStore>();
     if (!_standsInForSidebar(context)) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.only(right: Space.xxs),
       child: IconBtnX(
         Ix.menu,
         key: const ValueKey('sidebar-open'),
@@ -105,7 +105,7 @@ class CollapsedFeedbackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!_standsInForSidebar(context)) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.only(right: Space.xxs),
       child: IconBtnX(
         Ix.feedback,
         key: const ValueKey('topbar-feedback'),
@@ -321,26 +321,26 @@ class _SidebarState extends State<Sidebar> {
         top: _pointer.dy - 14,
         child: IgnorePointer(
           child: Opacity(
-            opacity: 0.85,
+            opacity: Alpha.strong,
             child: MenuSurface(
               child: Container(
                 height: 28,
                 constraints: const BoxConstraints(maxWidth: 220),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     PageIcon(icon: icon, size: 16, color: c.iconSecondary),
-                    const SizedBox(width: 6),
+                    const Gap(Space.xs),
                     Flexible(
                       child: Text(
                         title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: ts(
-                          TypeScale.desktop.ui,
+                          TypeScale.pointer.ui,
                           c.textPrimary,
-                          weight: 400,
+                          weight: Weight.regular,
                         ),
                       ),
                     ),
@@ -597,7 +597,7 @@ class _SidebarState extends State<Sidebar> {
         if (favs.isNotEmpty) ...[
           _SectionLabel('Favorites', key: const ValueKey('sidebar-favorites')),
           for (final r in _withoutPlaceholders(tree.favoriteRows())) favRow(r),
-          const SizedBox(height: 12),
+          const Gap(Space.md),
         ],
         const _SectionLabel('Pages'),
         Column(
@@ -605,7 +605,7 @@ class _SidebarState extends State<Sidebar> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [for (var i = 0; i < rows.length; i++) treeRow(i, rows[i])],
         ),
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
       ],
     );
 
@@ -626,28 +626,28 @@ class _SidebarState extends State<Sidebar> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 6),
+                    const Gap(Space.xs),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                       child: SizedBox(
                         height: 32,
                         child: Row(
                           children: [
-                            const SizedBox(width: 8),
+                            const Gap(Space.sm),
                             SizedBox(
                               width: 26,
                               height: 26,
                               child: const CalicoMark(size: 26),
                             ),
-                            const SizedBox(width: 10),
+                            const Gap(Space.md),
                             Expanded(
                               child: Text(
                                 appName,
                                 maxLines: 1,
                                 style: tsDisplay(
-                                  const TypeSpec(19, 23, 660),
+                                  context.type.h3,
                                   c.railInk,
-                                ),
+                                 weight: Weight.display),
                               ),
                             ),
                             if (_hover)
@@ -655,8 +655,8 @@ class _SidebarState extends State<Sidebar> {
                                 Ix.collapse,
                                 key: const ValueKey('sidebar-collapse'),
                                 onTap: () => tree.setSidebarCollapsed(true),
-                                size: 28,
-                                glyph: 18,
+                                size: ControlSize.sm,
+                                glyph: IconSize.md,
                                 color: c.railMuted,
                                 semanticLabel: 'Close sidebar',
                                 command: 'sidebar.toggle',
@@ -665,7 +665,7 @@ class _SidebarState extends State<Sidebar> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const Gap(Space.xxs),
                     _NavRow(
                       key: const ValueKey('sidebar-search'),
                       icon: Ico.search,
@@ -699,16 +699,16 @@ class _SidebarState extends State<Sidebar> {
                             )
                           : const SizedBox.shrink(),
                     ),
-                    const SizedBox(height: 14),
+                    const Gap(Space.lg),
                     Expanded(child: list),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+                      padding: const EdgeInsets.fromLTRB(Space.md, Space.xs, Space.md, Space.sm),
                       child: KeyedSubtree(
                         key: const ValueKey('sidebar-new-page-row'),
                         child: PrimaryButton(
                           key: const ValueKey('new-page'),
                           label: 'New page',
-                          height: 42,
+                          size: ControlSize.xl,
                           icon: Ico.plus,
                           onTap: () => createPage(context),
                         ),
@@ -716,7 +716,7 @@ class _SidebarState extends State<Sidebar> {
                     ),
                     const ConflictRailGroup(),
                     const UpdateRailRow(),
-                    const SizedBox(height: 4),
+                    const Gap(Space.xxs),
                     Row(
                       children: [
                         Expanded(
@@ -728,12 +728,12 @@ class _SidebarState extends State<Sidebar> {
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.only(right: Space.sm),
                           child: IconBtnX(
                             Ix.feedback,
                             key: const ValueKey('sidebar-feedback'),
-                            size: Layout.sidebarRowHeight - 2,
-                            glyph: 18,
+                            size: ControlSize.sm,
+                            glyph: IconSize.md,
                             color: c.railMuted,
                             onTap: () => sendFeedback(context),
                             semanticLabel: feedbackButtonLabel,
@@ -752,7 +752,7 @@ class _SidebarState extends State<Sidebar> {
                         onTap: () => _openTrash(row),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const Gap(Space.sm),
                   ],
                 ),
               ),
@@ -783,12 +783,12 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+      padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, 0),
       child: SizedBox(
         height: 30,
         child: Align(
           alignment: Alignment.centerLeft,
-          child: Text(text, style: tsRaw(12, 16, 700, c.railMuted)),
+          child: Text(text, style: ts(context.type.uiSmall, c.railMuted, weight: Weight.bold)),
         ),
       ),
     );
@@ -816,7 +816,7 @@ class _DropIndicator extends StatelessWidget {
           Positioned.fill(
             key: const ValueKey('tree-drop-inside'),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+              padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.hair),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: c.bgSelectedBlock,
@@ -834,7 +834,7 @@ class _DropIndicator extends StatelessWidget {
             top: mode == _Drop.before ? 0 : null,
             bottom: mode == _Drop.after ? 0 : null,
             height: 2,
-            child: ColoredBox(color: c.accent.withValues(alpha: 0.6)),
+            child: ColoredBox(color: c.accent.withValues(alpha: Alpha.muted)),
           ),
       ],
     );
@@ -905,8 +905,8 @@ class _ProposalsRow extends StatelessWidget {
               : Container(
                   key: const ValueKey('sidebar-proposals-count'),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 1,
+                    horizontal: Space.xs,
+                    vertical: Space.hair,
                   ),
                   decoration: BoxDecoration(
                     color: c.accent,
@@ -914,7 +914,7 @@ class _ProposalsRow extends StatelessWidget {
                   ),
                   child: Text(
                     '$n',
-                    style: ts(const TypeSpec(11, 15, 700), c.onAccent),
+                    style: ts(context.type.caption, c.onAccent, weight: Weight.bold),
                   ),
                 ),
         );
@@ -951,7 +951,7 @@ class _NavRowState extends State<_NavRow> {
     final c = context.colors;
     final ty = context.type;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.hair),
       child: Hover(
         onTap: widget.onTap,
         selected: widget.selected,
@@ -959,7 +959,7 @@ class _NavRowState extends State<_NavRow> {
         hoverColor: railHover(c),
         onHoverChanged: (value) => setState(() => _hover = value),
         borderRadius: Radii.ctl,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: Space.sm),
         child: SizedBox(
           height: Layout.sidebarRowHeight - 2,
           child: Row(
@@ -970,12 +970,12 @@ class _NavRowState extends State<_NavRow> {
                 child: Center(
                   child: Icon20(
                     widget.icon,
-                    size: 18,
+                    size: IconSize.md,
                     color: widget.selected || _hover ? c.railInk : c.railMuted,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               Expanded(
                 child: Text(
                   widget.label,
@@ -984,18 +984,18 @@ class _NavRowState extends State<_NavRow> {
                   style: ts(
                     ty.ui,
                     widget.selected || _hover ? c.railInk : c.railMuted,
-                    weight: widget.selected ? 700 : 400,
+                    weight: widget.selected ? Weight.bold : Weight.regular,
                   ),
                 ),
               ),
               if (widget.trailing != null) widget.trailing!,
               if (widget.label == 'Search')
                 Opacity(
-                  opacity: 0.7,
+                  opacity: Alpha.muted,
                   child: Text(
                     shortcutHint('Ctrl K'),
                     style: ts(
-                      const TypeSpec(11, 15, 400),
+                      context.type.caption,
                       c.railMuted,
                       mono: true,
                     ),
@@ -1108,7 +1108,7 @@ class _TreeRowViewState extends State<_TreeRowView> {
               widget.selected || _hover || widget.menuOpen
                   ? c.railInk
                   : c.railMuted,
-              weight: widget.selected ? 700 : 400,
+              weight: widget.selected ? Weight.bold : Weight.regular,
             ),
           );
 
@@ -1131,9 +1131,9 @@ class _TreeRowViewState extends State<_TreeRowView> {
           );
 
     return Opacity(
-      opacity: widget.dragging ? 0.4 : 1,
+      opacity: widget.dragging ? Alpha.wash : 1,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+        padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.hair),
         child: Stack(
           children: [
             Hover(
@@ -1144,7 +1144,7 @@ class _TreeRowViewState extends State<_TreeRowView> {
               selectedColor: widget.selected ? railSelected(c) : c.rail2,
               hoverColor: railHover(c),
               borderRadius: Radii.ctl,
-              padding: EdgeInsets.only(left: 4 + 12.0 * widget.depth, right: 4),
+              padding: EdgeInsets.only(left: 4 + 12.0 * widget.depth, right: Space.xxs),
               child: SizedBox(
                 height: Layout.sidebarRowHeight - 2,
                 child: Row(
@@ -1169,7 +1169,7 @@ class _TreeRowViewState extends State<_TreeRowView> {
                                   widget.expanded
                                       ? Ico.chevronDown
                                       : Ico.chevronRight,
-                                  size: 12,
+                                  size: IconSize.xs,
                                   color: c.railMuted,
                                 ),
                               ),
@@ -1177,14 +1177,14 @@ class _TreeRowViewState extends State<_TreeRowView> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 2),
+                      const Gap(Space.hair),
                     ] else if (widget.showToggle)
                       // A leaf keeps the chevron's room so icons line up.
-                      const SizedBox(width: 22)
+                      const Gap(Space.xl)
                     else
-                      const SizedBox(width: 4),
+                      const Gap(Space.xxs),
                     icon,
-                    const SizedBox(width: 6),
+                    const Gap(Space.xs),
                     Expanded(
                       child: Row(children: [Flexible(child: label)]),
                     ),
@@ -1193,8 +1193,8 @@ class _TreeRowViewState extends State<_TreeRowView> {
                         Ico.more,
                         key: ValueKey('$pre-more-$id'),
                         onTap: _menu,
-                        size: 20,
-                        glyph: 14,
+                        size: ControlSize.xs,
+                        glyph: IconSize.xs,
                         radius: Radii.sm,
                         color: c.railMuted,
                         semanticLabel: 'Page actions',
@@ -1203,8 +1203,8 @@ class _TreeRowViewState extends State<_TreeRowView> {
                         Ico.plus,
                         key: ValueKey('$pre-add-$id'),
                         onTap: widget.onAdd,
-                        size: 20,
-                        glyph: 14,
+                        size: ControlSize.xs,
+                        glyph: IconSize.xs,
                         radius: Radii.sm,
                         color: c.railMuted,
                         semanticLabel: 'Add a page inside',
@@ -1236,7 +1236,7 @@ class _TreeRowViewState extends State<_TreeRowView> {
 
 /// The current row on the rail: a lighter fill than hover, with the bar.
 Color railSelected(AppColors c) =>
-    Color.alphaBlend(c.railInk.withValues(alpha: .10), c.rail2);
+    Color.alphaBlend(c.railInk.withValues(alpha: Alpha.tint), c.rail2);
 
 /// A hovered row on the rail: a fainter fill than the current row.
-Color railHover(AppColors c) => c.rail2.withValues(alpha: .55);
+Color railHover(AppColors c) => c.rail2.withValues(alpha: Alpha.muted);

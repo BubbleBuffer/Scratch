@@ -46,7 +46,7 @@ Future<void> showSharePopup(
 }) {
   Widget body(BuildContext ctx) =>
       SharePopup(pageId: pageId, pageTitle: pageTitle);
-  if (context.mobile) {
+  if (context.touch) {
     return showSheet<void>(
       context,
       (ctx) => SheetSurface(children: [body(ctx)]),
@@ -198,19 +198,19 @@ class _SharePopupState extends State<SharePopup> {
   }
 
   Widget _label(BuildContext context, String text, {Key? key}) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
+    padding: const EdgeInsets.only(bottom: Space.xs),
     child: Text(
       text,
       key: key,
-      style: tsRaw(12, 16, 500, context.colors.textSecondary),
+      style: ts(context.type.uiSmall, context.colors.textSecondary),
     ),
   );
 
   Widget _hint(BuildContext context, String text) => Padding(
-    padding: const EdgeInsets.only(top: 6, bottom: 14),
+    padding: const EdgeInsets.only(top: Space.xs, bottom: Space.lg),
     child: Text(
       text,
-      style: tsRaw(12, 16, 400, context.colors.textSecondary),
+      style: ts(context.type.uiSmall, context.colors.textSecondary, weight: Weight.regular),
     ),
   );
 
@@ -222,7 +222,7 @@ class _SharePopupState extends State<SharePopup> {
     required ValueChanged<String> onPick,
   }) {
     final c = context.colors;
-    final h = context.mobile ? 36.0 : 28.0;
+    final h = context.touch ? 36.0 : 28.0;
     return Container(
       height: h,
       clipBehavior: Clip.antiAlias,
@@ -274,7 +274,7 @@ class _SharePopupState extends State<SharePopup> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final pad = m ? Layout.gutter : 20.0;
     final client = _client;
     final links = _links;
@@ -285,7 +285,7 @@ class _SharePopupState extends State<SharePopup> {
         child: Text(
           'Sign in to a hub in Sync to share pages.',
           key: const ValueKey('share-signed-out'),
-          style: tsRaw(13, 18, 400, c.textSecondary),
+          style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
         ),
       );
     }
@@ -298,15 +298,15 @@ class _SharePopupState extends State<SharePopup> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Share', style: tsRaw(16, 24, 500, c.textPrimary)),
-          const SizedBox(height: 2),
+          Text('Share', style: ts(context.type.body, c.textPrimary, weight: Weight.medium)),
+          const Gap(Space.hair),
           Text(
             displayTitle(widget.pageTitle),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: tsRaw(13, 18, 400, c.textSecondary),
+            style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
           ),
-          const SizedBox(height: 16),
+          const Gap(Space.lg),
           _label(
             context,
             'Who can view',
@@ -346,21 +346,21 @@ class _SharePopupState extends State<SharePopup> {
           PrimaryButton(
             key: const ValueKey('share-create'),
             label: _busy ? 'Creating…' : 'Create link',
-            height: 36,
+            size: ControlSize.lg,
             onTap: _create,
           ),
           if (_error != null) ...[
-            const SizedBox(height: 8),
+            const Gap(Space.sm),
             Text(
               _error!,
               key: const ValueKey('share-error'),
-              style: tsRaw(12, 16, 400, c.inlineCodeText),
+              style: ts(context.type.uiSmall, c.inlineCodeText, weight: Weight.regular),
             ),
           ],
           if (created != null) ...[
-            const SizedBox(height: 12),
+            const Gap(Space.md),
             Container(
-              padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+              padding: const EdgeInsets.fromLTRB(Space.md, Space.xs, Space.xxs, Space.xs),
               decoration: BoxDecoration(
                 color: c.bgSecondary,
                 borderRadius: Radii.field,
@@ -375,7 +375,7 @@ class _SharePopupState extends State<SharePopup> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: ts(
-                        const TypeSpec(13, 19, 400),
+                        context.type.code,
                         c.textPrimary,
                         mono: true,
                       ),
@@ -392,34 +392,34 @@ class _SharePopupState extends State<SharePopup> {
           ],
           if (created != null && created.existing)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: Space.xs),
               child: Text(
                 'Link already exists',
                 key: const ValueKey('share-existing'),
-                style: tsRaw(12, 16, 400, c.textSecondary),
+                style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular),
               ),
             ),
-          const SizedBox(height: 20),
+          const Gap(Space.xl),
           Text(
             'Links to this page',
-            style: tsRaw(14, 20, 500, c.textPrimary),
+            style: ts(context.type.ui, c.textPrimary),
           ),
           if (links == null && _error == null)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: Space.sm),
               child: Text(
                 'Loading links…',
                 key: const ValueKey('share-loading'),
-                style: tsRaw(12, 16, 400, c.textSecondary),
+                style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular),
               ),
             )
           else if (links != null && links.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: Space.sm),
               child: Text(
                 'No links yet.',
                 key: const ValueKey('share-empty'),
-                style: tsRaw(12, 16, 400, c.textSecondary),
+                style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular),
               ),
             )
           else if (links != null)
@@ -469,16 +469,16 @@ class ShareLinkRow extends StatelessWidget {
     if (confirming) {
       return Padding(
         key: ValueKey('share-row-${s.id}'),
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: Space.sm),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Revoke this link? It stops working for everyone.',
               key: ValueKey('share-confirm-${s.id}'),
-              style: tsRaw(14, 20, 400, c.textPrimary),
+              style: ts(context.type.ui, c.textPrimary, weight: Weight.regular),
             ),
-            const SizedBox(height: 4),
+            const Gap(Space.xxs),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -488,7 +488,7 @@ class ShareLinkRow extends StatelessWidget {
                   color: c.textSecondary,
                   onTap: onCancelRevoke,
                 ),
-                const SizedBox(width: 8),
+                const Gap(Space.sm),
                 TextBtn(
                   'Revoke',
                   key: ValueKey('share-revoke-confirm-${s.id}'),
@@ -514,13 +514,13 @@ class ShareLinkRow extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: title == null
-                ? tsRaw(14, 20, 500, c.textTertiary).copyWith(
+                ? ts(context.type.ui, c.textTertiary).copyWith(
                     fontStyle: FontStyle.italic,
                   )
-                : tsRaw(14, 20, 500, c.textPrimary),
+                : ts(context.type.ui, c.textPrimary),
           ),
-        Text(s.label, style: tsRaw(14, 20, 400, c.textPrimary)),
-        Text(relativeTime(s.created), style: tsRaw(12, 16, 400, c.textSecondary)),
+        Text(s.label, style: ts(context.type.ui, c.textPrimary, weight: Weight.regular)),
+        Text(relativeTime(s.created), style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular)),
       ],
     );
     final actions = Row(
@@ -529,7 +529,7 @@ class ShareLinkRow extends StatelessWidget {
         if (showTitle)
           // A disabled Open note is faded, so it reads as off in both themes.
           Opacity(
-            opacity: onOpen == null ? 0.4 : 1,
+            opacity: onOpen == null ? Alpha.wash : 1,
             child: TextBtn(
               'Open note',
               key: ValueKey('share-open-${s.id}'),
@@ -543,7 +543,7 @@ class ShareLinkRow extends StatelessWidget {
           color: c.textSecondary,
           onTap: onCopy,
         ),
-        const SizedBox(width: 8),
+        const Gap(Space.sm),
         TextBtn(
           'Revoke',
           key: ValueKey('share-revoke-${s.id}'),
@@ -554,13 +554,13 @@ class ShareLinkRow extends StatelessWidget {
     );
     return Padding(
       key: ValueKey('share-row-${s.id}'),
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: Space.sm),
       child: narrow
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 text,
-                const SizedBox(height: 2),
+                const Gap(Space.hair),
                 // The buttons' own padding is 8 px; pull them back so their
                 // labels line up with the text above.
                 Transform.translate(offset: const Offset(-8, 0), child: actions),
@@ -606,7 +606,7 @@ class _SegmentHalf extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: tsRaw(13, 18, 600, selected ? c.onAccent : c.textSecondary),
+              style: ts(context.type.ui, selected ? c.onAccent : c.textSecondary, weight: Weight.semibold),
             ),
           ),
         ),

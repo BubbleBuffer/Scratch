@@ -138,9 +138,9 @@ class ConfettiPainter extends CustomPainter {
       canvas.drawRRect(
         RRect.fromRectAndCorners(
           Rect.fromLTWH(0, 0, p.width, p.height),
-          topLeft: const Radius.circular(2),
-          topRight: const Radius.circular(4),
-          bottomLeft: const Radius.circular(3),
+          topLeft: const Radius.circular(Radii.sm),
+          topRight: const Radius.circular(Radii.sm),
+          bottomLeft: const Radius.circular(Radii.sm),
           bottomRight: const Radius.circular(1),
         ),
         Paint()

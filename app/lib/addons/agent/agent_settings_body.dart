@@ -216,7 +216,7 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
                   s.agentBunPath.isNotEmpty || s.agentClaudeCodeDir.isNotEmpty,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.only(top: Space.xxs),
                   child: Text.rich(
                     sRich(
                       'The agent can use **Claude Code** as a model provider, with your Claude Code sign-in. It needs the bun program and BubblePaw’s Claude Code extension. Scratch finds both on its own; leave these empty unless Claude Code is missing from Model.',
@@ -371,7 +371,7 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
                 key: ValueKey('agent-project-${project.id}'),
                 child: _renaming == project.id
                     ? Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                        padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.sm, Space.sm),
                         child: Row(
                           children: [
                             Expanded(
@@ -384,7 +384,7 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
                                 onSubmitted: (_) => _renameProject(project.id),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const Gap(Space.sm),
                             SButton(
                               'Cancel',
                               kind: SButtonKind.quiet,
@@ -461,7 +461,7 @@ class _AgentSettingsSectionState extends State<AgentSettingsSection> {
                       ),
                     ),
                     if (FileDialogs.instance.folders) ...[
-                      const SizedBox(width: 8),
+                      const Gap(Space.sm),
                       SButton(
                         'Browse…',
                         key: const ValueKey('agent-project-browse'),

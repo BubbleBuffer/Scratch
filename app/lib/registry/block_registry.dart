@@ -136,7 +136,7 @@ class BlockContext {
 
   AppColors get colors => context.colors;
   TypeScale get type => context.type;
-  bool get mobile => context.mobile;
+  bool get mobile => context.touch;
   bool get readOnly => host is ReadOnlyBlockHost;
 }
 

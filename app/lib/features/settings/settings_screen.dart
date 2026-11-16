@@ -96,13 +96,13 @@ class _SyncAndDevicesBody extends StatelessWidget {
 /// Opens settings at [section]. With none, a phone opens the list of
 /// pages and a computer opens General.
 Future<void> showSettings(BuildContext context, {SettingsSection? section}) {
-  if (context.mobile) {
+  if (context.touch) {
     if (section == null) {
       return Navigator.of(context).push(
         pageRoute(
           (_) => const SettingsPage(),
           motion: Motion.of(context),
-          mobile: true,
+          slide: true,
           settings: const RouteSettings(name: '/settings'),
         ),
       );
@@ -193,7 +193,7 @@ class _PanelRoute<T> extends PopupRoute<T> {
 
 /// Mobile: a full-screen page with a back button and [title].
 Future<void> pushSettingsPage(BuildContext context, String title, Widget body, {Key? key}) =>
-    Navigator.of(context).push(pageRoute((_) => MobileSettingsScaffold(key: key, title: title, body: body), motion: Motion.of(context), mobile: true));
+    Navigator.of(context).push(pageRoute((_) => MobileSettingsScaffold(key: key, title: title, body: body), motion: Motion.of(context), slide: true));
 
 /// Mobile: one settings page under a "‹ Settings" crumb; the page shows
 /// its own title.
@@ -210,7 +210,7 @@ Future<void> pushSectionPage(BuildContext context, SettingsSection s) =>
           ),
         ),
         motion: Motion.of(context),
-        mobile: true,
+        slide: true,
       ),
     );
 
@@ -241,14 +241,14 @@ class MobileSettingsScaffold extends StatelessWidget {
           SizedBox(
             height: Layout.topbarHeight,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
               child: crumb
                   ? Row(children: [
                       Hover(
                         key: const ValueKey('back'),
                         onTap: () => Navigator.of(context).maybePop(),
                         lift: 0,
-                        padding: const EdgeInsets.fromLTRB(6, 0, 12, 0),
+                        padding: const EdgeInsets.fromLTRB(Space.xs, 0, Space.md, 0),
                         child: Semantics(
                           button: true,
                           label: 'Back to $title',
@@ -256,8 +256,8 @@ class MobileSettingsScaffold extends StatelessWidget {
                             height: 44,
                             child: Row(mainAxisSize: MainAxisSize.min, children: [
                               SIcon(Sx.chevronLeft, size: 20, color: c.textSecondary),
-                              const SizedBox(width: 2),
-                              Text(title, style: tsRaw(15, 20, 600, c.textSecondary)),
+                              const Gap(Space.hair),
+                              Text(title, style: ts(context.type.title, c.textSecondary, weight: Weight.semibold)),
                             ]),
                           ),
                         ),
@@ -267,17 +267,17 @@ class MobileSettingsScaffold extends StatelessWidget {
                       IconBtn(Ico.chevronLeft,
                           key: const ValueKey('back'),
                           onTap: () => Navigator.of(context).maybePop(),
-                          size: 44,
-                          glyph: 24,
+                          size: ControlSize.xl,
+                          glyph: IconSize.xl,
                           color: c.iconPrimary,
                           semanticLabel: 'Back'),
-                      Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary))),
+                      Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display))),
                     ]),
             ),
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(padded ? Layout.gutter : 0, 8, padded ? Layout.gutter : 0, mq.padding.bottom + 48),
+              padding: EdgeInsets.fromLTRB(padded ? Layout.gutter : 0, Space.sm, padded ? Layout.gutter : 0, mq.padding.bottom + 48),
               child: body,
             ),
           ),
@@ -332,14 +332,14 @@ class _SettingsModalState extends State<SettingsModal> {
           color: c.bgSecondary,
           border: Border(right: BorderSide(color: c.border)),
         ),
-        padding: const EdgeInsets.fromLTRB(10, 18, 10, 18),
+        padding: const EdgeInsets.fromLTRB(Space.md, Space.lg, Space.md, Space.lg),
         child: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.md),
               child: Semantics(
                 header: true,
-                child: Text('Settings', style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
+                child: Text('Settings', style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display)),
               ),
             ),
             ...nav,
@@ -351,7 +351,7 @@ class _SettingsModalState extends State<SettingsModal> {
           color: c.bgPrimary,
           child: SingleChildScrollView(
             key: ValueKey('settings-body-${_section.name}'),
-            padding: const EdgeInsets.fromLTRB(48, 36, 48, 64),
+            padding: const EdgeInsets.fromLTRB(Space.xxxl, Space.xxl, Space.xxxl, Space.xxxl),
             child: Align(
               alignment: Alignment.topLeft,
               child: ConstrainedBox(
@@ -378,8 +378,8 @@ class _NavGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(10, 16, 10, 4),
-    child: Text(label, style: tsRaw(11, 16, 720, context.colors.textTertiary)),
+    padding: const EdgeInsets.fromLTRB(Space.md, Space.lg, Space.md, Space.xxs),
+    child: Text(label, style: ts(context.type.caption, context.colors.textTertiary, weight: Weight.bold)),
   );
 }
 
@@ -394,7 +394,7 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 1),
+      padding: const EdgeInsets.only(bottom: Space.hair),
       child: Semantics(
         selected: selected,
         child: Hover(
@@ -408,16 +408,16 @@ class _NavItem extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: 32),
             decoration: BoxDecoration(
               border: Border(
-                left: BorderSide(color: selected ? c.accent : const Color(0x00000000), width: 3),
+                left: BorderSide(color: selected ? c.accent : const Color(0x00000000), width: Stroke.seam),
               ),
             ),
-            padding: const EdgeInsets.fromLTRB(7, 6, 10, 6),
+            padding: const EdgeInsets.fromLTRB(Space.sm, Space.xs, Space.md, Space.xs),
             child: Row(children: [
               sectionIcon(section, selected ? c.iconPrimary : c.iconSecondary, 16),
-              const SizedBox(width: 10),
+              const Gap(Space.md),
               Expanded(
                 child: Text(section.label,
-                    style: tsRaw(13.5, 18, selected ? 620 : 500, selected ? c.textPrimary : c.textSecondary)),
+                    style: ts(context.type.ui, selected ? c.textPrimary : c.textSecondary, weight: selected ? Weight.semibold : Weight.medium)),
               ),
               if (badge != null) _Badge(badge!),
             ]),
@@ -433,11 +433,11 @@ class _Badge extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
         height: 18,
         alignment: Alignment.center,
         decoration: BoxDecoration(color: context.colors.attnBg, borderRadius: Radii.pill),
-        child: Text(text, style: tsRaw(11, 14, 650, context.colors.textPrimary)),
+        child: Text(text, style: ts(context.type.caption, context.colors.textPrimary, weight: Weight.display)),
       );
 }
 
@@ -477,8 +477,8 @@ class SettingsPage extends StatelessWidget {
         group = s.group;
         if (group != null) {
           rows.add(Padding(
-            padding: const EdgeInsets.fromLTRB(Layout.gutter, 20, Layout.gutter, 6),
-            child: Text(group, style: tsRaw(12, 16, 720, c.textTertiary)),
+            padding: const EdgeInsets.fromLTRB(Layout.gutter, Space.xl, Layout.gutter, Space.xs),
+            child: Text(group, style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.bold)),
           ));
         }
       }
@@ -493,11 +493,11 @@ class SettingsPage extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 48),
           child: Row(children: [
             sectionIcon(s, c.iconSecondary, 20),
-            const SizedBox(width: 14),
-            Expanded(child: Text(s.label, style: tsRaw(15, 20, 500, c.textPrimary))),
+            const Gap(Space.lg),
+            Expanded(child: Text(s.label, style: ts(context.type.ui, c.textPrimary))),
             if (_value(context, s) case final v?) ...[
-              Text(v, style: tsRaw(14, 20, 400, c.textTertiary)),
-              const SizedBox(width: 6),
+              Text(v, style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
+              const Gap(Space.xs),
             ],
             SIcon(Sx.chevronRight, size: 16, color: c.iconTertiary),
           ]),
@@ -509,10 +509,10 @@ class SettingsPage extends StatelessWidget {
       padded: false,
       body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(Layout.gutter, 0, Layout.gutter, 4),
+          padding: const EdgeInsets.fromLTRB(Layout.gutter, 0, Layout.gutter, Space.xxs),
           child: Semantics(
             header: true,
-            child: Text('Settings', style: tsDisplay(const TypeSpec(24, 28, 680), c.textPrimary)),
+            child: Text('Settings', style: tsDisplay(context.type.h2, c.textPrimary, weight: Weight.bold)),
           ),
         ),
         ...rows,
@@ -536,7 +536,7 @@ class GeneralBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppSettings.of(context);
-    final m = context.mobile;
+    final m = context.touch;
     final phone = defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
     return SPage(
@@ -749,7 +749,7 @@ class _VaultBodyState extends State<VaultBody> {
     final s = AppSettings.of(context);
     final root = context.app.vault.root;
     final pending = s.vaultPath != null && s.vaultPath != root ? s.vaultPath : null;
-    final desktop = !context.mobile;
+    final desktop = !context.touch;
     return SPage(
       title: 'Storage',
       intro:
@@ -767,7 +767,7 @@ class _VaultBodyState extends State<VaultBody> {
               below: pending == null
                   ? null
                   : Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.only(top: Space.sm),
                       child: Text(
                         '$appName opens $pending the next time it starts.',
                         key: const ValueKey('vault-pending'),
@@ -799,10 +799,10 @@ class _VaultBodyState extends State<VaultBody> {
                         ),
                       ),
                       if (FileDialogs.instance.folders) ...[
-                        const SizedBox(width: 8),
+                        const Gap(Space.sm),
                         SButton('Choose…', key: const ValueKey('vault-choose'), onTap: () => _choose(s)),
                       ],
-                      const SizedBox(width: 8),
+                      const Gap(Space.sm),
                       SButton('Use folder', key: const ValueKey('vault-use'), onTap: () => _use(s)),
                     ]),
                     below: _error == null

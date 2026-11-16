@@ -18,7 +18,7 @@ import '../state/app_state.dart';
 import '../ui/ui.dart';
 
 Future<T?> _show<T>(BuildContext context, Rect? anchor, Widget Function(BuildContext ctx) body, {double width = 420}) {
-  if (context.mobile || anchor == null) {
+  if (context.touch || anchor == null) {
     return showSheet<T>(context, (ctx) => SheetSurface(children: [body(ctx)]));
   }
   return showPopover<T>(context, anchor, (ctx) => MenuSurface(width: width, child: body(ctx)));
@@ -153,7 +153,7 @@ class _FieldPickerState extends State<_FieldPicker> {
     final choose = widget.onChoose;
     final field = Container(
       height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
         color: c.bgHover,
@@ -165,7 +165,7 @@ class _FieldPickerState extends State<_FieldPicker> {
         controller: _ctl,
         focusNode: _focus,
         autofocus: choose == null,
-        style: ts(ty.ui, c.textPrimary, weight: 400),
+        style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
         placeholder: widget.placeholder,
         textInputAction: TextInputAction.done,
         onSubmitted: (_) => _submit(),
@@ -186,24 +186,24 @@ class _FieldPickerState extends State<_FieldPicker> {
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
         height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: Space.sm),
         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border))),
         child: Row(children: [
           Container(
             height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: Space.xs),
             alignment: Alignment.center,
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.textPrimary, width: 2))),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.textPrimary, width: Stroke.bold))),
             child: Text(widget.tab, style: ts(ty.ui, c.textPrimary)),
           ),
         ]),
       ),
-      Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 0), child: first),
-      Padding(padding: const EdgeInsets.fromLTRB(12, 10, 12, 0), child: second),
+      Padding(padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.md, 0), child: first),
+      Padding(padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.md, 0), child: second),
       Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, Space.md),
         child: Text(_error ?? widget.hint,
-            textAlign: TextAlign.center, style: ts(ty.uiSmall, _error != null ? c.inlineCodeText : c.textTertiary, weight: 400)),
+            textAlign: TextAlign.center, style: ts(ty.uiSmall, _error != null ? c.inlineCodeText : c.textTertiary, weight: Weight.regular)),
       ),
     ]);
   }
@@ -294,12 +294,12 @@ class _PageSearchListState extends State<PageSearchList> {
     final c = context.colors;
     final ty = context.type;
     return Padding(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(Space.xs),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Container(
           height: 30,
-          margin: const EdgeInsets.fromLTRB(2, 2, 2, 6),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          margin: const EdgeInsets.fromLTRB(Space.hair, Space.hair, Space.hair, Space.xs),
+          padding: const EdgeInsets.symmetric(horizontal: Space.sm),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(
             color: c.bgHover,
@@ -311,7 +311,7 @@ class _PageSearchListState extends State<PageSearchList> {
             controller: _ctl,
             focusNode: _focus,
             autofocus: true,
-            style: ts(ty.ui, c.textPrimary, weight: 400),
+            style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
             placeholder: 'Search for a page…',
             onChanged: (_) {
               _debounce?.cancel();
@@ -335,7 +335,7 @@ class _PageSearchListState extends State<PageSearchList> {
       key: ValueKey('page-pick-${h.id}'),
       label: label.text,
       firstLine: label.firstLine,
-      leading: PageIcon(icon: h.icon, size: context.mobile ? 22 : 20),
+      leading: PageIcon(icon: h.icon, size: context.touch ? 22 : 20),
       onTap: () => widget.onPick(h.id),
     );
   }

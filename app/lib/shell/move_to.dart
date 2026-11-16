@@ -31,7 +31,7 @@ Future<void> showMoveTo(BuildContext context, String pageId, {Rect? anchor}) asy
         onPick: (t) => Navigator.of(ctx).pop(t),
       );
   final MoveTarget? t;
-  if (context.mobile || anchor == null) {
+  if (context.touch || anchor == null) {
     t = await showSheet<MoveTarget>(context, (ctx) => SheetSurface(children: [body(ctx)]));
   } else {
     t = await showPopover<MoveTarget>(context, anchor, (ctx) => MenuSurface(width: 320, child: body(ctx)));
@@ -100,13 +100,13 @@ class _MoveToListState extends State<MoveToList> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final ty = context.type;
-    final m = context.mobile;
+    final m = context.touch;
     final empty = _ctl.text.trim().isEmpty;
     return Padding(
-      padding: EdgeInsets.all(m ? 0 : 6),
+      padding: EdgeInsets.all(m ? 0 : Space.xs),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(m ? Layout.gutter : 2, 2, m ? Layout.gutter : 2, 6),
+          padding: EdgeInsets.fromLTRB(m ? Layout.gutter : Space.hair, Space.hair, m ? Layout.gutter : Space.hair, Space.xs),
           child: InputBox(
             height: m ? 40 : 30,
             child: PlainField(
@@ -114,7 +114,7 @@ class _MoveToListState extends State<MoveToList> {
               controller: _ctl,
               focusNode: _focus,
               autofocus: !m,
-              style: ts(ty.ui, c.textPrimary, weight: 400),
+              style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
               placeholder: 'Move page to…',
               onChanged: (_) {
                 _debounce?.cancel();
@@ -150,7 +150,7 @@ class _MoveToListState extends State<MoveToList> {
   }
 
   Widget _item({required Key key, required String label, required Widget leading, required VoidCallback onTap}) =>
-      context.mobile
+      context.touch
           ? SheetItem(key: key, label: label, leading: leading, onTap: onTap)
           : MenuItem(key: key, label: label, leading: leading, onTap: onTap);
 }

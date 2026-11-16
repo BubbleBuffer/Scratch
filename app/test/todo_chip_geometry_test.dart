@@ -17,7 +17,7 @@ void main() {
         await tester.runAsync(loadFonts);
         sansFamily = 'Atkinson Hyperlegible Next';
         monoFamily = 'Fragment Mono';
-        final base = ts(mobile ? TypeScale.mobile.body : TypeScale.desktop.body, AppColors.light.textPrimary);
+        final base = ts(mobile ? TypeScale.touch.body : TypeScale.pointer.body, AppColors.light.textPrimary);
         late BuildContext editableContext;
         await tester.pumpWidget(MediaQuery(
           data: MediaQueryData(textScaler: textScaler),

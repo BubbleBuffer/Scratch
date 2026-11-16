@@ -67,7 +67,7 @@ Future<void> pickDateProp(BuildContext ctx, Rect rect, ViewArgs a) async {
             propIcon(d),
             key: ValueKey('date-prop-${d.name}'),
             trailing: a.view.dateProp == d.key
-                ? Icon20(Ico.check, size: 16, color: c.colors.iconPrimary)
+                ? Icon20(Ico.check, size: IconSize.sm, color: c.colors.iconPrimary)
                 : null,
             onTap: () => Navigator.of(c).pop(d.key),
           ),
@@ -151,7 +151,7 @@ class _CalendarViewState extends State<CalendarView> {
     final c = context.colors;
     if (key == null || a.store.def(key) == null) {
       return Padding(
-        padding: EdgeInsets.fromLTRB(a.gutter, 24, a.gutter, 24),
+        padding: EdgeInsets.fromLTRB(a.gutter, Space.xl, a.gutter, Space.xl),
         child: Builder(
           builder: (b) => ChipBtn(
             key: const ValueKey('calendar-pick-date'),
@@ -166,9 +166,9 @@ class _CalendarViewState extends State<CalendarView> {
     final last = first.add(_weeks * 7 - 1);
     final (from, to) = queryRangeOf(first, last);
     a.store.showRange(key, from, to);
-    final m = context.mobile;
+    final m = context.touch;
     final head = Padding(
-      padding: EdgeInsets.fromLTRB(a.gutter + (m ? 8 : 8), 4, a.gutter, 4),
+      padding: EdgeInsets.fromLTRB(a.gutter + (m ? 8 : 8), Space.xxs, a.gutter, Space.xxs),
       child: SizedBox(
         height: m ? 40 : 32,
         child: Row(
@@ -177,17 +177,17 @@ class _CalendarViewState extends State<CalendarView> {
               '${monthName(_month.month)} ${_month.year}',
               key: const ValueKey('calendar-month'),
               style: ts(
-                m ? const TypeSpec(17, 22, 600) : context.type.ui,
+                m ? context.type.title : context.type.ui,
                 c.textPrimary,
-                weight: 600,
+                weight: Weight.semibold,
               ),
             ),
             const Spacer(),
             IconBtn(
               Ico.chevronLeft,
               key: const ValueKey('calendar-prev'),
-              size: m ? 36 : 24,
-              glyph: m ? 20 : 16,
+              size: m ? ControlSize.lg : ControlSize.xs,
+              glyph: m ? IconSize.lg : IconSize.sm,
               color: c.iconSecondary,
               semanticLabel: 'Previous month',
               onTap: () => _shiftMonth(-1),
@@ -195,7 +195,7 @@ class _CalendarViewState extends State<CalendarView> {
             TextBtn(
               'Today',
               key: const ValueKey('calendar-today'),
-              height: m ? 36 : 24,
+              size: m ? ControlSize.lg : ControlSize.xs,
               color: c.textSecondary,
               onTap: () {
                 setState(() {
@@ -207,8 +207,8 @@ class _CalendarViewState extends State<CalendarView> {
             IconBtn(
               Ico.chevronRight,
               key: const ValueKey('calendar-next'),
-              size: m ? 36 : 24,
-              glyph: m ? 20 : 16,
+              size: m ? ControlSize.lg : ControlSize.xs,
+              glyph: m ? IconSize.lg : IconSize.sm,
               color: c.iconSecondary,
               semanticLabel: 'Next month',
               onTap: () => _shiftMonth(1),
@@ -264,7 +264,7 @@ class _CalendarViewState extends State<CalendarView> {
                             style: ts(
                               context.type.uiSmall,
                               c.textTertiary,
-                              weight: 400,
+                              weight: Weight.regular,
                             ),
                           ),
                         ),
@@ -441,7 +441,7 @@ class _CalendarViewState extends State<CalendarView> {
                       child: Center(
                         child: Text(
                           n,
-                          style: tsRaw(13, 18, 400, c.textTertiary),
+                          style: ts(context.type.ui, c.textTertiary, weight: Weight.regular),
                         ),
                       ),
                     ),
@@ -493,20 +493,19 @@ class _CalendarViewState extends State<CalendarView> {
                                       child: Center(
                                         child: Text(
                                           '${d.day}',
-                                          style: tsRaw(
-                                            16,
-                                            20,
-                                            d == today ? 600 : 400,
+                                          style: ts(
+                                            context.type.body,
                                             d == today
                                                 ? c.bgPrimary
                                                 : (d.month != _month.month
                                                       ? c.textTertiary
                                                       : c.textPrimary),
+                                            weight: d == today ? Weight.semibold : Weight.regular,
                                           ),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const Gap(Space.xxs),
                                     SizedBox(
                                       height: 5,
                                       child: Row(
@@ -523,7 +522,7 @@ class _CalendarViewState extends State<CalendarView> {
                                               height: 4,
                                               margin:
                                                   const EdgeInsets.symmetric(
-                                                    horizontal: 1,
+                                                    horizontal: Space.hair,
                                                   ),
                                               decoration: BoxDecoration(
                                                 color: c.textTertiary,
@@ -543,15 +542,15 @@ class _CalendarViewState extends State<CalendarView> {
                   ],
                 ),
               ),
-            const SizedBox(height: 12),
+            const Gap(Space.md),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
               child: Text(
                 formatDay(sel),
-                style: tsRaw(15, 20, 600, c.textSecondary),
+                style: ts(context.type.title, c.textSecondary, weight: Weight.semibold),
               ),
             ),
-            const SizedBox(height: 4),
+            const Gap(Space.xxs),
             for (final e in ofDay)
               LongPressDraggable<RangeEntry>(
                 data: e,
@@ -571,19 +570,19 @@ class _CalendarViewState extends State<CalendarView> {
                   onTap: () =>
                       a.ctl.openRow(context, e.page.id, title: e.page.title),
                   radius: Radii.md,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
                   child: SizedBox(
                     height: 44,
                     child: Row(
                       children: [
                         PageIcon(icon: e.page.icon, size: 20),
-                        const SizedBox(width: 10),
+                        const Gap(Space.md),
                         Expanded(
                           child: Text(
                             displayTitle(e.page.title, firstLine: untitledLine(context, e.page)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: tsRaw(16, 22, 500, c.textPrimary),
+                            style: ts(context.type.body, c.textPrimary, weight: Weight.medium),
                           ),
                         ),
                       ],
@@ -595,14 +594,14 @@ class _CalendarViewState extends State<CalendarView> {
               key: const ValueKey('mcal-new'),
               onTap: () => _addOn(sel),
               radius: Radii.md,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
               child: SizedBox(
                 height: 44,
                 child: Row(
                   children: [
-                    Icon20(Ico.plus, size: 18, color: c.iconTertiary),
-                    const SizedBox(width: 10),
-                    Text('New page', style: tsRaw(16, 22, 400, c.textTertiary)),
+                    Icon20(Ico.plus, size: IconSize.md, color: c.iconTertiary),
+                    const Gap(Space.md),
+                    Text('New page', style: ts(context.type.body, c.textTertiary)),
                   ],
                 ),
               ),
@@ -681,7 +680,7 @@ class _DayCellState extends State<_DayCell> {
                     ? Container(
                         height: 24,
                         constraints: const BoxConstraints(minWidth: 24),
-                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
                         decoration: BoxDecoration(
                           color: c.textPrimary,
                           borderRadius: Radii.pill,
@@ -689,7 +688,7 @@ class _DayCellState extends State<_DayCell> {
                         child: Center(
                           child: Text(
                             label,
-                            style: tsRaw(14, 18, 600, c.bgPrimary),
+                            style: ts(context.type.ui, c.bgPrimary, weight: Weight.semibold),
                           ),
                         ),
                       )
@@ -698,14 +697,7 @@ class _DayCellState extends State<_DayCell> {
                         child: Center(
                           child: Text(
                             label,
-                            style: tsRaw(
-                              14,
-                              18,
-                              400,
-                              widget.outside || widget.weekend
-                                  ? c.textTertiary
-                                  : c.textSecondary,
-                            ),
+                            style: ts(context.type.ui, widget.outside || widget.weekend ? c.textTertiary : c.textSecondary, weight: Weight.regular),
                           ),
                         ),
                       ),
@@ -717,8 +709,8 @@ class _DayCellState extends State<_DayCell> {
                   child: IconBtn(
                     Ico.plus,
                     key: ValueKey('day-add-$d'),
-                    size: 22,
-                    glyph: 14,
+                    size: ControlSize.xs,
+                    glyph: IconSize.xs,
                     color: c.iconTertiary,
                     semanticLabel: 'New page on ${formatDay(d)}',
                     onTap: () => widget.state._addOn(d),
@@ -732,10 +724,10 @@ class _DayCellState extends State<_DayCell> {
                     builder: (b) => Hover(
                       onTap: () => widget.state._dayList(b, d),
                       radius: Radii.sm,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
                       child: Text(
                         '${widget.hidden} more',
-                        style: tsRaw(12, 16, 500, c.textTertiary),
+                        style: ts(context.type.uiSmall, c.textTertiary),
                       ),
                     ),
                   ),
@@ -782,7 +774,7 @@ class _EntryBar extends StatelessWidget {
           height: 22,
           child: _EntryChip(entry: entry, color: color, lifted: true),
         ),
-        childWhenDragging: Opacity(opacity: 0.4, child: chip),
+        childWhenDragging: Opacity(opacity: Alpha.wash, child: chip),
         child: GestureDetector(
           key: ValueKey('entry-${entry.page.title}'),
           onTap: () =>
@@ -809,7 +801,7 @@ class _EntryChip extends StatelessWidget {
     final c = context.colors;
     return Container(
       height: 22,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.symmetric(horizontal: Space.xs),
       decoration: BoxDecoration(
         color: color,
         borderRadius: Radii.pill,
@@ -821,13 +813,13 @@ class _EntryChip extends StatelessWidget {
       child: Row(
         children: [
           PageIcon(icon: entry.page.icon, size: 14, color: c.iconSecondary),
-          const SizedBox(width: 4),
+          const Gap(Space.xxs),
           Expanded(
             child: Text(
               displayTitle(entry.page.title, firstLine: untitledLine(context, entry.page)),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: tsRaw(12, 16, 500, c.textPrimary),
+              style: ts(context.type.uiSmall, c.textPrimary),
             ),
           ),
         ],

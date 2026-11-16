@@ -98,12 +98,12 @@ class SIcon extends StatelessWidget {
 // Text styles.
 
 TextStyle sLabel(BuildContext context, {Color? color}) =>
-    tsRaw(14.5, 20, 640, color ?? context.colors.textPrimary);
+    ts(context.type.ui, color ?? context.colors.textPrimary, weight: Weight.display);
 TextStyle sDesc(BuildContext context, {Color? color}) =>
-    tsRaw(13.5, 19, 400, color ?? context.colors.textSecondary);
-TextStyle sHint(BuildContext context) => tsRaw(12.5, 17, 400, context.colors.textTertiary);
+    ts(context.type.ui, color ?? context.colors.textSecondary, weight: Weight.regular);
+TextStyle sHint(BuildContext context) => ts(context.type.uiSmall, context.colors.textTertiary, weight: Weight.regular);
 TextStyle sMono(BuildContext context, {Color? color}) =>
-    ts(const TypeSpec(12.5, 18, 400), color ?? context.colors.textPrimary, mono: true);
+    ts(context.type.codeSmall, color ?? context.colors.textPrimary, mono: true);
 
 /// Turns `**bold**` in [text] into bold spans, for descriptions and intros.
 InlineSpan sRich(String text, TextStyle style) {
@@ -129,19 +129,19 @@ class SPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Semantics(
         header: true,
-        child: Text(title, style: tsDisplay(m ? const TypeSpec(26, 30, 640) : const TypeSpec(28, 32, 640), c.textPrimary)),
+        child: Text(title, style: tsDisplay(m ? context.type.h2 : context.type.h1, c.textPrimary)),
       ),
       if (intro != null) ...[
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text.rich(sRich(intro!, tsRaw(15, 22, 400, c.textSecondary))),
+            child: Text.rich(sRich(intro!, ts(context.type.body, c.textSecondary))),
           ),
         ),
       ],
@@ -162,16 +162,16 @@ class SSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: EdgeInsets.only(top: first ? 18 : 28),
+      padding: EdgeInsets.only(top: first ? Space.lg : Space.xxl),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (title != null)
           Container(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: Space.sm),
             decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Semantics(header: true, child: Text(title!, style: tsDisplay(const TypeSpec(17, 22, 620), c.textPrimary, weight: 620))),
+              Semantics(header: true, child: Text(title!, style: tsDisplay(context.type.title, c.textPrimary, weight: Weight.semibold))),
               if (intro != null) ...[
-                const SizedBox(height: 3),
+                const Gap(Space.xxs),
                 Text.rich(sRich(intro!, sDesc(context))),
               ],
             ]),
@@ -288,7 +288,7 @@ class _SRowState extends State<SRow> {
     final w = widget;
     final open = _pinned || _peek;
     final fade = w.disabled ? .62 : 1.0;
-    final head = Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 4, children: [
+    final head = Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: Space.xs, runSpacing: Space.xxs, children: [
       Opacity(opacity: fade, child: Text(w.label, style: sLabel(context))),
       if (w.help != null)
         _HelpButton(
@@ -306,7 +306,7 @@ class _SRowState extends State<SRow> {
     final text = Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
       head,
       if (w.desc != null) ...[
-        const SizedBox(height: 3),
+        const Gap(Space.xxs),
         Opacity(
           opacity: fade,
           child: ConstrainedBox(
@@ -328,7 +328,7 @@ class _SRowState extends State<SRow> {
           child: _HelpNote(help: w.help!, extra: w.extra),
         ),
       if (w.reason != null) ...[
-        const SizedBox(height: 6),
+        const Gap(Space.xs),
         SReason(w.reason!, action: w.reasonAction, actionLabel: w.reasonActionLabel),
       ],
     ]);
@@ -336,19 +336,19 @@ class _SRowState extends State<SRow> {
     if (w.control == null) {
       body = text;
     } else if (w.stack) {
-      body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text, const SizedBox(height: 10), w.control!]);
+      body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text, const Gap(Space.md), w.control!]);
     } else {
       body = Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(child: text),
-        const SizedBox(width: 24),
+        const Gap(Space.xl),
         w.control!,
       ]);
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: Space.lg),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         body,
-        if (w.below != null) ...[const SizedBox(height: 10), w.below!],
+        if (w.below != null) ...[const Gap(Space.md), w.below!],
       ]),
     );
   }
@@ -382,7 +382,7 @@ class _HelpButtonState extends State<_HelpButton> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final s = context.mobile ? 28.0 : 22.0;
+    final s = context.touch ? 28.0 : 22.0;
     return Semantics(
       button: true,
       expanded: widget.open,
@@ -408,8 +408,8 @@ class _HelpButtonState extends State<_HelpButton> {
               height: s,
               decoration: BoxDecoration(
                 color: widget.open ? c.bgSecondary : null,
-                borderRadius: BorderRadius.circular(5),
-                border: _focus.hasFocus ? Border.all(color: c.focus, width: 2) : null,
+                borderRadius: BorderRadius.circular(Radii.md),
+                border: _focus.hasFocus ? Border.all(color: c.focus, width: Stroke.bold) : null,
               ),
               alignment: Alignment.center,
               child: SIcon(Sx.info, size: 15, color: widget.open ? c.textPrimary : c.textTertiary),
@@ -429,19 +429,19 @@ class _HelpNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final style = tsRaw(13, 19, 400, c.textSecondary);
+    final style = ts(context.type.ui, c.textSecondary, weight: Weight.regular);
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      margin: const EdgeInsets.only(top: Space.sm),
       constraints: const BoxConstraints(maxWidth: 540),
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 9),
+      padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, Space.sm),
       decoration: BoxDecoration(
         color: c.bgSecondary,
-        border: Border(left: BorderSide(color: c.moss, width: 3)),
+        border: Border(left: BorderSide(color: c.moss, width: Stroke.seam)),
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(2),
-          topRight: Radius.circular(8),
-          bottomRight: Radius.circular(8),
-          bottomLeft: Radius.circular(2),
+          topLeft: Radius.circular(Radii.sm),
+          topRight: Radius.circular(Radii.lg),
+          bottomRight: Radius.circular(Radii.lg),
+          bottomLeft: Radius.circular(Radii.sm),
         ),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -449,7 +449,7 @@ class _HelpNote extends StatelessWidget {
           TextSpan(text: 'When to change it: ', style: style.copyWith(fontWeight: FontWeight.w700, color: c.textPrimary)),
           TextSpan(text: help),
         ])),
-        if (extra != null) ...[const SizedBox(height: 6), Text(extra!, style: style)],
+        if (extra != null) ...[const Gap(Space.xs), Text(extra!, style: style)],
       ]),
     );
   }
@@ -465,12 +465,12 @@ class SReason extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final style = tsRaw(13, 18, 600, c.accentText);
+    final style = ts(context.type.ui, c.accentText, weight: Weight.semibold);
     return Row(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-      Padding(padding: const EdgeInsets.only(top: 2), child: SIcon(Sx.lock, size: 13, color: c.accentText)),
-      const SizedBox(width: 6),
+      Padding(padding: const EdgeInsets.only(top: Space.hair), child: SIcon(Sx.lock, size: 13, color: c.accentText)),
+      const Gap(Space.xs),
       Flexible(
-        child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
+        child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: Space.sm, children: [
           Text(text, style: style),
           if (action != null && actionLabel != null) SLink(actionLabel!, onTap: action!),
         ]),
@@ -488,9 +488,9 @@ class SScope extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.hair),
       decoration: BoxDecoration(borderRadius: Radii.pill, border: Border.all(color: c.border)),
-      child: Text(text, style: tsRaw(11.5, 16, 500, c.textTertiary)),
+      child: Text(text, style: ts(context.type.uiSmall, c.textTertiary)),
     );
   }
 }
@@ -511,7 +511,7 @@ class SLink extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Text(label,
-              style: tsRaw(13, 18, 600, c.accentText).copyWith(
+              style: ts(context.type.ui, c.accentText, weight: Weight.semibold).copyWith(
                 decoration: TextDecoration.underline,
                 decorationColor: c.accentText,
               )),
@@ -530,7 +530,7 @@ class SLinkLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: Space.md),
       child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
         Text(before, style: sDesc(context)),
         SLink(link, onTap: onTap),
@@ -553,7 +553,7 @@ class SSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final w = m ? 46.0 : 40.0, h = m ? 26.0 : 22.0, k = m ? 20.0 : 16.0;
     final travel = m ? 20.0 : 18.0;
     final motion = Motion.of(context);
@@ -568,14 +568,14 @@ class SSwitch extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onChanged == null ? null : () => onChanged!(!on),
           child: Opacity(
-            opacity: onChanged == null ? .45 : 1,
+            opacity: onChanged == null ? Alpha.muted : 1,
             child: AnimatedContainer(
               duration: motion.fast,
               width: w,
               height: h,
               decoration: BoxDecoration(
                 color: on ? c.moss : c.bgSecondary,
-                borderRadius: BorderRadius.circular(5),
+                borderRadius: BorderRadius.circular(Radii.md),
                 border: Border.all(color: on ? c.moss : c.borderStrong),
               ),
               child: Stack(children: [
@@ -591,10 +591,10 @@ class SSwitch extends StatelessWidget {
                       color: c.bgPrimary,
                       border: Border.all(color: on ? c.moss : c.borderStrong),
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(3),
-                        topRight: Radius.circular(4),
-                        bottomRight: Radius.circular(3),
-                        bottomLeft: Radius.circular(4),
+                        topLeft: Radius.circular(Radii.sm),
+                        topRight: Radius.circular(Radii.sm),
+                        bottomRight: Radius.circular(Radii.sm),
+                        bottomLeft: Radius.circular(Radii.sm),
                       ),
                     ),
                   ),
@@ -639,7 +639,7 @@ class SButton extends StatelessWidget {
       button: true,
       enabled: !off,
       child: Opacity(
-        opacity: off ? .5 : 1,
+        opacity: off ? Alpha.muted : 1,
         child: Hover(
           onTap: onTap,
           borderRadius: Radii.ctl,
@@ -648,12 +648,12 @@ class SButton extends StatelessWidget {
           border: kind == SButtonKind.quiet || kind == SButtonKind.primary ? null : Border.all(color: c.borderStrong),
           lift: 0,
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: context.mobile ? 40 : 34),
+            constraints: BoxConstraints(minHeight: context.touch ? 40 : 34),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                if (icon != null) ...[SIcon(icon!, size: 15, color: fg), const SizedBox(width: 6)],
-                Text(label, style: tsRaw(13.5, 18, 680, fg)),
+                if (icon != null) ...[SIcon(icon!, size: 15, color: fg), const Gap(Space.xs)],
+                Text(label, style: ts(context.type.ui, fg, weight: Weight.bold)),
               ]),
             ),
           ),
@@ -673,13 +673,13 @@ class SIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final s = context.mobile ? 40.0 : 32.0;
+    final s = context.touch ? 40.0 : 32.0;
     return Semantics(
       button: true,
       label: label,
       enabled: onTap != null,
       child: Opacity(
-        opacity: onTap == null ? .4 : 1,
+        opacity: onTap == null ? Alpha.wash : 1,
         child: Hover(
           onTap: onTap,
           borderRadius: Radii.ctl,
@@ -719,7 +719,7 @@ class SSelect<T> extends StatelessWidget {
 
   Future<void> _open(BuildContext context) async {
     T? picked;
-    if (context.mobile) {
+    if (context.touch) {
       picked = await showSheet<T>(
         context,
         (ctx) => SheetSurface(children: [
@@ -761,7 +761,7 @@ class SSelect<T> extends StatelessWidget {
       enabled: !off,
       child: Builder(
         builder: (b) => Opacity(
-          opacity: off ? .55 : 1,
+          opacity: off ? Alpha.muted : 1,
           child: Hover(
             onTap: off ? null : () => _open(b),
             borderRadius: Radii.field,
@@ -769,12 +769,12 @@ class SSelect<T> extends StatelessWidget {
             border: Border.all(color: c.borderStrong),
             lift: 0,
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: context.mobile ? 40 : 34, minWidth: minWidth),
+              constraints: BoxConstraints(minHeight: context.touch ? 40 : 34, minWidth: minWidth),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(11, 7, 8, 7),
+                padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.sm, Space.sm),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Flexible(child: Text(labelOf(value), overflow: TextOverflow.ellipsis, style: tsRaw(13.5, 18, 500, c.textPrimary))),
-                  const SizedBox(width: 8),
+                  Flexible(child: Text(labelOf(value), overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.textPrimary))),
+                  const Gap(Space.sm),
                   SIcon(Sx.chevronDown, size: 15, color: c.textTertiary),
                 ]),
               ),
@@ -799,7 +799,7 @@ class SSegmented<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(Space.hair),
       decoration: BoxDecoration(color: c.bgSecondary, borderRadius: Radii.ctl, border: Border.all(color: c.borderStrong)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         for (final o in options)
@@ -812,9 +812,9 @@ class SSegmented<T> extends StatelessWidget {
               borderRadius: Radii.ctl,
               lift: 0,
               background: o == value ? c.bgPrimary : null,
-              border: o == value ? Border(bottom: BorderSide(color: c.accent, width: 2)) : null,
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: context.mobile ? 9 : 6),
-              child: Text(labelOf(o), style: tsRaw(13.5, 18, o == value ? 680 : 500, o == value ? c.textPrimary : c.textSecondary)),
+              border: o == value ? Border(bottom: BorderSide(color: c.accent, width: Stroke.bold)) : null,
+              padding: EdgeInsets.symmetric(horizontal: Space.md, vertical: context.touch ? Space.sm : Space.xs),
+              child: Text(labelOf(o), style: ts(context.type.ui, o == value ? c.textPrimary : c.textSecondary, weight: o == value ? Weight.semibold : Weight.medium)),
             ),
           ),
       ]),
@@ -844,7 +844,7 @@ class SChoices<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cards = [for (final ch in choices) _ChoiceCard<T>(choice: ch, checked: ch.value == value, onChanged: onChanged, cardKey: keyOf?.call(ch.value))];
-    if (context.mobile) {
+    if (context.touch) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (var i = 0; i < cards.length; i++) ...[if (i > 0) const SizedBox(height: 8), cards[i]],
       ]);
@@ -873,32 +873,32 @@ class _ChoiceCard<T> extends StatelessWidget {
       selected: checked,
       enabled: !off,
       child: Opacity(
-        opacity: choice.disabledNote != null ? .62 : 1,
+        opacity: choice.disabledNote != null ? Alpha.muted : 1,
         child: Hover(
           key: cardKey,
           onTap: off || checked ? null : () => onChanged!(choice.value),
           borderRadius: Radii.field,
           background: c.bgPrimary,
           lift: 0,
-          border: Border.all(color: checked ? c.accent : c.borderStrong, width: checked ? 2 : 1),
-          padding: EdgeInsets.fromLTRB(checked ? 13 : 14, checked ? 11 : 12, checked ? 13 : 14, checked ? 11 : 12),
+          border: Border.all(color: checked ? c.accent : c.borderStrong, width: checked ? Stroke.bold : Stroke.hair),
+          padding: EdgeInsets.fromLTRB(checked ? Space.md : Space.lg, checked ? Space.md : Space.md, checked ? Space.md : Space.lg, checked ? Space.md : Space.md),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              if (choice.icon != null) ...[SIcon(choice.icon!, size: 16, color: c.textSecondary), const SizedBox(width: 8)],
-              Expanded(child: Text(choice.title, style: tsRaw(14, 19, 700, c.textPrimary))),
-              const SizedBox(width: 8),
+              if (choice.icon != null) ...[SIcon(choice.icon!, size: 16, color: c.textSecondary), const Gap(Space.sm)],
+              Expanded(child: Text(choice.title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold))),
+              const Gap(Space.sm),
               Container(
                 width: 16,
                 height: 16,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: c.bgPrimary,
-                  border: Border.all(color: checked ? c.accent : c.borderStrong, width: checked ? 5 : 1.5),
+                  border: Border.all(color: checked ? c.accent : c.borderStrong, width: checked ? Stroke.seam : Stroke.regular),
                 ),
               ),
             ]),
-            const SizedBox(height: 4),
-            Text(choice.disabledNote ?? choice.desc, style: tsRaw(13, 18, 400, c.textSecondary)),
+            const Gap(Space.xxs),
+            Text(choice.disabledNote ?? choice.desc, style: ts(context.type.ui, c.textSecondary, weight: Weight.regular)),
           ]),
         ),
       ),
@@ -920,12 +920,12 @@ class SField extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: Space.md),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(label, style: tsRaw(13, 18, 640, c.textPrimary)),
-        const SizedBox(height: 4),
+        Text(label, style: ts(context.type.ui, c.textPrimary, weight: Weight.display)),
+        const Gap(Space.xxs),
         child,
-        if (hint != null) ...[const SizedBox(height: 4), Text(hint!, style: sHint(context))],
+        if (hint != null) ...[const Gap(Space.xxs), Text(hint!, style: sHint(context))],
       ]),
     );
   }
@@ -972,17 +972,17 @@ class _STextFieldState extends State<STextField> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
-    final style = widget.mono ? sMono(context) : tsRaw(m ? 15 : 14, 20, 400, c.textPrimary);
+    final m = context.touch;
+    final style = widget.mono ? sMono(context) : ts(context.type.ui, c.textPrimary, weight: Weight.regular);
     return GestureDetector(
       onTap: _focus.requestFocus,
       child: Container(
         constraints: BoxConstraints(minHeight: m ? 40 : 36),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
         decoration: BoxDecoration(
           color: c.bgPrimary,
           borderRadius: Radii.field,
-          border: Border.all(color: _focus.hasFocus ? c.focus : c.borderStrong, width: _focus.hasFocus ? 2 : 1),
+          border: Border.all(color: _focus.hasFocus ? c.focus : c.borderStrong, width: _focus.hasFocus ? Stroke.bold : Stroke.hair),
         ),
         alignment: Alignment.centerLeft,
         child: PlainField(
@@ -1013,15 +1013,15 @@ class SEditor extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      margin: const EdgeInsets.only(top: Space.md),
+      padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.lg),
       decoration: BoxDecoration(color: c.bgPrimary, borderRadius: Radii.field, border: Border.all(color: c.accent)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(title, style: tsRaw(14, 19, 700, c.textPrimary)),
-        if (desc != null) ...[const SizedBox(height: 3), Text(desc!, style: sDesc(context))],
+        Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
+        if (desc != null) ...[const Gap(Space.xxs), Text(desc!, style: sDesc(context))],
         ...children,
-        const SizedBox(height: 14),
-        Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 8, children: actions),
+        const Gap(Space.lg),
+        Wrap(alignment: WrapAlignment.end, spacing: Space.sm, runSpacing: Space.sm, children: actions),
       ]),
     );
   }
@@ -1048,7 +1048,7 @@ class SList extends StatelessWidget {
               : DecoratedBox(decoration: BoxDecoration(border: Border(top: BorderSide(color: c.border))), child: children[i]),
         if (foot != null)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
             decoration: BoxDecoration(color: c.bgSecondary, border: children.isEmpty ? null : Border(top: BorderSide(color: c.border))),
             child: foot,
           ),
@@ -1075,7 +1075,7 @@ class SItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.sm, Space.md),
       child: Row(children: [
         if (icon != null) ...[
           Container(
@@ -1084,36 +1084,36 @@ class SItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: c.bgSecondary,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(6),
-                topRight: Radius.circular(9),
-                bottomRight: Radius.circular(6),
-                bottomLeft: Radius.circular(8),
+                topLeft: Radius.circular(Radii.md),
+                topRight: Radius.circular(Radii.lg),
+                bottomRight: Radius.circular(Radii.md),
+                bottomLeft: Radius.circular(Radii.lg),
               ),
             ),
             alignment: Alignment.center,
             child: SIcon(icon!, size: 16, color: c.textSecondary),
           ),
-          const SizedBox(width: 12),
+          const Gap(Space.md),
         ],
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, runSpacing: 2, children: [
-              nameWidget ?? Text(name, style: tsRaw(14, 19, 680, c.textPrimary)),
+            Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: Space.xs, runSpacing: Space.hair, children: [
+              nameWidget ?? Text(name, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
               for (final t in tags) STag(t),
               ?status,
             ]),
             if (sub != null && sub!.isNotEmpty) ...[
-              const SizedBox(height: 2),
+              const Gap(Space.hair),
               Text(sub!, maxLines: 1, overflow: TextOverflow.ellipsis, style: subMono ? sMono(context, color: c.textTertiary) : sHint(context)),
             ],
             if (error != null) ...[
-              const SizedBox(height: 2),
-              Text(error!, style: tsRaw(12.5, 17, 500, c.dangerText)),
+              const Gap(Space.hair),
+              Text(error!, style: ts(context.type.uiSmall, c.dangerText)),
             ],
           ]),
         ),
         if (trailing.isNotEmpty) ...[
-          const SizedBox(width: 12),
+          const Gap(Space.md),
           Row(mainAxisSize: MainAxisSize.min, children: [
             for (var i = 0; i < trailing.length; i++) ...[if (i > 0) const SizedBox(width: 4), trailing[i]],
           ]),
@@ -1129,7 +1129,7 @@ class SListFoot extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 12, runSpacing: 6, children: children);
+  Widget build(BuildContext context) => Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: Space.md, runSpacing: Space.xs, children: children);
 }
 
 enum SStatusKind { ok, info, warn, bad, off }
@@ -1158,7 +1158,7 @@ class SStatus extends StatelessWidget {
       SStatusKind.off => c.textTertiary,
     };
     return Container(
-      padding: const EdgeInsets.fromLTRB(7, 0, 8, 0),
+      padding: const EdgeInsets.fromLTRB(Space.sm, 0, Space.sm, 0),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: Radii.pill,
@@ -1166,8 +1166,8 @@ class SStatus extends StatelessWidget {
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-        const SizedBox(width: 5),
-        Text(label, style: tsRaw(11.5, 19, 680, kind == SStatusKind.off ? c.textSecondary : c.textPrimary)),
+        const Gap(Space.xs),
+        Text(label, style: ts(context.type.uiSmall, kind == SStatusKind.off ? c.textSecondary : c.textPrimary, weight: Weight.bold)),
       ]),
     );
   }
@@ -1182,9 +1182,9 @@ class STag extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), border: Border.all(color: c.border)),
-      child: Text(text, style: tsRaw(11, 15, 600, c.textSecondary)),
+      padding: const EdgeInsets.symmetric(horizontal: Space.xs, vertical: Space.hair),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(Radii.sm), border: Border.all(color: c.border)),
+      child: Text(text, style: ts(context.type.caption, c.textSecondary, weight: Weight.semibold)),
     );
   }
 }
@@ -1200,15 +1200,15 @@ class SEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.xl),
       decoration: BoxDecoration(color: c.bgSecondary, borderRadius: Radii.field),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SIcon(icon, size: 22, color: c.textTertiary),
-        const SizedBox(height: 8),
-        Text(title, style: tsRaw(14, 19, 700, c.textPrimary)),
-        const SizedBox(height: 3),
+        const Gap(Space.sm),
+        Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
+        const Gap(Space.xxs),
         Text(text, style: sDesc(context)),
-        if (action != null) ...[const SizedBox(height: 12), action!],
+        if (action != null) ...[const Gap(Space.md), action!],
       ]),
     );
   }
@@ -1236,24 +1236,24 @@ class SNotice extends StatelessWidget {
       SNoticeKind.bad => c.dangerText,
     };
     return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      margin: const EdgeInsets.only(top: Space.md),
+      padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.md, Space.md),
       decoration: BoxDecoration(
         color: c.bgSecondary,
-        border: Border(left: BorderSide(color: rule, width: 3)),
+        border: Border(left: BorderSide(color: rule, width: Stroke.seam)),
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(2),
-          topRight: Radius.circular(8),
-          bottomRight: Radius.circular(8),
-          bottomLeft: Radius.circular(2),
+          topLeft: Radius.circular(Radii.sm),
+          topRight: Radius.circular(Radii.lg),
+          bottomRight: Radius.circular(Radii.lg),
+          bottomLeft: Radius.circular(Radii.sm),
         ),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text.rich(sRich(text, tsRaw(13.5, 19, 400, kind == SNoticeKind.bad ? c.dangerText : c.textPrimary)), key: textKey),
-        if (below != null) ...[const SizedBox(height: 8), below!],
+        Text.rich(sRich(text, ts(context.type.ui, kind == SNoticeKind.bad ? c.dangerText : c.textPrimary, weight: Weight.regular)), key: textKey),
+        if (below != null) ...[const Gap(Space.sm), below!],
         if (actions.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 6, children: actions),
+          const Gap(Space.sm),
+          Wrap(spacing: Space.sm, runSpacing: Space.xs, children: actions),
         ],
       ]),
     );
@@ -1272,8 +1272,8 @@ class SStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      margin: const EdgeInsets.only(top: 18),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      margin: const EdgeInsets.only(top: Space.lg),
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.lg),
       decoration: BoxDecoration(color: c.bgSecondary, borderRadius: Radii.panel, border: Border.all(color: c.border)),
       child: Row(children: [
         Container(
@@ -1283,24 +1283,24 @@ class SStatusCard extends StatelessWidget {
             color: ok ? c.okBg : c.bgPrimary,
             border: ok ? null : Border.all(color: c.border),
             borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(8),
-              topRight: Radius.circular(12),
-              bottomRight: Radius.circular(8),
-              bottomLeft: Radius.circular(10),
+              topLeft: Radius.circular(Radii.lg),
+              topRight: Radius.circular(Radii.sheet),
+              bottomRight: Radius.circular(Radii.lg),
+              bottomLeft: Radius.circular(Radii.lg),
             ),
           ),
           alignment: Alignment.center,
           child: SIcon(icon, size: 19, color: ok ? c.textPrimary : c.textTertiary),
         ),
-        const SizedBox(width: 14),
+        const Gap(Space.lg),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: tsRaw(15, 20, 700, c.textPrimary)),
-            const SizedBox(height: 2),
+            Text(title, style: ts(context.type.title, c.textPrimary, weight: Weight.bold)),
+            const Gap(Space.hair),
             Text(text, style: sDesc(context)),
           ]),
         ),
-        if (action != null) ...[const SizedBox(width: 12), action!],
+        if (action != null) ...[const Gap(Space.md), action!],
       ]),
     );
   }
@@ -1326,7 +1326,7 @@ class _SAdvancedState extends State<SAdvanced> {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      margin: const EdgeInsets.only(top: 18),
+      margin: const EdgeInsets.only(top: Space.lg),
       decoration: BoxDecoration(border: Border(top: BorderSide(color: c.border))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Semantics(
@@ -1336,17 +1336,17 @@ class _SAdvancedState extends State<SAdvanced> {
             key: widget.headerKey,
             onTap: () => setState(() => _open = !_open),
             lift: 0,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
+            padding: const EdgeInsets.symmetric(vertical: Space.md, horizontal: Space.hair),
             child: Row(children: [
               AnimatedRotation(
                 turns: _open ? .25 : 0,
                 duration: Motion.of(context).fast,
                 child: SIcon(Sx.chevronRight, size: 15, color: c.textTertiary),
               ),
-              const SizedBox(width: 6),
-              Text(widget.title, style: tsDisplay(const TypeSpec(15, 20, 620), c.textSecondary, weight: 620)),
+              const Gap(Space.xs),
+              Text(widget.title, style: tsDisplay(context.type.title, c.textSecondary, weight: Weight.semibold)),
               if (widget.summary != null) ...[
-                const SizedBox(width: 8),
+                const Gap(Space.sm),
                 Flexible(child: Text(widget.summary!, overflow: TextOverflow.ellipsis, style: sHint(context))),
               ],
             ]),
@@ -1387,15 +1387,15 @@ class _SCopyLineState extends State<SCopyLine> {
     final c = context.colors;
     return Container(
       constraints: const BoxConstraints(minHeight: 36),
-      padding: const EdgeInsets.fromLTRB(10, 2, 2, 2),
+      padding: const EdgeInsets.fromLTRB(Space.md, Space.hair, Space.hair, Space.hair),
       decoration: BoxDecoration(color: c.bgSecondary, borderRadius: Radii.field, border: Border.all(color: c.border)),
       child: Row(children: [
         if (widget.label != null) ...[
-          Text(widget.label!, style: tsRaw(13, 18, 640, c.textSecondary)),
-          const SizedBox(width: 10),
+          Text(widget.label!, style: ts(context.type.ui, c.textSecondary, weight: Weight.display)),
+          const Gap(Space.md),
         ],
         Expanded(child: Text(widget.text, key: widget.textKey, style: sMono(context))),
-        const SizedBox(width: 8),
+        const Gap(Space.sm),
         SButton(_copied ? 'Copied' : 'Copy', onTap: _copy, kind: SButtonKind.quiet),
       ]),
     );
@@ -1431,10 +1431,10 @@ class SPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
-    final statusText = Text(status, style: tsRaw(12.5, 17, 600, c.textSecondary));
+    final m = context.touch;
+    final statusText = Text(status, style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.semibold));
     return Container(
-      margin: const EdgeInsets.only(top: 14),
+      margin: const EdgeInsets.only(top: Space.lg),
       decoration: BoxDecoration(color: c.bgPrimary, borderRadius: Radii.field, border: Border.all(color: c.border)),
       clipBehavior: Clip.antiAlias,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -1446,26 +1446,26 @@ class SPanel extends StatelessWidget {
             onTap: onToggle,
             lift: 0,
             borderRadius: BorderRadius.zero,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.lg),
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               Container(
                 width: 32,
                 height: 32,
-                decoration: BoxDecoration(color: c.bgSecondary, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: c.bgSecondary, borderRadius: BorderRadius.circular(Radii.lg)),
                 alignment: Alignment.center,
                 child: SIcon(icon, size: 16, color: c.textSecondary),
               ),
-              const SizedBox(width: 12),
+              const Gap(Space.md),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, style: tsDisplay(const TypeSpec(15, 20, 620), c.textPrimary, weight: 620)),
-                  const SizedBox(height: 2),
-                  Text(desc, style: tsRaw(13, 18, 400, c.textTertiary)),
-                  if (m) ...[const SizedBox(height: 4), statusText],
+                  Text(title, style: tsDisplay(context.type.title, c.textPrimary, weight: Weight.semibold)),
+                  const Gap(Space.hair),
+                  Text(desc, style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
+                  if (m) ...[const Gap(Space.xxs), statusText],
                 ]),
               ),
-              if (!m) ...[const SizedBox(width: 12), statusText],
-              const SizedBox(width: 10),
+              if (!m) ...[const Gap(Space.md), statusText],
+              const Gap(Space.md),
               AnimatedRotation(
                 turns: open ? .5 : 0,
                 duration: Motion.of(context).fast,
@@ -1478,7 +1478,7 @@ class SPanel extends StatelessWidget {
           Offstage(
             offstage: !open,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              padding: const EdgeInsets.fromLTRB(Space.lg, Space.xxs, Space.lg, Space.lg),
               decoration: BoxDecoration(border: Border(top: BorderSide(color: c.border))),
               child: child,
             ),

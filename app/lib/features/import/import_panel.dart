@@ -34,7 +34,7 @@ Future<void> showExport(BuildContext context, String pageId) => _show(
     );
 
 Future<void> _show(BuildContext context, WidgetBuilder body) async {
-  if (context.mobile) {
+  if (context.touch) {
     await showSheet<void>(context, (ctx) => SheetSurface(children: [body(ctx)]));
     return;
   }
@@ -76,23 +76,23 @@ class _PathDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final ty = context.type;
-    final m = context.mobile;
+    final m = context.touch;
     final pad = m ? Layout.gutter : 20.0;
     return Padding(
-      padding: EdgeInsets.fromLTRB(pad, m ? 0 : 18, pad, m ? 8 : 18),
+      padding: EdgeInsets.fromLTRB(pad, m ? 0 : Space.lg, pad, m ? Space.sm : Space.lg),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           IconX(icon, size: 20, color: c.iconSecondary),
-          const SizedBox(width: 8),
-          Text(title, style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
+          const Gap(Space.sm),
+          Text(title, style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display)),
         ]),
-        const SizedBox(height: 6),
-        Text(hint, style: ts(ty.uiSmall, c.textSecondary, weight: 400)),
-        const SizedBox(height: 14),
+        const Gap(Space.xs),
+        Text(hint, style: ts(ty.uiSmall, c.textSecondary, weight: Weight.regular)),
+        const Gap(Space.lg),
         field,
-        const SizedBox(height: 12),
+        const Gap(Space.md),
         button,
-        const SizedBox(height: 10),
+        const Gap(Space.md),
         status,
       ]),
     );
@@ -107,8 +107,8 @@ Widget _pathField(BuildContext context, Key key, TextEditingController ctl, Focu
       key: key,
       controller: ctl,
       focusNode: focus,
-      autofocus: !context.mobile,
-      style: ts(context.type.ui, c.textPrimary, weight: 400),
+      autofocus: !context.touch,
+      style: ts(context.type.ui, c.textPrimary, weight: Weight.regular),
       placeholder: placeholder,
       textInputAction: TextInputAction.done,
       onSubmitted: (_) => onSubmit(),
@@ -117,18 +117,18 @@ Widget _pathField(BuildContext context, Key key, TextEditingController ctl, Focu
   if (onChoose == null) return field;
   return Row(children: [
     Expanded(child: field),
-    const SizedBox(width: 8),
+    const Gap(Space.sm),
     DialogButton(key: chooseKey, label: 'Choose…', onTap: onChoose),
   ]);
 }
 
 Widget _status(BuildContext context, Key key, bool busy, String? text, bool error, String busyText) {
   final c = context.colors;
-  final style = ts(context.type.uiSmall, error ? c.inlineCodeText : c.textSecondary, weight: 400);
+  final style = ts(context.type.uiSmall, error ? c.inlineCodeText : c.textSecondary, weight: Weight.regular);
   if (busy) {
     return Row(children: [
-      const Spinner(size: 14),
-      const SizedBox(width: 8),
+      const Spinner(size: IconSize.xs),
+      const Gap(Space.sm),
       Expanded(child: Text(busyText, style: style)),
     ]);
   }

@@ -31,14 +31,14 @@ Future<PageMenuAction?> showPageMenu(BuildContext context, Rect? anchor,
         canUndo: canUndo,
         canAskAi: canAskAi,
         canShare: canShare,
-        sheet: context.mobile,
+        sheet: context.touch,
         onAction: (a) => Navigator.of(ctx).pop(a),
       );
-  if (context.mobile || anchor == null) {
+  if (context.touch || anchor == null) {
     return showSheet<PageMenuAction>(context, (ctx) => SheetSurface(children: [body(ctx)]));
   }
   return showPopover<PageMenuAction>(
-      context, anchor, (ctx) => MenuSurface(width: 265, padding: const EdgeInsets.all(6), child: body(ctx)));
+      context, anchor, (ctx) => MenuSurface(width: 265, padding: const EdgeInsets.all(Space.xs), child: body(ctx)));
 }
 
 class PageMenu extends StatefulWidget {
@@ -107,8 +107,8 @@ class _PageMenuState extends State<PageMenu> {
     final meta = pages.meta(pageId);
     final m = sheet;
     final rowH = m ? 48.0 : 28.0;
-    final textStyle = ts(m ? ty.body : ty.ui, c.textPrimary, weight: 400);
-    final iconSize = m ? 22.0 : 18.0;
+    final textStyle = ts(m ? ty.body : ty.ui, c.textPrimary, weight: Weight.regular);
+    final iconSize = m ? IconSize.xl : IconSize.md;
 
     Widget row(String key, Widget icon, String label, VoidCallback? onTap,
         {String? shortcut, Widget? trailing, bool danger = false}) {
@@ -116,19 +116,19 @@ class _PageMenuState extends State<PageMenu> {
         key: ValueKey('page-menu-$key'),
         onTap: onTap,
         radius: m ? 0 : Radii.md,
-        padding: EdgeInsets.symmetric(horizontal: m ? Layout.gutter : 8),
+        padding: EdgeInsets.symmetric(horizontal: m ? Layout.gutter : Space.sm),
         child: SizedBox(
           height: rowH,
           child: Row(children: [
             SizedBox(width: m ? 22 : 20, child: Center(child: icon)),
-            SizedBox(width: m ? 14 : 8),
+            Gap(m ? 14 : 8),
             Expanded(
               child: Text(label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: danger ? textStyle.copyWith(color: c.inlineCodeText) : textStyle),
             ),
-            if (shortcut != null && !m) Text(shortcut, style: ts(ty.uiSmall, c.textTertiary, weight: 400)),
+            if (shortcut != null && !m) Text(shortcut, style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)),
             ?trailing,
           ]),
         ),
@@ -136,9 +136,9 @@ class _PageMenuState extends State<PageMenu> {
     }
 
     Widget ico(Ico i, {bool danger = false}) => Icon20(i, size: iconSize, color: danger ? c.inlineCodeText : c.iconPrimary);
-    Widget icx(Ix i) => IconX(i, size: iconSize, color: c.iconPrimary);
+    Widget icx(Ix i) => IconX(i, size: iconSize.px, color: c.iconPrimary);
     Widget sep() => m
-        ? Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: HLine(color: c.borderSubtle))
+        ? Padding(padding: const EdgeInsets.symmetric(vertical: Space.xxs), child: HLine(color: c.borderSubtle))
         : const MenuSeparator();
 
     void set(void Function(PagePrefs p) f) => pages.updatePrefs(pageId, f);
@@ -159,7 +159,7 @@ class _PageMenuState extends State<PageMenu> {
       return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         row('colour-back', ico(Ico.chevronLeft), 'Colour', () => setState(() => _colour = false)),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: m ? Layout.gutter : 8, vertical: 8),
+          padding: EdgeInsets.symmetric(horizontal: m ? Layout.gutter : Space.sm, vertical: Space.sm),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             for (final name in spaceColorNames)
               Hover(
@@ -181,7 +181,7 @@ class _PageMenuState extends State<PageMenu> {
           ]),
         ),
         row('colour-none', ico(Ico.close), 'None', _saving ? null : () => pick('none')),
-        if (_error != null) Padding(padding: const EdgeInsets.all(8), child: Text(_error!, style: ts(ty.uiSmall, c.inlineCodeText))),
+        if (_error != null) Padding(padding: const EdgeInsets.all(Space.sm), child: Text(_error!, style: ts(ty.uiSmall, c.inlineCodeText))),
       ]);
     }
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -199,15 +199,15 @@ class _PageMenuState extends State<PageMenu> {
       if (meta != null && !meta.missing && meta.parent == null)
         row('colour', icx(Ix.color), 'Colour', () => setState(() => _colour = true),
             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              SpaceDot(meta.color), const SizedBox(width: 6), ico(Ico.chevronRight),
+              SpaceDot(meta.color), const Gap(Space.xs), ico(Ico.chevronRight),
             ])),
       row('copy-link', ico(Ico.link), 'Copy link', () => onAction(PageMenuAction.copyLink), shortcut: shortcutHint('Ctrl+L')),
       if (widget.canShare) row('share', icx(Ix.linkPage), shareMenuLabel(_shareCount), () => onAction(PageMenuAction.share)),
       row('duplicate', ico(Ico.duplicate), 'Duplicate', () => onAction(PageMenuAction.duplicate), shortcut: shortcutHint('Ctrl+D')),
       row('move-to', icx(Ix.move), 'Move to', () => onAction(PageMenuAction.moveTo)),
-      if (widget.canAskAi) row('ask-ai', AiMark(size: iconSize), 'Ask AI', () => onAction(PageMenuAction.askAi)),
+      if (widget.canAskAi) row('ask-ai', AiMark(size: iconSize.px), 'Ask AI', () => onAction(PageMenuAction.askAi)),
       if (meta != null && !meta.missing && meta.parent == null) ...[
-        row('triage', AiMark(size: iconSize), 'Triage', () => onAction(PageMenuAction.triage)),
+        row('triage', AiMark(size: iconSize.px), 'Triage', () => onAction(PageMenuAction.triage)),
         row('proposals', ico(Ico.duplicate), 'Merge proposals', () => onAction(PageMenuAction.proposals)),
       ],
       sep(),

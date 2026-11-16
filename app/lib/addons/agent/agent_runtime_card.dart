@@ -157,7 +157,7 @@ class RuntimePackageCard extends StatelessWidget {
         : PrimaryButton(
             key: const ValueKey('agent-runtime-action'),
             label: action,
-            height: 32,
+            size: ControlSize.md,
             onTap: () => packages.install(name),
           );
     final text = Text(
@@ -171,12 +171,12 @@ class RuntimePackageCard extends StatelessWidget {
       ),
     );
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: Space.sm),
       child: Container(
       key: ValueKey(
         compact ? 'agent-runtime-card-compact' : 'agent-runtime-card',
       ),
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: compact ? 6 : 10),
+      padding: EdgeInsets.symmetric(horizontal: Space.md, vertical: compact ? Space.xs : Space.md),
       decoration: BoxDecoration(
         color: c.bgSecondary,
         borderRadius: Radii.panel,
@@ -188,8 +188,8 @@ class RuntimePackageCard extends StatelessWidget {
             child: compact
                 ? Row(
                     children: [
-                      Text(title, style: tsRaw(14, 19, 680, c.textPrimary)),
-                      const SizedBox(width: 8),
+                      Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
+                      const Gap(Space.sm),
                       Expanded(child: text),
                     ],
                   )
@@ -197,17 +197,17 @@ class RuntimePackageCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(title, style: tsRaw(14, 19, 680, c.textPrimary)),
-                      const SizedBox(height: 2),
+                      Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
+                      const Gap(Space.hair),
                       text,
                     ],
                   ),
           ),
           if (working) ...[
-            const SizedBox(width: 8),
-            Spinner(size: 14, color: c.iconTertiary),
+            const Gap(Space.sm),
+            Spinner(size: IconSize.xs, color: c.iconTertiary),
           ],
-          if (button != null) ...[const SizedBox(width: 12), button],
+          if (button != null) ...[const Gap(Space.md), button],
         ],
       ),
     ),

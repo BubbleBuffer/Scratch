@@ -60,7 +60,7 @@ class _DbListViewState extends State<DbListView> {
   Widget build(BuildContext context) {
     final src = a.store.main;
     final n = math.max(0, src.total);
-    final m = context.mobile;
+    final m = context.touch;
     final h = m ? 44.0 : 34.0;
     Widget row(int i) {
       final r = src.rowAt(i);
@@ -102,7 +102,7 @@ class _ListRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final a = args;
     final props = [for (final d in a.store.visibleProps(a.view)) if (shownOnCard(row.valueOf(d))) d];
     return Builder(builder: (cell) {
@@ -111,7 +111,7 @@ class _ListRow extends StatelessWidget {
         key: ValueKey('list-${row.title}'),
         onTap: () => a.ctl.openRow(context, row.id, title: row.title),
         radius: Radii.sm,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
         child: SizedBox(
           height: height,
           child: Row(children: [
@@ -119,12 +119,12 @@ class _ListRow extends StatelessWidget {
               flex: 3,
               child: RowTitle(
                 row: row,
-                style: ts(m ? const TypeSpec(16, 22, 500) : const TypeSpec(14, 20, 500), c.textPrimary),
+                style: ts(m ? context.type.body : context.type.ui, c.textPrimary),
                 iconSize: m ? 20 : 18,
                 showIcon: a.view.cfg.showIcon,
               ),
             ),
-            const SizedBox(width: 16),
+            const Gap(Space.lg),
             Expanded(
               flex: 4,
               child: ClipRect(
@@ -137,7 +137,7 @@ class _ListRow extends StatelessWidget {
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       for (final d in props)
                         Padding(
-                          padding: const EdgeInsets.only(left: 12),
+                          padding: const EdgeInsets.only(left: Space.md),
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 280),
                             child: valueOf(context, d, row, CellMode.list),

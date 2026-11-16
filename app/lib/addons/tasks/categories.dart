@@ -13,7 +13,7 @@ Future<void> showCalendarCategories(BuildContext context) =>
       desktopWidth: 410,
       desktopHeight: 640,
       shrink: false,
-      mobileHeightFactor: .82,
+      sheetHeightFactor: .82,
     );
 
 class CalendarCategoriesPanel extends StatefulWidget {
@@ -177,7 +177,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
     child: Hover(
       onTap: _busy ? null : action,
       child: Padding(
-        padding: const EdgeInsets.all(5),
+        padding: const EdgeInsets.all(Space.xs),
         child: Toggle(value: value, onChanged: null),
       ),
     ),
@@ -191,7 +191,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+          padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.sm, Space.md),
           child: Row(
             children: [
               Expanded(
@@ -211,7 +211,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
         ),
         if (_error != null)
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(Space.md),
             child: Text(
               _error!,
               style: ts(context.type.uiSmall, colors.inlineCodeText),
@@ -219,7 +219,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
           ),
         if (settings == null)
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(Space.lg),
             child: Text(
               'Loading calendars…',
               style: ts(context.type.ui, colors.textSecondary),
@@ -228,7 +228,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
         else
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+              padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.xl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -237,14 +237,14 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                       const Spacer(),
                       Text(
                         'Calendar',
-                        style: tsRaw(10, 14, 500, colors.textTertiary),
+                        style: ts(context.type.micro, colors.textTertiary, weight: Weight.medium),
                       ),
-                      const SizedBox(width: 8),
+                      const Gap(Space.sm),
                       Text(
                         'Today',
-                        style: tsRaw(10, 14, 500, colors.textTertiary),
+                        style: ts(context.type.micro, colors.textTertiary, weight: Weight.medium),
                       ),
-                      const SizedBox(width: 32),
+                      const Gap(Space.xxl),
                     ],
                   ),
                   _heading(context, 'My calendars'),
@@ -254,7 +254,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                       child: Row(
                         children: [
                           SpaceDot(c.color),
-                          const SizedBox(width: 8),
+                          const Gap(Space.sm),
                           Expanded(
                             child: Text(
                               c.name,
@@ -294,7 +294,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                   _heading(context, 'From databases'),
                   if (_databases.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.symmetric(vertical: Space.md),
                       child: Text(
                         'No databases yet.',
                         style: ts(context.type.uiSmall, colors.textSecondary),
@@ -310,7 +310,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                             size: 16,
                             color: colors.iconSecondary,
                           ),
-                          const SizedBox(width: 8),
+                          const Gap(Space.sm),
                           Expanded(
                             child: Text(
                               displayTitle(db.title),
@@ -333,17 +333,17 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 60),
+                          const Gap(Space.xxxl),
                         ],
                       ),
                     ),
-                  const SizedBox(height: 12),
+                  const Gap(Space.md),
                   TextBtn(
                     'New calendar',
                     onTap: _busy ? null : () => _edit(),
-                    height: 42,
+                    size: ControlSize.xl,
                   ),
-                  const SizedBox(height: 16),
+                  const Gap(Space.lg),
                   Text(
                     'Calendar and Today visibility are independent. Hiding a database keeps every row and its dates.',
                     style: ts(context.type.uiSmall, colors.textSecondary),
@@ -357,13 +357,13 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
   }
 
   Widget _heading(BuildContext context, String title) => Padding(
-    padding: const EdgeInsets.only(top: 20, bottom: 7),
+    padding: const EdgeInsets.only(top: Space.xl, bottom: Space.sm),
     child: Text(
       title,
       style: ts(
         context.type.uiSmall,
         context.colors.textSecondary,
-        weight: 700,
+        weight: Weight.bold,
       ),
     ),
   );
@@ -405,7 +405,7 @@ class _CalendarEditorState extends State<_CalendarEditor> {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(Space.xl),
     child: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -414,7 +414,7 @@ class _CalendarEditorState extends State<_CalendarEditor> {
           widget.calendar == null ? 'New calendar' : 'Edit calendar',
           style: tsDisplay(context.type.h3, context.colors.textPrimary),
         ),
-        const SizedBox(height: 18),
+        const Gap(Space.lg),
         FieldFrame(
           child: PlainField(
             controller: _name,
@@ -426,10 +426,10 @@ class _CalendarEditorState extends State<_CalendarEditor> {
             onSubmitted: (_) => _save(),
           ),
         ),
-        const SizedBox(height: 16),
+        const Gap(Space.lg),
         Wrap(
-          spacing: 10,
-          runSpacing: 8,
+          spacing: Space.md,
+          runSpacing: Space.sm,
           children: [
             for (final color in spaceColorNames)
               Semantics(
@@ -456,7 +456,7 @@ class _CalendarEditorState extends State<_CalendarEditor> {
                           border: _color == color
                               ? Border.all(
                                   color: context.colors.textPrimary,
-                                  width: 2,
+                                  width: Stroke.bold,
                                 )
                               : null,
                         ),
@@ -467,7 +467,7 @@ class _CalendarEditorState extends State<_CalendarEditor> {
               ),
           ],
         ),
-        const SizedBox(height: 24),
+        const Gap(Space.xl),
         SecondaryButton(
           label: 'Save calendar',
           onTap: _name.text.trim().isEmpty ? null : _save,

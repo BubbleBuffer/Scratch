@@ -22,7 +22,7 @@ Future<void> editAsText(EditArgs a, {required String initial, required PropValue
       initial: initial,
       multiline: multiline,
       onDone: (s) => result = s,
-      placeholder: a.context.mobile ? a.def.name : '',
+      placeholder: a.context.touch ? a.def.name : '',
     ),
   );
   final s = result;
@@ -81,10 +81,10 @@ class _TextBoxState extends State<_TextBox> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
-    final style = ts(m ? context.type.body : const TypeSpec(14, 21, 400), c.textPrimary, weight: 400);
+    final m = context.touch;
+    final style = ts(m ? context.type.body : context.type.ui, c.textPrimary, weight: Weight.regular);
     return Padding(
-      padding: m ? const EdgeInsets.fromLTRB(8, 0, 8, 12) : const EdgeInsets.fromLTRB(8, 7.5, 8, 7.5),
+      padding: m ? const EdgeInsets.fromLTRB(Space.sm, 0, Space.sm, Space.md) : const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.sm, Space.sm),
       child: m
           ? MenuField(controller: _ctl, autofocus: true, placeholder: widget.placeholder, onSubmitted: (_) => Navigator.of(context).maybePop())
           : ConstrainedBox(

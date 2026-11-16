@@ -49,7 +49,7 @@ class _Card extends StatelessWidget {
       radius: Radii.lg,
       child: Container(
         constraints: const BoxConstraints(minHeight: 72),
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.lg),
         decoration: BoxDecoration(
           border: Border.all(color: c.border),
           borderRadius: BorderRadius.circular(Radii.lg),
@@ -59,16 +59,16 @@ class _Card extends StatelessWidget {
               key: ValueKey('bookmark-title-$url'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: tsRaw(14, 20, 400, c.textPrimary)),
+              style: ts(context.type.ui, c.textPrimary, weight: Weight.regular)),
           if (desc != null) ...[
-            const SizedBox(height: 4),
+            const Gap(Space.xxs),
             Text(desc,
                 key: ValueKey('bookmark-description-$url'),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: tsRaw(12, 16, 400, c.textSecondary)),
+                style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular)),
           ],
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           Row(children: [
             if (icon != null)
               SizedBox(
@@ -80,9 +80,9 @@ class _Card extends StatelessWidget {
               )
             else
               fallback,
-            const SizedBox(width: 6),
+            const Gap(Space.xs),
             Flexible(
-              child: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(12, 16, 400, c.textPrimary)),
+              child: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.regular)),
             ),
           ]),
         ]),

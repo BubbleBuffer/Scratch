@@ -19,7 +19,7 @@ Future<void> pumpTaskHost(
       view: tester.view,
       child: AppTheme(
         colors: dark ? AppColors.darkTheme : AppColors.light,
-        formFactor: mobile ? FormFactor.mobile : FormFactor.desktop,
+        density: mobile ? Density.touch : Density.pointer,
         child: AppScope(
           state: fixture.app,
           child: WidgetsApp(

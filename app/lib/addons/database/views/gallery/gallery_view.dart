@@ -38,7 +38,7 @@ final galleryView = ViewType(
                 MenuItem(
                   key: ValueKey('preview-$id'),
                   label: _previewLabel(id),
-                  trailing: cfg.previewFor(ViewKind.gallery) == id ? Icon20(Ico.check, size: 16, color: c.colors.iconPrimary) : null,
+                  trailing: cfg.previewFor(ViewKind.gallery) == id ? Icon20(Ico.check, size: IconSize.sm, color: c.colors.iconPrimary) : null,
                   onTap: () => Navigator.of(c).pop(id),
                 ),
             ]),
@@ -59,7 +59,7 @@ final galleryView = ViewType(
                 MenuItem(
                   key: ValueKey('size-${v.name}'),
                   label: _sizeLabel(v),
-                  trailing: cfg.cardSize == v ? Icon20(Ico.check, size: 16, color: c.colors.iconPrimary) : null,
+                  trailing: cfg.cardSize == v ? Icon20(Ico.check, size: IconSize.sm, color: c.colors.iconPrimary) : null,
                   onTap: () => Navigator.of(c).pop(v),
                 ),
             ]),
@@ -104,7 +104,7 @@ class _GalleryViewState extends State<GalleryView> {
   @override
   Widget build(BuildContext context) {
     final cfg = a.view.cfg;
-    final m = context.mobile;
+    final m = context.touch;
     final minW = switch (cfg.cardSize) {
       CardSize.small => m ? 150.0 : 180.0,
       CardSize.medium => m ? 300.0 : 260.0,
@@ -144,7 +144,7 @@ class _GalleryViewState extends State<GalleryView> {
 
       if (a.inline) {
         return Padding(
-          padding: EdgeInsets.only(left: a.gutter, top: 4),
+          padding: EdgeInsets.only(left: a.gutter, top: Space.xxs),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             for (var i = 0; i < rows; i++) gridRow(i),
             if (total > n) LoadMore(onTap: () => setState(() => _limit += inlinePage)),
@@ -155,7 +155,7 @@ class _GalleryViewState extends State<GalleryView> {
       return ListView.builder(
         key: const ValueKey('gallery-rows'),
         controller: _v,
-        padding: EdgeInsets.fromLTRB(a.gutter, 4, a.gutter, 120),
+        padding: EdgeInsets.fromLTRB(a.gutter, Space.xxs, a.gutter, 120),
         itemCount: rows + 1,
         itemBuilder: (context, i) => i < rows ? gridRow(i) : Align(alignment: Alignment.centerLeft, child: add),
       );

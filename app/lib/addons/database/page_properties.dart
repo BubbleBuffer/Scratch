@@ -213,8 +213,8 @@ class _PagePropertiesState extends State<PageProperties> {
 
   Widget _build(BuildContext context) {
     final s = _store;
-    final mobile = context.mobile;
-    final pad = EdgeInsets.only(left: widget.left, bottom: 8);
+    final mobile = context.touch;
+    final pad = EdgeInsets.only(left: widget.left, bottom: Space.sm);
     // Pages under a document or a page with properties; other page types
     // (a journal, a mod's type) keep their own children.
     if (s == null ||
@@ -257,7 +257,7 @@ class _PagePropertiesState extends State<PageProperties> {
                   key: const ValueKey('props-more'),
                   icon: Icon20(
                     _showHidden ? Ico.chevronDown : Ico.chevronRight,
-                    size: 14,
+                    size: IconSize.xs,
                     color: c.iconTertiary,
                   ),
                   label: _showHidden
@@ -268,14 +268,14 @@ class _PagePropertiesState extends State<PageProperties> {
               _footRow(
                 context,
                 key: const ValueKey('props-add'),
-                icon: Icon20(Ico.plus, size: 16, color: c.iconTertiary),
+                icon: Icon20(Ico.plus, size: IconSize.sm, color: c.iconTertiary),
                 label: 'Add a property',
                 onTap: _add,
               ),
               if (s.schema.isNotEmpty) ...[
-                const SizedBox(height: 8),
+                const Gap(Space.sm),
                 HLine(color: c.divider),
-                const SizedBox(height: 4),
+                const Gap(Space.xxs),
               ],
             ],
           ),
@@ -286,13 +286,13 @@ class _PagePropertiesState extends State<PageProperties> {
 
   Widget _propRow(BuildContext context, PropDef d, PageRow r) {
     final c = context.colors;
-    final mobile = context.mobile;
+    final mobile = context.touch;
     final t = propertyRegistry.of(d.kind);
     final v = r.valueOf(d);
     const labelW = 140.0;
-    final labelStyle = tsRaw(14, 20, 400, c.textSecondary);
+    final labelStyle = ts(context.type.ui, c.textSecondary, weight: Weight.regular);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: Space.xxs),
       child: ConstrainedBox(
         constraints: BoxConstraints(minHeight: mobile ? 34 : 30),
         child: Row(
@@ -305,7 +305,7 @@ class _PagePropertiesState extends State<PageProperties> {
                   key: ValueKey('prop-label-${d.name}'),
                   onTap: () => showPropertyMenu(b, _ctl!, d, inPage: true),
                   radius: Radii.sm,
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: Space.xs),
                   child: SizedBox(
                     height: mobile ? 34 : 30,
                     child: Row(
@@ -315,7 +315,7 @@ class _PagePropertiesState extends State<PageProperties> {
                           size: mobile ? 18 : 16,
                           color: c.textSecondary,
                         ),
-                        SizedBox(width: mobile ? 10 : 8),
+                        Gap(mobile ? 10 : 8),
                         Expanded(
                           child: Text(
                             d.name,
@@ -330,7 +330,7 @@ class _PagePropertiesState extends State<PageProperties> {
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const Gap(Space.xxs),
             Expanded(
               child: Builder(
                 builder: (b) => Hover(
@@ -340,8 +340,8 @@ class _PagePropertiesState extends State<PageProperties> {
                       : () => _edit(b, d),
                   radius: Radii.sm,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 5,
+                    horizontal: Space.xs,
+                    vertical: Space.xs,
                   ),
                   child: Align(
                     alignment: Alignment.centerLeft,
@@ -379,19 +379,19 @@ class _PagePropertiesState extends State<PageProperties> {
         key: key,
         onTap: () => onTap(b),
         radius: Radii.sm,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
         child: SizedBox(
-          height: context.mobile ? 34 : 30,
+          height: context.touch ? 34 : 30,
           child: Row(
             children: [
               SizedBox(width: 16, child: Center(child: icon)),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               Text(
                 label,
                 style: ts(
-                  context.mobile
-                      ? const TypeSpec(15, 20, 400)
-                      : const TypeSpec(14, 20, 400),
+                  context.touch
+                      ? context.type.ui
+                      : context.type.ui,
                   c.textTertiary,
                 ),
               ),

@@ -98,7 +98,7 @@ class _DatePickerState extends State<DatePicker> {
     final first = month;
     final lead = first.weekday0Sunday();
     final gridStart = first.add(-lead);
-    final m = context.mobile;
+    final m = context.touch;
     final cell = m ? 40.0 : 32.0;
 
     Widget field(Day? d, int minutes, bool isEnd) {
@@ -108,7 +108,7 @@ class _DatePickerState extends State<DatePicker> {
           onTap: () => setState(() => editingEnd = isEnd),
           child: Container(
             height: m ? 36 : 28,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: Space.xs),
             decoration: BoxDecoration(
               color: c.bgSecondary,
               borderRadius: Radii.field,
@@ -119,7 +119,7 @@ class _DatePickerState extends State<DatePicker> {
               d == null ? '' : '${formatDay(d)}${hasTime ? ' ${_fmtMin(minutes)}' : ''}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ts(ty.ui, c.textPrimary, weight: 400),
+              style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
             ),
           ),
         ),
@@ -129,39 +129,39 @@ class _DatePickerState extends State<DatePicker> {
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
         field(start, startMin, false),
-        if (end != null) ...[const SizedBox(width: 6), field(end, endMin, true)],
+        if (end != null) ...[const Gap(Space.xs), field(end, endMin, true)],
       ]),
-      const SizedBox(height: 8),
+      const Gap(Space.sm),
       Row(children: [
-        const SizedBox(width: 6),
+        const Gap(Space.xs),
         Expanded(
             child: Text('${monthName(month.month)} ${month.year}',
-                key: const ValueKey('date-month'), style: ts(ty.ui, c.textPrimary, weight: 600))),
-        TextBtn('Today', height: 24, color: c.textSecondary, onTap: () => setState(() => month = Day(today.year, today.month, 1))),
+                key: const ValueKey('date-month'), style: ts(ty.ui, c.textPrimary, weight: Weight.semibold))),
+        TextBtn('Today', size: ControlSize.xs, color: c.textSecondary, onTap: () => setState(() => month = Day(today.year, today.month, 1))),
         IconBtn(Ico.chevronLeft,
             key: const ValueKey('date-prev'),
-            size: 24,
-            glyph: 16,
+            size: ControlSize.xs,
+            glyph: IconSize.sm,
             onTap: () => setState(() => month = _addMonths(month, -1)),
             semanticLabel: 'Previous month'),
         IconBtn(Ico.chevronRight,
             key: const ValueKey('date-next'),
-            size: 24,
-            glyph: 16,
+            size: ControlSize.xs,
+            glyph: IconSize.sm,
             onTap: () => setState(() => month = _addMonths(month, 1)),
             semanticLabel: 'Next month'),
       ]),
-      const SizedBox(height: 4),
+      const Gap(Space.xxs),
       Row(children: [
         for (final w in ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'])
-          Expanded(child: Center(child: Text(w, style: ts(ty.uiSmall, c.textTertiary, weight: 400)))),
+          Expanded(child: Center(child: Text(w, style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)))),
       ]),
       for (var week = 0; week < 6; week++)
         Row(children: [
           for (var i = 0; i < 7; i++)
             Expanded(child: _dayCell(context, gridStart.add(week * 7 + i), today, cell)),
         ]),
-      const SizedBox(height: 4),
+      const Gap(Space.xxs),
       const MenuSeparator(),
       if (!widget.dayOnly) MenuItem(
         key: const ValueKey('date-end-toggle'),
@@ -186,7 +186,7 @@ class _DatePickerState extends State<DatePicker> {
       ),
       if (hasTime)
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
+          padding: const EdgeInsets.fromLTRB(Space.sm, Space.hair, Space.sm, Space.xxs),
           child: Row(children: [
             Expanded(
               child: MenuField(
@@ -200,7 +200,7 @@ class _DatePickerState extends State<DatePicker> {
               ),
             ),
             if (end != null) ...[
-              const SizedBox(width: 6),
+              const Gap(Space.xs),
               Expanded(
                 child: MenuField(
                   key: const ValueKey('date-end-time'),
@@ -245,7 +245,7 @@ class _DatePickerState extends State<DatePicker> {
       onTap: () => _pickDay(d),
       child: Container(
         height: size,
-        color: inRange ? c.accent.withValues(alpha: 0.12) : null,
+        color: inRange ? c.accent.withValues(alpha: Alpha.tint) : null,
         alignment: Alignment.center,
         child: Hover(
           onTap: () => _pickDay(d),
@@ -265,7 +265,7 @@ class _DatePickerState extends State<DatePicker> {
                           : inMonth
                               ? c.textPrimary
                               : c.textTertiary,
-                  weight: d == today || picked ? 600 : 400,
+                  weight: d == today || picked ? Weight.semibold : Weight.regular,
                 )),
           ),
         ),

@@ -247,5 +247,5 @@ Color eventPillFill(AppColors colors, String? name) =>
     spaceColor(
       name,
       colors.dark ? Brightness.dark : Brightness.light,
-    )?.withValues(alpha: .25) ??
+    )?.withValues(alpha: Alpha.wash) ??
     colors.infoBg;

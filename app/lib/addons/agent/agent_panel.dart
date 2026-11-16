@@ -92,7 +92,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
     // Covered, closed and unrelated sessions cannot move the editor.
     if (!agentRoute &&
         (!app.ui.agentPanelOpen ||
-            context.mobile ||
+            context.touch ||
             (route != null && !route.isFirst && stack.idOf(route) == null))) {
       return;
     }
@@ -106,7 +106,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
       final current = stack.currentRoute;
       if (current?.settings.name != agentRouteName &&
           (!app.ui.agentPanelOpen ||
-              context.mobile ||
+              context.touch ||
               (current != null &&
                   !current.isFirst &&
                   stack.idOf(current) == null))) {
@@ -114,7 +114,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
       }
       final target = stack.navigator?.overlay?.context;
       if (target == null || !target.mounted) return;
-      if (context.mobile) {
+      if (context.touch) {
         _mobileNotice(
           target,
           displayTitle(page.title, firstLine: PageMeta.of(page).firstLine),
@@ -162,7 +162,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
       builder: (context, _) {
         final stack = PageStackScope.of(context);
         final show =
-            !context.mobile &&
+            !context.touch &&
             store.enabled &&
             app.ui.agentPanelOpen &&
             !stack.routes.any((r) => r.settings.name == agentRouteName);
@@ -185,7 +185,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
                 listenable: Listenable.merge([app.ui, stack, store]),
                 builder: (context, _) {
                   final dock =
-                      !context.mobile &&
+                      !context.touch &&
                       store.enabled &&
                       app.ui.agentPanelOpen &&
                       !stack.routes.any(
@@ -216,7 +216,7 @@ class AgentPanelToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.maybeOf(context);
-    if (app == null || context.mobile || !AgentStore.of(app).enabled) {
+    if (app == null || context.touch || !AgentStore.of(app).enabled) {
       return const SizedBox.shrink();
     }
     return ListenableBuilder(
@@ -292,13 +292,13 @@ class AgentPanel extends StatelessWidget {
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 6),
+            padding: const EdgeInsets.only(left: Space.xs),
             child: Column(
               children: [
                 SizedBox(
                   height: Layout.topbarHeight,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                     child: Row(
                       children: [
                         Expanded(
@@ -308,8 +308,8 @@ class AgentPanel extends StatelessWidget {
                               onTap: () => _sessions(anchor),
                               radius: Radii.md,
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 6,
+                                horizontal: Space.xs,
+                                vertical: Space.xs,
                               ),
                               child: Row(
                                 children: [
@@ -326,7 +326,7 @@ class AgentPanel extends StatelessWidget {
                                   ),
                                   Icon20(
                                     Ico.chevronDown,
-                                    size: 14,
+                                    size: IconSize.xs,
                                     color: c.iconSecondary,
                                   ),
                                 ],
@@ -443,7 +443,7 @@ class _MobileAgentNoticeState extends State<_MobileAgentNotice> {
     bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
     child: MenuSurface(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+        padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.sm, Space.sm),
         child: Row(
           children: [
             Expanded(

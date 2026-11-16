@@ -58,7 +58,7 @@ class RowTitle extends StatelessWidget {
           padding: EdgeInsets.only(top: ((style.height ?? 1.3) * (style.fontSize ?? 14) - iconSize) / 2),
           child: PageIcon(icon: row.icon, size: iconSize, color: c.iconSecondary),
         ),
-        const SizedBox(width: 6),
+        const Gap(Space.xs),
       ],
       Flexible(
         child: Text(
@@ -100,9 +100,9 @@ class AddRowButton extends StatelessWidget {
       child: SizedBox(
         height: height,
         child: Row(children: [
-          Icon20(Ico.plus, size: 14, color: c.iconTertiary),
-          const SizedBox(width: 6),
-          Text(label, style: ts(context.mobile ? const TypeSpec(15, 20, 400) : context.type.ui, c.textTertiary, weight: 400)),
+          Icon20(Ico.plus, size: IconSize.xs, color: c.iconTertiary),
+          const Gap(Space.xs),
+          Text(label, style: ts(context.touch ? context.type.ui : context.type.ui, c.textTertiary, weight: Weight.regular)),
         ]),
       ),
     );
@@ -121,13 +121,13 @@ class LoadMore extends StatelessWidget {
       key: const ValueKey('load-more'),
       onTap: onTap,
       radius: Radii.sm,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       child: SizedBox(
         height: 33,
         child: Row(children: [
-          Icon20(Ico.arrowDown, size: 14, color: c.iconTertiary),
-          const SizedBox(width: 6),
-          Text('Load more', style: ts(context.type.ui, c.textTertiary, weight: 400)),
+          Icon20(Ico.arrowDown, size: IconSize.xs, color: c.iconTertiary),
+          const Gap(Space.xs),
+          Text('Load more', style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
         ]),
       ),
     );
@@ -144,14 +144,14 @@ class OpenChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     return Hover(
       onTap: onTap,
       radius: Radii.sm,
       hoverColor: c.bgHover,
       child: Container(
         height: m ? 26 : 22,
-        padding: EdgeInsets.symmetric(horizontal: m ? 6 : 5),
+        padding: EdgeInsets.symmetric(horizontal: m ? Space.xs : Space.xs),
         decoration: BoxDecoration(
           color: c.bgPrimary,
           borderRadius: BorderRadius.circular(Radii.sm),
@@ -163,13 +163,13 @@ class OpenChip extends StatelessWidget {
             Container(
               width: 12,
               height: 10,
-              decoration: BoxDecoration(border: Border.all(color: c.iconTertiary, width: 1.2), borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(border: Border.all(color: c.iconTertiary, width: Stroke.hair), borderRadius: BorderRadius.circular(Radii.sm)),
               alignment: Alignment.centerRight,
               child: Container(width: 4, color: c.iconTertiary),
             ),
-            const SizedBox(width: 4),
+            const Gap(Space.xxs),
           ],
-          Text(label, style: tsRaw(m ? 12 : 11.5, 14, 600, c.textTertiary).copyWith(letterSpacing: 0.5)),
+          Text(label, style: ts(context.type.caption, c.textTertiary, weight: Weight.semibold).copyWith(letterSpacing: 0.5)),
         ]),
       ),
     );

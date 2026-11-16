@@ -129,14 +129,14 @@ class UpdatesBody extends StatelessWidget {
             control: Row(mainAxisSize: MainAxisSize.min, children: [
               if (r.notesUrl.isNotEmpty) ...[
                 SButton('Release notes', key: const ValueKey('updates-notes'), kind: SButtonKind.quiet, onTap: () => _openNotes(r.notesUrl)),
-                const SizedBox(width: 8),
+                const Gap(Space.sm),
               ],
               action,
             ]),
           ),
         if (u.problem != null && u.phase != UpdatePhase.development)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: Space.sm),
             child: Text(u.problem!, key: const ValueKey('updates-problem'), style: sHint(context)),
           ),
       ],
@@ -158,26 +158,26 @@ class UpdateRailRow extends StatelessWidget {
         if (!u.ready) return const SizedBox.shrink();
         final c = context.colors;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+          padding: const EdgeInsets.fromLTRB(Space.sm, Space.xxs, Space.sm, 0),
           child: AppTooltip(
             label: 'Version ${_version(u.release!.tag)} is ready to install',
             child: Hover(
               key: const ValueKey('update-ready-row'),
               onTap: () => showUpdateReady(context, u),
               borderRadius: Radii.ctl,
-              hoverColor: c.rail2.withValues(alpha: .55),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              hoverColor: c.rail2.withValues(alpha: Alpha.muted),
+              padding: const EdgeInsets.symmetric(horizontal: Space.sm),
               child: SizedBox(
                 height: Layout.sidebarRowHeight - 2,
                 child: Row(children: [
                   Container(
                     width: 8,
                     height: 8,
-                    decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(4)),
+                    decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(Radii.sm)),
                   ),
-                  const SizedBox(width: 10),
+                  const Gap(Space.md),
                   Expanded(
-                    child: Text('Update ready', maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(14, 20, 400, c.railInk)),
+                    child: Text('Update ready', maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.railInk, weight: Weight.regular)),
                   ),
                 ]),
               ),
@@ -211,35 +211,35 @@ class _UpdateReadyBox extends StatelessWidget {
       builder: (context, _) {
         final r = u.release;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          padding: const EdgeInsets.fromLTRB(Space.xl, Space.xl, Space.xl, Space.lg),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Update ready', textAlign: TextAlign.center, style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
-            const SizedBox(height: 6),
+            Text('Update ready', textAlign: TextAlign.center, style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display)),
+            const Gap(Space.xs),
             Text(
               r == null
                   ? updateStatusText(u)
                   : '$appName ${_version(r.tag)} is downloaded and verified. $appName closes, the installer runs, then $appName opens again.',
               textAlign: TextAlign.center,
-              style: ts(ty.uiSmall, c.textSecondary, weight: 400),
+              style: ts(ty.uiSmall, c.textSecondary, weight: Weight.regular),
             ),
             if (r != null && r.notesUrl.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const Gap(Space.sm),
               Center(
                 child: TextBtn('Release notes', key: const ValueKey('update-ready-notes'), onTap: () => _openNotes(r.notesUrl)),
               ),
             ],
             if (u.problem != null && u.phase == UpdatePhase.available) ...[
-              const SizedBox(height: 8),
-              Text(u.problem!, textAlign: TextAlign.center, style: ts(ty.uiSmall, c.inlineCodeText, weight: 400)),
+              const Gap(Space.sm),
+              Text(u.problem!, textAlign: TextAlign.center, style: ts(ty.uiSmall, c.inlineCodeText, weight: Weight.regular)),
             ],
-            const SizedBox(height: 16),
+            const Gap(Space.lg),
             DialogButton(
               key: const ValueKey('update-ready-install'),
               label: u.phase == UpdatePhase.installing ? 'Starting…' : 'Restart to update',
               filled: true,
               onTap: u.ready ? u.install : null,
             ),
-            const SizedBox(height: 8),
+            const Gap(Space.sm),
             DialogButton(key: const ValueKey('update-ready-later'), label: 'Later', onTap: onClose),
           ]),
         );

@@ -439,7 +439,7 @@ Widget _cell(
 ) {
   final runs = _inlineRuns(markdown, pages: pages);
   return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
     child: Text.rich(
       TextSpan(
         style: base,

@@ -60,7 +60,7 @@ class _ImageViewState extends State<_ImageView> {
           return _missing(context, w);
         },
       );
-      final handles = !context.mobile && (_hover || _drag != null);
+      final handles = !context.touch && (_hover || _drag != null);
       return MouseRegion(
         onEnter: (_) => setState(() => _hover = true),
         onExit: (_) => setState(() => _hover = false),
@@ -89,8 +89,8 @@ class _ImageViewState extends State<_ImageView> {
       color: c.bgSecondary,
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         IconX(Ix.image, size: 20, color: c.iconTertiary),
-        const SizedBox(width: 8),
-        Text('Image not available on this device', style: ts(context.type.ui, c.textTertiary, weight: 400)),
+        const Gap(Space.sm),
+        Text('Image not available on this device', style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
       ]),
     );
   }
@@ -126,7 +126,7 @@ class _ImageViewState extends State<_ImageView> {
               decoration: BoxDecoration(
                 color: const Color(0x99000000),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: c.bgPrimary.withValues(alpha: 0.9)),
+                border: Border.all(color: c.bgPrimary.withValues(alpha: Alpha.strong)),
               ),
             ),
           ),

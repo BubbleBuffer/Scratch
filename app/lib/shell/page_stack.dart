@@ -266,7 +266,7 @@ class PageStackHome extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) {
-    if (context.mobile) return child;
+    if (context.touch) return child;
     final stack = PageStackScope.of(context);
     final covered = stack.pages.isNotEmpty;
     final animation = ModalRoute.of(context)?.secondaryAnimation;
@@ -376,7 +376,7 @@ class _PageStackChromeState extends State<PageStackChrome> {
 
   @override
   Widget build(BuildContext context) {
-    if (context.mobile) return widget.child;
+    if (context.touch) return widget.child;
     // No store scope before the vault opens: there is no pile to show yet.
     final tree = context.maybeWatch<TreeStore>();
     if (tree == null) return widget.child;
@@ -440,7 +440,7 @@ class _PageStackChromeState extends State<PageStackChrome> {
                         decoration: BoxDecoration(
                           color: c.bgPrimary,
                           borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(4),
+                            topLeft: Radius.circular(Radii.sm),
                           ),
                           border: Border(
                             top: BorderSide(color: c.border),
@@ -600,7 +600,7 @@ class _SpineState extends State<_Spine> {
       firstLine: context.watch<PagesStore>().meta(widget.id)?.firstLine ?? '',
     );
     final style = tsDisplay(
-      const TypeSpec(15, 18, 640),
+      context.type.title,
       patch?.ink ?? c.textPrimary,
     );
     return Semantics(
@@ -639,7 +639,7 @@ class _SpineState extends State<_Spine> {
               borderRadius: radius,
               color: _hover
                   ? Color.alphaBlend(
-                      (patch?.ink ?? c.accent).withValues(alpha: .12),
+                      (patch?.ink ?? c.accent).withValues(alpha: Alpha.tint),
                       fill,
                     )
                   : fill,
@@ -647,10 +647,10 @@ class _SpineState extends State<_Spine> {
             foregroundDecoration: _focus
                 ? BoxDecoration(
                     borderRadius: radius,
-                    border: Border.all(color: c.focus, width: 2),
+                    border: Border.all(color: c.focus, width: Stroke.bold),
                   )
                 : null,
-            padding: const EdgeInsets.only(top: 18, bottom: 18),
+            padding: const EdgeInsets.only(top: Space.lg, bottom: Space.lg),
             child: Column(
               children: [
                 Container(
@@ -668,7 +668,7 @@ class _SpineState extends State<_Spine> {
                     color: patch?.ink ?? c.iconSecondary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const Gap(Space.md),
                 Flexible(
                   child: RotatedBox(
                     quarterTurns: 3,
@@ -676,15 +676,15 @@ class _SpineState extends State<_Spine> {
                       // Moss needs its original backing to preserve AA on hover.
                       padding: patch?.fill == const Color(0xFF5F7062)
                           ? const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
+                              horizontal: Space.xxs,
+                              vertical: Space.hair,
                             )
                           : EdgeInsets.zero,
                       decoration: BoxDecoration(
                         color: patch?.fill == const Color(0xFF5F7062)
                             ? patch!.fill
                             : const Color(0x00000000),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(Radii.sm),
                       ),
                       child: Text(
                         label.text,
@@ -727,7 +727,7 @@ class _FanList extends StatelessWidget {
       child: MenuSurface(
         key: const ValueKey('stack-fan'),
         width: 280,
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(Space.xs),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -743,7 +743,7 @@ class _FanList extends StatelessWidget {
                     final style = ts(
                       ty.ui,
                       c.textPrimary,
-                      weight: identical(e.$1, top) ? 700 : 400,
+                      weight: identical(e.$1, top) ? Weight.bold : Weight.regular,
                     );
                     return Semantics(
                       button: true,
@@ -758,7 +758,7 @@ class _FanList extends StatelessWidget {
                         selected: identical(e.$1, top),
                         radius: Radii.sm,
                         lift: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
                         child: SizedBox(
                           height: 32,
                           child: Row(
@@ -770,7 +770,7 @@ class _FanList extends StatelessWidget {
                                   child: Center(
                                     child: Icon20(
                                       Ico.home,
-                                      size: 18,
+                                      size: IconSize.md,
                                       color: c.iconSecondary,
                                     ),
                                   ),
@@ -783,7 +783,7 @@ class _FanList extends StatelessWidget {
                                   glyphSize: 16,
                                   color: c.iconSecondary,
                                 ),
-                              const SizedBox(width: 8),
+                              const Gap(Space.sm),
                               Expanded(
                                 child: Text(
                                   label.text,
@@ -800,7 +800,7 @@ class _FanList extends StatelessWidget {
                                   style: ts(
                                     ty.uiSmall,
                                     c.textTertiary,
-                                    weight: 400,
+                                    weight: Weight.regular,
                                   ),
                                 ),
                             ],

@@ -96,7 +96,7 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
           intro:
               'Connectors link Scratch with other tools, both ways. Scratch’s agent can use outside tools, and outside AI apps can use your vault.',
           children: [
-            const SizedBox(height: 10),
+            const Gap(Space.md),
             SPanel(
               headerKey: const ValueKey('connectors-tools'),
               icon: Sx.wrench,
@@ -112,7 +112,7 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
                       child: McpServersSettings(store: agent),
                     )
                   : Padding(
-                      padding: const EdgeInsets.only(top: 12),
+                      padding: const EdgeInsets.only(top: Space.md),
                       child: Text(_onComputer, style: sDesc(context)),
                     ),
             ),
@@ -130,9 +130,9 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Its `notes setup` commands run in a desktop terminal.
-                  if (!context.mobile) const ConnectAgentSection(first: true),
+                  if (!context.touch) const ConnectAgentSection(first: true),
                   AgentTokensSection(
-                    first: context.mobile,
+                    first: context.touch,
                     onCount: (n) {
                       if (mounted && n != _tokens) setState(() => _tokens = n);
                     },
@@ -152,7 +152,7 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
               child: computer
                   ? _HubPanel(signedIn: signedIn, agent: agent)
                   : Padding(
-                      padding: const EdgeInsets.only(top: 12),
+                      padding: const EdgeInsets.only(top: Space.md),
                       child: Text(_onComputer, style: sDesc(context)),
                     ),
             ),
