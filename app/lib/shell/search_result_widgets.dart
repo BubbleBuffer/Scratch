@@ -82,7 +82,7 @@ bb.SearchResult searchResultOf(
     snippetHighlights: bb.termHighlights(shownSnippet, terms),
     leading: PageIcon(
       icon: meta?.icon,
-      size: m ? 22 : 20,
+      size: context.metrics.icon.px,
       color: c.iconSecondary,
     ),
     rowKey: ValueKey('hit-$rowId'),

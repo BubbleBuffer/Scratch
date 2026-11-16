@@ -10,7 +10,7 @@ import '../../core/models.dart';
 import '../../registry/note_type_registry.dart';
 import '../../ui/database/config.dart';
 import '../../ui/database/db_icons.dart';
-import '../../ui/database/db_theme.dart';
+import '../../ui/database/db_tokens.dart';
 import '../database/api.dart';
 import '../../ui/database/values.dart';
 import '../../ui/database/widgets.dart';
@@ -240,7 +240,7 @@ class _BoardViewState extends State<BoardView> {
       return Text(
         'No ${gd.name}',
         style: ts(
-          context.touch ? context.type.ui : context.type.ui,
+          context.type.ui,
           c.textPrimary,
           weight: Weight.medium,
         ),

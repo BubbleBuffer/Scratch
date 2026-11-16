@@ -156,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _focusSearch() {
     if (!mounted) return;
-    if (context.touch) {
+    if (context.sizeClass.isCompact) {
       _openSearch();
     } else {
       final previousEnd = _scroll.hasClients
@@ -224,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final mq = MediaQuery.of(context);
     final pages = context.watch<PagesStore>();
     _logLayout(mq, pages);
-    return context.touch ? _mobile(context, mq) : _desktop(context);
+    return context.sizeClass.isCompact ? _mobile(context, mq) : _desktop(context);
   }
 
   // ---- shared pieces ----
@@ -250,7 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return _pages.docComplete ? formatCount(_pages.docCount) : null;
   }
 
-  Widget _row(BuildContext context, int i, {required bool mobile}) {
+  Widget _row(BuildContext context, int i) {
     final c = context.colors;
     final ty = context.type;
     final r = _pages.docAt(i);
@@ -259,13 +259,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final sub = r == null ? null : relativeTime(r.updatedMs.toInt());
     final empty = title == null || title.isEmpty;
     final label = id == null ? null : pageLabelOf(context, id, title ?? '');
-    final style = mobile
-        ? ts(ty.body, empty ? c.textSecondary : c.textPrimary)
-        : ts(ty.ui, empty ? c.textSecondary : c.textPrimary);
+    final style = ts(ty.item, empty ? c.textSecondary : c.textPrimary);
     final content = Row(
       children: [
-        PageIcon(icon: r?.icon, size: mobile ? 22 : 20, color: c.iconSecondary),
-        Gap(mobile ? 12 : 8),
+        PageIcon(icon: r?.icon, size: context.metrics.icon.px, color: c.iconSecondary),
+        Gap(context.metrics.iconGap),
         Expanded(
           child: Text(
             label?.text ?? '',
@@ -286,28 +284,28 @@ class _HomeScreenState extends State<HomeScreen> {
       key: i == 0 ? _firstRowKey : (id == null ? null : ValueKey('row-$id')),
       onTap: id == null ? null : () => _open(id, title ?? ''),
       borderRadius: Radii.ctl,
-      padding: EdgeInsets.symmetric(horizontal: mobile ? Space.lg : Space.sm),
+      padding: EdgeInsets.symmetric(horizontal: context.metrics.insetX),
       child: Semantics(button: id != null, child: content),
     );
   }
 
-  Widget _list({required bool mobile, required double gutter}) {
+  Widget _list({required double gutter}) {
     final hits = _hits;
     return SliverPadding(
       padding: EdgeInsets.symmetric(horizontal: gutter),
       sliver: SliverFixedExtentList(
         itemExtent: hits != null
             ? SearchResultRow.extent(context.metrics)
-            : (mobile ? Layout.listRowHeight : 36),
+            : context.metrics.listRow.height,
         delegate: SliverChildBuilderDelegate(
           (context, i) => Padding(
-            padding: EdgeInsets.symmetric(vertical: mobile ? 0 : Space.hair),
+            padding: EdgeInsets.symmetric(vertical: context.touch ? 0 : Space.hair),
             child: hits != null
                 ? SearchResultRow(
                     hit: hits[i],
                     onTap: () => _open(hits[i].id, hits[i].title),
                   )
-                : _row(context, i, mobile: mobile),
+                : _row(context, i),
           ),
           childCount: _count,
         ),
@@ -339,16 +337,15 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         const TodayDayNote(),
         const Gap(Space.xl),
-        TodayCapture(mobile: context.touch),
+        TodayCapture(mobile: context.sizeClass.isCompact),
       ],
     ),
   );
 
   List<Widget> _allPages(
     BuildContext context,
-    double gutter, {
-    required bool mobile,
-  }) {
+    double gutter,
+  ) {
     final c = context.colors;
     final expanded = context.app.ui.allPagesExpanded;
     // The header count needs the scan too; boot no longer runs it.
@@ -357,9 +354,9 @@ class _HomeScreenState extends State<HomeScreen> {
       SliverToBoxAdapter(
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-            gutter + (mobile ? 18 : 8),
+            gutter + context.metrics.insetX,
             Space.xl,
-            gutter + (mobile ? 18 : 8),
+            gutter + context.metrics.insetX,
             Space.sm,
           ),
           child: Hover(
@@ -391,15 +388,15 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-              gutter + (mobile ? 18 : 8),
+              gutter + context.metrics.insetX,
               0,
-              gutter + (mobile ? 18 : 8),
+              gutter + context.metrics.insetX,
               Space.sm,
             ),
             child: _searchField(),
           ),
         ),
-        _list(mobile: mobile, gutter: gutter),
+        _list(gutter: gutter),
       ],
     ];
   }
@@ -446,8 +443,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, box) {
-                      final width = math.min(box.maxWidth, 860.0);
-                      final gutter = (box.maxWidth - width) / 2 + 40;
+                      final width = math.min(box.maxWidth, HomeLayout.width);
+                      final gutter = (box.maxWidth - width) / 2 + HomeLayout.margin;
                       return _scrollView([
                         SliverToBoxAdapter(
                           child: Padding(
@@ -458,8 +455,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-                        ..._allPages(context, gutter - 8, mobile: false),
-                        const SliverToBoxAdapter(child: SizedBox(height: 64)),
+                        ..._allPages(context, gutter - context.metrics.insetX),
+                        const SliverToBoxAdapter(child: SizedBox(height: HomeLayout.endPadding)),
                       ]);
                     },
                   ),
@@ -522,7 +519,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.sm, 0),
           child: Row(
             children: [
-              const CalicoMark(key: ValueKey('home-mark'), size: 26),
+              const CalicoMark(key: ValueKey('home-mark'), size: ArtSizes.calicoMarkSmall),
               const Gap(Space.sm),
               Expanded(
                 child: Text(
@@ -530,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold),
                 ),
               ),
-              const SizedBox(height: 44, child: Center(child: SyncIndicator())),
+              const SizedBox(height: Layout.minTapTarget, child: Center(child: SyncIndicator())),
               const Gap(Space.md),
             ],
           ),
@@ -546,8 +543,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      ..._allPages(context, 0, mobile: true),
-      const SliverToBoxAdapter(child: SizedBox(height: 80)),
+      ..._allPages(context, 0),
+      const SliverToBoxAdapter(child: SizedBox(height: HomeLayout.compactEndPadding)),
     ]);
   }
 }
@@ -598,9 +595,9 @@ class ShellMobileFrame extends StatelessWidget {
               Positioned.fill(child: child),
               if (pageAction || action != null)
                 Positioned(
-                  right: 16,
+                  right: Space.lg,
                   bottom:
-                      16 +
+                      Space.lg +
                       (showDock ? 0 : MediaQuery.paddingOf(context).bottom),
                   child: Semantics(
                     button: true,
@@ -619,8 +616,8 @@ class ShellMobileFrame extends StatelessWidget {
                         borderRadius: Radii.panel,
                         shadow: c.stack,
                         child: SizedBox(
-                          width: 48,
-                          height: 48,
+                          width: ControlSize.xxl.height,
+                          height: ControlSize.xxl.height,
                           child: Center(
                             child: Icon20(Ico.plus, size: IconSize.xl, color: c.onAccent),
                           ),
@@ -676,9 +673,8 @@ class _MobileDock extends StatelessWidget {
             key: ValueKey('nav-$id'),
             onTap: onTap,
             borderRadius: Radii.ctl,
-            child: SizedBox(
-              width: 60,
-              height: 44,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: MobileDock.destination, minHeight: ControlSize.xl.height),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -698,7 +694,7 @@ class _MobileDock extends StatelessWidget {
         );
     return Container(
       key: const ValueKey('mobile-dock'),
-      padding: EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, mq.padding.bottom + 8),
+      padding: EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, mq.padding.bottom + Space.sm),
       decoration: BoxDecoration(
         color: c.bgPrimary,
         border: Border(top: BorderSide(color: c.border)),
@@ -722,13 +718,13 @@ class _MobileDock extends StatelessWidget {
               child: Hover(
                 key: const ValueKey('nav-search'),
                 onTap: onSearch,
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: Radii.pill,
                 child: Container(
-                  height: 44,
+                  constraints: BoxConstraints(minHeight: ControlSize.xl.height),
                   padding: const EdgeInsets.symmetric(horizontal: Space.md),
                   decoration: BoxDecoration(
                     color: c.bgSecondary,
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: Radii.pill,
                     border: Border.all(color: c.border),
                   ),
                   child: Row(
@@ -775,7 +771,7 @@ class MobilePages extends StatelessWidget {
       color: c.desk,
       child: ListView(
         key: const ValueKey('pages-list'),
-        padding: const EdgeInsets.only(top: Space.md, bottom: 80),
+        padding: const EdgeInsets.only(top: Space.md, bottom: HomeLayout.compactEndPadding),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.md),
@@ -802,7 +798,7 @@ class MobilePages extends StatelessWidget {
             ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
-            child: Container(height: 1, color: c.border),
+            child: Container(height: Stroke.hair, color: c.border),
           ),
           _PagesAction(
             key: const ValueKey('pages-trash'),
@@ -850,14 +846,14 @@ class _PageTreeTile extends StatelessWidget {
     final c = context.colors;
     final tree = context.watch<TreeStore>();
     final p = row.page;
-    final indent = 8 + 20.0 * row.depth;
+    final indent = Space.sm + MobileTree.indent * row.depth;
     final scope = fav ? 'pages-fav-${row.root}-' : 'pages-';
     if (row.placeholder) {
       return Padding(
         key: ValueKey('${scope}empty-${p.id}'),
-        padding: EdgeInsets.only(left: indent + 44, right: Space.lg),
+        padding: EdgeInsets.only(left: indent + Layout.minTapTarget, right: Space.lg),
         child: SizedBox(
-          height: 48,
+          height: MobileTree.emptyRow,
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -887,8 +883,8 @@ class _PageTreeTile extends StatelessWidget {
       onTap: () => openPage(context, p.id, p.title),
       borderRadius: Radii.ctl,
       padding: EdgeInsets.only(left: indent, right: Space.lg),
-      child: SizedBox(
-        height: 52,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: MobileTree.row),
         child: Row(
           children: [
             if (canExpand)
@@ -902,8 +898,8 @@ class _PageTreeTile extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   onTap: () => tree.toggle(p.id, fav: fav),
                   child: SizedBox(
-                    width: 44,
-                    height: 52,
+                    width: Layout.minTapTarget,
+                    height: MobileTree.row,
                     child: Center(
                       child: Icon20(
                         expanded ? Ico.chevronDown : Ico.chevronRight,
@@ -915,12 +911,12 @@ class _PageTreeTile extends StatelessWidget {
                 ),
               )
             else
-              const Gap(Space.xxxl),
+              const Gap(Layout.minTapTarget),
             SpaceIconTile(
               icon: p.icon,
               patch: patch,
-              size: 26,
-              glyphSize: 18,
+              size: MobileTree.tile,
+              glyphSize: MobileTree.tileGlyph,
               color: c.iconSecondary,
             ),
             const Gap(Space.md),
@@ -963,17 +959,17 @@ class _PagesAction extends StatelessWidget {
         onTap: onTap,
         borderRadius: Radii.ctl,
         // Icons line up with the page icons above.
-        padding: const EdgeInsets.only(left: 8 + 44, right: Space.lg),
-        child: SizedBox(
-          height: 52,
+        padding: const EdgeInsets.only(left: Space.sm + Layout.minTapTarget, right: Space.lg),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: MobileTree.row),
           child: Row(
             children: [
               SizedBox(
-                width: 26,
+                width: MobileTree.tile,
                 child: Center(
                   child: icon != null
                       ? Icon20(icon!, size: IconSize.xl, color: c.iconSecondary)
-                      : IconX(iconX!, size: 22, color: c.iconSecondary),
+                      : IconX(iconX!, size: IconSize.xl.px, color: c.iconSecondary),
                 ),
               ),
               const Gap(Space.md),

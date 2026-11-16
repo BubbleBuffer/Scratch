@@ -1,13 +1,15 @@
 // Native text selection on phones: the selection handles keep the app's
 // accent look (NoteSelectionControls), and the toolbar is Flutter's stock
 // one for the platform (cut, copy, paste, select all, and on Android share and
-// the system text-processing actions). Desktop keeps its own toolbar, so
-// everything here is chosen with context.mobile.
+// the system text-processing actions). A pointer keeps its own toolbar, so
+// everything here is chosen with context.touch.
 //
 // The app is a WidgetsApp with no Material ancestor, and the stock Android
 // toolbar reads Material localizations and a Theme. Only the context menu is
 // wrapped in them, themed from the app's colour tokens.
 
+// The stock toolbar is Material's; only it is imported (see above).
+// ignore: bb_lints/no_material
 import 'package:flutter/material.dart'
     show
         AdaptiveTextSelectionToolbar,
@@ -28,11 +30,11 @@ class MobileSelectionControls extends NoteSelectionControls
 
 final mobileSelectionControls = MobileSelectionControls();
 
-/// The selection controls for a field: native on mobile, the kit's otherwise.
+/// The selection controls for a field: native by touch, the kit's otherwise.
 TextSelectionControls selectionControlsFor(BuildContext context) =>
     context.touch ? mobileSelectionControls : noteSelectionControls;
 
-/// The context menu for a field: the stock toolbar on mobile, none otherwise.
+/// The context menu for a field: the stock toolbar by touch, none otherwise.
 EditableTextContextMenuBuilder? contextMenuFor(BuildContext context) =>
     context.touch ? mobileContextMenu : null;
 

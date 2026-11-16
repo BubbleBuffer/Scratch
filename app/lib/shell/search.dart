@@ -292,7 +292,7 @@ class _SearchScreenState extends State<SearchScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(Layout.gutter - 4, Space.sm, Space.xs, Space.sm),
+              padding: const EdgeInsets.fromLTRB(Layout.gutter - Space.xxs, Space.sm, Space.xs, Space.sm),
               child: Row(
                 children: [
                   Expanded(
@@ -335,7 +335,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       sections: groupSearchHits(hits),
                       showActive: false,
                       terms: _query.terms,
-                      padding: EdgeInsets.only(bottom: mq.padding.bottom + 8),
+                      padding: EdgeInsets.only(bottom: mq.padding.bottom + Space.sm),
                       onPick: _pick,
                     ),
             ),
@@ -373,8 +373,8 @@ Future<void> showSearchOverlay(BuildContext context, {String? query}) async {
     final hit = await showModalPanel<Hit>(
       context,
       (_) => SearchPanel(initialQuery: query),
-      width: 640,
-      height: 520,
+      width: SearchOverlay.width,
+      height: SearchOverlay.height,
     );
     if (hit != null && context.mounted) {
       await openSearchHit(context, hit);

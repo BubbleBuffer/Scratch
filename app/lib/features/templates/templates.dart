@@ -313,7 +313,7 @@ class _PageStartersState extends State<PageStarters> {
       label: label,
       icon: icon,
       active: active,
-      height: 26,
+      size: ControlSize.sm,
       radius: Radii.md,
       onTap: onTap,
     );

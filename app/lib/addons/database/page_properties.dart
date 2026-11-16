@@ -389,9 +389,7 @@ class _PagePropertiesState extends State<PageProperties> {
               Text(
                 label,
                 style: ts(
-                  context.touch
-                      ? context.type.ui
-                      : context.type.ui,
+                  context.type.ui,
                   c.textTertiary,
                 ),
               ),

@@ -1169,7 +1169,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
       });
     }
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: context.touch ? Space.lg : Space.lg),
+      padding: EdgeInsets.symmetric(horizontal: Space.lg),
       child: Column(
         children: [
           SizedBox(

@@ -63,7 +63,7 @@ bool _standsInForSidebar(BuildContext context) {
       (routePage is String ? routePage : null)) {
     return false;
   }
-  return !context.touch && tree.sidebarCollapsed;
+  return !context.sizeClass.isCompact && tree.sidebarCollapsed;
 }
 
 /// Semantic label for the feedback buttons. Their visible tooltip is AppTooltip
@@ -223,7 +223,7 @@ class _SidebarState extends State<Sidebar> {
       context,
       anchor,
       (ctx) => MenuList(
-        width: 240,
+        width: Widths.menu,
         children: [
           MenuItem(
             key: const ValueKey('tree-menu-add'),
@@ -245,21 +245,21 @@ class _SidebarState extends State<Sidebar> {
           ),
           MenuItem(
             key: const ValueKey('tree-menu-move'),
-            leading: IconX(Ix.move, size: 20, color: c.iconPrimary),
+            leading: IconX(Ix.move, color: c.iconPrimary),
             label: 'Move to',
             onTap: () => Navigator.of(ctx).pop('move'),
           ),
           if (p.parent == null)
             MenuItem(
               key: const ValueKey('tree-menu-triage'),
-              leading: AiMark(size: 20),
+              leading: AiMark(),
               label: 'Triage',
               onTap: () => Navigator.of(ctx).pop('triage'),
             ),
           MenuItem(
             key: const ValueKey('tree-menu-favorite'),
             leading: fav
-                ? IconX(Ix.starFilled, size: 20, color: c.iconPrimary)
+                ? IconX(Ix.starFilled, color: c.iconPrimary)
                 : null,
             icon: fav ? null : Ico.star,
             label: fav ? 'Remove from Favorites' : 'Add to Favorites',
@@ -317,20 +317,19 @@ class _SidebarState extends State<Sidebar> {
     final icon = r.page.icon;
     _ghost = OverlayEntry(
       builder: (_) => Positioned(
-        left: _pointer.dx + 8,
-        top: _pointer.dy - 14,
+        left: _pointer.dx + SidebarTree.ghostOffset.dx,
+        top: _pointer.dy + SidebarTree.ghostOffset.dy,
         child: IgnorePointer(
           child: Opacity(
             opacity: Alpha.strong,
             child: MenuSurface(
               child: Container(
-                height: 28,
-                constraints: const BoxConstraints(maxWidth: 220),
+                constraints: BoxConstraints(minHeight: ControlSize.sm.height, maxWidth: Widths.popover),
                 padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    PageIcon(icon: icon, size: 16, color: c.iconSecondary),
+                    PageIcon(icon: icon, size: IconSize.sm.px, color: c.iconSecondary),
                     const Gap(Space.xs),
                     Flexible(
                       child: Text(
@@ -629,16 +628,12 @@ class _SidebarState extends State<Sidebar> {
                     const Gap(Space.xs),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-                      child: SizedBox(
-                        height: 32,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: ControlSize.md.height),
                         child: Row(
                           children: [
                             const Gap(Space.sm),
-                            SizedBox(
-                              width: 26,
-                              height: 26,
-                              child: const CalicoMark(size: 26),
-                            ),
+                            const CalicoMark(size: ArtSizes.calicoMarkSmall),
                             const Gap(Space.md),
                             Expanded(
                               child: Text(
@@ -761,7 +756,7 @@ class _SidebarState extends State<Sidebar> {
               right: 0,
               top: 0,
               bottom: 0,
-              width: 6,
+              width: SidebarTree.resizeHandle,
               child: _ResizeHandle(
                 key: const ValueKey('sidebar-resize'),
                 onDrag: (dx) => tree.setSidebarWidth(tree.sidebarWidth + dx),
@@ -784,8 +779,8 @@ class _SectionLabel extends StatelessWidget {
     final c = context.colors;
     return Padding(
       padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, 0),
-      child: SizedBox(
-        height: 30,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: Layout.sidebarRowHeight),
         child: Align(
           alignment: Alignment.centerLeft,
           child: Text(text, style: ts(context.type.uiSmall, c.railMuted, weight: Weight.bold)),
@@ -809,7 +804,7 @@ class _DropIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final left = 8.0 + 4 + 12.0 * depth + 22;
+    final left = Space.sm + Space.xxs + SidebarTree.indent * depth + SpaceTile.size;
     return Stack(
       children: [
         if (mode == _Drop.inside)
@@ -830,10 +825,10 @@ class _DropIndicator extends StatelessWidget {
           Positioned(
             key: const ValueKey('tree-drop-line'),
             left: left,
-            right: 8,
+            right: Space.sm,
             top: mode == _Drop.before ? 0 : null,
             bottom: mode == _Drop.after ? 0 : null,
-            height: 2,
+            height: Stroke.bold,
             child: ColoredBox(color: c.accent.withValues(alpha: Alpha.muted)),
           ),
       ],
@@ -872,8 +867,8 @@ class _ResizeHandleState extends State<_ResizeHandle> {
         child: Align(
           alignment: Alignment.centerRight,
           child: Container(
-            width: 2,
-            color: _hover || _down ? c.borderStrong : const Color(0x00000000),
+            width: Stroke.bold,
+            color: _hover || _down ? c.borderStrong : kTransparent,
           ),
         ),
       ),
@@ -965,8 +960,8 @@ class _NavRowState extends State<_NavRow> {
           child: Row(
             children: [
               SizedBox(
-                width: 20,
-                height: 20,
+                width: IconSize.lg.px,
+                height: IconSize.lg.px,
                 child: Center(
                   child: Icon20(
                     widget.icon,
@@ -1118,15 +1113,14 @@ class _TreeRowViewState extends State<_TreeRowView> {
               key: ValueKey('rail-space-tile-$id'),
               icon: p.icon,
               patch: tilePatch,
-              size: 22,
-              glyphSize: 16,
+              glyphSize: IconSize.sm.px,
             ),
           )
         : SizedBox(
-            width: 20,
-            height: 20,
+            width: IconSize.lg.px,
+            height: IconSize.lg.px,
             child: Center(
-              child: PageIcon(icon: p.icon, size: 18, color: c.railMuted),
+              child: PageIcon(icon: p.icon, size: IconSize.md.px, color: c.railMuted),
             ),
           );
 
@@ -1144,7 +1138,7 @@ class _TreeRowViewState extends State<_TreeRowView> {
               selectedColor: widget.selected ? railSelected(c) : c.rail2,
               hoverColor: railHover(c),
               borderRadius: Radii.ctl,
-              padding: EdgeInsets.only(left: 4 + 12.0 * widget.depth, right: Space.xxs),
+              padding: EdgeInsets.only(left: Space.xxs + SidebarTree.indent * widget.depth, right: Space.xxs),
               child: SizedBox(
                 height: Layout.sidebarRowHeight - 2,
                 child: Row(
@@ -1162,8 +1156,8 @@ class _TreeRowViewState extends State<_TreeRowView> {
                             onTap: widget.onToggle,
                             radius: Radii.sm,
                             child: SizedBox(
-                              width: 20,
-                              height: 20,
+                              width: IconSize.lg.px,
+                              height: IconSize.lg.px,
                               child: Center(
                                 child: Icon20(
                                   widget.expanded
@@ -1219,7 +1213,7 @@ class _TreeRowViewState extends State<_TreeRowView> {
                 left: 0,
                 top: 0,
                 bottom: 0,
-                width: 3,
+                width: Stroke.seam,
                 child: IgnorePointer(
                   child: ColoredBox(
                     key: ValueKey('rail-current-bar-$id'),

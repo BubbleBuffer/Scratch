@@ -1,13 +1,14 @@
 // Small parts every database screen shares: option pills, the checkbox,
 // icon buttons with database icons, menu rows, the boxed menu field, a
-// toggle, and [showPanel] (a popover on desktop, a bottom sheet on mobile).
+// toggle, and [showPanel] (a popover, or a bottom sheet on a compact screen).
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../features/settings/controls.dart' as bb show Toggle;
 import '../ui.dart';
 import 'db_icons.dart';
-import 'db_theme.dart';
+import 'db_tokens.dart';
 import 'config.dart';
 
 /// A select, multi-select or status option as a pill.
@@ -35,18 +36,17 @@ class Pill extends StatelessWidget {
             StatusGroup.complete => c.okBg,
           }, c.textPrimary)
         : c.tag(color);
-    final h = small ? 18.0 : 22.0;
     return Container(
-      height: h,
+      constraints: BoxConstraints(minHeight: small ? Db.smallPillHeight : Db.pillHeight),
       padding: EdgeInsets.symmetric(horizontal: small ? Space.xs : (m ? Space.sm : Space.xs)),
       decoration: BoxDecoration(color: st.bg, borderRadius: Radii.pill),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         if (status) ...[
           Container(
-              width: small ? 6 : 8,
-              height: small ? 6 : 8,
+              width: small ? Db.smallPillDot : Sizes.dot,
+              height: small ? Db.smallPillDot : Sizes.dot,
               decoration: BoxDecoration(color: c.tone(color), shape: BoxShape.circle)),
-          Gap(small ? 4 : 5),
+          const Gap(Space.xxs),
         ],
         Flexible(
           child: Text(label.isEmpty ? ' ' : label,
@@ -61,7 +61,7 @@ class Pill extends StatelessWidget {
 
 /// The 16 px checkbox of checkbox properties.
 class DbCheckbox extends StatelessWidget {
-  const DbCheckbox({super.key, required this.checked, this.size = 16});
+  const DbCheckbox({super.key, required this.checked, this.size = Db.checkbox});
   final bool checked;
   final double size;
 
@@ -113,7 +113,7 @@ MenuItem dbItem(BuildContext context, String label, DbIco? icon,
       icon: ico,
       leading: icon == null
           ? null
-          : DbIcon(icon, size: context.touch ? 22 : 20, color: danger ? context.colors.inlineCodeText : context.colors.iconPrimary),
+          : DbIcon(icon, size: context.metrics.icon.px, color: danger ? context.colors.inlineCodeText : context.colors.iconPrimary),
       trailing: trailing,
       selected: selected,
       danger: danger,
@@ -124,7 +124,7 @@ Widget menuValue(BuildContext context, String value, {bool chevron = true}) {
   final c = context.colors;
   return Row(mainAxisSize: MainAxisSize.min, children: [
     ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 140),
+      constraints: const BoxConstraints(maxWidth: Db.menuValue),
       child: Text(value,
           maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
     ),
@@ -180,7 +180,7 @@ class _MenuFieldState extends State<MenuField> {
     final c = context.colors;
     final m = context.touch;
     return FieldFrame(
-      height: m ? 36 : 28,
+      height: (m ? ControlSize.lg : ControlSize.sm).height,
       padding: const EdgeInsets.symmetric(horizontal: Space.xs),
       child: Row(children: [
         if (widget.leading != null) ...[widget.leading!, const Gap(Space.xs)],
@@ -201,34 +201,20 @@ class _MenuFieldState extends State<MenuField> {
   }
 }
 
-/// An on/off switch (view settings).
+/// An on/off switch (view settings): bb_ui's, shown in a row that toggles
+/// it.
 class Toggle extends StatelessWidget {
   const Toggle({super.key, required this.on});
   final bool on;
 
   @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return AnimatedContainer(
-      duration: Motion.of(context).fast,
-      width: 26,
-      height: 14,
-      padding: const EdgeInsets.all(Space.hair),
-      decoration: BoxDecoration(
-        color: on ? c.accent : (c.dark ? const Color(0x33FFFFFF) : const Color(0x29000000)),
-        borderRadius: BorderRadius.circular(Radii.md),
-      ),
-      alignment: on ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-          width: 10, height: 10, decoration: const BoxDecoration(color: Color(0xFFFFFFFF), shape: BoxShape.circle)),
-    );
-  }
+  Widget build(BuildContext context) => bb.Toggle(value: on, onChanged: null);
 }
 
-/// Shows [content] as a popover under [anchor] (desktop) or in a bottom
-/// sheet (mobile). Completes with what it pops.
-Future<T?> showPanel<T>(BuildContext context, Rect anchor, WidgetBuilder content, {double width = 265}) {
-  if (context.touch) {
+/// Shows [content] as a popover under [anchor], or in a bottom sheet on a
+/// compact screen. Completes with what it pops.
+Future<T?> showPanel<T>(BuildContext context, Rect anchor, WidgetBuilder content, {double width = Widths.menu}) {
+  if (context.sizeClass.isCompact) {
     return showSheet<T>(
       context,
       (ctx) => SheetSurface(children: [
@@ -247,10 +233,10 @@ Future<T?> showPanel<T>(BuildContext context, Rect anchor, WidgetBuilder content
   );
 }
 
-/// Shows [content] over [anchor] (a cell editor): desktop only, at the
-/// cell's top-left, at least the cell's width.
+/// Shows [content] over [anchor] (a cell editor) at the cell's top-left, at
+/// least the cell's width; a sheet on a compact screen.
 Future<T?> showOverCell<T>(BuildContext context, Rect anchor, WidgetBuilder content, {double? width}) {
-  if (context.touch) return showPanel<T>(context, anchor, content);
+  if (context.sizeClass.isCompact) return showPanel<T>(context, anchor, content);
   return Navigator.of(context).push(_OverCellRoute<T>(anchor, width, content, Motion.of(context).fast));
 }
 
@@ -272,7 +258,7 @@ class _OverCellRoute<T> extends PopupRoute<T> {
 
   @override
   Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
-    final w = width ?? (anchor.width < 240 ? 240.0 : anchor.width);
+    final w = width ?? (anchor.width < Db.cellEditorMin ? Db.cellEditorMin : anchor.width);
     return CustomSingleChildLayout(
       delegate: _OverCellLayout(anchor, w),
       child: MenuSurface(child: builder(context)),
@@ -291,7 +277,7 @@ class _OverCellLayout extends SingleChildLayoutDelegate {
   final Rect anchor;
   final double width;
 
-  static const margin = 8.0;
+  static const margin = Space.sm;
 
   @override
   BoxConstraints getConstraintsForChild(BoxConstraints c) =>
@@ -317,8 +303,8 @@ class ChipBtn extends StatelessWidget {
     this.icon,
     this.chevron = false,
     this.active = false,
-    this.radius = 14,
-    this.height = 24,
+    this.radius = Db.chipRadius,
+    this.size = ControlSize.xs,
   });
   final String label;
   final VoidCallback? onTap;
@@ -327,7 +313,10 @@ class ChipBtn extends StatelessWidget {
 
   /// Tinted blue (a rule that applies).
   final bool active;
-  final double radius, height;
+  final double radius;
+
+  /// The chip's least height; it grows with the text.
+  final ControlSize size;
 
   @override
   Widget build(BuildContext context) {
@@ -337,15 +326,14 @@ class ChipBtn extends StatelessWidget {
       onTap: onTap,
       radius: radius,
       selected: active,
-      selectedColor: c.accent.withValues(alpha: c.dark ? Alpha.tint : Alpha.tint),
+      selectedColor: c.accent.withValues(alpha: Alpha.tint),
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-      child: Container(
-        height: height,
-        decoration: active ? null : null,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: size.height),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (icon != null) ...[DbIcon(icon!, size: 14, color: fg), const Gap(Space.xxs)],
+          if (icon != null) ...[DbIcon(icon!, size: IconSize.xs.px, color: fg), const Gap(Space.xxs)],
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 220),
+            constraints: const BoxConstraints(maxWidth: Db.chipLabel),
             child: Text(label,
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.uiSmall, fg, weight: Weight.medium)),
           ),

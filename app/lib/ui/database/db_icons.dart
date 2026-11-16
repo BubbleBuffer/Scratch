@@ -1,5 +1,7 @@
 // Database icons: property types, view layouts and toolbar glyphs, drawn
-// like the UI kit's icons (thin strokes on a 20-unit grid).
+// like the UI kit's icons (thin strokes on a 20-unit grid). The painter's
+// arcs, corners and letter glyphs are in that grid's units, not the UI's.
+// ignore_for_file: bb_lints/tokens_only, bb_lints/no_raw_text_style
 
 import 'dart:math' as math;
 
@@ -53,16 +55,17 @@ enum DbIco {
 }
 
 class DbIcon extends StatelessWidget {
-  const DbIcon(this.icon, {super.key, this.size = 20, required this.color, this.stroke = 1.5});
+  const DbIcon(this.icon, {super.key, this.size, required this.color, this.stroke = Stroke.regular});
   final DbIco icon;
-  final double size;
+
+  /// The icon's box; [IconSize.lg] by default. Any size, like [IconX].
+  final double? size;
   final Color color;
   final double stroke;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: size,
-        height: size,
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: size ?? IconSize.lg.px,
         child: CustomPaint(painter: _DbIconPainter(icon, color, stroke)),
       );
 }
@@ -255,7 +258,7 @@ class _DbIconPainter extends CustomPainter {
       case DbIco.sliders:
         line(3.5, 6.5, 16.5, 6.5);
         line(3.5, 13.5, 16.5, 13.5);
-        canvas.drawCircle(const Offset(12.5, 6.5), 2, Paint()..color = const Color(0x00000000));
+        canvas.drawCircle(const Offset(12.5, 6.5), 2, Paint()..color = kTransparent);
         circle(12.5, 6.5, 2);
         circle(7.5, 13.5, 2);
       case DbIco.peekSide:

@@ -56,7 +56,7 @@ class _RowCardState extends State<RowCard> {
     ];
     final bg = c.bgPrimary;
     final title = ts(
-      m ? context.type.ui : context.type.ui,
+      context.type.ui,
       c.textPrimary,
     );
     return Hover(

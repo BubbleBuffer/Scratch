@@ -1,6 +1,8 @@
 // Database colours and sizes from design/tokens.json (`palette.*`,
 // `database.*`): tag pills, board group tints, card rings and shadows, grid
-// lines, the checkbox and the calendar's today circle.
+// lines, the checkbox and the calendar's today circle. A token library: the
+// database views read their particular values from here by name. Text tones
+// and card rings are the block palette's (block_color_tokens.dart).
 
 import 'package:flutter/widgets.dart';
 
@@ -87,19 +89,6 @@ Color _readableTagText(TagStyle style, AppColors colors) {
   return const Color(0xFFFFFFFF);
 }
 
-/// `palette.text`: the colour's text tone (same in light and dark).
-const _textTone = <String, Color>{
-  'gray': Color(0xFF7D7A75),
-  'brown': Color(0xFF9F765A),
-  'orange': Color(0xFFD27B2D),
-  'yellow': Color(0xFFCB9434),
-  'green': Color(0xFF50946E),
-  'blue': Color(0xFF387DC9),
-  'purple': Color(0xFF9A6BB4),
-  'pink': Color(0xFFC14C8A),
-  'red': Color(0xFFCF5148),
-};
-
 final _groupLight = <String, Color>{
   'gray': _rgba(66, 35, 3, 0.03),
   'brown': _rgba(115, 59, 3, 0.035),
@@ -122,31 +111,6 @@ final _groupDark = <String, Color>{
   'purple': _rgba(196, 101, 253, 0.05),
   'pink': _rgba(255, 78, 149, 0.055),
   'red': _rgba(251, 107, 107, 0.047),
-};
-
-/// `palette.background` (card rings of coloured board groups).
-final _bgLight = <String, Color>{
-  'gray': _rgba(42, 28, 0, 0.07),
-  'brown': _rgba(139, 46, 0, 0.086),
-  'orange': _rgba(224, 101, 1, 0.13),
-  'yellow': _rgba(211, 168, 0, 0.137),
-  'green': _rgba(0, 100, 45, 0.09),
-  'blue': _rgba(0, 124, 215, 0.094),
-  'purple': _rgba(102, 0, 178, 0.08),
-  'pink': _rgba(197, 0, 93, 0.086),
-  'red': _rgba(223, 22, 0, 0.094),
-};
-
-final _bgDark = <String, Color>{
-  'gray': _rgba(255, 255, 235, 0.1),
-  'brown': _rgba(255, 177, 129, 0.192),
-  'orange': _rgba(255, 147, 75, 0.28),
-  'yellow': _rgba(255, 205, 75, 0.24),
-  'green': _rgba(108, 255, 172, 0.157),
-  'blue': _rgba(67, 155, 255, 0.24),
-  'purple': _rgba(200, 125, 255, 0.2),
-  'pink': _rgba(255, 103, 177, 0.23),
-  'red': _rgba(255, 104, 92, 0.24),
 };
 
 /// `palette.callout.dark`: dark cards of coloured board groups.
@@ -172,14 +136,14 @@ extension DbColors on AppColors {
   }
 
   /// The dot of a status pill and the count of a board group.
-  Color tone(String? color) => _textTone[color] ?? textSecondary;
+  Color tone(String? color) => BlockPalette.text[color] ?? textSecondary;
 
   Color groupTint(String? color) =>
       (dark ? _groupDark : _groupLight)[color] ??
       (dark ? _groupDark : _groupLight)['gray']!;
 
   Color cardRing(String? color) =>
-      (dark ? _bgDark : _bgLight)[color] ??
+      (dark ? BlockPalette.backgroundDark : BlockPalette.backgroundLight)[color] ??
       (dark ? _rgba(255, 255, 243, 0.082) : _rgba(42, 28, 0, 0.07));
 
   Color cardBg(String? color) =>
@@ -240,6 +204,24 @@ abstract final class Db {
   static const boardGap = 12.0;
   static const cardWidth = 260.0;
   static const mobileRowHeight = 47.0;
+
+  /// An option pill's height, and a board or gallery card's smaller pill.
+  static const pillHeight = 22.0, smallPillHeight = 18.0;
+
+  /// A status pill's dot on a card's smaller pill.
+  static const smallPillDot = 6.0;
+
+  /// The checkbox of checkbox properties.
+  static const checkbox = 16.0;
+
+  /// The longest value beside a menu row's label.
+  static const menuValue = 140.0;
+
+  /// A toolbar or rule chip's corners, and its longest label.
+  static const chipRadius = 14.0, chipLabel = 220.0;
+
+  /// The narrowest editor over a cell.
+  static const cellEditorMin = 240.0;
 }
 
 /// Calendar and timeline entries inherit their database's space colour.

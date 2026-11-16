@@ -138,10 +138,10 @@ class ConfettiPainter extends CustomPainter {
       canvas.drawRRect(
         RRect.fromRectAndCorners(
           Rect.fromLTWH(0, 0, p.width, p.height),
-          topLeft: const Radius.circular(Radii.sm),
-          topRight: const Radius.circular(Radii.sm),
-          bottomLeft: const Radius.circular(Radii.sm),
-          bottomRight: const Radius.circular(1),
+          topLeft: ConfettiCorners.topLeft,
+          topRight: ConfettiCorners.topRight,
+          bottomLeft: ConfettiCorners.bottomLeft,
+          bottomRight: ConfettiCorners.bottomRight,
         ),
         Paint()
           ..color = (n.isEven ? patch.fill : patch.deep).withValues(

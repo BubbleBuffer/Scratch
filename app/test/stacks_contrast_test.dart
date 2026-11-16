@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/ui/tokens.dart';
 import 'package:notes_app/ui/block_colors.dart';
-import 'package:notes_app/ui/database/db_theme.dart';
+import 'package:notes_app/ui/database/db_tokens.dart';
 
 // Every Stacks text colour meets body-text AA (4.5:1) on sheet, desk and
 // inset, and rail text on the rail, in both themes.

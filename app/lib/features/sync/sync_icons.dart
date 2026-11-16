@@ -1,21 +1,25 @@
 // Line icons for sync and settings, drawn like the UI kit's (20-unit grid,
-// 1.5 px stroke), kept here so the kit's icon set stays unchanged.
+// 1.5 px stroke), kept here so the kit's icon set stays unchanged. The
+// painter's arcs and corners are in that grid's units, not the UI's.
+// ignore_for_file: bb_lints/tokens_only
 
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
+import '../../ui/tokens.dart';
+
 enum SyncIco { cloud, cloudCheck, cloudSync, cloudOff, cloudAlert, device, devices, conflict, folder, info, sun, qr }
 
 class SyncIcon extends StatelessWidget {
-  const SyncIcon(this.icon, {super.key, this.size = 20, required this.color});
+  const SyncIcon(this.icon, {super.key, this.size = IconSize.lg, required this.color});
   final SyncIco icon;
-  final double size;
+  final IconSize size;
   final Color color;
 
   @override
   Widget build(BuildContext context) =>
-      SizedBox(width: size, height: size, child: CustomPaint(painter: _Painter(icon, color)));
+      SizedBox.square(dimension: size.px, child: CustomPaint(painter: _Painter(icon, color)));
 }
 
 class _Painter extends CustomPainter {
@@ -32,7 +36,7 @@ class _Painter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = 1.5 / k;
+      ..strokeWidth = Stroke.regular / k;
     final fill = Paint()..color = color;
     void line(double x1, double y1, double x2, double y2) => canvas.drawLine(Offset(x1, y1), Offset(x2, y2), p);
     void rrect(double l, double t, double r, double b, double rad) =>

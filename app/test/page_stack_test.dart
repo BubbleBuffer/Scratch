@@ -11,7 +11,7 @@ import 'package:notes_app/core/models.dart';
 import 'package:notes_app/feedback/feedback_sheet.dart';
 import 'package:notes_app/shell/home.dart';
 import 'package:notes_app/shell/navigation.dart';
-import 'package:notes_app/shell/page_stack.dart' show PileGeometry;
+import 'package:notes_app/ui/tokens.dart' show PileGeometry;
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'harness.dart';

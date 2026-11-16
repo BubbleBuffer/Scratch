@@ -38,8 +38,8 @@ class UnsupportedCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: Space.hair, right: Space.md),
               child: Image.asset(
                 'assets/icons/app_icon_64.png',
-                width: 20,
-                height: 20,
+                width: IconSize.lg.px,
+                height: IconSize.lg.px,
                 filterQuality: FilterQuality.medium,
                 excludeFromSemantics: true,
               ),

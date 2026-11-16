@@ -102,7 +102,7 @@ class AddRowButton extends StatelessWidget {
         child: Row(children: [
           Icon20(Ico.plus, size: IconSize.xs, color: c.iconTertiary),
           const Gap(Space.xs),
-          Text(label, style: ts(context.touch ? context.type.ui : context.type.ui, c.textTertiary, weight: Weight.regular)),
+          Text(label, style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
         ]),
       ),
     );
@@ -151,7 +151,7 @@ class OpenChip extends StatelessWidget {
       hoverColor: c.bgHover,
       child: Container(
         height: m ? 26 : 22,
-        padding: EdgeInsets.symmetric(horizontal: m ? Space.xs : Space.xs),
+        padding: EdgeInsets.symmetric(horizontal: Space.xs),
         decoration: BoxDecoration(
           color: c.bgPrimary,
           borderRadius: BorderRadius.circular(Radii.sm),

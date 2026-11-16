@@ -881,7 +881,7 @@ class _ChoiceCard<T> extends StatelessWidget {
           background: c.bgPrimary,
           lift: 0,
           border: Border.all(color: checked ? c.accent : c.borderStrong, width: checked ? Stroke.bold : Stroke.hair),
-          padding: EdgeInsets.fromLTRB(checked ? Space.md : Space.lg, checked ? Space.md : Space.md, checked ? Space.md : Space.lg, checked ? Space.md : Space.md),
+          padding: EdgeInsets.fromLTRB(checked ? Space.md : Space.lg, Space.md, checked ? Space.md : Space.lg, Space.md),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               if (choice.icon != null) ...[SIcon(choice.icon!, size: 16, color: c.textSecondary), const Gap(Space.sm)],

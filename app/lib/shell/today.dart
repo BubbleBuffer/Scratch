@@ -168,7 +168,7 @@ class _TodayCaptureState extends State<TodayCapture> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final field = FieldFrame(
-      height: widget.mobile ? 48 : 42,
+      height: (widget.mobile ? ControlSize.xxl : ControlSize.xl).height,
       padding: const EdgeInsets.symmetric(horizontal: Space.md),
       child: Row(
         children: [
@@ -201,8 +201,8 @@ class _TodayCaptureState extends State<TodayCapture> {
             onTap: _saving ? null : () => _capture(''),
             hoverColor: c.accentHover,
             child: Container(
-              height: widget.mobile ? 48 : 42,
-              width: widget.mobile ? 48 : null,
+              height: (widget.mobile ? ControlSize.xxl : ControlSize.xl).height,
+              width: widget.mobile ? ControlSize.xxl.height : null,
               padding: EdgeInsets.symmetric(horizontal: widget.mobile ? 0 : Space.md),
               decoration: BoxDecoration(
                 color: c.accent,
@@ -299,7 +299,7 @@ class WeekStrip extends StatelessWidget {
                   hoverColor: c.bgPrimary,
                   lift: 2,
                   child: Container(
-                    height: 64,
+                    constraints: const BoxConstraints(minHeight: WeekStripSize.day),
                     margin: const EdgeInsets.symmetric(horizontal: Space.hair),
                     decoration: BoxDecoration(
                       color: sameDay(day, store.today)
@@ -313,7 +313,7 @@ class WeekStrip extends StatelessWidget {
                             sameDay(day, store.selectedDay) &&
                                 !sameDay(day, store.today)
                             ? c.thread
-                            : const Color(0x00000000),
+                            : kTransparent,
                       ),
                     ),
                     child: Column(
@@ -335,7 +335,7 @@ class WeekStrip extends StatelessWidget {
                         ),
                         const Gap(Space.xs),
                         SizedBox(
-                          height: 6,
+                          height: WeekStripSize.dotRow,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -349,10 +349,10 @@ class WeekStrip extends StatelessWidget {
                                     horizontal: Space.hair,
                                   ),
                                   child: Container(
-                                    width: 5,
-                                    height: 5,
+                                    width: WeekStripSize.dot,
+                                    height: WeekStripSize.dot,
                                     decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(1),
+                                      borderRadius: BorderRadius.circular(WeekStripSize.dotRadius),
                                       color: sameDay(day, store.today)
                                           ? c.accent
                                           : c.threadStrong,
@@ -429,13 +429,13 @@ class WeekPeek extends StatelessWidget {
         .where((i) => i.kind == AgendaKind.task && !i.done)
         .length;
     return Padding(
-      padding: EdgeInsets.only(top: context.touch ? Space.sm : Space.xs),
+      padding: EdgeInsets.only(top: context.sizeClass.isCompact ? Space.sm : Space.xs),
       child: Text(
         dayPeek(store.selectedDay, events: events, tasks: tasks),
         key: const ValueKey('week-peek'),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        textAlign: context.touch ? TextAlign.left : TextAlign.right,
+        textAlign: context.sizeClass.isCompact ? TextAlign.left : TextAlign.right,
         style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
       ),
     );
@@ -620,7 +620,7 @@ class _AgendaDayState extends State<AgendaDay>
             c.dangerBg,
           )
         : statusChip;
-    final metadata = context.touch
+    final metadata = context.sizeClass.isCompact
         ? taskChip
         : Row(
             mainAxisSize: MainAxisSize.min,
@@ -658,12 +658,12 @@ class _AgendaDayState extends State<AgendaDay>
                   ? null
                   : () => _toggle(i, overdue: overdue),
               child: SizedBox(
-                width: 28,
-                height: 28,
+                width: AgendaRow.checkTarget,
+                height: AgendaRow.checkTarget,
                 child: Center(
                   child: StacksCheckbox(
                     checked: checked,
-                    size: 22,
+                    size: AgendaRow.check,
                     fill: spacePatch(
                       i.spaceColor,
                       c.dark ? Brightness.dark : Brightness.light,
@@ -692,7 +692,7 @@ class _AgendaDayState extends State<AgendaDay>
           if (metadata != null) ...[
             const Gap(Space.sm),
             ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: context.touch ? 174 : 260),
+              constraints: BoxConstraints(maxWidth: context.sizeClass.isCompact ? AgendaRow.metadataCompact : AgendaRow.metadata),
               child: metadata,
             ),
           ],
@@ -774,7 +774,7 @@ class _AgendaDayState extends State<AgendaDay>
       builder: (context, constraints) {
         // Separate close nodes and give their labels extra lanes. Very busy
         // days can scroll the track rather than obscure clickable events.
-        final width = math.max(constraints.maxWidth, items.length * 32.0 + 24);
+        final width = math.max(constraints.maxWidth, items.length * DayTimeline.perItem + Space.xl);
         final laneEnds = <double>[];
         final positions =
             <
@@ -789,15 +789,15 @@ class _AgendaDayState extends State<AgendaDay>
         final nodes = [
           for (final item in items)
             ((hour(item) - start) / (end - start) * width)
-                .clamp(12.0, width - 12)
+                .clamp(DayTimeline.nodeInset, width - DayTimeline.nodeInset)
                 .toDouble(),
         ];
         for (var index = 1; index < nodes.length; index++) {
-          nodes[index] = math.max(nodes[index], nodes[index - 1] + 28);
+          nodes[index] = math.max(nodes[index], nodes[index - 1] + DayTimeline.nodeGap);
         }
-        nodes[nodes.length - 1] = math.min(nodes.last, width - 12);
+        nodes[nodes.length - 1] = math.min(nodes.last, width - DayTimeline.nodeInset);
         for (var index = nodes.length - 2; index >= 0; index--) {
-          nodes[index] = math.min(nodes[index], nodes[index + 1] - 28);
+          nodes[index] = math.min(nodes[index], nodes[index + 1] - DayTimeline.nodeGap);
         }
         double textWidth(String text, TextStyle style) {
           final painter = TextPainter(
@@ -808,7 +808,7 @@ class _AgendaDayState extends State<AgendaDay>
           return painter.width;
         }
 
-        final timeStyle = ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular).copyWith(fontFamily: monoFamily);
+        final timeStyle = ts(context.type.codeSmall, c.textSecondary, mono: true);
         for (var index = 0; index < nodes.length; index++) {
           final node = nodes[index];
           final available =
@@ -832,7 +832,7 @@ class _AgendaDayState extends State<AgendaDay>
               .clamp(88.0, math.min(240.0, width))
               .toDouble();
           var countdownLine = false;
-          if (next == index && !context.touch) {
+          if (next == index && !context.sizeClass.isCompact) {
             final fullWidth =
                 textWidth(
                   '${timeRange(items[index])} · ${_until(items[index].startMs.toInt() - nowMs)}',
@@ -880,17 +880,17 @@ class _AgendaDayState extends State<AgendaDay>
           padding: const EdgeInsets.only(top: Space.md, bottom: Space.lg),
           child: SizedBox(
             height:
-                (positions.any((p) => p.countdownLine) ? 100 : 86) +
-                math.max(0, laneEnds.length - 1) * 53.0,
+                (positions.any((p) => p.countdownLine) ? DayTimeline.countdownHeight : DayTimeline.height) +
+                math.max(0, laneEnds.length - 1) * DayTimeline.lane,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 Positioned(
-                  top: 25,
+                  top: DayTimeline.trackTop,
                   left: 0,
                   right: 0,
                   child: Container(
-                    height: 8,
+                    height: DayTimeline.track,
                     decoration: BoxDecoration(
                       color: c.bgSecondary,
                       borderRadius: BorderRadius.circular(Radii.sm),
@@ -899,11 +899,11 @@ class _AgendaDayState extends State<AgendaDay>
                 ),
                 if (store.isToday)
                   Positioned(
-                    top: 25,
+                    top: DayTimeline.trackTop,
                     left: 0,
                     width: nowX,
                     child: Container(
-                      height: 8,
+                      height: DayTimeline.track,
                       decoration: BoxDecoration(
                         color: c.thread.withValues(alpha: Alpha.muted),
                         borderRadius: BorderRadius.circular(Radii.sm),
@@ -914,25 +914,25 @@ class _AgendaDayState extends State<AgendaDay>
                   Positioned(
                     key: const ValueKey('agenda-now'),
                     left: nowX,
-                    top: 4,
+                    top: DayTimeline.nowTop,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Transform.translate(
-                          offset: Offset(nowX > width - 100 ? -95 : 6, -4),
+                          offset: Offset(nowX > width - DayTimeline.nowFlipZone ? -DayTimeline.nowFlip : DayTimeline.nowLabelGap, -DayTimeline.nowLift),
                           child: Text(
                             'now ${_time(nowMs)}',
                             style: ts(context.type.uiSmall, c.accentText, weight: Weight.bold),
                           ),
                         ),
-                        Container(width: 2, height: 40, color: c.accentText),
+                        Container(width: Stroke.bold, height: DayTimeline.nowLine, color: c.accentText),
                       ],
                     ),
                   ),
                 for (var index = 0; index < items.length; index++) ...[
                   Positioned(
-                    left: positions[index].node - 12,
-                    top: 17,
+                    left: positions[index].node - DayTimeline.nodeInset,
+                    top: DayTimeline.nodeTop,
                     child: Hover(
                       key: ValueKey(
                         'agenda-${AgendaStore.itemKey(items[index])}',
@@ -946,8 +946,8 @@ class _AgendaDayState extends State<AgendaDay>
                           next: next == index,
                         ),
                         child: SizedBox(
-                          width: 24,
-                          height: 24,
+                          width: DayTimeline.node,
+                          height: DayTimeline.node,
                           child: Center(
                             child: past(items[index])
                                 ? Icon20(
@@ -963,7 +963,7 @@ class _AgendaDayState extends State<AgendaDay>
                   ),
                   Positioned(
                     left: positions[index].label,
-                    top: 47 + positions[index].lane * 53.0,
+                    top: DayTimeline.labelTop + positions[index].lane * DayTimeline.lane,
                     width: positions[index].width,
                     child: GestureDetector(
                       onTap: () => _open(items[index]),
@@ -977,7 +977,7 @@ class _AgendaDayState extends State<AgendaDay>
                             style: ts(context.type.uiSmall, past(items[index]) ? c.textSecondary : c.textPrimary, weight: Weight.bold),
                           ),
                           Text(
-                            '${timeRange(items[index])}${next == index && !context.touch && !positions[index].countdownLine ? ' · ${_until(items[index].startMs.toInt() - nowMs)}' : ''}',
+                            '${timeRange(items[index])}${next == index && !context.sizeClass.isCompact && !positions[index].countdownLine ? ' · ${_until(items[index].startMs.toInt() - nowMs)}' : ''}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: timeStyle,
@@ -995,9 +995,9 @@ class _AgendaDayState extends State<AgendaDay>
                 ],
                 if (store.isToday)
                   Positioned(
-                    left: nowX - 3,
-                    top: 17,
-                    child: _dot(c.accentText, 8),
+                    left: nowX - Sizes.focusGap,
+                    top: DayTimeline.nodeTop,
+                    child: _dot(c.accentText, DayTimeline.nowDot),
                   ),
               ],
             ),
@@ -1161,7 +1161,7 @@ class _AgendaDayState extends State<AgendaDay>
         // The done pile shows once something is done.
         if (done.isNotEmpty || _departing.isNotEmpty) ...[
         const Gap(Space.md),
-        Container(height: 1, color: c.border),
+        Container(height: Stroke.hair, color: c.border),
         const Gap(Space.md),
         Row(
           key: const ValueKey('agenda-done-row'),
@@ -1170,7 +1170,7 @@ class _AgendaDayState extends State<AgendaDay>
             AnimatedBuilder(
               animation: _bump,
               builder: (context, child) => Transform.scale(
-                scale: 1 + math.sin(_bump.value * math.pi) * .15,
+                scale: 1 + math.sin(_bump.value * math.pi) * DonePile.bump,
                 child: child,
               ),
               child: ConfettiBurst(
@@ -1190,17 +1190,17 @@ class _AgendaDayState extends State<AgendaDay>
                   child: Row(
                     children: [
                       SizedBox(
-                        width: 28,
-                        height: 24,
+                        width: DonePile.width,
+                        height: DonePile.height,
                         child: Stack(
                           children: [
                             for (var i = 0; i < math.min(done.length, 4); i++)
                               Positioned(
-                                left: i.isEven ? 2 : 3,
-                                right: i.isEven ? 3 : 2,
-                                bottom: i * 5.0,
+                                left: i.isEven ? DonePile.slipInset : DonePile.slipInsetOdd,
+                                right: i.isEven ? DonePile.slipInsetOdd : DonePile.slipInset,
+                                bottom: i * DonePile.slipStep,
                                 child: Container(
-                                  height: 7,
+                                  height: DonePile.slip,
                                   decoration: BoxDecoration(
                                     color: c.okBg,
                                     border: Border.all(color: c.thread),
@@ -1251,10 +1251,10 @@ class _AgendaDayState extends State<AgendaDay>
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            left: 22,
-            right: 20,
-            bottom: -12,
-            height: 18,
+            left: DonePile.backLeft,
+            right: DonePile.backRight,
+            bottom: -DonePile.backDrop,
+            height: DonePile.card,
             child: Container(
               decoration: BoxDecoration(
                 color: c.bgPrimary.withValues(alpha: Alpha.strong),
@@ -1264,10 +1264,10 @@ class _AgendaDayState extends State<AgendaDay>
             ),
           ),
           Positioned(
-            left: 10,
-            right: 10,
-            bottom: -6,
-            height: 18,
+            left: DonePile.frontInset,
+            right: DonePile.frontInset,
+            bottom: -DonePile.frontDrop,
+            height: DonePile.card,
             child: Container(
               decoration: BoxDecoration(
                 color: c.bgPrimary,
@@ -1278,9 +1278,9 @@ class _AgendaDayState extends State<AgendaDay>
           ),
           Container(
             padding: EdgeInsets.fromLTRB(
-              context.touch ? Space.lg : Space.xl,
+              context.sizeClass.isCompact ? Space.lg : Space.xl,
               Space.xl,
-              context.touch ? Space.lg : Space.xl,
+              context.sizeClass.isCompact ? Space.lg : Space.xl,
               Space.lg,
             ),
             decoration: BoxDecoration(
@@ -1308,16 +1308,16 @@ class _EventNodePainter extends CustomPainter {
   final bool past, next;
   @override
   void paint(Canvas canvas, Size size) {
-    final shape = Radii.ctl.toRRect(Offset.zero & size).deflate(.75);
+    final shape = Radii.ctl.toRRect(Offset.zero & size).deflate(DayTimeline.nodeRingInset);
     canvas.drawRRect(shape, Paint()..color = fill);
     final paint = Paint()
       ..color = next ? fill : border
-      ..strokeWidth = 1.5
+      ..strokeWidth = Stroke.regular
       ..style = PaintingStyle.stroke;
     if (past) {
       final path = Path()..addRRect(shape);
       for (final metric in path.computeMetrics()) {
-        for (double distance = 0; distance < metric.length; distance += 6) {
+        for (double distance = 0; distance < metric.length; distance += DayTimeline.dash) {
           canvas.drawPath(
             metric.extractPath(distance, math.min(distance + 3, metric.length)),
             paint,
@@ -1362,8 +1362,8 @@ class InMotion extends StatelessWidget {
             child: Row(
               children: [
                 SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: MotionRing.size,
+                  height: MotionRing.size,
                   child: CustomPaint(
                     painter: _ProgressRingPainter(
                       item.total == 0 ? 0 : item.done / item.total,
@@ -1419,10 +1419,10 @@ class _ProgressRingPainter extends CustomPainter {
   final Color track, fill;
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = (Offset.zero & size).deflate(3);
+    final rect = (Offset.zero & size).deflate(MotionRing.inset);
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
+      ..strokeWidth = MotionRing.stroke
       ..strokeCap = StrokeCap.round
       ..color = track;
     canvas.drawOval(rect, paint);

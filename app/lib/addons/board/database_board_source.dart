@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/models.dart';
 import '../../ui/database/config.dart';
-import '../../ui/database/db_theme.dart';
+import '../../ui/database/db_tokens.dart';
 import '../../ui/database/values.dart';
 import '../../registry/view_registry.dart';
 import '../../state/collection_store.dart';

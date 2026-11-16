@@ -16,7 +16,7 @@ import '../registry/addon_registry.dart' show AddonInlineMark;
 import '../ui/block_colors.dart';
 import '../ui/icons.dart';
 import '../ui/tokens.dart';
-import '../ui/database/db_theme.dart';
+import '../ui/database/db_tokens.dart';
 import 'todo_dates.dart';
 
 class RichController extends TextEditingController {

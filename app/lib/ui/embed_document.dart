@@ -82,7 +82,7 @@ class _EmbedDocumentState extends State<EmbedDocument>
           style: ts(context.type.ui, context.colors.textTertiary),
         );
       } else {
-        body = type.body?.call(b) ?? const SizedBox(height: 24);
+        body = type.body?.call(b) ?? const SizedBox(height: Space.xl);
       }
       return Column(
         key: ValueKey('embed-block-${node.id}'),

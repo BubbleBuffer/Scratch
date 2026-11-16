@@ -16,7 +16,7 @@ import '../../ui/ui.dart';
 import '../../ui/database/config.dart';
 import 'controller.dart';
 import '../../ui/database/db_icons.dart';
-import '../../ui/database/db_theme.dart';
+import '../../ui/database/db_tokens.dart';
 import 'editors/option_picker.dart';
 import 'filter_editor.dart';
 import '../../ui/database/values.dart';

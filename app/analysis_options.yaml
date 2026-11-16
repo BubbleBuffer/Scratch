@@ -7,3 +7,13 @@ analyzer:
     - windows/**
     - rust_builder/cargokit/**
     - linux/**
+
+# bb-ui's design-token rules (wiki/app/agent-kit.md). Run `dart analyze` in
+# app/ without path arguments: `flutter analyze` and `dart analyze lib test`
+# skip analyzer plugins.
+plugins:
+  bb_lints:
+    git:
+      url: https://github.com/BubbleBuffer/bb-ui
+      ref: b93bdbca27dff32a2060744afd770cec2047203e
+      path: packages/bb_lints

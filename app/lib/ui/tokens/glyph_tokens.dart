@@ -34,6 +34,10 @@ TextStyle letterMarkStyle(double box, Color color, {bool toggle = false}) {
 /// The share of its icon box an emoji icon fills.
 const double emojiIconShare = .85;
 
+/// An emoji at [size] logical pixels, as a picker shows it.
+TextStyle emojiStyle(double size, List<String> fallback) =>
+    TextStyle(fontSize: size, height: 1, fontFamilyFallback: fallback);
+
 /// The style of an emoji drawn as an icon in a box of [box] logical pixels.
 TextStyle emojiIconStyle(double box, List<String> fallback) => TextStyle(
   fontSize: box * emojiIconShare,

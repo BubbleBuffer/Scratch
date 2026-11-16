@@ -347,9 +347,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
           Text(
             displayTitle(title, firstLine: firstLine),
             style: ts(
-              mobile
-                  ? context.type.ui
-                  : context.type.ui,
+              context.type.ui,
               c.textPrimary,
             ),
           ),

@@ -341,7 +341,7 @@ class _Boot extends StatelessWidget {
     final frac = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
     return Center(
       child: SizedBox(
-        width: 280,
+        width: Widths.panel,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(updatingIndex ? 'Updating search index' : 'Creating the bench vault', style: ts(ty.h3, c.textPrimary)),
           const Gap(Space.sm),
@@ -351,7 +351,7 @@ class _Boot extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(Radii.sm),
             child: SizedBox(
-              height: 4,
+              height: Space.xxs,
               child: Stack(children: [
                 Container(color: c.bgTertiary),
                 FractionallySizedBox(widthFactor: frac, child: Container(color: c.accent)),

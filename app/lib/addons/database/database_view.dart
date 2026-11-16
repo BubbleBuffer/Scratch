@@ -156,7 +156,7 @@ class DatabaseViewState extends State<DatabaseView> {
               final v = store.view;
               return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Padding(padding: EdgeInsets.fromLTRB(g, context.touch ? Space.lg : Space.md, g, 0), child: _pageTitle(context)),
-                Gap(context.touch ? Space.md : Space.md),
+                Gap(Space.md),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: g - (context.touch ? 0 : 0)),
                   child: context.touch ? _mobileBar(context) : _tabsBar(context, box.maxWidth - 2 * g),

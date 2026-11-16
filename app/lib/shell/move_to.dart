@@ -31,10 +31,10 @@ Future<void> showMoveTo(BuildContext context, String pageId, {Rect? anchor}) asy
         onPick: (t) => Navigator.of(ctx).pop(t),
       );
   final MoveTarget? t;
-  if (context.touch || anchor == null) {
+  if (context.sizeClass.isCompact || anchor == null) {
     t = await showSheet<MoveTarget>(context, (ctx) => SheetSurface(children: [body(ctx)]));
   } else {
-    t = await showPopover<MoveTarget>(context, anchor, (ctx) => MenuSurface(width: 320, child: body(ctx)));
+    t = await showPopover<MoveTarget>(context, anchor, (ctx) => MenuSurface(width: Widths.dialog, child: body(ctx)));
   }
   if (t == null) return;
   try {
@@ -100,7 +100,8 @@ class _MoveToListState extends State<MoveToList> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final ty = context.type;
-    final m = context.touch;
+    // In a sheet on a compact screen, in a popover otherwise.
+    final m = context.sizeClass.isCompact;
     final empty = _ctl.text.trim().isEmpty;
     return Padding(
       padding: EdgeInsets.all(m ? 0 : Space.xs),
@@ -108,7 +109,7 @@ class _MoveToListState extends State<MoveToList> {
         Padding(
           padding: EdgeInsets.fromLTRB(m ? Layout.gutter : Space.hair, Space.hair, m ? Layout.gutter : Space.hair, Space.xs),
           child: InputBox(
-            height: m ? 40 : 30,
+            height: context.metrics.field.height,
             child: PlainField(
               key: const ValueKey('move-to-field'),
               controller: _ctl,
@@ -131,7 +132,7 @@ class _MoveToListState extends State<MoveToList> {
           _item(
             key: const ValueKey('move-to-root'),
             label: 'Pages (top level)',
-            leading: IconX(Ix.subPage, size: m ? 22 : 20, color: c.iconSecondary),
+            leading: IconX(Ix.subPage, size: context.metrics.icon.px, color: c.iconSecondary),
             onTap: () => widget.onPick(const MoveTarget(null)),
           ),
         ],
@@ -142,7 +143,7 @@ class _MoveToListState extends State<MoveToList> {
           _item(
             key: ValueKey('move-pick-${h.id}'),
             label: displayTitle(h.title, firstLine: context.watch<PagesStore>().meta(h.id)?.firstLine ?? ''),
-            leading: PageIcon(icon: h.icon, size: m ? 22 : 20),
+            leading: PageIcon(icon: h.icon, size: context.metrics.icon.px),
             onTap: () => widget.onPick(MoveTarget(h.id)),
           ),
       ]),
@@ -150,7 +151,7 @@ class _MoveToListState extends State<MoveToList> {
   }
 
   Widget _item({required Key key, required String label, required Widget leading, required VoidCallback onTap}) =>
-      context.touch
+      context.sizeClass.isCompact
           ? SheetItem(key: key, label: label, leading: leading, onTap: onTap)
           : MenuItem(key: key, label: label, leading: leading, onTap: onTap);
 }

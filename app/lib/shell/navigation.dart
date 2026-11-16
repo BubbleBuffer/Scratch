@@ -56,7 +56,7 @@ Future<void> openPage(
 }) async {
   final nav =
       PageStackScope.maybeOf(context)?.navigator ?? Navigator.of(context);
-  final mobile = context.touch;
+  final mobile = context.sizeClass.isCompact;
   final motion = Motion.of(context);
   final pages = context.read<PageStore>();
   final tree = context.read<TreeStore>();

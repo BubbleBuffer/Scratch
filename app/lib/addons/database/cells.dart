@@ -8,7 +8,7 @@ import '../../core/models.dart' hide StatusGroup;
 import '../../registry/property_registry.dart';
 import '../../ui/ui.dart';
 import '../../ui/database/config.dart';
-import '../../ui/database/db_theme.dart';
+import '../../ui/database/db_tokens.dart';
 import '../../ui/database/values.dart';
 import '../../ui/database/widgets.dart';
 
@@ -20,7 +20,7 @@ TextStyle cellStyle(BuildContext context, CellMode mode, {Color? color, Weight w
     CellMode.table => m ? context.type.title : context.type.ui,
     CellMode.card => context.type.uiSmall,
     CellMode.list => context.type.ui,
-    CellMode.page => m ? context.type.ui : context.type.ui,
+    CellMode.page => context.type.ui,
   };
   return ts(spec, color ?? c.textPrimary, weight: weight);
 }

@@ -1,10 +1,15 @@
+// The calico illustrations. Path geometry, stroke widths and the zzz
+// glyphs are in each drawing's own grid (32 units for the mark, 200 by 140
+// for the loaf), not on the UI scales.
+// ignore_for_file: bb_lints/tokens_only, bb_lints/no_raw_text_style
+
 import 'package:flutter/widgets.dart';
 
 import 'tokens.dart';
 
 /// The approved prototype mark; deliberately independent of theme and space.
 class CalicoMark extends StatelessWidget {
-  const CalicoMark({super.key, this.size = 28});
+  const CalicoMark({super.key, this.size = ArtSizes.calicoMark});
   final double size;
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
@@ -31,11 +36,11 @@ class CalicoMarkPainter extends CustomPainter {
       ..lineTo(1.5, 7)
       ..cubicTo(1.5, 3.8, 3.8, 1.5, 7, 1.5)
       ..close();
-    canvas.drawPath(outline, Paint()..color = const Color(0xFFFFFAF1));
+    canvas.drawPath(outline, Paint()..color = CalicoInk.cream);
     canvas.drawPath(
       outline,
       Paint()
-        ..color = const Color(0xFF282A2F)
+        ..color = CalicoInk.outline
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
@@ -47,7 +52,7 @@ class CalicoMarkPainter extends CustomPainter {
         ..lineTo(14, 13)
         ..lineTo(1.5, 16)
         ..close(),
-      Paint()..color = const Color(0xFFDE945F),
+      Paint()..color = CalicoInk.apricot,
     );
     canvas.drawPath(
       Path()
@@ -57,7 +62,7 @@ class CalicoMarkPainter extends CustomPainter {
         ..lineTo(17, 30.5)
         ..lineTo(19, 21)
         ..close(),
-      Paint()..color = const Color(0xFF282A2F),
+      Paint()..color = CalicoInk.outline,
     );
     canvas.drawPath(
       Path()
@@ -67,7 +72,7 @@ class CalicoMarkPainter extends CustomPainter {
         ..lineTo(30.5, 10)
         ..lineTo(23, 8)
         ..close(),
-      Paint()..color = const Color(0xFFDDA39D),
+      Paint()..color = CalicoInk.blush,
     );
   }
 
@@ -80,8 +85,8 @@ class SleepingCatLoaf extends StatelessWidget {
   const SleepingCatLoaf({
     super.key,
     required this.patch,
-    this.width = 200,
-    this.height = 140,
+    this.width = ArtSizes.catLoafWidth,
+    this.height = ArtSizes.catLoafHeight,
   });
   final SpacePatch patch;
   final double width, height;
@@ -134,7 +139,7 @@ class SleepingCatPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(16, 121, 172, 3),
-        const Radius.circular(1.5),
+        ArtSizes.catGround,
       ),
       Paint()..color = ground,
     );

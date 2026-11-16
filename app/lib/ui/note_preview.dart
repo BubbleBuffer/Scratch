@@ -11,7 +11,7 @@ Widget noteChip(BuildContext context, NoteArgs args) => Hover(
   child: Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      PageIcon(icon: args.icon, size: 16, color: context.colors.iconSecondary),
+      PageIcon(icon: args.icon, size: IconSize.sm.px, color: context.colors.iconSecondary),
       const Gap(Space.xs),
       Flexible(
         child: Text(

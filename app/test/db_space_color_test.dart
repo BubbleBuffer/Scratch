@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/core/vault.dart';
-import 'package:notes_app/ui/database/db_theme.dart';
+import 'package:notes_app/ui/database/db_tokens.dart';
 import 'package:notes_app/state/collection_store.dart';
 import 'package:notes_app/ui/ui.dart';
 

@@ -104,17 +104,22 @@ const _ixFill = <Ix, List<Offset>>{
 };
 
 class IconX extends StatelessWidget {
-  const IconX(this.icon, {super.key, this.size = 20, required this.color, this.stroke = 1.5});
+  const IconX(this.icon, {super.key, this.size, required this.color, this.stroke = Stroke.regular});
   final Ix icon;
-  final double size;
+
+  /// The icon's box; [IconSize.lg] by default. Any size, so a glyph can
+  /// scale with the box it fills.
+  final double? size;
   final Color color;
 
   /// Line weight in px; picks the nearest Lucide weight.
   final double stroke;
 
   @override
-  Widget build(BuildContext context) => LucideIcon(lucideWeight(ixGlyphs[icon]!, size, stroke),
-      size: size, color: color, fill: _ixFill[icon]);
+  Widget build(BuildContext context) {
+    final size = this.size ?? IconSize.lg.px;
+    return LucideIcon(lucideWeight(ixGlyphs[icon]!, size, stroke), size: size, color: color, fill: _ixFill[icon]);
+  }
 }
 
 /// A square button with an [Ix] icon (the counterpart of IconBtn).

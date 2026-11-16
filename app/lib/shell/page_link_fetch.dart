@@ -56,12 +56,12 @@ Future<LinkFetch> fetchLinkedPage(
     signIn: signIn,
     onDone: (r) => Navigator.of(ctx).pop(r),
   );
-  final result = context.touch
+  final result = context.sizeClass.isCompact
       ? await showSheet<LinkFetch>(
           context,
           (ctx) => SheetSurface(children: [body(ctx)]),
         )
-      : await showModalPanel<LinkFetch>(context, body, width: 420, shrink: true);
+      : await showModalPanel<LinkFetch>(context, body, width: Widths.form, shrink: true);
   return result ?? LinkFetch.cancelled;
 }
 

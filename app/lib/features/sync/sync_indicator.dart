@@ -74,7 +74,7 @@ class SyncIndicatorView extends StatelessWidget {
             height: m ? 44 : 28,
             width: showLabel ? null : (m ? 44 : 28),
             child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
-              SyncIcon(phaseIcon(phase), size: m ? 22 : 18, color: color),
+              SyncIcon(phaseIcon(phase), size: m ? IconSize.xl : IconSize.md, color: color),
               if (showLabel) ...[
                 const Gap(Space.xs),
                 Text(phaseLabel(phase), style: ts(context.type.ui, error ? c.inlineCodeText : c.textTertiary, weight: Weight.regular)),
@@ -105,7 +105,7 @@ Future<void> showSyncDetails(BuildContext context, Rect anchor, SyncPhase phase,
       padding: EdgeInsets.fromLTRB(m ? Layout.gutter : Space.sm, Space.xxs, m ? Layout.gutter : Space.sm, Space.sm),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
-          SyncIcon(phaseIcon(phase), size: 18, color: phase == SyncPhase.error ? c.inlineCodeText : c.iconSecondary),
+          SyncIcon(phaseIcon(phase), size: IconSize.md, color: phase == SyncPhase.error ? c.inlineCodeText : c.iconSecondary),
           const Gap(Space.sm),
           Text(phaseLabel(phase), style: ts(ctx.type.ui, c.textPrimary)),
         ]),

@@ -278,9 +278,7 @@ class _BoardRendererState extends State<BoardRenderer> {
                   Text(
                     displayTitle(card.title, firstLine: firstLine),
                     style: ts(
-                      context.touch
-                          ? context.type.ui
-                          : context.type.ui,
+                      context.type.ui,
                       c.textPrimary,
                     ),
                   ),
@@ -553,11 +551,11 @@ class _BoardFocusRing extends CustomPainter {
   final Color color;
   @override
   void paint(Canvas canvas, Size size) => canvas.drawRRect(
-    Radii.panel.toRRect((Offset.zero & size).inflate(3)),
+    Radii.panel.toRRect((Offset.zero & size).inflate(Sizes.focusGap)),
     Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2,
+      ..strokeWidth = Stroke.bold,
   );
   @override
   bool shouldRepaint(_BoardFocusRing old) => old.color != color;
@@ -642,13 +640,13 @@ class _BoardColumnState extends State<_BoardColumn> {
 
     Widget card(int i) {
       final r = source.cardAt(g.id, i);
-      if (r == null) return const SizedBox(height: 60);
-      final cardW = widget.width - 16;
+      if (r == null) return const SizedBox(height: BoardSize.placeholderCard);
+      final cardW = widget.width - Space.lg;
       final body = b._card(context, g, r, false);
       final feedback = SizedBox(
         width: cardW,
         child: Transform.rotate(
-          angle: 0.02,
+          angle: BoardSize.dragTilt,
           child: b._card(context, g, r, true),
         ),
       );
@@ -679,7 +677,7 @@ class _BoardColumnState extends State<_BoardColumn> {
             children: [
               if (cand.isNotEmpty)
                 Container(
-                  height: 3,
+                  height: Stroke.seam,
                   margin: const EdgeInsets.only(bottom: Space.xs),
                   decoration: BoxDecoration(
                     color: c.accent.withValues(alpha: Alpha.muted),
@@ -696,8 +694,8 @@ class _BoardColumnState extends State<_BoardColumn> {
     final header = MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
-      child: SizedBox(
-        height: m ? 44 : 34,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: (m ? ControlSize.xl : ControlSize.lg).height),
         child: Row(
           children: [
             const Gap(Space.hair),
@@ -731,7 +729,7 @@ class _BoardColumnState extends State<_BoardColumn> {
                   Text(
                     '${g.count}',
                     style: ts(
-                      m ? context.type.ui : context.type.ui,
+                      context.type.ui,
                       c.textTertiary,
                       weight: Weight.regular,
                     ),
@@ -805,7 +803,7 @@ class _BoardColumnState extends State<_BoardColumn> {
         children: [
           if (_dropEnd)
             Container(
-              height: 3,
+              height: Stroke.seam,
               margin: const EdgeInsets.only(bottom: Space.xs),
               decoration: BoxDecoration(
                 color: c.accent.withValues(alpha: Alpha.muted),
@@ -828,7 +826,7 @@ class _BoardColumnState extends State<_BoardColumn> {
               key: ValueKey('board-new-$label'),
               label: b.widget.addCardLabel,
               onTap: () => source.addCard(context, g.id),
-              height: m ? 40 : 32,
+              size: m ? ControlSize.xl : ControlSize.md,
             ),
           ),
         ],
@@ -894,7 +892,7 @@ class _BoardColumnState extends State<_BoardColumn> {
       anchor,
       globalRectOf(anchor),
       (ctx) => MenuList(
-        width: 220,
+        width: Widths.popover,
         children: [
           if (source.renameColumn != null)
             MenuItem(
@@ -940,11 +938,13 @@ class _BoardAddButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onTap,
-    this.height = 33,
+    this.size = ControlSize.md,
   });
   final String label;
   final VoidCallback onTap;
-  final double height;
+
+  /// The button's least height; it grows with the text.
+  final ControlSize size;
 
   @override
   Widget build(BuildContext context) {
@@ -953,8 +953,8 @@ class _BoardAddButton extends StatelessWidget {
       onTap: onTap,
       radius: Radii.sm,
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-      child: SizedBox(
-        height: height,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: size.height),
         child: Row(
           children: [
             Icon20(Ico.plus, size: IconSize.xs, color: c.iconTertiary),
@@ -962,7 +962,7 @@ class _BoardAddButton extends StatelessWidget {
             Text(
               label,
               style: ts(
-                context.touch ? context.type.ui : context.type.ui,
+                context.type.ui,
                 c.textTertiary,
                 weight: Weight.regular,
               ),
@@ -987,8 +987,8 @@ class _BoardLoadMore extends StatelessWidget {
       onTap: onTap,
       radius: Radii.sm,
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-      child: SizedBox(
-        height: 33,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: ControlSize.md.height),
         child: Row(
           children: [
             Icon20(Ico.arrowDown, size: IconSize.xs, color: c.iconTertiary),
