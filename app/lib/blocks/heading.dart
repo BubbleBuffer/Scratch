@@ -135,7 +135,7 @@ class HeadingProgressBar extends StatelessWidget {
         child: ColoredBox(
           color: c.border,
           child: SizedBox(
-            height: 6,
+            height: HeadingSpace.progressBar,
             child: TweenAnimationBuilder<double>(
               tween: Tween(end: progress.fraction),
               duration: Motion.of(context).standard,
@@ -162,9 +162,9 @@ TextStyle _h2(Node n, AppColors c, TypeScale ty) =>
     tsDisplay(ty.h2, c.textPrimary);
 TextStyle _h3(Node n, AppColors c, TypeScale ty) =>
     tsDisplay(ty.h3, c.textPrimary);
-double _m1(bool mobile) => mobile ? 20 : 32;
-double _m2(bool mobile) => mobile ? 16 : 22;
-double _m3(bool mobile) => mobile ? 12 : 16;
+double _m1(bool touch) => touch ? HeadingSpace.h1Touch : HeadingSpace.h1;
+double _m2(bool touch) => touch ? HeadingSpace.h2Touch : HeadingSpace.h2;
+double _m3(bool touch) => touch ? HeadingSpace.h3Touch : HeadingSpace.h3;
 
 const heading1Block = BlockType(
   kind: Kinds.heading1,

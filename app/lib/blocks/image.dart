@@ -43,7 +43,7 @@ class _ImageViewState extends State<_ImageView> {
     final n = widget.b.node;
     return LayoutBuilder(builder: (context, box) {
       final full = box.maxWidth;
-      final w = (_drag ?? (n.width == null ? full : full * n.width! / 100)).clamp(48.0, full);
+      final w = (_drag ?? (n.width == null ? full : full * n.width! / MediaBlock.fullWidth)).clamp(MediaBlock.imageMin, full);
       final image = AttachmentBuilder(
         id: widget.id,
         builder: (context, a, loading) {
@@ -56,7 +56,7 @@ class _ImageViewState extends State<_ImageView> {
               errorBuilder: (_, _, _) => _missing(context, w),
             );
           }
-          if (loading) return Container(width: w, height: 160, color: c.bgSecondary);
+          if (loading) return Container(width: w, height: MediaBlock.loading, color: c.bgSecondary);
           return _missing(context, w);
         },
       );
@@ -84,11 +84,11 @@ class _ImageViewState extends State<_ImageView> {
     final c = context.colors;
     return Container(
       width: w,
-      height: 120,
+      constraints: const BoxConstraints(minHeight: MediaBlock.dropZone),
       alignment: Alignment.center,
       color: c.bgSecondary,
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        IconX(Ix.image, size: 20, color: c.iconTertiary),
+        IconX(Ix.image, color: c.iconTertiary),
         const Gap(Space.sm),
         Text('Image not available on this device', style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
       ]),
@@ -102,7 +102,7 @@ class _ImageViewState extends State<_ImageView> {
       right: left ? null : 0,
       top: 0,
       bottom: 0,
-      width: 18,
+      width: MediaBlock.gripZone,
       child: MouseRegion(
         cursor: SystemMouseCursors.resizeColumn,
         child: GestureDetector(
@@ -112,20 +112,20 @@ class _ImageViewState extends State<_ImageView> {
           onHorizontalDragUpdate: (d) => setState(() {
             // Symmetric: both edges move by the drag.
             final dx = left ? -d.delta.dx : d.delta.dx;
-            _drag = ((_drag ?? w) + 2 * dx).clamp(48.0, full);
+            _drag = ((_drag ?? w) + 2 * dx).clamp(MediaBlock.imageMin, full);
           }),
           onHorizontalDragEnd: (_) {
-            final pct = ((_drag ?? w) / full * 100).round();
+            final pct = ((_drag ?? w) / full * MediaBlock.fullWidth).round();
             setState(() => _drag = null);
             widget.b.host.setWidth(widget.b.node, pct >= 99 ? null : pct);
           },
           child: Center(
             child: Container(
-              width: 6,
-              height: 48,
+              width: MediaBlock.grip,
+              height: MediaBlock.gripHeight,
               decoration: BoxDecoration(
-                color: const Color(0x99000000),
-                borderRadius: BorderRadius.circular(20),
+                color: MediaBlock.gripShade,
+                borderRadius: const BorderRadius.all(MediaBlock.gripRadius),
                 border: Border.all(color: c.bgPrimary.withValues(alpha: Alpha.strong)),
               ),
             ),
@@ -152,4 +152,4 @@ const imageBlock = BlockType(
   group: 'Media',
 );
 
-double _top(BlockContext b) => b.mobile ? 6 : 4;
+double _top(BlockContext b) => b.touch ? Space.xs : Space.xxs;

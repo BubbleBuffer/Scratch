@@ -25,7 +25,7 @@ Widget _decorate(BlockContext b, Widget text) => Container(
         Positioned(
           left: 0,
           right: 0,
-          top: -24,
+          top: -CodeBlockParts.label,
           child: Text(
             _label(b.node),
             maxLines: 1,

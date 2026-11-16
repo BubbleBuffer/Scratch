@@ -36,9 +36,9 @@ Widget _body(BlockContext b) {
         radius: Radii.sm,
         onTap: () => b.host.revealBlock(h),
         child: Container(
-          height: 30,
+          constraints: const BoxConstraints(minHeight: TocParts.row),
           alignment: Alignment.centerLeft,
-          padding: EdgeInsets.only(left: 2 + 24.0 * (headingLevel(h) - top), right: Space.hair),
+          padding: EdgeInsets.only(left: Space.hair + TocParts.indent * (headingLevel(h) - top), right: Space.hair),
           child: Container(
             decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.divider))),
             child: Text(h.text.isEmpty ? 'Untitled' : h.text,

@@ -165,14 +165,14 @@ class BlockRowState extends State<BlockRow>
     super.build(context);
     final c = context.colors;
     final ty = context.type;
-    final mobile = context.touch;
+    final touch = context.touch;
     final n = node;
     final type = blockRegistry.of(n.kind);
     final geo = widget.geo;
     final indent = (n.depth - widget.baseDepth) * Layout.indent;
     var style = type.textStyle(n, c, ty);
     if (ed.smallText && style.fontSize != null) {
-      style = style.copyWith(fontSize: style.fontSize! * 14 / 16);
+      style = smallTextStyle(style);
     }
     final color = type.colorable && !type.paintsColor ? n.color : null;
     final textColor = paletteText(color, c);
@@ -180,7 +180,7 @@ class BlockRowState extends State<BlockRow>
     final fill = isBackgroundColor(color) ? paletteBackground(color, c) : null;
     final lineH = (style.height ?? 1.5) * (style.fontSize ?? 16);
     final selected = ed.isSelected(n);
-    final top = type.topMargin(mobile);
+    final top = type.topMargin(touch);
     final b = BlockContext(
       context: context,
       node: n,
@@ -195,15 +195,15 @@ class BlockRowState extends State<BlockRow>
       box = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => ed.tapBlock(n),
-        onLongPress: mobile ? () => ed.onLongPress(n) : null,
-        child: type.body?.call(b) ?? const SizedBox(height: 24),
+        onLongPress: touch ? () => ed.onLongPress(n) : null,
+        child: type.body?.call(b) ?? const SizedBox(height: BlockRhythm.placeholder),
       );
     } else {
       final text = _text(context, n, type, style);
       box = type.decorate?.call(b, text) ?? text;
-      // 28 px for one line of body text: 24 + 2 + 2 on desktop, 22 + 3 + 3 on mobile.
+      // 28 px for one line of body text: 24 + 2 + 2 with a pointer, 22 + 3 + 3 by touch.
       box = Padding(
-        padding: EdgeInsets.symmetric(vertical: mobile ? Space.xxs : Space.hair),
+        padding: EdgeInsets.symmetric(vertical: BlockRhythm.pad(touch)),
         child: box,
       );
     }
@@ -223,7 +223,7 @@ class BlockRowState extends State<BlockRow>
       child: box,
     );
 
-    if (ed.selectMode && mobile) {
+    if (ed.selectMode && touch) {
       box = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => ed.toggleSelected(n),
@@ -231,15 +231,15 @@ class BlockRowState extends State<BlockRow>
       );
     }
 
-    final shift = embedded && !mobile ? columnGutter : 0.0;
+    final shift = embedded && !context.sizeClass.isCompact ? columnGutter : 0.0;
     final showHandles =
-        !mobile &&
+        !touch &&
         !embedded &&
         !ed.readOnly &&
         (_hover || ed.menuBlockId == n.id) &&
         ed.dragNode == null;
     final handleTop =
-        type.handleTop?.call(b) ?? (mobile ? 3 : 2) + (lineH - 24) / 2;
+        type.handleTop?.call(b) ?? BlockRhythm.pad(touch) + (lineH - BlockRhythm.handleLine) / 2;
     // Where the content's box starts, and where its text starts inside it.
     final boxLeft = math.max(
       0.0,
@@ -261,8 +261,8 @@ class BlockRowState extends State<BlockRow>
         ),
       );
       return MouseRegion(
-        onEnter: (_) => mobile ? null : setState(() => _hover = true),
-        onExit: (_) => mobile ? null : setState(() => _hover = false),
+        onEnter: (_) => touch ? null : setState(() => _hover = true),
+        onExit: (_) => touch ? null : setState(() => _hover = false),
         child: Padding(
           padding: EdgeInsets.only(
             top: top + Layout.blockRowGap / 2,
@@ -277,7 +277,7 @@ class BlockRowState extends State<BlockRow>
                 clipBehavior: Clip.none,
                 children: [
                   Padding(
-                    // Rows inside a stacked column (mobile) start at 0: clamp.
+                    // Rows inside a stacked column (compact) start at 0: clamp.
                     padding: EdgeInsets.only(left: boxLeft),
                     child: SizedBox(
                       width: math.max(
@@ -295,7 +295,7 @@ class BlockRowState extends State<BlockRow>
                             ),
                     ),
                   ),
-                  if (!mobile && !embedded)
+                  if (!touch && !embedded)
                     Positioned(
                       left: geo.textLeft + indent + Layout.handleOffset,
                       top: handleTop,
@@ -335,8 +335,8 @@ class BlockRowState extends State<BlockRow>
           onTap: () => ed.addBlockBelow(node),
           radius: Radii.sm,
           child: SizedBox(
-            width: 18,
-            height: 24,
+            width: BlockHandle.width,
+            height: BlockHandle.height,
             child: Center(
               child: Icon20(Ico.plus, size: IconSize.sm, color: c.iconTertiary),
             ),
@@ -357,8 +357,8 @@ class BlockRowState extends State<BlockRow>
             },
             radius: Radii.sm,
             child: SizedBox(
-              width: 18,
-              height: 24,
+              width: BlockHandle.width,
+              height: BlockHandle.height,
               child: Center(
                 child: Icon20(Ico.grip, size: IconSize.sm, color: c.iconTertiary),
               ),

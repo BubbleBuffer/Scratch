@@ -18,7 +18,7 @@ import '../state/app_state.dart';
 import '../ui/ui.dart';
 
 Future<T?> _show<T>(BuildContext context, Rect? anchor, Widget Function(BuildContext ctx) body, {double width = 420}) {
-  if (context.touch || anchor == null) {
+  if (context.sizeClass.isCompact || anchor == null) {
     return showSheet<T>(context, (ctx) => SheetSurface(children: [body(ctx)]));
   }
   return showPopover<T>(context, anchor, (ctx) => MenuSurface(width: width, child: body(ctx)));
@@ -152,7 +152,7 @@ class _FieldPickerState extends State<_FieldPicker> {
     final ty = context.type;
     final choose = widget.onChoose;
     final field = Container(
-      height: 32,
+      height: ControlSize.md.height,
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
@@ -173,7 +173,7 @@ class _FieldPickerState extends State<_FieldPicker> {
     );
     final button = Center(
       child: SizedBox(
-        width: 260,
+        width: Widths.menu,
         child: PrimaryButton(
           key: const ValueKey('picker-submit'),
           label: widget.button,
@@ -185,12 +185,12 @@ class _FieldPickerState extends State<_FieldPicker> {
     final (first, second) = choose != null ? (button, field) : (field, button);
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
-        height: 40,
+        height: PickerTabs.height,
         padding: const EdgeInsets.symmetric(horizontal: Space.sm),
         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border))),
         child: Row(children: [
           Container(
-            height: 40,
+            height: PickerTabs.height,
             padding: const EdgeInsets.symmetric(horizontal: Space.xs),
             alignment: Alignment.center,
             decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.textPrimary, width: Stroke.bold))),
@@ -297,7 +297,7 @@ class _PageSearchListState extends State<PageSearchList> {
       padding: const EdgeInsets.all(Space.xs),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Container(
-          height: 30,
+          height: ControlSize.md.height,
           margin: const EdgeInsets.fromLTRB(Space.hair, Space.hair, Space.hair, Space.xs),
           padding: const EdgeInsets.symmetric(horizontal: Space.sm),
           alignment: Alignment.centerLeft,
@@ -335,7 +335,7 @@ class _PageSearchListState extends State<PageSearchList> {
       key: ValueKey('page-pick-${h.id}'),
       label: label.text,
       firstLine: label.firstLine,
-      leading: PageIcon(icon: h.icon, size: context.touch ? 22 : 20),
+      leading: PageIcon(icon: h.icon, size: context.metrics.icon.px),
       onTap: () => widget.onPick(h.id),
     );
   }

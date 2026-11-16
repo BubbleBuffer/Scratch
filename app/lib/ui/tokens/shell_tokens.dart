@@ -39,8 +39,9 @@ abstract final class PileGeometry {
   /// The spine of the sheet directly below the top one.
   static const spine = 58.0;
 
-  /// The corner of the spine's top left, and the icon tile on it.
-  static const spineCorner = Radius.circular(16);
+  /// The top left corner of a sheet and its spine, and the icon tile on
+  /// the spine.
+  static const corner = Radius.circular(16);
   static const spineTile = 30.0;
 
   /// One older sheet's paper edge, and how many of them show at most.

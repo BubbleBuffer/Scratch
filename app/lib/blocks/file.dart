@@ -24,11 +24,11 @@ Widget _decorate(BlockContext b, Widget text) {
             final missing = !loading && (a == null || a.path.isEmpty);
             return Hover(
               radius: Radii.sm,
-              child: SizedBox(
-                height: 28,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: ControlSize.sm.height),
                 child: Row(children: [
                   const Gap(Space.hair),
-                  IconX(Ix.file, size: 18, color: c.iconSecondary),
+                  IconX(Ix.file, size: IconSize.md.px, color: c.iconSecondary),
                   const Gap(Space.xs),
                   Flexible(
                     child: Text(name,
@@ -68,4 +68,4 @@ const fileBlock = BlockType(
   group: 'Media',
 );
 
-double _top(BlockContext b) => (b.mobile ? 3 : 2) + 2;
+double _top(BlockContext b) => BlockRhythm.pad(b.touch) + Space.hair;

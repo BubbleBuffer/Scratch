@@ -95,7 +95,7 @@ class MentionMenu extends StatelessWidget {
     required this.active,
     required this.onPick,
     required this.onHover,
-    this.maxHeight = 360,
+    this.maxHeight = Heights.list,
   });
   final List<MentionItem> items;
   final int active;
@@ -145,10 +145,10 @@ class MentionMenu extends StatelessWidget {
     }
     if (items.isEmpty) rows.add(const MenuHeader('No results'));
     return MenuSurface(
-      width: m ? null : 324,
+      width: context.sizeClass.isCompact ? null : EditorMenu.width,
       padding: const EdgeInsets.all(Space.xs),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight - 12),
+        constraints: BoxConstraints(maxHeight: maxHeight - Space.md),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

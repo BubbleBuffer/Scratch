@@ -11,7 +11,7 @@ Widget _decorate(BlockContext b, Widget text) => markerRow(
       b,
       Center(
           child: CustomPaint(
-              size: const Size(8, 8), painter: _BulletPainter(b.node.depth % 3, b.colors.accent))),
+              size: const Size.square(ListMarker.bullet), painter: _BulletPainter(b.node.depth % 3, b.colors.accent))),
       text,
     );
 
@@ -38,17 +38,17 @@ class _BulletPainter extends CustomPainter {
     final ctr = size.center(Offset.zero);
     switch (level) {
       case 0:
-        canvas.drawCircle(ctr, 3, Paint()..color = color);
+        canvas.drawCircle(ctr, ListMarker.disc, Paint()..color = color);
       case 1:
         canvas.drawCircle(
             ctr,
-            2.75,
+            ListMarker.ring,
             Paint()
               ..color = color
               ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.2);
+              ..strokeWidth = ListMarker.ringStroke);
       default:
-        canvas.drawRect(Rect.fromCenter(center: ctr, width: 5.5, height: 5.5), Paint()..color = color);
+        canvas.drawRect(Rect.fromCenter(center: ctr, width: ListMarker.square, height: ListMarker.square), Paint()..color = color);
     }
   }
 

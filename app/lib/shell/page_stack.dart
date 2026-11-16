@@ -560,7 +560,7 @@ class _SpineState extends State<_Spine> {
     final c = context.colors;
     final patch = widget.patch;
     final fill = patch?.fill ?? widget.surface;
-    const radius = BorderRadius.only(topLeft: PileGeometry.spineCorner);
+    const radius = BorderRadius.only(topLeft: PileGeometry.corner);
     final label = pageLabel(
       PageStackScope.maybeOf(context),
       widget.id,

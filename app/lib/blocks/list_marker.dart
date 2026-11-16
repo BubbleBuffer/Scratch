@@ -9,7 +9,7 @@ import '../ui/layout.dart';
 Widget markerRow(BlockContext b, Widget marker, Widget text) => Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 24, height: b.lineHeight, child: marker),
+        SizedBox(width: ListMarker.column, height: b.lineHeight, child: marker),
         const Gap(Space.hair),
         Expanded(child: text),
       ],

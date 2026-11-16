@@ -44,11 +44,11 @@ class _Card extends StatelessWidget {
     final title = p?.title;
     final desc = p?.description;
     final icon = p?.icon;
-    final fallback = IconX(Ix.bookmark, size: 14, color: c.iconSecondary);
+    final fallback = IconX(Ix.bookmark, size: BookmarkCard.favicon, color: c.iconSecondary);
     return Hover(
       radius: Radii.lg,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 72),
+        constraints: const BoxConstraints(minHeight: BookmarkCard.minHeight),
         padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.lg),
         decoration: BoxDecoration(
           border: Border.all(color: c.border),
@@ -73,10 +73,10 @@ class _Card extends StatelessWidget {
             if (icon != null)
               SizedBox(
                 key: ValueKey('bookmark-favicon-$url'),
-                width: 14,
-                height: 14,
+                width: BookmarkCard.favicon,
+                height: BookmarkCard.favicon,
                 child: Image.memory(icon,
-                    width: 14, height: 14, fit: BoxFit.contain, errorBuilder: (_, _, _) => fallback),
+                    width: BookmarkCard.favicon, height: BookmarkCard.favicon, fit: BoxFit.contain, errorBuilder: (_, _, _) => fallback),
               )
             else
               fallback,
@@ -107,4 +107,4 @@ const bookmarkBlock = BlockType(
   group: 'Media',
 );
 
-double _top(BlockContext b) => (b.mobile ? 3 : 2) + 12;
+double _top(BlockContext b) => BlockRhythm.pad(b.touch) + BookmarkCard.handleDrop;

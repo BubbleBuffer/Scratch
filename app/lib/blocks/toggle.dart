@@ -29,7 +29,7 @@ class ToggleButton extends StatelessWidget {
     super.key,
     required this.open,
     required this.onTap,
-    this.size = 24,
+    this.size = ListMarker.column,
   });
   final bool open;
   final VoidCallback onTap;
@@ -48,7 +48,7 @@ class ToggleButton extends StatelessWidget {
           duration: Motion.of(context).fast,
           child: IconX(
             Ix.triangle,
-            size: 16,
+            size: IconSize.sm.px,
             color: context.colors.iconPrimary,
           ),
         ),
@@ -93,7 +93,7 @@ Widget _decorate(BlockContext b, Widget text) {
           child: Text(
             'Empty toggle. Click or drop blocks inside.',
             style: ts(
-              b.mobile ? b.type.body : b.type.ui,
+              b.type.item,
               b.colors.textTertiary,
               weight: Weight.regular,
             ),
@@ -105,7 +105,7 @@ Widget _decorate(BlockContext b, Widget text) {
 }
 
 double _handleTop(BlockContext b) =>
-    (b.mobile ? 3 : 2) + (b.lineHeight - 24) / 2;
+    BlockRhythm.pad(b.touch) + (b.lineHeight - BlockRhythm.handleLine) / 2;
 
 const toggleBlock = BlockType(
   kind: Kinds.toggle,

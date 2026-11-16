@@ -14,7 +14,7 @@ class ColorMenu extends StatelessWidget {
   final String? current;
   final ValueChanged<String> onPick;
 
-  /// Rows sized for the mobile sheet.
+  /// Rows sized for the sheet (touch).
   final bool sheet;
 
   @override
@@ -24,8 +24,8 @@ class ColorMenu extends StatelessWidget {
     Widget swatch(String name, bool bg) {
       final base = name == 'default' ? null : name;
       return Container(
-        width: m ? 26 : 22,
-        height: m ? 26 : 22,
+        width: m ? EditorMenu.swatchTouch : EditorMenu.swatch,
+        height: m ? EditorMenu.swatchTouch : EditorMenu.swatch,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bg ? (base == null ? c.bgPrimary : paletteBackground(base, c)) : null,
@@ -47,11 +47,11 @@ class ColorMenu extends StatelessWidget {
         onTap: () => onPick(value),
         radius: Radii.md,
         padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-        child: SizedBox(
-          height: m ? 44 : 28,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: (m ? ControlSize.xl : ControlSize.sm).height),
           child: Row(children: [
             swatch(name, bg),
-            Gap(m ? 12 : 8),
+            Gap(m ? Space.md : Space.sm),
             Expanded(child: Text(label, style: ts(m ? context.type.body : context.type.ui, c.textPrimary, weight: Weight.regular))),
             if (on) Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary),
           ]),
@@ -71,10 +71,10 @@ class ColorMenu extends StatelessWidget {
       return SheetSurface(children: children);
     }
     return MenuSurface(
-      width: 220,
+      width: Widths.popover,
       padding: const EdgeInsets.all(Space.xs),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 420),
+        constraints: const BoxConstraints(maxHeight: EditorMenu.colorHeight),
         child: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: children),
         ),

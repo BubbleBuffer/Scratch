@@ -59,7 +59,7 @@ class SlashMenu extends StatelessWidget {
     required this.onPick,
     required this.onHover,
     this.title = 'Basic blocks',
-    this.maxHeight = 400,
+    this.maxHeight = EditorMenu.slashHeight,
     this.grouped = true,
   });
   final List<BlockType> types;
@@ -75,13 +75,12 @@ class SlashMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
     final ty = context.type;
     return MenuSurface(
-      width: m ? null : 324,
+      width: context.sizeClass.isCompact ? null : EditorMenu.width,
       padding: const EdgeInsets.all(Space.xs),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight - 12),
+        constraints: BoxConstraints(maxHeight: maxHeight - Space.md),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -139,7 +138,7 @@ class SelectionToolbar extends StatelessWidget {
   /// Opens the colour menu under the given anchor.
   final ValueChanged<BuildContext>? onColor;
 
-  static const height = 36.0;
+  static const height = EditorToolbar.selection;
 
   @override
   Widget build(BuildContext context) {
@@ -151,8 +150,8 @@ class SelectionToolbar extends StatelessWidget {
         onTap: () => onMark(k),
         radius: Radii.sm,
         child: SizedBox(
-          width: 28,
-          height: 28,
+          width: ControlSize.sm.height,
+          height: ControlSize.sm.height,
           child: Center(
             child: Text(s,
                 style: ts(context.type.ui, on ? c.accentText : c.iconPrimary, weight: weight)
@@ -176,8 +175,8 @@ class SelectionToolbar extends StatelessWidget {
           onTap: onTurnInto,
           radius: Radii.sm,
           padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-          child: SizedBox(
-            height: 28,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: ControlSize.sm.height),
             child: Row(children: [
               Text(blockRegistry.of(kind).label, style: ts(TypeScale.pointer.ui, c.textPrimary)),
               const Gap(Space.xxs),
@@ -208,8 +207,8 @@ class SelectionToolbar extends StatelessWidget {
               onTap: () => onMark(BMarkKind.code),
               radius: Radii.sm,
               child: SizedBox(
-                width: 28,
-                height: 28,
+                width: ControlSize.sm.height,
+                height: ControlSize.sm.height,
                 child: Center(
                     child: Icon20(Ico.code,
                         size: IconSize.sm, color: active.contains(BMarkKind.code) ? c.accent : c.iconPrimary)),
@@ -225,8 +224,8 @@ class SelectionToolbar extends StatelessWidget {
               onTap: () => onColor!(anchor),
               radius: Radii.sm,
               padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
-              child: SizedBox(
-                height: 28,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: ControlSize.sm.height),
                 child: Row(children: [
                   Text('A',
                       style: ts(context.type.ui, c.iconPrimary)
@@ -249,7 +248,7 @@ class SelectionToolbar extends StatelessWidget {
                 key: const ValueKey('fmt-ask-ai'),
                 onTap: onAskAi,
                 radius: Radii.sm,
-                child: const SizedBox(width: 28, height: 28, child: Center(child: AiMark(size: 16))),
+                child: SizedBox(width: ControlSize.sm.height, height: ControlSize.sm.height, child: Center(child: AiMark(size: IconSize.sm.px))),
               ),
             ),
           ),
@@ -308,7 +307,7 @@ class KeyboardToolbar extends StatelessWidget {
   final ValueChanged<String> onKind;
   final ValueChanged<BMarkKind> onMark;
 
-  static const button = 40.0;
+  static const button = EditorToolbar.keyButton;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +320,7 @@ class KeyboardToolbar extends StatelessWidget {
         selected: on,
         selectedColor: c.bgPressed,
         radius: Radii.md,
-        child: SizedBox(width: button, height: 44, child: Center(child: child)),
+        child: SizedBox(width: button, height: Layout.keyboardToolbarHeight, child: Center(child: child)),
       );
       if (tip == null) return hover;
       return Semantics(button: true, label: tip, child: AppTooltip(label: tip, child: hover));
@@ -330,7 +329,7 @@ class KeyboardToolbar extends StatelessWidget {
     Widget btn(Ico i, VoidCallback? onTap, String key, {bool on = false, String? tip}) => box(
         key, Icon20(i, size: IconSize.xl, color: onTap == null ? c.textDisabled : c.iconSecondary), onTap, on: on, tip: tip);
     Widget btnX(Ix i, VoidCallback? onTap, String key, {bool on = false, String? tip}) => box(
-        key, IconX(i, size: 22, color: onTap == null ? c.textDisabled : c.iconSecondary), onTap, on: on, tip: tip);
+        key, IconX(i, size: IconSize.xl.px, color: onTap == null ? c.textDisabled : c.iconSecondary), onTap, on: on, tip: tip);
     Widget glyph(String s, BMarkKind k, {FontStyle? style, TextDecoration? deco, Weight weight = Weight.semibold}) {
       final on = active.contains(k);
       return box(
@@ -392,7 +391,7 @@ class KeyboardToolbar extends StatelessWidget {
             children: items,
           ),
         ),
-        Container(width: 1, height: 24, color: c.border),
+        Container(width: Stroke.hair, height: IconSize.xl.px, color: c.border),
         IconBtn(Ico.keyboardHide,
             key: const ValueKey('kb-hide'),
             onTap: onHide,
@@ -473,7 +472,7 @@ class _BlockMenuState extends State<BlockMenu> {
       if (type.colorable || widget.count > 1)
         MenuItem(
             key: const ValueKey('menu-color'),
-            leading: IconX(Ix.color, size: 20, color: c.iconPrimary),
+            leading: IconX(Ix.color, color: c.iconPrimary),
             label: 'Color',
             onTap: () => setState(() => _sub = 2),
             trailing: Icon20(Ico.chevronRight, size: IconSize.sm, color: c.iconTertiary)),
@@ -482,7 +481,7 @@ class _BlockMenuState extends State<BlockMenu> {
             onTap: () => widget.onAction(BlockAction.setDate)),
       if (canTurn || type.colorable) const MenuSeparator(),
       if (widget.onAskAi != null)
-        MenuItem(key: const ValueKey('menu-ask-ai'), leading: const AiMark(size: 18),
+        MenuItem(key: const ValueKey('menu-ask-ai'), leading: AiMark(size: IconSize.md.px),
             label: 'Ask AI', onTap: widget.onAskAi!),
       if (widget.onAskAgent != null)
         MenuItem(key: const ValueKey('menu-ask-agent'), icon: Ico.comment,
@@ -572,7 +571,7 @@ class _BlockSheetState extends State<BlockSheet> {
         : [
             if (widget.count > 1) SheetHeader('${widget.count} blocks'),
             if (widget.onAskAi != null)
-              SheetItem(key: const ValueKey('sheet-ask-ai'), leading: const AiMark(size: 20),
+              SheetItem(key: const ValueKey('sheet-ask-ai'), leading: const AiMark(),
                   label: 'Ask AI', onTap: () {
                     Navigator.of(context).pop();
                     widget.onAskAi!();
@@ -591,7 +590,7 @@ class _BlockSheetState extends State<BlockSheet> {
             if (type.colorable || widget.count > 1)
               SheetItem(
                   key: const ValueKey('sheet-color'),
-                  leading: IconX(Ix.color, size: 22, color: c.iconPrimary),
+                  leading: IconX(Ix.color, size: IconSize.xl.px, color: c.iconPrimary),
                   label: 'Color',
                   onTap: () => setState(() => _sub = 2)),
             if (widget.kind == Kinds.todo && widget.count == 1)
@@ -600,7 +599,7 @@ class _BlockSheetState extends State<BlockSheet> {
             if (widget.count == 1)
               SheetItem(
                   key: const ValueKey('sheet-select'),
-                  leading: IconX(Ix.select, size: 22, color: c.iconPrimary),
+                  leading: IconX(Ix.select, size: IconSize.xl.px, color: c.iconPrimary),
                   label: 'Select',
                   onTap: () => pop(const SheetResult(BlockAction.select))),
             SheetItem(
@@ -663,10 +662,10 @@ class _LinkBoxState extends State<LinkBox> {
     final c = context.colors;
     final ty = context.type;
     return MenuSurface(
-      width: 320,
+      width: Widths.dialog,
       padding: const EdgeInsets.all(Space.sm),
       child: Container(
-        height: 32,
+        height: ControlSize.md.height,
         padding: const EdgeInsets.symmetric(horizontal: Space.sm),
         decoration: BoxDecoration(
           color: c.bgHover,
