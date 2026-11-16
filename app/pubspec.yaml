@@ -13,7 +13,7 @@ dependencies:
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/bb-ui
-      ref: v0.7.2
+      ref: 1e3863ac3c9a0123fb5e502e890005701423a586
       path: packages/bb_ui
   device_info_plus: ^13.3.0
   file_picker: ^13.1.0
@@ -28,18 +28,18 @@ dependencies:
   url_launcher: 6.3.3
   notes_bridge:
     path: rust_builder
-  # The shared agent kit, pinned to the commit of kit tag v0.17.3 (a tag ref on agent_kit_core fails version solving):
+  # The shared agent kit 0.20.0, pinned to commit 88db604 (agent-kit PR #70; a tag ref on agent_kit_core fails version solving):
   # agent_kit_core remains a path dependency of agent_kit, so both direct
   # refs must be the same full commit SHA. The chat's outline and the dev pane use them.
   agent_kit:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: e19afa4432b19a8d75cf8afabc109a1c362972cf
+      ref: 88db604e1f3e370ed53866490c4804540681c251
       path: packages/agent_kit
   agent_kit_core:
     git:
       url: https://github.com/BubbleBuffer/agent-kit.git
-      ref: e19afa4432b19a8d75cf8afabc109a1c362972cf
+      ref: 88db604e1f3e370ed53866490c4804540681c251
       path: packages/agent_kit_core
 
 dev_dependencies:
