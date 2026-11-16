@@ -15,13 +15,13 @@ import '../../../ui/database/widgets.dart';
 /// The colour a new option gets: the palette in turn, skipping Default.
 String nextOptionColor(List<SelectOption> options) => tagColors[1 + options.length % (tagColors.length - 1)];
 
-/// Opens the option picker for [a]: over the cell on desktop (its chips
-/// where the cell's were), a sheet on mobile.
+/// Opens the option picker for [a]: over the cell (its chips where the
+/// cell's were), or a sheet on a compact screen.
 Future<void> editOptions(EditArgs a) => showOverCell<void>(
       a.context,
       a.anchor,
-      (ctx) => ctx.touch ? OptionPicker(args: a) : Padding(padding: const EdgeInsets.all(Space.xs), child: OptionPicker(args: a)),
-      width: a.anchor.width < 300 ? 300 : a.anchor.width,
+      (ctx) => ctx.sizeClass.isCompact ? OptionPicker(args: a) : Padding(padding: const EdgeInsets.all(Space.xs), child: OptionPicker(args: a)),
+      width: a.anchor.width < Db.optionEditor ? Db.optionEditor : a.anchor.width,
     );
 
 class OptionPicker extends StatefulWidget {

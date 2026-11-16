@@ -129,7 +129,7 @@ class SPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
+    final m = context.sizeClass.isCompact;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Semantics(
         header: true,
@@ -717,7 +717,7 @@ class SSelect<T> extends StatelessWidget {
 
   Future<void> _open(BuildContext context) async {
     T? picked;
-    if (context.touch) {
+    if (context.sizeClass.isCompact) {
       picked = await showSheet<T>(
         context,
         (ctx) => SheetSurface(children: [
@@ -842,7 +842,7 @@ class SChoices<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cards = [for (final ch in choices) _ChoiceCard<T>(choice: ch, checked: ch.value == value, onChanged: onChanged, cardKey: keyOf?.call(ch.value))];
-    if (context.touch) {
+    if (context.sizeClass.isCompact) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (var i = 0; i < cards.length; i++) ...[if (i > 0) const Gap(Space.sm), cards[i]],
       ]);
@@ -1429,7 +1429,7 @@ class SPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
+    final m = context.sizeClass.isCompact;
     final statusText = Text(status, style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.semibold));
     return Container(
       margin: const EdgeInsets.only(top: Space.lg),

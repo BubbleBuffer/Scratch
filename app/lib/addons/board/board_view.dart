@@ -145,11 +145,11 @@ class _BoardViewState extends State<BoardView> {
   }
 
   double get _colWidth {
-    final m = context.touch;
+    final m = context.sizeClass.isCompact;
     return switch (a.view.cfg.cardSize) {
-      CardSize.small => m ? 220.0 : 220.0,
-      CardSize.medium => m ? 276.0 : Db.boardColumn,
-      CardSize.large => m ? 300.0 : 340.0,
+      CardSize.small => Db.boardColumnSmall,
+      CardSize.medium => Db.boardColumn,
+      CardSize.large => m ? Db.boardColumnLargeCompact : Db.boardColumnLarge,
     };
   }
 

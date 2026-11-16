@@ -202,6 +202,8 @@ abstract final class Db {
   static const minColumn = 90.0;
   static const titleColumnCompact = 160.0, defaultColumnCompact = 140.0;
   static const boardColumn = 276.0;
+  static const boardColumnSmall = 220.0;
+  static const boardColumnLarge = 340.0, boardColumnLargeCompact = 300.0;
   static const boardGap = 12.0;
   static const cardWidth = 260.0;
   static const mobileRowHeight = 47.0;
@@ -264,6 +266,9 @@ abstract final class Db {
   /// and a colour swatch.
   static const optionRow = 34.0, optionFieldMin = 80.0, optionFieldMax = 260.0;
   static const swatch = 18.0;
+
+  /// The option editor over a cell, at least.
+  static const optionEditor = 300.0;
 
   /// The relation picker's list.
   static const relationList = 280.0;

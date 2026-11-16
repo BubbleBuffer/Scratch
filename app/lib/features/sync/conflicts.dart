@@ -221,7 +221,8 @@ class _Topline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
+    // Stacked on a compact screen, in a row otherwise.
+    final m = context.sizeClass.isCompact;
     final sync = context.read<SyncStore>();
     final k = conflict;
     final key = _scopeKey(k);
@@ -372,7 +373,6 @@ class _OtherVersion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
     final sync = context.read<SyncStore>();
     final k = conflict;
     final alt = _blockOtherIndex(k);
@@ -391,7 +391,7 @@ class _OtherVersion extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: Space.hair),
                 child: Text(text.isEmpty ? conflictEmptyBlock : text,
-                    style: m ? ts(context.type.body, c.textTertiary) : ts(context.type.body, c.textTertiary)),
+                    style: ts(context.type.body, c.textTertiary)),
               ),
             ),
         ]),

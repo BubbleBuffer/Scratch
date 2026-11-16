@@ -92,7 +92,8 @@ Future<void> showSyncDetails(BuildContext context, Rect anchor, SyncPhase phase,
   final sync = context.read<SyncStore>();
   Widget details(BuildContext ctx) {
     final c = ctx.colors;
-    final m = ctx.touch;
+    // In a sheet on a compact screen.
+    final m = ctx.sizeClass.isCompact;
     final lines = <String>[];
     if (sync.connected) {
       lines.add('Hub: ${sync.hubUrl}');
