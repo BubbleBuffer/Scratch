@@ -146,7 +146,7 @@ class QueryRowTile extends StatelessWidget {
         : PageIcon(
             key: ValueKey('query-page-${hit.id}'),
             icon: pageIcon,
-            size: 20,
+            size: IconSize.lg.px,
           );
     return FocusFrame(
       onActivate: tick ?? onOpen,

@@ -441,7 +441,7 @@ class _TodayViewState extends State<TodayView> {
           ),
         if (widget.note != null) ...[
           const Gap(Space.lg),
-          Container(height: 1, color: c.border),
+          Container(height: Stroke.hair, color: c.border),
           const Gap(Space.lg),
           widget.note!,
         ],

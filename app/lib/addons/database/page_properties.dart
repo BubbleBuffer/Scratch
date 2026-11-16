@@ -26,6 +26,7 @@ import 'controller.dart';
 import '../../ui/database/db_icons.dart';
 import 'property_menu.dart';
 import '../../ui/database/values.dart';
+import '../../ui/database/db_tokens.dart';
 
 class PageProperties extends StatefulWidget {
   const PageProperties({
@@ -224,7 +225,7 @@ class _PagePropertiesState extends State<PageProperties> {
     }
     final r = _row;
     if (r == null) {
-      return SizedBox(height: s.schema.length * (mobile ? 38.0 : 34.0));
+      return SizedBox(height: s.schema.length * ((mobile ? Db.propRowTouch : Db.propRow) + Space.xxs));
     }
     final shown = <PropDef>[], hidden = <PropDef>[];
     for (final d in s.schema) {
@@ -289,12 +290,12 @@ class _PagePropertiesState extends State<PageProperties> {
     final mobile = context.touch;
     final t = propertyRegistry.of(d.kind);
     final v = r.valueOf(d);
-    const labelW = 140.0;
+    const labelW = Db.propLabel;
     final labelStyle = ts(context.type.ui, c.textSecondary, weight: Weight.regular);
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.xxs),
       child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: mobile ? 34 : 30),
+        constraints: BoxConstraints(minHeight: mobile ? Db.propRowTouch : Db.propRow),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -306,16 +307,16 @@ class _PagePropertiesState extends State<PageProperties> {
                   onTap: () => showPropertyMenu(b, _ctl!, d, inPage: true),
                   radius: Radii.sm,
                   padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-                  child: SizedBox(
-                    height: mobile ? 34 : 30,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: mobile ? Db.propRowTouch : Db.propRow),
                     child: Row(
                       children: [
                         DbIcon(
                           propIcon(d),
-                          size: mobile ? 18 : 16,
+                          size: (mobile ? IconSize.md : IconSize.sm).px,
                           color: c.textSecondary,
                         ),
-                        Gap(mobile ? 10 : 8),
+                        Gap(mobile ? Space.md : Space.sm),
                         Expanded(
                           child: Text(
                             d.name,
@@ -380,11 +381,11 @@ class _PagePropertiesState extends State<PageProperties> {
         onTap: () => onTap(b),
         radius: Radii.sm,
         padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-        child: SizedBox(
-          height: context.touch ? 34 : 30,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: context.touch ? Db.propRowTouch : Db.propRow),
           child: Row(
             children: [
-              SizedBox(width: 16, child: Center(child: icon)),
+              SizedBox(width: IconSize.sm.px, child: Center(child: icon)),
               const Gap(Space.sm),
               Text(
                 label,

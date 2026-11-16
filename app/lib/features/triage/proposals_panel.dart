@@ -143,7 +143,7 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
         vertical: Space.sm,
       ),
       itemCount: items.length + applied.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const Gap(Space.sm),
       itemBuilder: (_, i) => i < items.length
           ? _entry(context, items[i])
           : _run(context, applied[i - items.length]),

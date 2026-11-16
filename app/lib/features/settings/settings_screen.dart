@@ -322,7 +322,7 @@ class _SettingsModalState extends State<SettingsModal> {
       // About sits apart from the AI group.
       if (s == SettingsSection.connectors) {
         group = null;
-        nav.add(const SizedBox(height: 12));
+        nav.add(const Gap(Space.md));
       }
     }
     return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -408,7 +408,7 @@ class _NavItem extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: 32),
             decoration: BoxDecoration(
               border: Border(
-                left: BorderSide(color: selected ? c.accent : const Color(0x00000000), width: Stroke.seam),
+                left: BorderSide(color: selected ? c.accent : kTransparent, width: Stroke.seam),
               ),
             ),
             padding: const EdgeInsets.fromLTRB(Space.sm, Space.xs, Space.md, Space.xs),
@@ -482,7 +482,7 @@ class SettingsPage extends StatelessWidget {
           ));
         }
       }
-      if (s == SettingsSection.about) rows.add(const SizedBox(height: 20));
+      if (s == SettingsSection.about) rows.add(const Gap(Space.xl));
       rows.add(Hover(
         key: ValueKey('settings-nav-${s.name}'),
         onTap: () => pushSectionPage(context, s),

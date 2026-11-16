@@ -135,13 +135,13 @@ class _OptionPickerState extends State<OptionPicker> {
             selected: selected.contains(o.id),
             padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
             child: SizedBox(
-              height: context.touch ? 44 : 28,
+              height: context.metrics.row.height,
               child: Row(children: [
                 ReorderableDragStartListener(
                   index: i,
                   child: MouseRegion(
                     cursor: SystemMouseCursors.grab,
-                    child: SizedBox(width: 18, child: Icon20(Ico.grip, size: IconSize.xs, color: c.iconTertiary)),
+                    child: SizedBox(width: Db.swatch, child: Icon20(Ico.grip, size: IconSize.xs, color: c.iconTertiary)),
                   ),
                 ),
                 const Gap(Space.xxs),
@@ -182,7 +182,7 @@ class _OptionPickerState extends State<OptionPicker> {
 
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
-        constraints: const BoxConstraints(minHeight: 34),
+        constraints: const BoxConstraints(minHeight: Db.optionRow),
         padding: const EdgeInsets.fromLTRB(Space.xs, Space.xxs, Space.xs, Space.xxs),
         decoration: BoxDecoration(
           color: c.bgSecondary,
@@ -203,7 +203,7 @@ class _OptionPickerState extends State<OptionPicker> {
                   ),
               ]),
           ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 80, maxWidth: 260),
+            constraints: const BoxConstraints(minWidth: Db.optionFieldMin, maxWidth: Db.optionFieldMax),
             child: IntrinsicWidth(
               child: PlainField(
                 key: const ValueKey('option-query'),
@@ -240,7 +240,7 @@ class _OptionPickerState extends State<OptionPicker> {
           radius: Radii.md,
           padding: const EdgeInsets.symmetric(horizontal: Space.sm),
           child: SizedBox(
-            height: context.touch ? 44 : 28,
+            height: context.metrics.row.height,
             child: Row(children: [
               Text('Create ', style: ts(ty.ui, c.textSecondary, weight: Weight.regular)),
               Flexible(child: Pill(_query.text.trim(), color: nextOptionColor(def.options), status: status)),
@@ -297,8 +297,8 @@ class _OptionEditorState extends State<OptionEditor> {
             key: ValueKey('color-$col'),
             label: colorLabel(col),
             leading: Container(
-              width: 18,
-              height: 18,
+              width: Db.swatch,
+              height: Db.swatch,
               decoration: BoxDecoration(
                 color: c.tag(col).bg,
                 borderRadius: BorderRadius.circular(Radii.sm),

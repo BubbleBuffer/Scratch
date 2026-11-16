@@ -129,9 +129,9 @@ class ShortItemCard extends StatelessWidget {
             ),
           )
         : item.collection != null
-        ? DbIcon(DbIco.database, size: 18, color: c.iconTertiary)
+        ? DbIcon(DbIco.database, size: IconSize.md.px, color: c.iconTertiary)
         : item.kind == AgendaKind.mention
-        ? PageIcon(icon: item.icon, size: 18, color: c.iconTertiary)
+        ? PageIcon(icon: item.icon, size: IconSize.md.px, color: c.iconTertiary)
         : Icon20(
             item.hasTime ? Ico.clock : Ico.todo,
             size: IconSize.md,
@@ -337,7 +337,7 @@ class _ItemSourceState extends State<_ItemSource> {
                     ),
                   )
                 else if (widget.database)
-                  DbIcon(DbIco.database, size: 12, color: c.iconTertiary)
+                  DbIcon(DbIco.database, size: IconSize.xs.px, color: c.iconTertiary)
                 else
                   Icon20(Ico.page, size: IconSize.xs, color: c.iconTertiary),
                 const Gap(Space.xs),

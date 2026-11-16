@@ -186,7 +186,7 @@ class _TrashPanelState extends State<TrashPanel> {
       child: SizedBox(
         height: m ? 56 : (path == null ? 32 : 42),
         child: Row(children: [
-          PageIcon(icon: p.icon, size: m ? 22 : 18, color: c.iconSecondary),
+          PageIcon(icon: p.icon, size: (m ? IconSize.xl : IconSize.md).px, color: c.iconSecondary),
           Gap(m ? 12 : 8),
           Expanded(
             child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [

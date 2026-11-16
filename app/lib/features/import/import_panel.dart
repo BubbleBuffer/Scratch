@@ -82,7 +82,7 @@ class _PathDialog extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(pad, m ? 0 : Space.lg, pad, m ? Space.sm : Space.lg),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          IconX(icon, size: 20, color: c.iconSecondary),
+          IconX(icon, size: IconSize.lg.px, color: c.iconSecondary),
           const Gap(Space.sm),
           Text(title, style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display)),
         ]),

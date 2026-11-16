@@ -15,6 +15,7 @@ import '../../ui/database/db_icons.dart';
 import 'property_menu.dart';
 import '../../ui/database/values.dart';
 import '../../ui/database/widgets.dart';
+import '../../ui/database/db_tokens.dart';
 
 /// The title as a property definition (for filters and sorts).
 const titleDef = PropDef(key: BuiltinKeys.title, name: 'Name', kind: PropKind.text, options: [], config: '');
@@ -291,7 +292,7 @@ class _OpButton extends StatelessWidget {
 // ----------------------------------------------------------- advanced filter
 
 Future<void> showAdvancedFilter(BuildContext context, Rect rect, CollectionStore s) =>
-    showPanel<void>(context, rect, (ctx) => _AdvancedFilter(store: s), width: context.touch ? 360 : 560);
+    showPanel<void>(context, rect, (ctx) => _AdvancedFilter(store: s), width: Widths.palette);
 
 class _AdvancedFilter extends StatelessWidget {
   const _AdvancedFilter({required this.store});
@@ -443,7 +444,7 @@ class _AdvancedFilter extends StatelessWidget {
       out.add(Padding(
         padding: const EdgeInsets.symmetric(vertical: Space.hair),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 64, height: 28, child: Align(alignment: Alignment.centerLeft, child: lead)),
+          ConstrainedBox(constraints: BoxConstraints(minWidth: Db.filterLead, maxWidth: Db.filterLead, minHeight: ControlSize.sm.height), child: Align(alignment: Alignment.centerLeft, child: lead)),
           Expanded(child: body),
         ]),
       ));
@@ -498,7 +499,7 @@ Future<void> sortButton(BuildContext anchor, CollectionStore s) async {
 }
 
 Future<void> showSortEditor(BuildContext context, Rect rect, CollectionStore s) =>
-    showPanel<void>(context, rect, (ctx) => _SortEditor(store: s), width: context.touch ? 360 : 420);
+    showPanel<void>(context, rect, (ctx) => _SortEditor(store: s), width: Widths.form);
 
 class _SortEditor extends StatelessWidget {
   const _SortEditor({required this.store});

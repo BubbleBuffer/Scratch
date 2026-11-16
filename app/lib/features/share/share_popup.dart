@@ -600,7 +600,7 @@ class _SegmentHalf extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: ColoredBox(
-          color: selected ? c.accent : const Color(0x00000000),
+          color: selected ? c.accent : kTransparent,
           child: Center(
             child: Text(
               label,

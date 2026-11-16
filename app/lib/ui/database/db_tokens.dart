@@ -200,10 +200,18 @@ abstract final class Db {
   static const defaultColumn = 200.0;
   static const titleColumn = 280.0;
   static const minColumn = 90.0;
+  static const titleColumnCompact = 160.0, defaultColumnCompact = 140.0;
   static const boardColumn = 276.0;
   static const boardGap = 12.0;
   static const cardWidth = 260.0;
   static const mobileRowHeight = 47.0;
+
+  /// A table: its header by touch, the "+" column for a new property (with
+  /// a pointer), the new-row row with a pointer and by touch, the totals
+  /// row, and a column's resize grip.
+  static const headerHeightTouch = 40.0, addColumn = 34.0;
+  static const addRow = 34.0, addRowTouch = 45.0, calcRow = 36.0;
+  static const resizeGrip = 7.0, resizeGripReach = 3.0;
 
   /// An option pill's height, and a board or gallery card's smaller pill.
   static const pillHeight = 22.0, smallPillHeight = 18.0;
@@ -220,8 +228,124 @@ abstract final class Db {
   /// A toolbar or rule chip's corners, and its longest label.
   static const chipRadius = 14.0, chipLabel = 220.0;
 
+  /// The room under a view's last row.
+  static const endPadding = 120.0;
+
   /// The narrowest editor over a cell.
   static const cellEditorMin = 240.0;
+
+  /// A full-page database's side margin, on a wide screen and narrower.
+  static const pageMarginWide = 96.0, pageMargin = 48.0, wideAt = 900.0;
+
+  /// Room kept for a view while it loads.
+  static const loading = 120.0;
+
+  /// The views tab bar, a tab's corners and the longest tab name.
+  static const tabBar = 40.0, tabRadius = 16.0, tabLabel = 220.0;
+
+  /// The toolbar's search field and its "New" button.
+  static const searchField = 150.0, newButton = 72.0;
+
+  /// The rules bar under the tabs (sorts and filters).
+  static const rulesBar = 30.0;
+
+  /// The view switcher on a compact screen, its pill's corners, and the
+  /// views sheet's header and rows.
+  static const switcherRadius = 18.0, sheetHeader = 52.0;
+
+  /// The checkbox in a card (smaller) and in a cell by touch (larger).
+  static const cardCheckbox = 14.0, touchCheckbox = 18.0;
+
+  /// The date picker's day cell, with a pointer and by touch, and the inset
+  /// of the picked day's circle.
+  static const dayCell = 32.0, dayCellTouch = 40.0, dayInset = 4.0;
+
+  /// The option editor: the chip row's least height, a new option's field,
+  /// and a colour swatch.
+  static const optionRow = 34.0, optionFieldMin = 80.0, optionFieldMax = 260.0;
+  static const swatch = 18.0;
+
+  /// The relation picker's list.
+  static const relationList = 280.0;
+
+  /// The text cell editor: one line at least, and the most it grows.
+  static const cellEditorLine = 21.0, cellEditorMax = 300.0;
+
+  /// The filter editor's "where/and/or" column.
+  static const filterLead = 64.0;
+
+  /// A page's property row (at least), with a pointer and by touch, and its
+  /// label column.
+  static const propRow = 30.0, propRowTouch = 34.0, propLabel = 140.0;
+
+  /// A layout tile in the view settings.
+  static const layoutTile = 62.0;
+
+  /// The longest list in a settings menu before it scrolls.
+  static const settingsList = 320.0;
+}
+
+/// The "Open" chip on a row a pointer hovers, with its little peek glyph,
+/// with a pointer and by touch.
+abstract final class DbOpenChip {
+  static const height = 22.0, heightTouch = 26.0;
+  static const glyph = Size(12, 10), glyphPane = 4.0;
+}
+
+/// The gallery: a card's least width by card size (compact screens take
+/// narrower small cards and wider medium ones), the cover's height, and the
+/// room a card keeps while its row loads.
+abstract final class DbGallery {
+  static const small = 180.0, smallCompact = 150.0;
+  static const medium = 260.0, mediumCompact = 300.0;
+  static const large = 340.0, largeCompact = 320.0;
+  static const smallCover = 110.0, mediumCover = 150.0, largeCover = 220.0;
+  static const loadingCard = 60.0;
+}
+
+/// The list view's row, with a pointer and by touch, and a value's widest.
+abstract final class DbList {
+  static const row = 34.0, rowTouch = 44.0, value = 280.0;
+
+  /// How far rows reach into the gutter.
+  static const reach = 6.0;
+}
+
+/// The timeline view: a lane, an entry's bar in it and the bar's resize
+/// handles, the room a narrow bar's label takes beside it, the date header
+/// and the room under the last lane.
+abstract final class DbTimeline {
+  static const row = 36.0, bar = 26.0, handle = 8.0, narrowLabel = 400.0;
+  static const header = 48.0, endPadding = 80.0;
+
+  /// A bar's inset from its days, and the least share of a day it takes.
+  static const barInset = 4.0, minBarShare = .5;
+
+  /// The lanes an inline timeline keeps at least.
+  static const inlineLanes = 4;
+}
+
+/// The calendar view.
+abstract final class DbCalendar {
+  /// A week of the month grid; an entry's bar, the gap between bars, the
+  /// first bar's top (under the day's number) and a bar's inset from its
+  /// days' edges.
+  static const row = 124.0, bar = 22.0, barGap = 3.0, barTop = 30.0;
+  static const barInset = 4.0;
+
+  /// The weekday names over the grid.
+  static const weekdays = 26.0;
+
+  /// The compact month: the weekday names, a week, the day's circle and its
+  /// dots.
+  static const compactWeekdays = 30.0, compactWeek = 60.0, compactDay = 30.0;
+  static const dotRow = 5.0, dot = 4.0;
+
+  /// A day's number (today's in a pill), and a dragged entry's widest.
+  static const dayLabel = 24.0, dragged = 220.0;
+
+  /// The room under the last week.
+  static const endPadding = 80.0;
 }
 
 /// Calendar and timeline entries inherit their database's space colour.

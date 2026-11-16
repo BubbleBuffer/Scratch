@@ -121,7 +121,7 @@ Future<void> showSyncDetails(BuildContext context, Rect anchor, SyncPhase phase,
           Text(message, key: const ValueKey('sync-error-message'), style: ts(context.type.ui, c.textSecondary, weight: Weight.regular)),
         ],
         for (final l in lines) ...[
-          const SizedBox(height: 6),
+          const Gap(Space.xs),
           Text(l, style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
         ],
       ]),

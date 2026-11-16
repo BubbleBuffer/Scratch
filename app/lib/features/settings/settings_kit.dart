@@ -197,7 +197,7 @@ class SRule extends StatelessWidget {
   const SRule({super.key});
 
   @override
-  Widget build(BuildContext context) => Container(height: 1, color: context.colors.border);
+  Widget build(BuildContext context) => Container(height: Stroke.hair, color: context.colors.border);
 }
 
 List<Widget> _separated(List<Widget> rows, Color line) {
@@ -846,12 +846,12 @@ class SChoices<T> extends StatelessWidget {
     final cards = [for (final ch in choices) _ChoiceCard<T>(choice: ch, checked: ch.value == value, onChanged: onChanged, cardKey: keyOf?.call(ch.value))];
     if (context.touch) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (var i = 0; i < cards.length; i++) ...[if (i > 0) const SizedBox(height: 8), cards[i]],
+        for (var i = 0; i < cards.length; i++) ...[if (i > 0) const Gap(Space.sm), cards[i]],
       ]);
     }
     return IntrinsicHeight(
       child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (var i = 0; i < cards.length; i++) ...[if (i > 0) const SizedBox(width: 10), Expanded(child: cards[i])],
+        for (var i = 0; i < cards.length; i++) ...[if (i > 0) const Gap(Space.md), Expanded(child: cards[i])],
       ]),
     );
   }
@@ -1115,7 +1115,7 @@ class SItem extends StatelessWidget {
         if (trailing.isNotEmpty) ...[
           const Gap(Space.md),
           Row(mainAxisSize: MainAxisSize.min, children: [
-            for (var i = 0; i < trailing.length; i++) ...[if (i > 0) const SizedBox(width: 4), trailing[i]],
+            for (var i = 0; i < trailing.length; i++) ...[if (i > 0) const Gap(Space.xxs), trailing[i]],
           ]),
         ],
       ]),

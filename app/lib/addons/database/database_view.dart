@@ -19,6 +19,7 @@ import 'filter_editor.dart';
 import '../../ui/database/values.dart';
 import 'view_settings.dart';
 import '../../ui/database/widgets.dart';
+import '../../ui/database/db_tokens.dart';
 
 /// The active tab of each group of view blocks in this session: the
 /// group's first block id -> the shown view's block id.
@@ -129,8 +130,8 @@ class DatabaseViewState extends State<DatabaseView> {
 
   double _gutter(double width) {
     if (widget.inline) return widget.left;
-    if (context.touch) return Layout.gutter;
-    return width >= 900 ? 96 : 48;
+    if (context.sizeClass.isCompact) return Layout.gutter;
+    return width >= Db.wideAt ? Db.pageMarginWide : Db.pageMargin;
   }
 
   @override
@@ -155,11 +156,11 @@ class DatabaseViewState extends State<DatabaseView> {
               final g = _gutter(box.maxWidth);
               final v = store.view;
               return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Padding(padding: EdgeInsets.fromLTRB(g, context.touch ? Space.lg : Space.md, g, 0), child: _pageTitle(context)),
+                Padding(padding: EdgeInsets.fromLTRB(g, context.sizeClass.isCompact ? Space.lg : Space.md, g, 0), child: _pageTitle(context)),
                 Gap(Space.md),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: g - (context.touch ? 0 : 0)),
-                  child: context.touch ? _mobileBar(context) : _tabsBar(context, box.maxWidth - 2 * g),
+                  padding: EdgeInsets.symmetric(horizontal: g),
+                  child: context.sizeClass.isCompact ? _mobileBar(context) : _tabsBar(context, box.maxWidth - 2 * g),
                 ),
                 if (v != null) _rulesBar(context, v, g),
                 const Gap(Space.xxs),
@@ -178,7 +179,7 @@ class DatabaseViewState extends State<DatabaseView> {
 
   Widget _pageTitle(BuildContext context) {
     final c = context.colors;
-    final style = tsDisplay(context.touch ? context.type.h1 : context.type.display, c.textPrimary);
+    final style = tsDisplay(context.type.display, c.textPrimary);
     final ctl = widget.title;
     if (ctl == null) return Text(_displayName(context), style: style);
     return ListenableBuilder(
@@ -213,14 +214,14 @@ class DatabaseViewState extends State<DatabaseView> {
   /// The tabs, the rules bar and the view; the page's own title and body
   /// are above.
   Widget _blocksFrame(BuildContext context) {
-    final w = widget.width ?? 600;
+    final w = widget.width ?? Widths.content;
     final v = store.view;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
       Padding(
         padding: EdgeInsets.only(left: widget.left, right: Space.sm),
         child: SizedBox(
           width: w,
-          child: context.touch ? _mobileBar(context) : _tabsBar(context, w),
+          child: context.sizeClass.isCompact ? _mobileBar(context) : _tabsBar(context, w),
         ),
       ),
       if (v != null) _rulesBar(context, v, widget.left),
@@ -235,7 +236,7 @@ class DatabaseViewState extends State<DatabaseView> {
 
   Widget _inlineFrame(BuildContext context) {
     final c = context.colors;
-    final w = widget.width ?? 600;
+    final w = widget.width ?? Widths.content;
     final v = store.view;
     _inlineTitle ??= TextEditingController(text: store.title);
     if (!_titleFocus.hasFocus && _inlineTitle!.text != store.title && store.loaded) _inlineTitle!.text = store.title;
@@ -245,7 +246,7 @@ class DatabaseViewState extends State<DatabaseView> {
         padding: EdgeInsets.only(left: widget.left, right: Space.sm),
         child: SizedBox(
           width: w,
-          child: context.touch ? _mobileBar(context) : _tabsBar(context, w),
+          child: context.sizeClass.isCompact ? _mobileBar(context) : _tabsBar(context, w),
         ),
       ),
       Padding(
@@ -290,7 +291,7 @@ class DatabaseViewState extends State<DatabaseView> {
   Widget _body(BuildContext context, double gutter) {
     final v = store.view;
     if (!store.loaded || v == null) {
-      return widget.inline || widget.blocks ? const SizedBox(height: 120) : const SizedBox.shrink();
+      return widget.inline || widget.blocks ? const SizedBox(height: Db.loading) : const SizedBox.shrink();
     }
     final t = viewRegistry.of(v.kind);
     if (t == null) return const SizedBox.shrink();
@@ -302,15 +303,18 @@ class DatabaseViewState extends State<DatabaseView> {
 
   // ----------------------------------------------------------------- tabs
 
-  static const _toolbarWidth = 5 * 28.0 + 4 * 2 + 12 + 72;
+  /// Five toolbar buttons with a hair between them, a gap and "New".
+  static double get _toolbarWidth =>
+      5 * ControlSize.sm.height + 4 * Space.hair + Space.md + Db.newButton;
 
   double _tabWidth(BuildContext context, ViewDef v) {
     final tp = TextPainter(
       text: TextSpan(text: v.name, style: ts(context.type.ui, context.colors.textPrimary, weight: Weight.medium)),
       textDirection: TextDirection.ltr,
       maxLines: 1,
-    )..layout(maxWidth: 220);
-    return tp.width + 16 + 6 + 20 + 4;
+    )..layout(maxWidth: Db.tabLabel);
+    // A tab: its padding, icon and gap, and the space after it.
+    return tp.width + 2 * Space.md + IconSize.sm.px + Space.xs + Space.xxs;
   }
 
   Widget _tabsBar(BuildContext context, double width) {
@@ -320,7 +324,7 @@ class DatabaseViewState extends State<DatabaseView> {
     // fit, the "N more…" button.
     final plus = widget.blocks ? 96.0 : 32.0;
     const more = 84.0;
-    final avail = width - (_searching ? _toolbarWidth + 150 : _toolbarWidth) - plus - 8;
+    final avail = width - (_searching ? _toolbarWidth + Db.searchField : _toolbarWidth) - plus - Space.sm;
     final widths = {for (final v in views) v.id: _tabWidth(context, v)};
     final total = widths.values.fold(0.0, (a, b) => a + b);
     var shown = [...views];
@@ -340,8 +344,8 @@ class DatabaseViewState extends State<DatabaseView> {
       }
     }
     final rest = [for (final v in views) if (!shown.contains(v)) v];
-    return SizedBox(
-      height: 40,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: Db.tabBar),
       child: Row(children: [
         Expanded(
           child: SingleChildScrollView(
@@ -354,10 +358,10 @@ class DatabaseViewState extends State<DatabaseView> {
                 builder: (b) => Hover(
                   key: const ValueKey('tabs-more'),
                   onTap: () => _moreViews(b, rest),
-                  radius: 16,
+                  radius: Db.tabRadius,
                   padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-                  child: SizedBox(
-                    height: 32,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: ControlSize.md.height),
                     child: Center(
                       child: Text(
                               '${rest.length} more…', style: ts(context.type.ui, context.colors.textTertiary, weight: Weight.regular)),
@@ -369,10 +373,10 @@ class DatabaseViewState extends State<DatabaseView> {
               Hover(
                 key: const ValueKey('add-view'),
                 onTap: addListView,
-                radius: 16,
+                radius: Db.tabRadius,
                 padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-                child: SizedBox(
-                  height: 32,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: ControlSize.md.height),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon20(Ico.plus, size: IconSize.xs, color: context.colors.iconTertiary),
                     const Gap(Space.xxs),
@@ -408,15 +412,15 @@ class DatabaseViewState extends State<DatabaseView> {
           key: ValueKey('tab-${v.name}'),
           onTap: () => active ? showViewMenu(b, ctl, v) : store.selectView(v.id),
           selected: active,
-          radius: 16,
+          radius: Db.tabRadius,
           padding: const EdgeInsets.symmetric(horizontal: Space.md),
-          child: SizedBox(
-            height: 32,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: ControlSize.md.height),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              DbIcon(layoutIcon(v.kind), size: 16, color: active ? c.iconPrimary : c.iconSecondary),
+              DbIcon(layoutIcon(v.kind), size: IconSize.sm.px, color: active ? c.iconPrimary : c.iconSecondary),
               const Gap(Space.xs),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 220),
+                constraints: const BoxConstraints(maxWidth: Db.tabLabel),
                 child: Text(v.name,
                     maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, fg, weight: active ? Weight.semibold : Weight.medium)),
               ),
@@ -466,8 +470,8 @@ class DatabaseViewState extends State<DatabaseView> {
       const Gap(Space.hair),
       if (_searching)
         SizedBox(
-          width: 150,
-          height: 28,
+          width: Db.searchField,
+          height: ControlSize.sm.height,
           child: Row(children: [
             Icon20(Ico.search, size: IconSize.sm, color: c.iconTertiary),
             const Gap(Space.xs),
@@ -515,8 +519,8 @@ class DatabaseViewState extends State<DatabaseView> {
       borderRadius: r,
       child: ColoredBox(
         color: c.accent,
-        child: SizedBox(
-          height: 28,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: ControlSize.sm.height),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Hover(
               key: const ValueKey('db-new'),
@@ -526,7 +530,7 @@ class DatabaseViewState extends State<DatabaseView> {
               padding: const EdgeInsets.symmetric(horizontal: Space.sm),
               child: Center(child: Text('New', style: ts(context.type.ui, ink, weight: Weight.bold))),
             ),
-            Container(width: 1, height: 28, color: c.onAccent.withValues(alpha: Alpha.tint)),
+            Container(width: Stroke.hair, height: ControlSize.sm.height, color: c.onAccent.withValues(alpha: Alpha.tint)),
             Builder(
               builder: (b) => Hover(
                 key: const ValueKey('db-new-menu'),
@@ -571,7 +575,7 @@ class DatabaseViewState extends State<DatabaseView> {
     return Padding(
       padding: EdgeInsets.fromLTRB(g, Space.xxs, g, Space.xxs),
       child: SizedBox(
-        height: 30,
+        height: Db.rulesBar,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(children: [
@@ -587,7 +591,7 @@ class DatabaseViewState extends State<DatabaseView> {
                 ),
               ),
             if (v.sorts.isNotEmpty && n > 0)
-              Container(width: 1, height: 16, margin: const EdgeInsets.symmetric(horizontal: Space.sm), color: c.divider),
+              Container(width: Stroke.hair, height: IconSize.sm.px, margin: const EdgeInsets.symmetric(horizontal: Space.sm), color: c.divider),
             if (rules != null)
               for (var i = 0; i < rules.length; i++)
                 Padding(
@@ -656,8 +660,8 @@ class DatabaseViewState extends State<DatabaseView> {
   Widget _mobileBar(BuildContext context) {
     final c = context.colors;
     final v = store.view;
-    return SizedBox(
-      height: 44,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: ControlSize.xl.height),
       child: Row(children: [
         Expanded(
           child: v == null
@@ -668,12 +672,12 @@ class DatabaseViewState extends State<DatabaseView> {
               key: const ValueKey('view-switcher'),
               onTap: () => showViewsSheet(context),
               selected: true,
-              radius: 18,
+              radius: Db.switcherRadius,
               padding: const EdgeInsets.symmetric(horizontal: Space.md),
-              child: SizedBox(
-                height: 36,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: ControlSize.lg.height),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  DbIcon(layoutIcon(v.kind), size: 18, color: c.iconPrimary),
+                  DbIcon(layoutIcon(v.kind), size: IconSize.md.px, color: c.iconPrimary),
                   const Gap(Space.sm),
                   Flexible(
                     child: Text(v.name,
@@ -762,7 +766,7 @@ class _ViewsSheetRoute extends PopupRoute<void> {
       alignment: Alignment.bottomCenter,
       child: ListenableBuilder(
         listenable: db.store,
-        builder: (context, _) => _ViewsSheet(db: db, height: mq.size.height - mq.padding.top - 16),
+        builder: (context, _) => _ViewsSheet(db: db, height: mq.size.height - mq.padding.top - Space.lg),
       ),
     );
   }
@@ -792,17 +796,17 @@ class _ViewsSheet extends StatelessWidget {
         const Gap(Space.sm),
         Center(
           child: Container(
-              width: 36, height: 4, decoration: BoxDecoration(color: c.borderStrong, borderRadius: BorderRadius.circular(Radii.sm))),
+              width: Sizes.grabWidth, height: Sizes.grabHeight, decoration: BoxDecoration(color: c.borderStrong, borderRadius: BorderRadius.circular(Radii.sm))),
         ),
         SizedBox(
-          height: 52,
+          height: Db.sheetHeader,
           child: Stack(children: [
             Center(
               child: Text('${views.length} ${views.length == 1 ? 'view' : 'views'}',
                   style: ts(context.type.title, c.textPrimary, weight: Weight.semibold)),
             ),
             Positioned(
-              right: 8,
+              right: Space.sm,
               top: 0,
               bottom: 0,
               child: Center(
@@ -833,10 +837,10 @@ class _ViewsSheet extends StatelessWidget {
                       },
                       onLongPress: () => showViewMenu(context, db.ctl, views[i]),
                       padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-                      child: SizedBox(
-                        height: 45,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: ControlSize.xl.height),
                         child: Row(children: [
-                          DbIcon(layoutIcon(views[i].kind), size: 18, color: c.iconPrimary),
+                          DbIcon(layoutIcon(views[i].kind), size: IconSize.md.px, color: c.iconPrimary),
                           const Gap(Space.lg),
                           Expanded(
                             child: Text(views[i].name,
@@ -866,8 +870,8 @@ class _ViewsSheet extends StatelessWidget {
                       }
                     },
                     padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-                    child: SizedBox(
-                      height: 45,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: ControlSize.xl.height),
                       child: Row(children: [
                         Icon20(Ico.plus, size: IconSize.md, color: c.accent),
                         const Gap(Space.lg),

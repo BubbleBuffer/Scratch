@@ -93,7 +93,7 @@ class _RowCardState extends State<RowCard> {
                     RowTitle(
                       row: r,
                       style: title,
-                      iconSize: m ? 18 : 16,
+                      iconSize: (m ? IconSize.md : IconSize.sm).px,
                       showIcon: a.view.cfg.showIcon,
                       wrap: true,
                     ),

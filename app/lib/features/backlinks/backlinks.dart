@@ -131,7 +131,7 @@ class _BacklinksBarState extends State<BacklinksBar> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  PageIcon(icon: r.icon, size: 16, color: c.iconSecondary),
+                  PageIcon(icon: r.icon, size: IconSize.sm.px, color: c.iconSecondary),
                   const Gap(Space.xs),
                   Flexible(
                     child: Container(

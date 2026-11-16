@@ -243,7 +243,7 @@ class _AddChatReferenceBoxState extends State<AddChatReferenceBox> {
                 label: _noteLabel(pages, n),
                 leading: PageIcon(
                   icon: n.icon,
-                  size: 20,
+                  size: IconSize.lg.px,
                   color: c.iconSecondary,
                 ),
                 selected: _target == n.id,

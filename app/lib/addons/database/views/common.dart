@@ -12,6 +12,7 @@ import '../../../state/pages_store.dart';
 import '../../../ui/database/values.dart';
 import '../../../registry/property_registry.dart';
 import '../../../ui/ui.dart';
+import '../../../ui/database/db_tokens.dart';
 
 /// Rows an inline database shows at first, and per "Load more".
 const inlinePage = 25;
@@ -38,13 +39,14 @@ class RowTitle extends StatelessWidget {
     super.key,
     required this.row,
     required this.style,
-    this.iconSize = 18,
+    this.iconSize,
     this.showIcon = true,
     this.wrap = false,
   });
   final PageRow row;
   final TextStyle style;
-  final double iconSize;
+  /// The page icon's box; [IconSize.md] by default.
+  final double? iconSize;
   final bool showIcon;
   final bool wrap;
 
@@ -52,10 +54,11 @@ class RowTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final empty = row.title.isEmpty;
+    final iconSize = this.iconSize ?? IconSize.md.px;
     return Row(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
       if (showIcon) ...[
         Padding(
-          padding: EdgeInsets.only(top: ((style.height ?? 1.3) * (style.fontSize ?? 14) - iconSize) / 2),
+          padding: EdgeInsets.only(top: (lineExtent(style) - iconSize) / 2),
           child: PageIcon(icon: row.icon, size: iconSize, color: c.iconSecondary),
         ),
         const Gap(Space.xs),
@@ -85,10 +88,13 @@ void editTitleWhenBuilt(BuildContext cell, ViewController ctl, PageRow row) {
 
 /// The grey "+ New" (or "+ New page") row of views.
 class AddRowButton extends StatelessWidget {
-  const AddRowButton({super.key, required this.label, required this.onTap, this.height = 33, this.padding = 8});
+  const AddRowButton({super.key, required this.label, required this.onTap, this.size = ControlSize.md, this.padding = Space.sm});
   final String label;
   final VoidCallback onTap;
-  final double height, padding;
+
+  /// The row's least height; it grows with the text.
+  final ControlSize size;
+  final double padding;
 
   @override
   Widget build(BuildContext context) {
@@ -97,8 +103,8 @@ class AddRowButton extends StatelessWidget {
       onTap: onTap,
       radius: Radii.sm,
       padding: EdgeInsets.symmetric(horizontal: padding),
-      child: SizedBox(
-        height: height,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: size.height),
         child: Row(children: [
           Icon20(Ico.plus, size: IconSize.xs, color: c.iconTertiary),
           const Gap(Space.xs),
@@ -122,8 +128,8 @@ class LoadMore extends StatelessWidget {
       onTap: onTap,
       radius: Radii.sm,
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-      child: SizedBox(
-        height: 33,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: ControlSize.md.height),
         child: Row(children: [
           Icon20(Ico.arrowDown, size: IconSize.xs, color: c.iconTertiary),
           const Gap(Space.xs),
@@ -150,7 +156,7 @@ class OpenChip extends StatelessWidget {
       radius: Radii.sm,
       hoverColor: c.bgHover,
       child: Container(
-        height: m ? 26 : 22,
+        constraints: BoxConstraints(minHeight: m ? DbOpenChip.heightTouch : DbOpenChip.height),
         padding: EdgeInsets.symmetric(horizontal: Space.xs),
         decoration: BoxDecoration(
           color: c.bgPrimary,
@@ -161,15 +167,15 @@ class OpenChip extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (!m) ...[
             Container(
-              width: 12,
-              height: 10,
+              width: DbOpenChip.glyph.width,
+              height: DbOpenChip.glyph.height,
               decoration: BoxDecoration(border: Border.all(color: c.iconTertiary, width: Stroke.hair), borderRadius: BorderRadius.circular(Radii.sm)),
               alignment: Alignment.centerRight,
-              child: Container(width: 4, color: c.iconTertiary),
+              child: Container(width: DbOpenChip.glyphPane, color: c.iconTertiary),
             ),
             const Gap(Space.xxs),
           ],
-          Text(label, style: ts(context.type.caption, c.textTertiary, weight: Weight.semibold).copyWith(letterSpacing: 0.5)),
+          Text(label, style: eyebrowStyle(context.type.caption, c.textTertiary, weight: Weight.semibold)),
         ]),
       ),
     );

@@ -307,7 +307,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                         children: [
                           PageIcon(
                             icon: db.icon,
-                            size: 16,
+                            size: IconSize.sm.px,
                             color: colors.iconSecondary,
                           ),
                           const Gap(Space.sm),

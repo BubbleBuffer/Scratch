@@ -204,10 +204,10 @@ class _PropertyMenuState extends State<PropertyMenu> {
 
   Widget _nameRow(BuildContext context) => Row(children: [
         Container(
-          width: 28,
-          height: 28,
+          width: ControlSize.sm.height,
+          height: ControlSize.sm.height,
           decoration: BoxDecoration(border: Border.all(color: context.colors.borderTranslucent), borderRadius: BorderRadius.circular(Radii.md)),
-          child: Center(child: DbIcon(propIcon(def), size: 16, color: context.colors.iconSecondary)),
+          child: Center(child: DbIcon(propIcon(def), size: IconSize.sm.px, color: context.colors.iconSecondary)),
         ),
         const Gap(Space.xs),
         Expanded(
@@ -237,7 +237,7 @@ class _PropertyMenuState extends State<PropertyMenu> {
           MenuItem(
             key: ValueKey('vis-${pv.name}'),
             label: pv.label,
-            leading: DbIcon(pv == PropVisibility.hidden ? DbIco.eyeOff : DbIco.eye, size: 20, color: context.colors.iconPrimary),
+            leading: DbIcon(pv == PropVisibility.hidden ? DbIco.eyeOff : DbIco.eye, size: IconSize.lg.px, color: context.colors.iconPrimary),
             trailing: d.cfg.visibility == pv ? Icon20(Ico.check, size: IconSize.sm, color: context.colors.iconPrimary) : null,
             onTap: () {
               final c = d.cfg..visibility = pv;
@@ -367,7 +367,7 @@ class _PropertyMenuState extends State<PropertyMenu> {
               child: Row(children: [
                 ReorderableDragStartListener(
                   index: i,
-                  child: SizedBox(width: 18, height: 28, child: Icon20(Ico.grip, size: IconSize.xs, color: c.iconTertiary)),
+                  child: SizedBox(width: IconSize.md.px, height: ControlSize.sm.height, child: Icon20(Ico.grip, size: IconSize.xs, color: c.iconTertiary)),
                 ),
                 Expanded(child: _optionRow(context, d, d.options[i])),
               ]),
@@ -404,7 +404,7 @@ class _PropertyMenuState extends State<PropertyMenu> {
           radius: Radii.md,
           padding: const EdgeInsets.symmetric(horizontal: Space.xs),
           child: SizedBox(
-            height: context.touch ? 44 : 28,
+            height: context.metrics.row.height,
             child: Row(children: [
               Expanded(
                 child: Align(alignment: Alignment.centerLeft, child: Pill(o.name, color: o.color, status: d.kind == PropKind.status,

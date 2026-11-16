@@ -64,7 +64,7 @@ Widget pillsCell(CellArgs a) {
       alignment: Alignment.centerLeft,
       maxWidth: double.infinity,
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        for (var i = 0; i < pills.length; i++) ...[if (i > 0) const SizedBox(width: 6), pills[i]],
+        for (var i = 0; i < pills.length; i++) ...[if (i > 0) const Gap(Space.xs), pills[i]],
       ]),
     ),
   );
@@ -94,7 +94,7 @@ Color hintColor(BuildContext context) => context.colors.textTertiary;
 
 /// The checkbox cell.
 Widget checkboxCell(CellArgs a) {
-  final size = a.mode == CellMode.card ? 14.0 : (a.context.touch ? 18.0 : 16.0);
+  final size = a.mode == CellMode.card ? Db.cardCheckbox : (a.context.touch ? Db.touchCheckbox : Db.checkbox);
   return DbCheckbox(checked: a.value.kind == ValueKind.checkbox && a.value.checked, size: size);
 }
 

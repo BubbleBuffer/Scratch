@@ -579,7 +579,7 @@ class _HubSettingsState extends State<HubSettings> {
           control: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             for (final (url, _) in _urls) ...[
               SCopyLine(url),
-              const SizedBox(height: 6),
+              const Gap(Space.xs),
             ],
           ]),
         ),
@@ -901,13 +901,13 @@ class _AddDeviceViewState extends State<AddDeviceView> {
     final children = <Widget>[
       if (!m) ...[
         Text('Add a device', style: ts(context.type.h3, c.textPrimary)),
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
       ],
     ];
     if (token == null) {
       children.addAll([
         Text('Name the device, then scan the code with it or copy the pairing code to it.', style: body),
-        const SizedBox(height: 16),
+        const Gap(Space.lg),
         SettingsField(
           fieldKey: const ValueKey('device-name-field'),
           controller: _name,
@@ -916,10 +916,10 @@ class _AddDeviceViewState extends State<AddDeviceView> {
           onSubmitted: (_) => _create(),
         ),
         if (_error != null) ...[
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           Text(_error!, style: ts(context.type.ui, c.inlineCodeText, weight: Weight.regular)),
         ],
-        const SizedBox(height: 16),
+        const Gap(Space.lg),
         Row(children: [PrimaryButton(key: const ValueKey('create-pairing'), label: 'Create pairing code', onTap: _create)]),
       ]);
     } else {
@@ -928,7 +928,7 @@ class _AddDeviceViewState extends State<AddDeviceView> {
       children.addAll([
         Text('On the device, open $appName › Settings › Sync and devices › Connect with a pairing code, and scan or paste this code. '
             'The token works for one device and is shown only now.', style: body),
-        const SizedBox(height: 20),
+        const Gap(Space.xl),
         Center(
           child: Container(
             key: const ValueKey('pairing-qr'),
@@ -941,7 +941,7 @@ class _AddDeviceViewState extends State<AddDeviceView> {
             child: QrView(code: QrCode.encode(code), size: m ? 220 : 200),
           ),
         ),
-        const SizedBox(height: 20),
+        const Gap(Space.xl),
         if (!sync.hosting)
           Padding(
             padding: const EdgeInsets.only(bottom: Space.md),
@@ -960,17 +960,17 @@ class _AddDeviceViewState extends State<AddDeviceView> {
               onChanged: (u) => setState(() => _url = u),
             ),
         ]),
-        const SizedBox(height: 6),
+        const Gap(Space.xs),
         CopyableText(url, textKey: const ValueKey('pair-url')),
-        const SizedBox(height: 12),
+        const Gap(Space.md),
         Text('Token', style: ts(context.type.uiSmall, c.textSecondary)),
-        const SizedBox(height: 6),
+        const Gap(Space.xs),
         CopyableText(token, textKey: const ValueKey('pair-token')),
-        const SizedBox(height: 12),
+        const Gap(Space.md),
         Text('Pairing code (address and token)', style: ts(context.type.uiSmall, c.textSecondary)),
-        const SizedBox(height: 6),
+        const Gap(Space.xs),
         CopyableText(code, textKey: const ValueKey('pair-code')),
-        const SizedBox(height: 20),
+        const Gap(Space.xl),
         Row(children: [
           PrimaryButton(key: const ValueKey('pair-done'), label: 'Done', onTap: () => Navigator.of(context).maybePop()),
         ]),

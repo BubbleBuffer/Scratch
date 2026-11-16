@@ -352,7 +352,7 @@ class _ProjectRow extends StatelessWidget {
             color: selected ? c.bgHover : null,
             borderRadius: Radii.field,
             border: Border.all(
-              color: selected ? c.borderStrong : const Color(0x00000000),
+              color: selected ? c.borderStrong : kTransparent,
             ),
           ),
           child: Row(
@@ -422,7 +422,7 @@ class _RunnerRow extends StatelessWidget {
             color: selected ? c.bgHover : null,
             borderRadius: Radii.field,
             border: Border.all(
-              color: selected ? c.borderStrong : const Color(0x00000000),
+              color: selected ? c.borderStrong : kTransparent,
             ),
           ),
           child: Row(
@@ -591,7 +591,7 @@ class _FocusRowState extends State<_FocusRow> {
         decoration: BoxDecoration(
           borderRadius: Radii.field,
           border: Border.all(
-            color: _highlight ? c.focus : const Color(0x00000000),
+            color: _highlight ? c.focus : kTransparent,
             width: Stroke.bold,
           ),
         ),

@@ -1,7 +1,7 @@
 // The calendar view: a month grid of the rows by a date property. Entries
 // spanning days are bars across the week; drag one to another day to
 // reschedule it; "+" on a day adds a row on that date. Only the shown
-// weeks are queried. On mobile, a compact month with dots and the chosen
+// weeks are queried. On a compact screen, a compact month with dots and the chosen
 // day's rows below it.
 
 import 'dart:math' as math;
@@ -166,11 +166,12 @@ class _CalendarViewState extends State<CalendarView> {
     final last = first.add(_weeks * 7 - 1);
     final (from, to) = queryRangeOf(first, last);
     a.store.showRange(key, from, to);
-    final m = context.touch;
+    // A compact screen gets the compact month with the chosen day's list.
+    final m = context.sizeClass.isCompact;
     final head = Padding(
-      padding: EdgeInsets.fromLTRB(a.gutter + (m ? 8 : 8), Space.xxs, a.gutter, Space.xxs),
-      child: SizedBox(
-        height: m ? 40 : 32,
+      padding: EdgeInsets.fromLTRB(a.gutter + Space.sm, Space.xxs, a.gutter, Space.xxs),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: (context.touch ? ControlSize.xl : ControlSize.md).height),
         child: Row(
           children: [
             Text(
@@ -186,8 +187,8 @@ class _CalendarViewState extends State<CalendarView> {
             IconBtn(
               Ico.chevronLeft,
               key: const ValueKey('calendar-prev'),
-              size: m ? ControlSize.lg : ControlSize.xs,
-              glyph: m ? IconSize.lg : IconSize.sm,
+              size: context.touch ? ControlSize.lg : ControlSize.xs,
+              glyph: context.touch ? IconSize.lg : IconSize.sm,
               color: c.iconSecondary,
               semanticLabel: 'Previous month',
               onTap: () => _shiftMonth(-1),
@@ -207,8 +208,8 @@ class _CalendarViewState extends State<CalendarView> {
             IconBtn(
               Ico.chevronRight,
               key: const ValueKey('calendar-next'),
-              size: m ? ControlSize.lg : ControlSize.xs,
-              glyph: m ? IconSize.lg : IconSize.sm,
+              size: context.touch ? ControlSize.lg : ControlSize.xs,
+              glyph: context.touch ? IconSize.lg : IconSize.sm,
               color: c.iconSecondary,
               semanticLabel: 'Next month',
               onTap: () => _shiftMonth(1),
@@ -241,7 +242,7 @@ class _CalendarViewState extends State<CalendarView> {
     final grid = LayoutBuilder(
       builder: (context, box) {
         final w = box.maxWidth - 2 * a.gutter + (a.inline ? a.gutter : 0);
-        final cw = (w - 1) / 7; // the grid's left border
+        final cw = (w - Stroke.hair) / DateTime.daysPerWeek; // the grid's left border
         return Padding(
           padding: EdgeInsets.only(
             left: a.gutter,
@@ -252,7 +253,7 @@ class _CalendarViewState extends State<CalendarView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                height: 26,
+                height: DbCalendar.weekdays,
                 child: Row(
                   children: [
                     for (final n in names)
@@ -294,12 +295,12 @@ class _CalendarViewState extends State<CalendarView> {
     );
     if (a.inline) return grid;
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: const EdgeInsets.only(bottom: DbCalendar.endPadding),
       child: grid,
     );
   }
 
-  static const _rowH = 124.0, _barH = 22.0, _barGap = 3.0, _top = 30.0;
+  static const _rowH = DbCalendar.row, _barH = DbCalendar.bar, _barGap = DbCalendar.barGap, _top = DbCalendar.barTop;
 
   Widget _week(
     BuildContext context,
@@ -324,7 +325,7 @@ class _CalendarViewState extends State<CalendarView> {
           );
         });
     // Lanes: each bar takes the first lane free over its days.
-    final maxLanes = ((_rowH - _top - 4) / (_barH + _barGap)).floor();
+    final maxLanes = ((_rowH - _top - DbCalendar.barInset) / (_barH + _barGap)).floor();
     final lanes = <List<bool>>[];
     final placed = <(RangeEntry, int, int, int)>[]; // entry, lane, col, span
     final hidden = List.filled(7, 0);
@@ -371,9 +372,9 @@ class _CalendarViewState extends State<CalendarView> {
           ),
           for (final (e, lane, col, span) in placed)
             Positioned(
-              left: col * cw + 4,
+              left: col * cw + DbCalendar.barInset,
               top: _top + lane * (_barH + _barGap),
-              width: span * cw - 8,
+              width: span * cw - 2 * DbCalendar.barInset,
               height: _barH,
               child: _EntryBar(
                 state: this,
@@ -402,7 +403,7 @@ class _CalendarViewState extends State<CalendarView> {
           for (final e in list)
             MenuItem(
               label: displayTitle(e.page.title, firstLine: untitledLine(ctx, e.page)),
-              leading: PageIcon(icon: e.page.icon, size: 18),
+              leading: PageIcon(icon: e.page.icon, size: IconSize.md.px),
               onTap: () {
                 Navigator.of(ctx).pop();
                 a.ctl.openRow(context, e.page.id, title: e.page.title);
@@ -426,13 +427,13 @@ class _CalendarViewState extends State<CalendarView> {
     final ofDay = _entries(sel, sel);
     return LayoutBuilder(
       builder: (context, box) {
-        final cw = (box.maxWidth - 2 * a.gutter) / 7;
+        final cw = (box.maxWidth - 2 * a.gutter) / DateTime.daysPerWeek;
         final grid = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              height: 30,
+              height: DbCalendar.compactWeekdays,
               child: Row(
                 children: [
                   for (final n in names)
@@ -448,10 +449,10 @@ class _CalendarViewState extends State<CalendarView> {
                 ],
               ),
             ),
-            Container(height: 2, color: c.calendarLine),
+            Container(height: Stroke.bold, color: c.calendarLine),
             for (var wk = 0; wk < _weeks; wk++)
               Container(
-                height: 60,
+                height: DbCalendar.compactWeek,
                 decoration: BoxDecoration(
                   border: Border(bottom: BorderSide(color: c.calendarLine)),
                 ),
@@ -480,8 +481,8 @@ class _CalendarViewState extends State<CalendarView> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Container(
-                                      width: 30,
-                                      height: 30,
+                                      width: DbCalendar.compactDay,
+                                      height: DbCalendar.compactDay,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: d == today
@@ -507,7 +508,7 @@ class _CalendarViewState extends State<CalendarView> {
                                     ),
                                     const Gap(Space.xxs),
                                     SizedBox(
-                                      height: 5,
+                                      height: DbCalendar.dotRow,
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
@@ -518,8 +519,8 @@ class _CalendarViewState extends State<CalendarView> {
                                             k++
                                           )
                                             Container(
-                                              width: 4,
-                                              height: 4,
+                                              width: DbCalendar.dot,
+                                              height: DbCalendar.dot,
                                               margin:
                                                   const EdgeInsets.symmetric(
                                                     horizontal: Space.hair,
@@ -556,7 +557,7 @@ class _CalendarViewState extends State<CalendarView> {
                 data: e,
                 onDragStarted: () => _grab = 0,
                 feedback: SizedBox(
-                  width: 220,
+                  width: DbCalendar.dragged,
                   child: _EntryChip(
                     entry: e,
                     color: eventPillFill(c, a.store.resolvedSpaceColor),
@@ -571,11 +572,11 @@ class _CalendarViewState extends State<CalendarView> {
                       a.ctl.openRow(context, e.page.id, title: e.page.title),
                   radius: Radii.md,
                   padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
-                  child: SizedBox(
-                    height: 44,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: ControlSize.xl.height),
                     child: Row(
                       children: [
-                        PageIcon(icon: e.page.icon, size: 20),
+                        PageIcon(icon: e.page.icon, size: IconSize.lg.px),
                         const Gap(Space.md),
                         Expanded(
                           child: Text(
@@ -595,8 +596,8 @@ class _CalendarViewState extends State<CalendarView> {
               onTap: () => _addOn(sel),
               radius: Radii.md,
               padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
-              child: SizedBox(
-                height: 44,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: ControlSize.xl.height),
                 child: Row(
                   children: [
                     Icon20(Ico.plus, size: IconSize.md, color: c.iconTertiary),
@@ -614,7 +615,7 @@ class _CalendarViewState extends State<CalendarView> {
         );
         if (a.inline) return padded;
         return SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 80),
+          padding: const EdgeInsets.only(bottom: DbCalendar.endPadding),
           child: padded,
         );
       },
@@ -674,12 +675,11 @@ class _DayCellState extends State<_DayCell> {
           child: Stack(
             children: [
               Positioned(
-                right: 8,
-                top: 4,
+                right: Space.sm,
+                top: Space.xxs,
                 child: widget.today
                     ? Container(
-                        height: 24,
-                        constraints: const BoxConstraints(minWidth: 24),
+                        constraints: const BoxConstraints(minWidth: DbCalendar.dayLabel, minHeight: DbCalendar.dayLabel),
                         padding: const EdgeInsets.symmetric(horizontal: Space.xs),
                         decoration: BoxDecoration(
                           color: c.textPrimary,
@@ -692,8 +692,8 @@ class _DayCellState extends State<_DayCell> {
                           ),
                         ),
                       )
-                    : SizedBox(
-                        height: 24,
+                    : ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: DbCalendar.dayLabel),
                         child: Center(
                           child: Text(
                             label,
@@ -704,8 +704,8 @@ class _DayCellState extends State<_DayCell> {
               ),
               if (_hover)
                 Positioned(
-                  left: 4,
-                  top: 4,
+                  left: Space.xxs,
+                  top: Space.xxs,
                   child: IconBtn(
                     Ico.plus,
                     key: ValueKey('day-add-$d'),
@@ -718,8 +718,8 @@ class _DayCellState extends State<_DayCell> {
                 ),
               if (widget.hidden > 0)
                 Positioned(
-                  left: 6,
-                  bottom: 4,
+                  left: Space.xs,
+                  bottom: Space.xxs,
                   child: Builder(
                     builder: (b) => Hover(
                       onTap: () => widget.state._dayList(b, d),
@@ -770,8 +770,8 @@ class _EntryBar extends StatelessWidget {
       child: Draggable<RangeEntry>(
         data: entry,
         feedback: SizedBox(
-          width: math.min(cellWidth - 8, 220),
-          height: 22,
+          width: math.min(cellWidth - 2 * DbCalendar.barInset, DbCalendar.dragged),
+          height: DbCalendar.bar,
           child: _EntryChip(entry: entry, color: color, lifted: true),
         ),
         childWhenDragging: Opacity(opacity: Alpha.wash, child: chip),
@@ -800,7 +800,7 @@ class _EntryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      height: 22,
+      height: DbCalendar.bar,
       padding: const EdgeInsets.symmetric(horizontal: Space.xs),
       decoration: BoxDecoration(
         color: color,
@@ -812,7 +812,7 @@ class _EntryChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          PageIcon(icon: entry.page.icon, size: 14, color: c.iconSecondary),
+          PageIcon(icon: entry.page.icon, size: IconSize.xs.px, color: c.iconSecondary),
           const Gap(Space.xxs),
           Expanded(
             child: Text(

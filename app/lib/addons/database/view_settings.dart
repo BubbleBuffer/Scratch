@@ -1,7 +1,7 @@
 // View settings (the sliders button of the toolbar): the view's name, the
 // layout picker, property visibility and order, filter, sort, group, the
 // layout's own options, where pages open, and duplicate or delete. A
-// popover on desktop, a sheet on mobile. Also the layout picker used to add
+// popover, or a sheet on a compact screen. Also the layout picker used to add
 // a view, and the active tab's menu.
 
 import 'package:flutter/widgets.dart';
@@ -19,6 +19,7 @@ import 'filter_editor.dart';
 import 'property_menu.dart';
 import '../../ui/database/values.dart';
 import '../../ui/database/widgets.dart';
+import '../../ui/database/db_tokens.dart';
 
 /// The icon of layout [k].
 DbIco layoutIcon(ViewKind k) => viewRegistry.of(k)?.icon ?? switch (k) {
@@ -94,13 +95,13 @@ class LayoutGrid extends StatelessWidget {
             onTap: () => onPick(k),
             radius: Radii.md,
             child: Container(
-              height: 62,
+              constraints: const BoxConstraints(minHeight: Db.layoutTile),
               decoration: BoxDecoration(
                 border: Border.all(color: sel ? c.accent : c.border, width: sel ? Stroke.regular : Stroke.hair),
                 borderRadius: BorderRadius.circular(Radii.md),
               ),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                DbIcon(layoutIcon(k), size: 20, color: fg),
+                DbIcon(layoutIcon(k), size: IconSize.lg.px, color: fg),
                 const Gap(Space.xs),
                 Text(viewLabel(k), style: ts(context.type.uiSmall, fg, weight: sel ? Weight.semibold : Weight.regular)),
               ]),
@@ -153,7 +154,7 @@ Future<void> showViewMenu(BuildContext anchor, DbController ctl, ViewDef v) {
         child: MenuField(
           key: const ValueKey('view-name'),
           controller: name,
-          leading: DbIcon(layoutIcon(v.kind), size: 16, color: ctx.colors.iconSecondary),
+          leading: DbIcon(layoutIcon(v.kind), size: IconSize.sm.px, color: ctx.colors.iconSecondary),
           onSubmitted: (_) => Navigator.of(ctx).pop(),
         ),
       ),
@@ -303,7 +304,7 @@ class _ViewSettingsState extends State<ViewSettings> {
         child: MenuField(
           key: const ValueKey('settings-name'),
           controller: _name,
-          leading: DbIcon(layoutIcon(v.kind), size: 16, color: context.colors.iconSecondary),
+          leading: DbIcon(layoutIcon(v.kind), size: IconSize.sm.px, color: context.colors.iconSecondary),
         ),
       ),
       dbItem(context, 'Layout', layoutIcon(v.kind),
@@ -341,8 +342,9 @@ class _ViewSettingsState extends State<ViewSettings> {
           key: const ValueKey('settings-agenda'),
           trailing: menuValue(context, _agendaLoaded ? agendaSettingsLabel(store.schema, _agenda) : '…'),
           onTap: () => setState(() => page = _Page.agenda)),
-      // Desktop opens every row as a sheet; the setting stays in the config.
-      if (context.touch)
+      // A wider screen opens every row as a sheet; the setting stays in the
+      // config.
+      if (context.sizeClass.isCompact)
         dbItem(context, 'Open pages in', DbIco.peekSide,
           key: const ValueKey('settings-open-in'),
           trailing: menuValue(context, _openLabel(v.cfg.openIn(v.kind))),
@@ -422,7 +424,7 @@ class _ViewSettingsState extends State<ViewSettings> {
       row(null, true),
       if (shown.isNotEmpty)
         ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 320),
+          constraints: const BoxConstraints(maxHeight: Db.settingsList),
           child: ReorderableList(
             shrinkWrap: true,
             itemCount: shown.length,
@@ -483,7 +485,7 @@ class _ViewSettingsState extends State<ViewSettings> {
           dbItem(context, g.group.label.isEmpty ? 'No ${store.groupDef!.name}' : g.group.label, null,
               key: ValueKey('group-vis-${g.key}'),
               trailing: DbIcon(cfg.hiddenGroups.contains(g.key) ? DbIco.eyeOff : DbIco.eye,
-                  size: 16, color: cfg.hiddenGroups.contains(g.key) ? c.iconTertiary : c.iconSecondary),
+                  size: IconSize.sm.px, color: cfg.hiddenGroups.contains(g.key) ? c.iconTertiary : c.iconSecondary),
               onTap: () => store.updateConfig(v, (c) {
                     final h = c.hiddenGroups;
                     h.contains(g.key) ? h.remove(g.key) : h.add(g.key);

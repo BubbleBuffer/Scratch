@@ -57,7 +57,7 @@ class Breadcrumbs extends StatelessWidget {
       final style = ts(ty.ui, c.textPrimary, weight: onTap == null ? Weight.bold : Weight.regular);
       final glyph = database && (icon == null || icon.isEmpty)
           ? patch == null
-                ? DbIcon(DbIco.database, size: 16, color: c.iconSecondary)
+                ? DbIcon(DbIco.database, size: IconSize.sm.px, color: c.iconSecondary)
                 : Container(
                     width: 22,
                     height: 22,
@@ -66,7 +66,7 @@ class Breadcrumbs extends StatelessWidget {
                       color: patch.fill,
                       borderRadius: Radii.ctl,
                     ),
-                    child: DbIcon(DbIco.database, size: 16, color: patch.ink),
+                    child: DbIcon(DbIco.database, size: IconSize.sm.px, color: patch.ink),
                   )
           : SpaceIconTile(
               icon: icon,

@@ -159,7 +159,7 @@ class _RollupSettingsState extends State<_RollupSettings> {
     final rel = _relation;
     final fn = d.cfg.rollupFunction;
     final fnLabel = rollupFunctions.firstWhere((f) => f.$1 == fn, orElse: () => rollupFunctions.first).$2;
-    Widget icon(DbIco i) => DbIcon(i, size: context.touch ? 22 : 20, color: c.iconPrimary);
+    Widget icon(DbIco i) => DbIcon(i, size: context.metrics.icon.px, color: c.iconPrimary);
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       settingsRow(context, 'Relation',
           key: const ValueKey('rollup-relation'),

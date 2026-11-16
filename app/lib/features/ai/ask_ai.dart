@@ -125,7 +125,7 @@ class _AskAiBoxState extends State<AskAiBox> {
       padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.xl, Space.lg),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          const AiMark(size: 18),
+          AiMark(size: IconSize.md.px),
           const Gap(Space.sm),
           Text('Ask AI', style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display)),
         ]),

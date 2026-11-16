@@ -259,7 +259,7 @@ class _Topline extends StatelessWidget {
     final text = Text(_scopeCopy(sync, k), style: ts(context.type.ui, c.textSecondary, weight: Weight.regular));
     final actions = Row(mainAxisSize: MainAxisSize.min, children: [
       for (var i = 0; i < acts.length; i++) ...[
-        if (i > 0) const SizedBox(width: 16),
+        if (i > 0) const Gap(Space.lg),
         acts[i],
       ],
     ]);
@@ -504,7 +504,7 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
       clipBehavior: Clip.antiAlias,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (var i = 0; i < rows.length; i++) ...[
-          if (i > 0) Container(height: 1, color: c.borderSubtle),
+          if (i > 0) Container(height: Stroke.hair, color: c.borderSubtle),
           rows[i],
         ],
       ]),
@@ -530,7 +530,7 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
             sub: summary,
             trailing: [
               Text(when, style: sHint(context)),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               SButton('Review', onTap: open),
             ],
           ),

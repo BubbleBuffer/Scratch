@@ -485,7 +485,7 @@ class _ChoiceRowState extends State<_ChoiceRow> {
             decoration: BoxDecoration(
               borderRadius: Radii.field,
               border: Border.all(
-                color: _highlight ? c.focus : const Color(0x00000000),
+                color: _highlight ? c.focus : kTransparent,
                 width: Stroke.bold,
               ),
             ),

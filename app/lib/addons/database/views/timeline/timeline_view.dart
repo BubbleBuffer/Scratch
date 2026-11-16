@@ -217,7 +217,7 @@ class _TimelineViewState extends State<TimelineView> {
           return s != 0 ? s : x.page.title.compareTo(y.page.title);
         });
     final m = context.touch;
-    const rowH = 36.0;
+    const rowH = DbTimeline.row;
 
     return LayoutBuilder(
       builder: (context, box) {
@@ -235,13 +235,13 @@ class _TimelineViewState extends State<TimelineView> {
 
         final toolbar = Padding(
           padding: EdgeInsets.fromLTRB(
-            a.inline ? a.gutter : a.gutter,
+            a.gutter,
             Space.xxs,
             a.inline ? Space.sm : a.gutter,
             0,
           ),
-          child: SizedBox(
-            height: m ? 40 : 30,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: (m ? ControlSize.xl : ControlSize.md).height),
             child: Row(
               children: [
                 Text(
@@ -256,8 +256,8 @@ class _TimelineViewState extends State<TimelineView> {
                     onTap: () => _pickZoom(b, globalRectOf(b), a),
                     radius: Radii.md,
                     padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-                    child: SizedBox(
-                      height: 24,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: ControlSize.xs.height),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -323,7 +323,7 @@ class _TimelineViewState extends State<TimelineView> {
           );
         }
 
-        final lanesH = math.max(entries.length + 1, a.inline ? 4 : 0) * rowH;
+        final lanesH = math.max(entries.length + 1, a.inline ? DbTimeline.inlineLanes : 0) * rowH;
         final Widget lanes = a.inline
             ? SizedBox(
                 height: lanesH,
@@ -337,7 +337,7 @@ class _TimelineViewState extends State<TimelineView> {
                 key: const ValueKey('timeline-rows'),
                 controller: _v,
                 itemExtent: rowH,
-                padding: const EdgeInsets.only(bottom: 80),
+                padding: const EdgeInsets.only(bottom: DbTimeline.endPadding),
                 itemCount: entries.length + 1,
                 itemBuilder: (context, i) => lane(i),
               );
@@ -349,7 +349,7 @@ class _TimelineViewState extends State<TimelineView> {
             mainAxisSize: a.inline ? MainAxisSize.min : MainAxisSize.max,
             children: [
               SizedBox(
-                height: 48,
+                height: DbTimeline.header,
                 child: CustomPaint(
                   painter: _HeaderPainter(
                     origin: _origin,
@@ -421,13 +421,13 @@ class _TimelineViewState extends State<TimelineView> {
     final s = entryStart(e), f = entryEnd(e);
     final (ds, de) = _drag[e.page.id] ?? (0.0, 0.0);
     final left = (s - _origin) * _dw + ds + 2;
-    final width = math.max(_dw * 0.5, (f - s + 1) * _dw + de - ds - 4);
+    final width = math.max(_dw * DbTimeline.minBarShare, (f - s + 1) * _dw + de - ds - DbTimeline.barInset);
     final title = displayTitle(e.page.title, firstLine: untitledLine(context, e.page));
     final narrow = width < 120;
     final label = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        PageIcon(icon: e.page.icon, size: 16, color: c.iconSecondary),
+        PageIcon(icon: e.page.icon, size: IconSize.sm.px, color: c.iconSecondary),
         const Gap(Space.xs),
         Flexible(
           child: Text(
@@ -445,7 +445,7 @@ class _TimelineViewState extends State<TimelineView> {
       right: start ? null : 0,
       top: 0,
       bottom: 0,
-      width: 8,
+      width: DbTimeline.handle,
       child: MouseRegion(
         cursor: SystemMouseCursors.resizeLeftRight,
         child: GestureDetector(
@@ -464,9 +464,9 @@ class _TimelineViewState extends State<TimelineView> {
 
     return Positioned(
       left: left,
-      top: (rowH - 26) / 2,
-      height: 26,
-      width: width + (narrow ? 400 : 0),
+      top: (rowH - DbTimeline.bar) / 2,
+      height: DbTimeline.bar,
+      width: width + (narrow ? DbTimeline.narrowLabel : 0),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -501,17 +501,17 @@ class _TimelineViewState extends State<TimelineView> {
           ),
           if (narrow)
             Positioned(
-              left: width + 8,
+              left: width + Space.sm,
               top: 0,
               bottom: 0,
               child: IgnorePointer(child: Center(child: label)),
             ),
           handle(true),
           Positioned(
-            left: width - 8,
+            left: width - DbTimeline.handle,
             top: 0,
             bottom: 0,
-            width: 8,
+            width: DbTimeline.handle,
             child: Stack(children: [handle(false)]),
           ),
         ],
@@ -560,19 +560,9 @@ class _HeaderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final first = (offset / dw).floor() - 1;
     final last = ((offset + viewport) / dw).ceil() + 1;
-    final small = TextStyle(
-      fontFamily: sansFamily,
-      fontSize: 12,
-      height: 1.3,
-      color: colors.textTertiary,
-    );
-    final month = TextStyle(
-      fontFamily: sansFamily,
-      fontSize: 14,
-      height: 1.3,
-      fontWeight: FontWeight.w600,
-      color: colors.textPrimary,
-    );
+    // The header is drawn at fixed offsets, at the pointer sizes.
+    final small = ts(TypeScale.pointer.uiSmall, colors.textTertiary, weight: Weight.regular);
+    final month = ts(TypeScale.pointer.ui, colors.textPrimary, weight: Weight.semibold);
     final step = dw >= 30 ? 1 : 7;
     for (var i = first; i <= last; i++) {
       final d = origin.add(i);
@@ -590,7 +580,7 @@ class _HeaderPainter extends CustomPainter {
           canvas,
           '${d.day}',
           Offset(x + dw / 2, 26),
-          small.copyWith(color: colors.bgPrimary, fontWeight: FontWeight.w600),
+          ts(TypeScale.pointer.uiSmall, colors.bgPrimary, weight: Weight.semibold),
           center: true,
         );
       } else if (step == 1 || d.weekday0Sunday() == 1) {
@@ -646,7 +636,7 @@ class _GridPainter extends CustomPainter {
       Offset(t, size.height),
       Paint()
         ..color = colors.accentText
-        ..strokeWidth = 1,
+        ..strokeWidth = Stroke.hair,
     );
     canvas.drawCircle(Offset(t, 0), 3, Paint()..color = colors.accentText);
     canvas.drawLine(

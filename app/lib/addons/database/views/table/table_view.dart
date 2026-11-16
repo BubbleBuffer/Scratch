@@ -93,11 +93,11 @@ class _TableViewState extends State<TableView> {
     final v = a.view;
     final cfg = v.cfg;
     final w = cfg.widths;
-    final m = context.touch;
+    final m = context.sizeClass.isCompact;
     double width(String key, bool title) =>
         _drag[key] ??
         w[key] ??
-        (title ? (m ? 160.0 : Db.titleColumn) : (m ? 140.0 : Db.defaultColumn));
+        (title ? (m ? Db.titleColumnCompact : Db.titleColumn) : (m ? Db.defaultColumnCompact : Db.defaultColumn));
     bool wrap(String key) => cfg.wrap || cfg.wrapped.contains(key);
     return [
       _Col(
@@ -126,7 +126,7 @@ class _TableViewState extends State<TableView> {
     final wrapAny = cols.any((c) => c.wrap);
     final g = a.gutter;
     final tableW =
-        cols.fold<double>(0, (s, c) => s + c.width) + (context.touch ? 0 : 34);
+        cols.fold<double>(0, (s, c) => s + c.width) + (context.touch ? 0 : Db.addColumn);
     final src = a.store.main;
     final n = math.max(0, src.total);
 
@@ -155,7 +155,7 @@ class _TableViewState extends State<TableView> {
           key: const ValueKey('table-new'),
           label: 'New page',
           onTap: _addRow,
-          height: context.touch ? 44 : 33,
+          size: context.touch ? ControlSize.xl : ControlSize.md,
         ),
       ),
     );
@@ -210,7 +210,7 @@ class _TableViewState extends State<TableView> {
                     padding: EdgeInsets.only(
                       left: g,
                       right: contentW - g - tableW,
-                      bottom: 120,
+                      bottom: Db.endPadding,
                     ),
                     itemCount: n + 2,
                     itemExtentBuilder: wrapAny
@@ -218,8 +218,8 @@ class _TableViewState extends State<TableView> {
                         : (i, _) => i < n
                               ? _rowH
                               : (i == n
-                                    ? (context.touch ? 45.0 : 34.0)
-                                    : 36.0),
+                                    ? (context.touch ? Db.addRowTouch : Db.addRow)
+                                    : Db.calcRow),
                     itemBuilder: (context, i) {
                       if (i < n) return row(i);
                       if (i == n) return newRow;
@@ -281,7 +281,7 @@ class _Header extends StatelessWidget {
     final c = context.colors;
     final a = state.a;
     final vlines = a.view.cfg.verticalLines;
-    final h = context.touch ? 40.0 : Db.headerHeight;
+    final h = context.touch ? Db.headerHeightTouch : Db.headerHeight;
     Widget cell(int i) => _HeaderCell(
       state: state,
       col: cols[i],
@@ -301,7 +301,7 @@ class _Header extends StatelessWidget {
               onTap: () => a.ctl.addProperty(b),
               radius: 0,
               child: SizedBox(
-                width: 34,
+                width: Db.addColumn,
                 height: h,
                 child: Center(
                   child: Icon20(Ico.plus, size: IconSize.sm, color: c.textSecondary),
@@ -379,7 +379,7 @@ class _HeaderCellState extends State<_HeaderCell> {
                     children: [
                       DbIcon(
                         propIcon(col.def),
-                        size: m ? 18 : 16,
+                        size: (m ? IconSize.md : IconSize.sm).px,
                         color: c.textSecondary,
                       ),
                       const Gap(Space.xs),
@@ -399,10 +399,10 @@ class _HeaderCellState extends State<_HeaderCell> {
           ),
           if (!m)
             Positioned(
-              right: -3,
+              right: -Db.resizeGripReach,
               top: 0,
               bottom: 0,
-              width: 7,
+              width: Db.resizeGrip,
               child: MouseRegion(
                 cursor: SystemMouseCursors.resizeColumn,
                 child: GestureDetector(
@@ -603,7 +603,7 @@ class _TableRowState extends State<_TableRow> {
                   child: RowTitle(
                     row: r,
                     style: style,
-                    iconSize: m ? 20 : 18,
+                    iconSize: (m ? IconSize.lg : IconSize.md).px,
                     showIcon: a.view.cfg.showIcon,
                     wrap: col.wrap,
                   ),
@@ -665,7 +665,7 @@ class _CalcRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 36,
+      height: Db.calcRow,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [for (final col in cols) _CalcCell(state: state, col: col)],
@@ -756,7 +756,7 @@ class _CalcCellState extends State<_CalcCell> {
       onExit: (_) => setState(() => _hover = false),
       child: SizedBox(
         width: col.width,
-        height: 36,
+        height: Db.calcRow,
         child: Builder(
           builder: (b) => Hover(
             key: ValueKey('calc-cell-${col.def?.name ?? 'Name'}'),
@@ -769,7 +769,7 @@ class _CalcCellState extends State<_CalcCell> {
                 if (calc != null) ...[
                   Text(
                     calc.short.toUpperCase(),
-                    style: ts(context.type.caption, c.textTertiary, weight: Weight.medium).copyWith(letterSpacing: 0.6),
+                    style: eyebrowStyle(context.type.caption, c.textTertiary, weight: Weight.medium),
                   ),
                   const Gap(Space.xs),
                   Flexible(

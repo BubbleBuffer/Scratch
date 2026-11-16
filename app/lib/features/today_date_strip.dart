@@ -472,7 +472,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
               color: c.textSecondary,
             ),
           const Gap(Space.md),
-          Container(height: 1, color: c.border),
+          Container(height: Stroke.hair, color: c.border),
         ],
       ),
     );

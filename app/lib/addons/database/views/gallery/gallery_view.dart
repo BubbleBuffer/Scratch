@@ -14,6 +14,7 @@ import '../../../../registry/view_registry.dart';
 import '../../../../ui/ui.dart';
 import '../card.dart';
 import '../common.dart';
+import '../../../../ui/database/db_tokens.dart';
 
 String _previewLabel(String p) => switch (p) { 'cover' => 'Page cover', 'content' => 'Page content', _ => 'None' };
 String _sizeLabel(CardSize s) => '${s.name[0].toUpperCase()}${s.name.substring(1)}';
@@ -104,17 +105,17 @@ class _GalleryViewState extends State<GalleryView> {
   @override
   Widget build(BuildContext context) {
     final cfg = a.view.cfg;
-    final m = context.touch;
+    final m = context.sizeClass.isCompact;
     final minW = switch (cfg.cardSize) {
-      CardSize.small => m ? 150.0 : 180.0,
-      CardSize.medium => m ? 300.0 : 260.0,
-      CardSize.large => m ? 320.0 : 340.0,
+      CardSize.small => m ? DbGallery.smallCompact : DbGallery.small,
+      CardSize.medium => m ? DbGallery.mediumCompact : DbGallery.medium,
+      CardSize.large => m ? DbGallery.largeCompact : DbGallery.large,
     };
     final preview = cfg.previewFor(ViewKind.gallery);
     final coverH = preview == 'none'
         ? null
-        : switch (cfg.cardSize) { CardSize.small => 110.0, CardSize.medium => 150.0, CardSize.large => 220.0 };
-    const gap = 16.0;
+        : switch (cfg.cardSize) { CardSize.small => DbGallery.smallCover, CardSize.medium => DbGallery.mediumCover, CardSize.large => DbGallery.largeCover };
+    const gap = Space.lg;
     final src = a.store.main;
     final total = math.max(0, src.total);
     final n = a.inline ? math.min(total, _limit) : total;
@@ -130,7 +131,7 @@ class _GalleryViewState extends State<GalleryView> {
             child: IntrinsicHeight(
               child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 for (var k = 0; k < perRow; k++) ...[
-                  if (k > 0) const SizedBox(width: gap),
+                  if (k > 0) const Gap(gap),
                   SizedBox(width: cardW, child: _card(ri * perRow + k, n, coverH, preview)),
                 ],
               ]),
@@ -139,7 +140,7 @@ class _GalleryViewState extends State<GalleryView> {
 
       final add = SizedBox(
         width: cardW,
-        child: AddRowButton(key: const ValueKey('gallery-new'), label: 'New page', onTap: _add, height: 34),
+        child: AddRowButton(key: const ValueKey('gallery-new'), label: 'New page', onTap: _add, size: ControlSize.lg),
       );
 
       if (a.inline) {
@@ -155,7 +156,7 @@ class _GalleryViewState extends State<GalleryView> {
       return ListView.builder(
         key: const ValueKey('gallery-rows'),
         controller: _v,
-        padding: EdgeInsets.fromLTRB(a.gutter, Space.xxs, a.gutter, 120),
+        padding: EdgeInsets.fromLTRB(a.gutter, Space.xxs, a.gutter, Db.endPadding),
         itemCount: rows + 1,
         itemBuilder: (context, i) => i < rows ? gridRow(i) : Align(alignment: Alignment.centerLeft, child: add),
       );
@@ -165,7 +166,7 @@ class _GalleryViewState extends State<GalleryView> {
   Widget _card(int i, int n, double? coverH, String preview) {
     if (i >= n) return const SizedBox.shrink();
     final r = a.store.main.rowAt(i);
-    if (r == null) return SizedBox(height: (coverH ?? 0) + 60);
+    if (r == null) return SizedBox(height: (coverH ?? 0) + DbGallery.loadingCard);
     return Builder(builder: (cell) {
       editTitleWhenBuilt(cell, a.ctl, r);
       return RowCard(key: ValueKey('gc-${r.id}'), args: a, row: r, coverHeight: coverH, contentPreview: preview == 'content');

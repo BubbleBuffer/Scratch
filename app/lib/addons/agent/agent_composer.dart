@@ -204,7 +204,7 @@ class _AgentComposerState extends State<AgentComposer> {
     final live = PageStackScope.maybeOf(context)?.firstLines[it.id];
     final line = live != null && live.trim().isNotEmpty ? live : stored;
     return kit.MentionRowLook(
-      leading: PageIcon(icon: it.icon, size: m ? 22 : 20),
+      leading: PageIcon(icon: it.icon, size: (m ? IconSize.xl : IconSize.lg).px),
       label: displayTitle(it.label, firstLine: line),
       firstLine: it.label.trim().isEmpty && line.trim().isNotEmpty,
     );

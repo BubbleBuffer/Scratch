@@ -188,7 +188,7 @@ class _BlockView extends StatelessWidget {
       'code' => CodeBox(b.text),
       'divider' => Padding(
         padding: const EdgeInsets.symmetric(vertical: Space.xs),
-        child: Container(height: 1, color: c.divider),
+        child: Container(height: Stroke.hair, color: c.divider),
       ),
       'quote' => Container(
         padding: const EdgeInsets.only(left: Space.lg),

@@ -15,3 +15,4 @@ export 'tokens/board_tokens.dart';
 export 'tokens/today_tokens.dart';
 export 'tokens/inline_tokens.dart';
 export 'tokens/editor_tokens.dart';
+export 'tokens/type_tokens.dart';

@@ -192,7 +192,7 @@ class _McpServersSettingsState extends State<McpServersSettings> {
             value: enabled,
             onChanged: (on) => _mcp.setEnabled(name, on),
           ),
-          const SizedBox(width: 4),
+          const Gap(Space.xxs),
           SIconButton(
             Sx.pencil,
             key: ValueKey('agent-mcp-edit-$name'),

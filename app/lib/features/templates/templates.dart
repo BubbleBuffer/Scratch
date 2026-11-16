@@ -159,7 +159,7 @@ class _TemplateTopState extends State<_TemplateTop> {
       ),
       child: Row(
         children: [
-          DbIcon(DbIco.template, size: 16, color: c.iconSecondary),
+          DbIcon(DbIco.template, size: IconSize.sm.px, color: c.iconSecondary),
           const Gap(Space.sm),
           Expanded(
             child: Text(

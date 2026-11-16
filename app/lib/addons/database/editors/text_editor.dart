@@ -10,6 +10,7 @@ import '../../../registry/property_registry.dart';
 import '../../../ui/ui.dart';
 import '../../../ui/database/values.dart';
 import '../../../ui/database/widgets.dart';
+import '../../../ui/database/db_tokens.dart';
 
 /// Opens the text editor for [a]. [parse] turns the text into a value
 /// (null: keep the old one); [initial] is the text to start with.
@@ -22,7 +23,7 @@ Future<void> editAsText(EditArgs a, {required String initial, required PropValue
       initial: initial,
       multiline: multiline,
       onDone: (s) => result = s,
-      placeholder: a.context.touch ? a.def.name : '',
+      placeholder: a.context.sizeClass.isCompact ? a.def.name : '',
     ),
   );
   final s = result;
@@ -81,14 +82,15 @@ class _TextBoxState extends State<_TextBox> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
-    final style = ts(m ? context.type.body : context.type.ui, c.textPrimary, weight: Weight.regular);
+    // In a sheet on a compact screen, over the cell otherwise.
+    final m = context.sizeClass.isCompact;
+    final style = ts(context.type.item, c.textPrimary, weight: Weight.regular);
     return Padding(
       padding: m ? const EdgeInsets.fromLTRB(Space.sm, 0, Space.sm, Space.md) : const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.sm, Space.sm),
       child: m
           ? MenuField(controller: _ctl, autofocus: true, placeholder: widget.placeholder, onSubmitted: (_) => Navigator.of(context).maybePop())
           : ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 21, maxHeight: 300),
+              constraints: const BoxConstraints(minHeight: Db.cellEditorLine, maxHeight: Db.cellEditorMax),
               child: SelectionToolbarHost(builder: (context, onSelectionChanged, showHandles) => EditableText(
                 key: const ValueKey('cell-editor'),
                 controller: _ctl,

@@ -99,7 +99,7 @@ class _DatePickerState extends State<DatePicker> {
     final lead = first.weekday0Sunday();
     final gridStart = first.add(-lead);
     final m = context.touch;
-    final cell = m ? 40.0 : 32.0;
+    final cell = m ? Db.dayCellTouch : Db.dayCell;
 
     Widget field(Day? d, int minutes, bool isEnd) {
       final active = end != null && editingEnd == isEnd;
@@ -107,7 +107,7 @@ class _DatePickerState extends State<DatePicker> {
         child: GestureDetector(
           onTap: () => setState(() => editingEnd = isEnd),
           child: Container(
-            height: m ? 36 : 28,
+            height: (m ? ControlSize.lg : ControlSize.sm).height,
             padding: const EdgeInsets.symmetric(horizontal: Space.xs),
             decoration: BoxDecoration(
               color: c.bgSecondary,
@@ -251,8 +251,8 @@ class _DatePickerState extends State<DatePicker> {
           onTap: () => _pickDay(d),
           radius: size / 2,
           child: Container(
-            width: size - 4,
-            height: size - 4,
+            width: size - Db.dayInset,
+            height: size - Db.dayInset,
             alignment: Alignment.center,
             decoration: picked ? BoxDecoration(color: c.accent, shape: BoxShape.circle) : null,
             child: Text('${d.day}',

@@ -1257,7 +1257,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                 : null,
             border: Border(
               right: BorderSide(
-                color: mobile ? const Color(0x00000000) : context.colors.border,
+                color: mobile ? kTransparent : context.colors.border,
               ),
               bottom: BorderSide(color: context.colors.border),
             ),

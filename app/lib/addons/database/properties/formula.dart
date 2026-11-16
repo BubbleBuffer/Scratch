@@ -47,7 +47,7 @@ Widget formulaSettings(BuildContext context, CollectionStore store, PropDef d, F
   return settingsRow(context, 'Formula',
       key: const ValueKey('prop-formula'),
       value: f.isEmpty ? 'Empty' : f,
-      leading: DbIcon(DbIco.formula, size: context.touch ? 22 : 20, color: context.colors.iconPrimary),
+      leading: DbIcon(DbIco.formula, size: context.metrics.icon.px, color: context.colors.iconPrimary),
       onTap: (rect) => editFormula(context, rect, store, d, save));
 }
 
@@ -116,14 +116,14 @@ class _FormulaEditorState extends State<FormulaEditor> {
             MenuItem(
               key: const ValueKey('formula-prop-title'),
               label: 'Name',
-              leading: DbIcon(DbIco.title, size: 18, color: c.iconSecondary),
+              leading: DbIcon(DbIco.title, size: IconSize.md.px, color: c.iconSecondary),
               onTap: () => _insert('prop("Name")'),
             ),
             for (final p in props)
               MenuItem(
                 key: ValueKey('formula-prop-${p.name}'),
                 label: p.name,
-                leading: DbIcon(propertyRegistry.of(p.kind)?.icon ?? DbIco.text, size: 18, color: c.iconSecondary),
+                leading: DbIcon(propertyRegistry.of(p.kind)?.icon ?? DbIco.text, size: IconSize.md.px, color: c.iconSecondary),
                 onTap: () => _insert('prop("${p.name}")'),
               ),
             const MenuHeader('Functions'),

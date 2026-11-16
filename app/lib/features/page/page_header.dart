@@ -140,7 +140,7 @@ class _PageHeaderState extends State<PageHeader> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              IconX(ix, size: 16, color: c.iconTertiary),
+              IconX(ix, size: IconSize.sm.px, color: c.iconTertiary),
               const Gap(Space.xs),
               Text(
                 label,
@@ -223,7 +223,7 @@ class _PageHeaderState extends State<PageHeader> {
         text.add(SizedBox(height: mobile ? 16 : 72));
         text.add(Align(alignment: Alignment.centerLeft, child: iconWidget));
       }
-      text.add(const SizedBox(height: 4));
+      text.add(const Gap(Space.xxs));
     } else {
       text.add(SizedBox(height: cover != null ? 12 : (mobile ? 12 : 64)));
     }
@@ -400,7 +400,7 @@ class _CoverState extends State<_Cover> {
                                 _dragY = null;
                               });
                             }),
-                            Container(width: 1, height: 26, color: c.border),
+                            Container(width: Stroke.hair, height: 26, color: c.border),
                             btn(
                               'cover-cancel',
                               'Cancel',
@@ -418,13 +418,13 @@ class _CoverState extends State<_Cover> {
                                 () => widget.onChange(anchor),
                               ),
                             ),
-                            Container(width: 1, height: 26, color: c.border),
+                            Container(width: Stroke.hair, height: 26, color: c.border),
                             btn(
                               'cover-reposition',
                               'Reposition',
                               () => setState(() => _repositioning = true),
                             ),
-                            Container(width: 1, height: 26, color: c.border),
+                            Container(width: Stroke.hair, height: 26, color: c.border),
                             btn('cover-remove', 'Remove', widget.onRemove),
                           ],
                   ),

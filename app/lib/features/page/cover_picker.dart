@@ -165,7 +165,7 @@ class _CoverPickerState extends State<_CoverPicker> {
             padding: const EdgeInsets.symmetric(horizontal: Space.sm),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: _tab == i ? c.textPrimary : const Color(0x00000000), width: Stroke.bold)),
+              border: Border(bottom: BorderSide(color: _tab == i ? c.textPrimary : kTransparent, width: Stroke.bold)),
             ),
             child: Text(label, style: ts(ty.ui, _tab == i ? c.textPrimary : c.textSecondary)),
           ),
