@@ -16,3 +16,10 @@ abstract final class EmojiPickerSize {
   /// A grid cell, the emoji in it, and the dice on the random button.
   static const double cell = 32, glyph = 22, dice = 16;
 }
+
+/// The page cover picker: its popover, a cover swatch and the upload
+/// button.
+abstract final class CoverPickerSize {
+  static const double width = 540, swatchWidth = 116, swatchHeight = 64;
+  static const double upload = 240;
+}

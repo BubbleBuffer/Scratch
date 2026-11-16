@@ -105,7 +105,7 @@ class _SchedulePageState extends State<SchedulePage> {
   @override
   Widget build(BuildContext context) {
     final c = _c!;
-    final mobile = context.touch;
+    final mobile = context.sizeClass.isCompact;
     final colors = context.colors;
     return ColoredBox(
       color: colors.bgPrimary,
@@ -113,13 +113,13 @@ class _SchedulePageState extends State<SchedulePage> {
         listenable: c,
         builder: (context, _) {
           if (!c.loaded) return const SizedBox.shrink();
-          final gutter = mobile ? Layout.gutter : 48.0;
+          final gutter = mobile ? Layout.gutter : PageChrome.columnMargin;
           return Align(
             alignment: Alignment.topCenter,
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(gutter, mobile ? Space.lg : Space.xl, gutter, Space.xxxl),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
+                constraints: const BoxConstraints(maxWidth: ScheduleSize.column),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -207,9 +207,7 @@ class _ScheduleTitleState extends State<_ScheduleTitle> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final style = tsDisplay(
-      context.touch
-          ? context.type.h1
-          : context.type.display,
+      context.type.display,
       c.textPrimary,
     );
     final controller = widget.controller;
@@ -526,7 +524,7 @@ class _NodeRow extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
+          constraints: const BoxConstraints(minHeight: ScheduleSize.run),
           padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
           decoration: BoxDecoration(
             color: selected ? c.bgSelectedBlock : c.bgSecondary,
@@ -670,7 +668,7 @@ class _PickerRow extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
+          constraints: const BoxConstraints(minHeight: ScheduleSize.run),
           padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
           decoration: BoxDecoration(
             color: c.bgSecondary,
@@ -847,7 +845,7 @@ class _BandLine extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 72,
+          width: ScheduleSize.actions,
           child: Text(label, style: labelStyle),
         ),
         Expanded(child: child),

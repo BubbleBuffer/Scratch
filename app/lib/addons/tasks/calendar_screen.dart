@@ -1427,7 +1427,8 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final now = clockNow();
-    final minute = now.hour * 60 + now.minute;
+    // The grid is one logical pixel per minute.
+    final minute = now.hour * Duration.minutesPerHour + now.minute;
     return Column(
       children: [
         Padding(
@@ -1646,9 +1647,9 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                                     top: segment.startMinute.toDouble(),
                                     height: math
                                         .min(
-                                          1440 - segment.startMinute,
+                                          CalendarTimeGrid.hours - segment.startMinute,
                                           math.max(
-                                            22,
+                                            CalendarMonth.chip,
                                             segment.endMinute -
                                                 segment.startMinute,
                                           ),

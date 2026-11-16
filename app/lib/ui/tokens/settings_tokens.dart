@@ -38,7 +38,7 @@ abstract final class SettingsSwitch {
 /// The settings controls' sizes.
 abstract final class SettingsSize {
   /// A disabled row's fade.
-  static const double disabledFade = .62;
+  static const double disabledFade = .62, enabledFade = 1;
 
   /// The widest an intro, a description and a help note run.
   static const double intro = 560, description = 520, help = 540;
@@ -70,4 +70,25 @@ abstract final class SettingsFrame {
 
   /// The room under a compact page's last row.
   static const double endPadding = 48;
+}
+
+/// Sync and its settings: a certificate fact's label column, the sync
+/// details menu, the conflict log's tallest, and the pairing QR code
+/// (default, compact and wider).
+abstract final class SyncSize {
+  static const double certLabel = 150, details = 300, conflictLog = 240;
+  static const double qr = 184, qrCompact = 220, qrWide = 200;
+}
+
+/// The trash: its panel and popover, and a row with a path and without, on
+/// a pointer and by touch.
+abstract final class TrashSize {
+  static const double width = 420, panel = 520, popover = 460;
+  static const double row = 32, rowWithPath = 42, rowTouch = 56;
+}
+
+/// A QR code's modules and quiet zone: black on white whatever the theme,
+/// so any camera reads it.
+abstract final class QrInk {
+  static const dark = Color(0xFF000000), light = Color(0xFFFFFFFF);
 }

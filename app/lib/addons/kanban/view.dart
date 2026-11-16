@@ -89,7 +89,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     final docked =
         open != null &&
         !widget.inline &&
-        !context.touch &&
+        !context.sizeClass.isCompact &&
         _columnOf(open.id) != null;
     final board = ListenableBuilder(
       listenable: widget.noteTypes ?? noteTypeRegistry,
@@ -111,7 +111,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
       listenable: _source,
       builder: (context, _) {
         final open = _open;
-        if (open == null || widget.inline || context.touch) return keyed;
+        if (open == null || widget.inline || context.sizeClass.isCompact) return keyed;
         final column = _columnOf(open.id);
         if (column == null) return keyed;
         return Row(
@@ -167,7 +167,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
   /// Opening a card shows its panel: beside the board on desktop, a bottom
   /// sheet on a phone. An embedded board has none and opens the note.
   void _showCard(BuildContext context, BoardCard card) {
-    if (context.touch) {
+    if (context.sizeClass.isCompact) {
       showSheet<void>(
         context,
         (sheet) => SheetSurface(
@@ -200,7 +200,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     final c = context.colors;
     return Container(
       key: const ValueKey('kanban-card-panel'),
-      width: 320,
+      width: Widths.dialog,
       decoration: BoxDecoration(
         color: c.bgPrimary,
         border: Border(left: BorderSide(color: c.border)),
@@ -671,14 +671,14 @@ class KanbanPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mobile = context.touch;
+    final mobile = context.sizeClass.isCompact;
     return ColoredBox(
       color: context.colors.desk,
       child: LayoutBuilder(
         builder: (context, box) {
           final gutter = mobile
               ? Layout.gutter
-              : (box.maxWidth >= 900 ? 96.0 : 48.0);
+              : (box.maxWidth >= PageChrome.wideAt ? PageChrome.fullWidthMargin : PageChrome.columnMargin);
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -695,7 +695,7 @@ class KanbanPage extends StatelessWidget {
                   onChanged: onTitleChanged,
                 ),
               ),
-              Gap(mobile ? 12 : 10),
+              const Gap(Space.md),
               Expanded(
                 child: KanbanBoard(
                   pageId: pageId,
@@ -734,9 +734,7 @@ class _KanbanTitleState extends State<_KanbanTitle> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final style = tsDisplay(
-      context.touch
-          ? context.type.h1
-          : context.type.display,
+      context.type.display,
       c.textPrimary,
     );
     final controller = widget.controller;

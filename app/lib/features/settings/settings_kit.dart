@@ -287,7 +287,7 @@ class _SRowState extends State<SRow> {
   Widget build(BuildContext context) {
     final w = widget;
     final open = _pinned || _peek;
-    final fade = w.disabled ? SettingsSize.disabledFade : 1.0;
+    final fade = w.disabled ? SettingsSize.disabledFade : SettingsSize.enabledFade;
     final head = Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: Space.xs, runSpacing: Space.xxs, children: [
       Opacity(opacity: fade, child: Text(w.label, style: sLabel(context))),
       if (w.help != null)

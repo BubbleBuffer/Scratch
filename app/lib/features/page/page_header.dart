@@ -1,5 +1,5 @@
-// The top of a page: the cover (full editor width, 270 tall on desktop and
-// 200 on mobile), the icon (64px paper tile, overlapping the cover's
+// The top of a page: the cover (full editor width, 270 tall, and 200 on a
+// compact screen), the icon (64px paper tile, overlapping the cover's
 // bottom by 42px), the "Add icon / Add cover / Add comment" row that shows
 // on hover, then the title the editor builds.
 
@@ -49,7 +49,7 @@ class PageHeader extends StatefulWidget {
   final bool readOnly;
   final SpacePatch? patch;
 
-  static double coverHeight(bool mobile) => mobile ? 200 : 270;
+  static double coverHeight(bool compact) => compact ? PageHeaderSize.coverCompact : PageHeaderSize.cover;
 
   @override
   State<PageHeader> createState() => _PageHeaderState();
@@ -61,7 +61,7 @@ class _PageHeaderState extends State<PageHeader> {
   Future<void> _pickIcon(BuildContext anchor) async {
     final e = await showEmojiPicker(
       anchor,
-      anchor: context.touch ? null : globalRectOf(anchor),
+      anchor: context.sizeClass.isCompact ? null : globalRectOf(anchor),
       removable: widget.icon != null,
     );
     if (e == null) return;
@@ -72,7 +72,7 @@ class _PageHeaderState extends State<PageHeader> {
     final r = await showCoverPicker(
       anchor,
       pageId: widget.pageId,
-      anchor: context.touch ? null : globalRectOf(anchor),
+      anchor: context.sizeClass.isCompact ? null : globalRectOf(anchor),
       hasCover: widget.cover != null,
     );
     if (r == null) return;
@@ -82,14 +82,15 @@ class _PageHeaderState extends State<PageHeader> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final mobile = context.touch;
+    final mobile = context.sizeClass.isCompact;
     final icon = widget.icon;
     final cover = widget.cover;
-    const iconSize = 64.0;
-    final overlap = mobile ? 36.0 : 42.0;
+    const iconSize = PageHeaderSize.icon;
+    final overlap = mobile ? PageHeaderSize.overlapCompact : PageHeaderSize.overlap;
+    // Without hover, the row stays shown.
     final showRow =
         !widget.readOnly &&
-        (mobile || _hover) &&
+        (context.touch || _hover) &&
         (icon == null || cover == null);
 
     final iconWidget = icon == null
@@ -113,11 +114,7 @@ class _PageHeaderState extends State<PageHeader> {
                 child: Center(
                   child: Text(
                     icon,
-                    style: TextStyle(
-                      fontSize: 40,
-                      height: 1.0,
-                      fontFamilyFallback: emojiFallback,
-                    ),
+                    style: emojiStyle(PageHeaderSize.emoji, emojiFallback),
                   ),
                 ),
               ),
@@ -135,8 +132,8 @@ class _PageHeaderState extends State<PageHeader> {
         radius: Radii.md,
         onTap: () => onTap(anchor),
         padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-        child: SizedBox(
-          height: 28,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: ControlSize.sm.height),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -157,9 +154,9 @@ class _PageHeaderState extends State<PageHeader> {
       duration: Motion.of(context).fast,
       child: IgnorePointer(
         ignoring: !showRow,
-        child: SizedBox(
-          height: 30,
-          child: Row(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: ControlSize.md.height),
+          child: Wrap(
             children: [
               if (icon == null)
                 rowButton('add-icon', Ix.smile, 'Add icon', _pickIcon),
@@ -220,12 +217,12 @@ class _PageHeaderState extends State<PageHeader> {
       if (cover != null) {
         // Placed with the cover above.
       } else {
-        text.add(SizedBox(height: mobile ? 16 : 72));
+        text.add(SizedBox(height: mobile ? PageHeaderSize.iconTopCompact : PageHeaderSize.iconTop));
         text.add(Align(alignment: Alignment.centerLeft, child: iconWidget));
       }
       text.add(const Gap(Space.xxs));
     } else {
-      text.add(SizedBox(height: cover != null ? 12 : (mobile ? 12 : 64)));
+      text.add(SizedBox(height: cover != null || mobile ? Space.md : PageHeaderSize.titleTop));
     }
     if (!widget.readOnly) text.add(row);
     text.add(widget.title);
@@ -309,14 +306,14 @@ class _CoverState extends State<_Cover> {
       onTap: onTap,
       radius: 0,
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-      child: SizedBox(
-        height: 26,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: PageHeaderSize.coverButton),
         child: Center(
           child: Text(label, style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular)),
         ),
       ),
     );
-    // Desktop: on hover. Mobile: a tap on the cover shows (and hides) them.
+    // With a pointer, on hover. By touch, a tap on the cover shows (and hides) them.
     final show = !widget.readOnly && (_hover || _repositioning);
     return MouseRegion(
       onEnter: context.touch ? null : (_) => setState(() => _hover = true),
@@ -357,25 +354,25 @@ class _CoverState extends State<_Cover> {
                       vertical: Space.xs,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0x99000000),
+                      color: ImageOverlay.shade,
                       borderRadius: BorderRadius.circular(Radii.sm),
                     ),
                     child: Text(
                       'Drag image to reposition',
-                      style: ts(context.type.ui, const Color(0xFFFFFFFF)),
+                      style: ts(context.type.ui, ImageOverlay.ink),
                     ),
                   ),
                 ),
               ),
             if (show)
               Positioned(
-                right: context.touch
-                    ? 12
+                right: context.sizeClass.isCompact
+                    ? Space.md
                     : (widget.width - widget.textRight).clamp(
-                        12.0,
+                        Space.md,
                         double.infinity,
                       ),
-                bottom: 10,
+                bottom: PageHeaderSize.coverButtonInset,
                 child: Container(
                   decoration: BoxDecoration(
                     color: c.bgElevated,
@@ -400,7 +397,7 @@ class _CoverState extends State<_Cover> {
                                 _dragY = null;
                               });
                             }),
-                            Container(width: Stroke.hair, height: 26, color: c.border),
+                            Container(width: Stroke.hair, height: PageHeaderSize.coverButton, color: c.border),
                             btn(
                               'cover-cancel',
                               'Cancel',
@@ -418,13 +415,13 @@ class _CoverState extends State<_Cover> {
                                 () => widget.onChange(anchor),
                               ),
                             ),
-                            Container(width: Stroke.hair, height: 26, color: c.border),
+                            Container(width: Stroke.hair, height: PageHeaderSize.coverButton, color: c.border),
                             btn(
                               'cover-reposition',
                               'Reposition',
                               () => setState(() => _repositioning = true),
                             ),
-                            Container(width: Stroke.hair, height: 26, color: c.border),
+                            Container(width: Stroke.hair, height: PageHeaderSize.coverButton, color: c.border),
                             btn('cover-remove', 'Remove', widget.onRemove),
                           ],
                   ),

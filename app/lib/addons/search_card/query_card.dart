@@ -299,7 +299,7 @@ class _QueryCardState extends State<QueryCard> {
       );
     }
     return Container(
-      constraints: const BoxConstraints(minHeight: 44),
+      constraints: BoxConstraints(minHeight: ControlSize.xl.height),
       padding: const EdgeInsets.fromLTRB(Space.md, Space.xs, Space.xs, Space.xs),
       decoration: BoxDecoration(
         color: c.bgSecondary,
@@ -323,8 +323,8 @@ class _QueryCardState extends State<QueryCard> {
                 onTap: () => _openOverflow(context),
                 borderRadius: BorderRadius.circular(Radii.sm),
                 child: SizedBox(
-                  width: 28,
-                  height: 28,
+                  width: ControlSize.sm.height,
+                  height: ControlSize.sm.height,
                   child: Center(
                     child: Icon20(Ico.more, size: IconSize.sm, color: c.iconSecondary),
                   ),
@@ -340,8 +340,8 @@ class _QueryCardState extends State<QueryCard> {
               onTap: () => setState(() => _collapsed = !_collapsed),
               borderRadius: BorderRadius.circular(Radii.sm),
               child: SizedBox(
-                width: 28,
-                height: 28,
+                width: ControlSize.sm.height,
+                height: ControlSize.sm.height,
                 child: Center(
                   child: RotatedBox(
                     quarterTurns: _collapsed ? 1 : 0,

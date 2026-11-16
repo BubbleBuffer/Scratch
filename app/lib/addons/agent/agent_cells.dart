@@ -38,8 +38,8 @@ class _CodeCellRowState extends State<CodeCellRow> {
             onTap: () => setState(() => _open = !_open),
             borderRadius: Radii.field,
             padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-            child: SizedBox(
-              height: 34,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: ControlSize.lg.height),
               child: Row(
                 children: [
                   Icon20(

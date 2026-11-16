@@ -102,7 +102,7 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
     final store = widget.store;
     final c = context.colors;
     final panel = widget.panel;
-    final pad = panel ? 12.0 : 32.0;
+    final pad = panel ? Space.md : Space.xxl;
     final title = widget.title;
     return Container(
       decoration: BoxDecoration(
@@ -194,7 +194,7 @@ class _ShellState extends State<_Shell> {
     if (store.pendingApprovals.isEmpty) return const SizedBox.shrink();
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: Layout.contentWidth + 64),
+        constraints: const BoxConstraints(maxWidth: Layout.contentWidth + AgentLayout.columnRoom),
         child: Padding(
           padding: EdgeInsets.fromLTRB(pad, 0, pad, Space.sm),
           child: AgentApprovalBars(store: store, draft: _draft),
@@ -211,7 +211,7 @@ class _ShellState extends State<_Shell> {
         final store = widget.store;
         final c = context.colors;
         final signIn = store.requiresHubSignIn;
-        final pad = widget.panel ? 12.0 : 32.0;
+        final pad = widget.panel ? Space.md : Space.xxl;
         return Container(
           decoration: BoxDecoration(
             color: c.bgPrimary,
@@ -241,7 +241,7 @@ class _ShellState extends State<_Shell> {
                   Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(
-                        maxWidth: Layout.contentWidth + 64,
+                        maxWidth: Layout.contentWidth + AgentLayout.columnRoom,
                       ),
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(

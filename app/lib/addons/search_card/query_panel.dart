@@ -24,10 +24,10 @@ const queryPanelRows = 6;
 const _undoMessageFor = Duration(seconds: 6);
 
 /// The panel's width on desktop.
-const queryPanelWidth = 420.0;
+const queryPanelWidth = Widths.form;
 
 /// Opens the panel for [watch]: a popover under [anchor] on desktop, a bottom
-/// sheet on phone. [onOpenInSearch] and [onShowAsBlock] run after the panel
+/// sheet on a compact screen. [onOpenInSearch] and [onShowAsBlock] run after the panel
 /// has closed.
 Future<void> showQueryPanel(
   BuildContext context, {
@@ -44,7 +44,7 @@ Future<void> showQueryPanel(
         onOpenInSearch: onOpenInSearch,
         onShowAsBlock: onShowAsBlock,
       );
-  if (context.touch) {
+  if (context.sizeClass.isCompact) {
     return showSheet<void>(context, (ctx) => panel(ctx, mobile: true));
   }
   return showPopover<void>(
@@ -167,7 +167,7 @@ class _QueryPanelState extends State<QueryPanel> {
     final more = visible.length - shown.length;
     final header = Container(
       padding: const EdgeInsets.fromLTRB(Space.md, Space.xs, Space.md, Space.xs),
-      constraints: const BoxConstraints(minHeight: 44),
+      constraints: BoxConstraints(minHeight: ControlSize.xl.height),
       decoration: BoxDecoration(
         color: widget.mobile ? c.bgPrimary : c.bgSecondary,
         border: Border(bottom: BorderSide(color: c.borderSubtle)),

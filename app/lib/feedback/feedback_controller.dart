@@ -116,9 +116,9 @@ class FeedbackController {
   }
 
   Future<T?> _showSheet<T>(BuildContext context, WidgetBuilder builder) =>
-      context.touch
+      context.sizeClass.isCompact
       ? showSheet<T>(context, builder)
-      : showModalPanel<T>(context, builder, width: 560, shrink: true);
+      : showModalPanel<T>(context, builder, width: FeedbackForm.width, shrink: true);
 
   /// The app's pixels as PNG, or null when there is no picture to take.
   Future<Uint8List?> _capture(BuildContext context) async {

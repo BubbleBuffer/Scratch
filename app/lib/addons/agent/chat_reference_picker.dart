@@ -61,7 +61,7 @@ class _ChatReferencePickerState extends State<ChatReferencePicker> {
     final c = context.colors;
     final ty = context.type;
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 480),
+      constraints: const BoxConstraints(maxWidth: AgentSheets.picker),
       child: PickerSheet(
         header: Padding(
           padding: const EdgeInsets.fromLTRB(

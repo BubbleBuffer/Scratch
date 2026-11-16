@@ -42,7 +42,7 @@ class SyncIndicator extends StatelessWidget {
     if (phase == SyncPhase.off) return const SizedBox.shrink();
     return SyncIndicatorView(
       phase: phase,
-      showLabel: showLabel ?? !context.touch,
+      showLabel: showLabel ?? !context.sizeClass.isCompact,
       onTap: (anchor) => showSyncDetails(context, anchor, phase, message),
     );
   }
@@ -71,8 +71,8 @@ class SyncIndicatorView extends StatelessWidget {
           radius: Radii.md,
           padding: EdgeInsets.symmetric(horizontal: showLabel ? Space.xs : 0),
           child: SizedBox(
-            height: m ? 44 : 28,
-            width: showLabel ? null : (m ? 44 : 28),
+            height: (m ? ControlSize.xl : ControlSize.sm).height,
+            width: showLabel ? null : (m ? ControlSize.xl : ControlSize.sm).height,
             child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
               SyncIcon(phaseIcon(phase), size: m ? IconSize.xl : IconSize.md, color: color),
               if (showLabel) ...[
@@ -128,7 +128,7 @@ Future<void> showSyncDetails(BuildContext context, Rect anchor, SyncPhase phase,
     );
   }
 
-  final action = context.touch
+  final action = context.sizeClass.isCompact
       ? await showSheet<String>(
           context,
           (ctx) => SheetSurface(children: [
@@ -140,7 +140,7 @@ Future<void> showSyncDetails(BuildContext context, Rect anchor, SyncPhase phase,
       : await showPopover<String>(
           context,
           anchor,
-          (ctx) => MenuList(width: 300, children: [
+          (ctx) => MenuList(width: SyncSize.details, children: [
             details(ctx),
             const MenuSeparator(),
             if (sync.connected)

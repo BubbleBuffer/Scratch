@@ -46,7 +46,7 @@ Future<void> showSharePopup(
 }) {
   Widget body(BuildContext ctx) =>
       SharePopup(pageId: pageId, pageTitle: pageTitle);
-  if (context.touch) {
+  if (context.sizeClass.isCompact) {
     return showSheet<void>(
       context,
       (ctx) => SheetSurface(children: [body(ctx)]),
@@ -55,8 +55,8 @@ Future<void> showSharePopup(
   return showModalPanel<void>(
     context,
     body,
-    width: 480,
-    height: 640,
+    width: ShareSize.width,
+    height: ShareSize.height,
     shrink: true,
   );
 }
@@ -222,7 +222,7 @@ class _SharePopupState extends State<SharePopup> {
     required ValueChanged<String> onPick,
   }) {
     final c = context.colors;
-    final h = context.touch ? 36.0 : 28.0;
+    final h = context.touch ? ShareSize.pillTouch : ShareSize.pill;
     return Container(
       height: h,
       clipBehavior: Clip.antiAlias,
@@ -274,8 +274,8 @@ class _SharePopupState extends State<SharePopup> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
-    final pad = m ? Layout.gutter : 20.0;
+    final m = context.sizeClass.isCompact;
+    final pad = m ? Layout.gutter : Space.xl;
     final client = _client;
     final links = _links;
 

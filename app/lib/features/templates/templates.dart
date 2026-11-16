@@ -348,8 +348,8 @@ class _PageStartersState extends State<PageStarters> {
                     onTap: _newTemplate,
                     radius: Radii.md,
                     padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-                    child: SizedBox(
-                      height: 26,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: ControlSize.xs.height),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

@@ -126,8 +126,8 @@ class _BacklinksBarState extends State<BacklinksBar> {
             radius: Radii.sm,
             onTap: () => openPage(context, r.id, r.title, stack: true),
             padding: const EdgeInsets.symmetric(horizontal: Space.hair),
-            child: SizedBox(
-              height: 26,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: ControlSize.xs.height),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

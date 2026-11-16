@@ -95,7 +95,7 @@ Future<AiRunner?> showTriageRunnerChoice(
       projectTitle: projectTitle,
       onPick: (r) => Navigator.of(ctx).pop(r),
     ),
-    width: 380,
+    width: TriageSize.start,
     shrink: true,
   );
 }
@@ -141,8 +141,8 @@ class _RunnerChoice extends StatelessWidget {
             PanelRow(
               key: ValueKey('triage-runner-${r.id}'),
               onTap: () => onPick(r),
-              child: SizedBox(
-                height: 56,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: TriageSize.runner),
                 child: Row(
                   children: [
                     Expanded(

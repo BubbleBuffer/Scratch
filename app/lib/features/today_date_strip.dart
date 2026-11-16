@@ -55,7 +55,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
       _app = app;
       _origin = calendarDay(app.agenda.selectedDay);
       _selected = _origin;
-      _extent = context.touch ? 48 : 58;
+      _extent = context.touch ? DateStrip.extentTouch : DateStrip.extent;
       _scroll = ScrollController(initialScrollOffset: _extent / 2)
         ..addListener(_scrolled);
       app.feed.addListener(_changed);
@@ -63,7 +63,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
         if (mounted) _loadVisible();
       });
     } else {
-      final nextExtent = context.touch ? 48.0 : 58.0;
+      final nextExtent = context.touch ? DateStrip.extentTouch : DateStrip.extent;
       if (_extent != nextExtent) {
         _extent = nextExtent;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -277,7 +277,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
           onTap: () => _select(day),
           lift: 0,
           background: selected ? c.textPrimary : null,
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: Radii.pill,
           padding: const EdgeInsets.symmetric(vertical: Space.xs),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -288,8 +288,8 @@ class _TodayDateStripState extends State<TodayDateStrip> {
               ),
               const Gap(Space.hair),
               Container(
-                width: 30,
-                height: 30,
+                width: DateStrip.day,
+                height: DateStrip.day,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -307,7 +307,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
               ),
               const Gap(Space.xxs),
               SizedBox(
-                height: 12,
+                height: DateStrip.dotRow,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -315,8 +315,8 @@ class _TodayDateStripState extends State<TodayDateStrip> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: Space.hair),
                         child: Container(
-                          width: 5,
-                          height: 5,
+                          width: DateStrip.dot,
+                          height: DateStrip.dot,
                           decoration: BoxDecoration(
                             color: color,
                             shape: BoxShape.circle,
@@ -397,7 +397,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
               ),
               Expanded(
                 child: SizedBox(
-                  height: 82,
+                  height: DateStrip.height,
                   child: Listener(
                     onPointerSignal: (event) {
                       if (event is PointerScrollEvent &&

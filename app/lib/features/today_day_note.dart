@@ -266,7 +266,7 @@ class _DayNoteState extends State<_DayNote> {
         else
           Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: context.touch ? Space.lg : Space.xxl,
+              horizontal: context.sizeClass.isCompact ? Space.lg : Space.xxl,
               vertical: Space.md,
             ),
             child: PlainField(

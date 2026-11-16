@@ -353,13 +353,13 @@ class _HiddenColumn extends StatelessWidget {
     final a = state.a;
     final gd = a.store.groupDef!;
     return SizedBox(
-      width: 220,
+      width: Widths.popover,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            height: 34,
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: ControlSize.lg.height),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -378,8 +378,8 @@ class _HiddenColumn extends StatelessWidget {
               ),
               radius: Radii.md,
               padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-              child: SizedBox(
-                height: 32,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: ControlSize.md.height),
                 child: Row(
                   children: [
                     if (g.key.isEmpty)

@@ -4,6 +4,7 @@
 // tool set ("What it may do": Read, Write or Everything). Everything else
 // on the page depends on the runner chosen here.
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
 
 import '../../core/tool_sets.dart';
@@ -90,7 +91,7 @@ class HubModelSetting extends StatelessWidget {
       label: 'Model',
       desc: _modelDesc,
       help: _modelHelp('the hub'),
-      stack: context.touch,
+      stack: context.sizeClass.isCompact,
       control: SSelect<String?>(
         key: const ValueKey('agent-hub-model'),
         title: 'Model',
@@ -151,7 +152,7 @@ class ComputerModelSetting extends StatelessWidget {
       label: 'Model',
       desc: _modelDesc,
       help: _modelHelp('this computer'),
-      stack: context.touch,
+      stack: context.sizeClass.isCompact,
       control: SSelect<String>(
         key: const ValueKey('agent-computer-model'),
         title: 'Model',
@@ -188,7 +189,10 @@ class RunnerToolSetSetting extends StatelessWidget {
   Widget build(BuildContext context) {
     final set = store.vaultDefaults.toolSetFor(runner);
     final onHub = runner == AgentHost.hub;
-    final computer = !onHub && !context.touch;
+    // A runner on this computer, not on a phone or tablet.
+    final computer = !onHub &&
+        defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS;
     String title(String s) => switch (s) {
       'read' => 'Read',
       'write' => 'Write',

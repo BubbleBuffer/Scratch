@@ -34,11 +34,11 @@ Future<void> showExport(BuildContext context, String pageId) => _show(
     );
 
 Future<void> _show(BuildContext context, WidgetBuilder body) async {
-  if (context.touch) {
+  if (context.sizeClass.isCompact) {
     await showSheet<void>(context, (ctx) => SheetSurface(children: [body(ctx)]));
     return;
   }
-  await showModalPanel<void>(context, body, width: 480, shrink: true);
+  await showModalPanel<void>(context, body, width: SmallPanels.import, shrink: true);
 }
 
 /// [name] with characters that file systems refuse replaced by `_`.
@@ -76,8 +76,9 @@ class _PathDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final ty = context.type;
-    final m = context.touch;
-    final pad = m ? Layout.gutter : 20.0;
+    // A sheet on a compact screen, a panel otherwise.
+    final m = context.sizeClass.isCompact;
+    final pad = m ? Layout.gutter : Space.xl;
     return Padding(
       padding: EdgeInsets.fromLTRB(pad, m ? 0 : Space.lg, pad, m ? Space.sm : Space.lg),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [

@@ -171,8 +171,8 @@ class UpdateRailRow extends StatelessWidget {
                 height: Layout.sidebarRowHeight - 2,
                 child: Row(children: [
                   Container(
-                    width: 8,
-                    height: 8,
+                    width: Sizes.dot,
+                    height: Sizes.dot,
                     decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(Radii.sm)),
                   ),
                   const Gap(Space.md),
@@ -193,7 +193,7 @@ class UpdateRailRow extends StatelessWidget {
 Future<void> showUpdateReady(BuildContext context, UpdateController u) => showModalPanel<void>(
       context,
       (ctx) => _UpdateReadyBox(u: u, onClose: () => Navigator.of(ctx).pop()),
-      width: 340,
+      width: SmallPanels.update,
       shrink: true,
     );
 

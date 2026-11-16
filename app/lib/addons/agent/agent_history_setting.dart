@@ -16,7 +16,7 @@ class ChatSettingsButton extends StatelessWidget {
 
   Future<void> _open(BuildContext context) async {
     Widget panel(BuildContext _) => ChatSettingsPanel(store: store);
-    if (context.touch) {
+    if (context.sizeClass.isCompact) {
       await showSheet<void>(
         context,
         (ctx) => SheetSurface(
@@ -27,7 +27,7 @@ class ChatSettingsButton extends StatelessWidget {
       await showPopover<void>(
         context,
         globalRectOf(context),
-        (ctx) => MenuSurface(width: 320, child: panel(ctx)),
+        (ctx) => MenuSurface(width: Widths.dialog, child: panel(ctx)),
       );
     }
   }
@@ -42,8 +42,8 @@ class ChatSettingsButton extends StatelessWidget {
         onTap: () => _open(b),
         radius: Radii.md,
         child: SizedBox(
-          width: 28,
-          height: 28,
+          width: ControlSize.sm.height,
+          height: ControlSize.sm.height,
           child: Center(
             child: Icon20(
               Ico.settings,
@@ -132,8 +132,8 @@ class _Segments extends StatelessWidget {
             hoverColor: on ? kTransparent : null,
             background: on ? c.bgPrimary : null,
             padding: const EdgeInsets.symmetric(horizontal: Space.md),
-            child: SizedBox(
-              height: 26,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: ControlSize.xs.height),
               child: Center(
                 child: Text.rich(
                   TextSpan(

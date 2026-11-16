@@ -176,7 +176,7 @@ class _BlockView extends StatelessWidget {
     final c = context.colors;
     final type = context.type;
     final b = block;
-    final indent = b.depth * 22.0;
+    final indent = b.depth * AgentSheets.listMarker;
     Widget text(TextStyle style) => _MarkedText(b.text, b.marks, style);
     final body = ts(type.body, c.textPrimary);
     final Widget view = switch (b.kind) {
@@ -201,7 +201,7 @@ class _BlockView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 22,
+            width: AgentSheets.listMarker,
             child: Text(
               switch (b.kind) {
                 'numbered' => '$number.',

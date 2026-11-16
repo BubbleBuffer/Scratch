@@ -11,6 +11,7 @@
 // Which panels are open is [connectorPanels], so other pages can open one
 // before jumping here ([showMcpServers]); it is cleared when this page goes.
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
 
 import '../../addons/agent/api.dart'
@@ -58,6 +59,8 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
 
   @override
   Widget build(BuildContext context) {
+    final desktop = defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS;
     final app = context.app;
     final agent = AgentStore.of(app);
     return ListenableBuilder(
@@ -130,9 +133,9 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Its `notes setup` commands run in a desktop terminal.
-                  if (!context.touch) const ConnectAgentSection(first: true),
+                  if (desktop) const ConnectAgentSection(first: true),
                   AgentTokensSection(
-                    first: context.touch,
+                    first: !desktop,
                     onCount: (n) {
                       if (mounted && n != _tokens) setState(() => _tokens = n);
                     },

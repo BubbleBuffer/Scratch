@@ -17,13 +17,13 @@ DateTime Function(int ms) versionTimeOf = DateTime.fromMillisecondsSinceEpoch;
 
 /// Shows page [pageId]'s version history.
 Future<void> showVersionHistory(BuildContext context, String pageId) async {
-  if (context.touch) {
+  if (context.sizeClass.isCompact) {
     await pushScreen<void>(context, (_) => HistoryPanel(key: const ValueKey('history-panel'), pageId: pageId),
         name: '/history');
     return;
   }
   await showModalPanel<void>(context, (_) => HistoryPanel(key: const ValueKey('history-panel'), pageId: pageId),
-      width: 1100, height: 760);
+      width: HistorySize.width, height: HistorySize.height);
 }
 
 class HistoryPanel extends StatefulWidget {
@@ -93,7 +93,8 @@ class _HistoryPanelState extends State<HistoryPanel> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
+    // A screen of its own on a compact screen, a split panel otherwise.
+    final m = context.sizeClass.isCompact;
     final list = _list(context);
     final preview = _previewView(context);
     if (m) {
@@ -101,7 +102,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
         title: 'Version history',
         actions: [_restoreButton(context)],
         body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          SizedBox(height: 200, child: list),
+          SizedBox(height: HistorySize.listCompact, child: list),
           HLine(color: c.border),
           Expanded(child: preview),
         ]),
@@ -109,7 +110,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
     }
     return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
-        width: 280,
+        width: HistorySize.list,
         decoration: BoxDecoration(color: c.bgSecondary, border: Border(right: BorderSide(color: c.borderSubtle))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
@@ -123,7 +124,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Expanded(child: preview),
           Container(
-            height: 56,
+            constraints: const BoxConstraints(minHeight: HistorySize.actions),
             padding: const EdgeInsets.symmetric(horizontal: Space.lg),
             decoration: BoxDecoration(border: Border(top: BorderSide(color: c.borderSubtle))),
             child: Row(children: [
@@ -156,7 +157,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
       key: const ValueKey('history-restore'),
       label: 'Restore version',
       filled: true,
-      height: context.touch ? 32 : null,
+      height: context.touch ? ControlSize.md.height : null,
       onTap: can ? _restore : null,
     );
   }
@@ -177,18 +178,18 @@ class _HistoryPanelState extends State<HistoryPanel> {
       if (d != day) {
         day = d;
         rows.add(Padding(
-          padding: EdgeInsets.fromLTRB(context.touch ? Layout.gutter : Space.lg, Space.md, Space.lg, Space.xxs),
+          padding: EdgeInsets.fromLTRB(context.sizeClass.isCompact ? Layout.gutter : Space.lg, Space.md, Space.lg, Space.xxs),
           child: Text(d, style: ts(ty.uiSmall, c.textTertiary)),
         ));
       }
       rows.add(Padding(
-        padding: EdgeInsets.symmetric(horizontal: context.touch ? 0 : Space.sm, vertical: Space.hair),
+        padding: EdgeInsets.symmetric(horizontal: context.sizeClass.isCompact ? 0 : Space.sm, vertical: Space.hair),
         child: PanelRow(
           key: ValueKey('history-version-$i'),
           selected: i == _selected,
           onTap: () => _select(i),
-          child: SizedBox(
-            height: 48,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: HistorySize.row),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(i == 0 ? '${_time(t)}  ·  Current' : _time(t),
                   style: ts(ty.ui, c.textPrimary, weight: i == _selected ? Weight.semibold : Weight.medium)),

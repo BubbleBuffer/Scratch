@@ -819,7 +819,7 @@ class TrustedCertificatesSettings extends StatelessWidget {
 
 /// Opens "Add a device"; [token] skips the naming step (screenshots).
 Future<void> showAddDevice(BuildContext context, {String? token}) {
-  if (context.touch) return pushSettingsPage(context, 'Add a device', AddDeviceView(initialToken: token));
+  if (context.sizeClass.isCompact) return pushSettingsPage(context, 'Add a device', AddDeviceView(initialToken: token));
   return showPanel(
     context,
     (_) => SingleChildScrollView(
@@ -894,9 +894,10 @@ class _AddDeviceViewState extends State<AddDeviceView> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
+    // A compact screen pushes this as its own page, titled by the bar.
+    final m = context.sizeClass.isCompact;
     final sync = context.watch<SyncStore>();
-    final body = m ? ts(context.type.ui, c.textSecondary, weight: Weight.regular) : ts(context.type.ui, c.textSecondary, weight: Weight.regular);
+    final body = ts(context.type.ui, c.textSecondary, weight: Weight.regular);
     final token = _token;
     final children = <Widget>[
       if (!m) ...[
@@ -912,7 +913,7 @@ class _AddDeviceViewState extends State<AddDeviceView> {
           fieldKey: const ValueKey('device-name-field'),
           controller: _name,
           placeholder: 'Phone',
-          autofocus: !m,
+          autofocus: !context.touch,
           onSubmitted: (_) => _create(),
         ),
         if (_error != null) ...[
@@ -934,11 +935,11 @@ class _AddDeviceViewState extends State<AddDeviceView> {
             key: const ValueKey('pairing-qr'),
             padding: const EdgeInsets.all(Space.xxs),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFFFF),
+              color: QrInk.light,
               borderRadius: BorderRadius.circular(Radii.md),
               border: Border.all(color: c.border),
             ),
-            child: QrView(code: QrCode.encode(code), size: m ? 220 : 200),
+            child: QrView(code: QrCode.encode(code), size: m ? SyncSize.qrCompact : SyncSize.qrWide),
           ),
         ),
         const Gap(Space.xl),

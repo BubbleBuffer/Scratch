@@ -45,7 +45,7 @@ Future<String?> showAskAi(BuildContext context, {required String pageId, String?
       },
       onCancel: () => Navigator.of(ctx).pop(),
     ),
-    width: 520,
+    width: SmallPanels.askAi,
     shrink: true,
   );
 }
@@ -162,14 +162,15 @@ class _AskAiBoxState extends State<AskAiBox> {
 
 /// The AI mark: a four-pointed sparkle.
 class AiMark extends StatelessWidget {
-  const AiMark({super.key, this.size = 20, this.color});
-  final double size;
+  const AiMark({super.key, this.size, this.color});
+
+  /// The mark's box; [IconSize.lg] by default.
+  final double? size;
   final Color? color;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: size,
-        height: size,
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: size ?? IconSize.lg.px,
         child: CustomPaint(painter: _SparklePainter(color ?? context.colors.iconPrimary)),
       );
 }

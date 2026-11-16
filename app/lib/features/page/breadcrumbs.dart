@@ -48,7 +48,7 @@ class Breadcrumbs extends StatelessWidget {
       String? icon,
       String title,
       VoidCallback? onTap, {
-      double maxWidth = 160,
+      double maxWidth = CrumbSize.crumb,
       bool database = false,
     }) {
       final patch = patchFor(key);
@@ -59,8 +59,8 @@ class Breadcrumbs extends StatelessWidget {
           ? patch == null
                 ? DbIcon(DbIco.database, size: IconSize.sm.px, color: c.iconSecondary)
                 : Container(
-                    width: 22,
-                    height: 22,
+                    width: SpaceTile.size,
+                    height: SpaceTile.size,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: patch.fill,
@@ -70,8 +70,7 @@ class Breadcrumbs extends StatelessWidget {
                   )
           : SpaceIconTile(
               icon: icon,
-              size: 22,
-              glyphSize: 16,
+              glyphSize: IconSize.sm.px,
               color: c.iconSecondary,
               patch: patch,
             );
@@ -80,8 +79,8 @@ class Breadcrumbs extends StatelessWidget {
         radius: Radii.sm,
         onTap: onTap,
         padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-        child: SizedBox(
-          height: 24,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: ControlSize.xs.height),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -132,7 +131,7 @@ class Breadcrumbs extends StatelessWidget {
         out.add(slash());
       }
     }
-    out.add(crumb('crumb-current', icon, title, null, maxWidth: 280));
+    out.add(crumb('crumb-current', icon, title, null, maxWidth: CrumbSize.current));
     // A narrow window clips the trail rather than overflowing the bar.
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,

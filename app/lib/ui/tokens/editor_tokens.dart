@@ -4,6 +4,8 @@
 
 import 'package:flutter/widgets.dart';
 
+import 'color_tokens.dart';
+
 /// The room above and below a block's text: one line of body text is 28 px
 /// (24 + 2 + 2 with a pointer, 22 + 3 + 3 by touch).
 abstract final class BlockRhythm {
@@ -82,7 +84,7 @@ abstract final class MediaBlock {
   static const double loading = 160, dropZone = 120;
   static const double grip = 6, gripHeight = 48, gripZone = 18;
   static const gripRadius = Radius.circular(20);
-  static const gripShade = Color(0x99000000);
+  static const gripShade = ImageOverlay.shade;
 }
 
 /// A page link's icon, and the small link badge on it.
@@ -127,8 +129,10 @@ abstract final class PageChrome {
   /// An embedded page's side gutter, compact and wider.
   static const double embeddedGutterCompact = 18, embeddedGutter = 30;
 
-  /// A wide page's margin either side of its column, full width and not.
-  static const double fullWidthMargin = 96, columnMargin = 48;
+  /// A wide page's margin either side of its column, full width and not,
+  /// and the width from which a full-page board or database takes the wider
+  /// margin.
+  static const double fullWidthMargin = 96, columnMargin = 48, wideAt = 900;
 }
 
 /// The `/` and mention menus above the soft keyboard: a header and rows of
@@ -143,4 +147,28 @@ abstract final class SoftKeyboardMenu {
 
   static const double minHeight = minRows * row + header;
   static const double maxHeight = maxRows * row + header;
+}
+
+/// A page's header: the cover (compact, wider), the icon's paper tile and
+/// its emoji, how far the icon overlaps the cover (compact, wider), and the
+/// room above the icon or title without a cover (compact, wider).
+abstract final class PageHeaderSize {
+  static const double coverCompact = 200, cover = 270;
+  static const double icon = 64, emoji = 40;
+  static const double overlapCompact = 36, overlap = 42;
+  static const double iconTopCompact = 16, iconTop = 72, titleTop = 64;
+
+  /// The cover's buttons: their height, and their inset from the cover's
+  /// edge.
+  static const double coverButton = 26, coverButtonInset = 10;
+}
+
+/// The breadcrumbs above a page: a crumb's widest, and the current page's.
+abstract final class CrumbSize {
+  static const double crumb = 160, current = 280;
+}
+
+/// The page's "•••" menu: its popover, and a row in its sheet.
+abstract final class PageMenuSize {
+  static const double width = 265, sheetRow = 48;
 }

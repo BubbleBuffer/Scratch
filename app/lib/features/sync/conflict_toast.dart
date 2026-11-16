@@ -115,22 +115,22 @@ class _ConflictToastState extends State<_ConflictToast> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.touch;
+    final m = context.sizeClass.isCompact;
     final undo = widget.undo;
     return Positioned(
-      left: widget.area.left + (m ? 16 : 24),
-      right: widget.area.right + (m ? 16 : 24),
-      bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
+      left: widget.area.left + (m ? Space.lg : Space.xl),
+      right: widget.area.right + (m ? Space.lg : Space.xl),
+      bottom: MediaQuery.viewInsetsOf(context).bottom + Space.xl,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: const BoxConstraints(maxWidth: Widths.form),
           child: Container(
             key: const ValueKey('conflict-toast'),
             padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
             decoration: BoxDecoration(
               color: c.rail,
               borderRadius: BorderRadius.circular(Radii.lg),
-              boxShadow: const [BoxShadow(color: Color(0x47141618), blurRadius: 20, offset: Offset(0, 8))],
+              boxShadow: ToastShadow.lift,
             ),
             child: Row(children: [
               Expanded(child: Text(widget.message, style: ts(context.type.ui, c.railInk, weight: Weight.regular))),

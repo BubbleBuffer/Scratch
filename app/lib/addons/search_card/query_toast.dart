@@ -30,9 +30,9 @@ VoidCallback showQueryToast(
 
   entry = OverlayEntry(
     builder: (ctx) => Positioned(
-      left: 24,
-      right: 24,
-      bottom: MediaQuery.viewInsetsOf(ctx).bottom + 80,
+      left: Space.xl,
+      right: Space.xl,
+      bottom: MediaQuery.viewInsetsOf(ctx).bottom + ToastPlacement.bottom,
       child: Align(
         alignment: Alignment.bottomCenter,
         child: MenuSurface(

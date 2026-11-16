@@ -156,13 +156,13 @@ class QueryRowTile extends StatelessWidget {
         onTap: onOpen,
         borderRadius: BorderRadius.circular(Radii.sm),
         hoverBackground: c.bgHover,
-        child: SizedBox(
-          height: mobile ? 52 : 40,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: mobile ? QueryCardSize.rowTouch : QueryCardSize.row),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: Space.md),
             child: Row(
               children: [
-                SizedBox(width: 22, child: Center(child: leading)),
+                SizedBox(width: QueryCardSize.lead, child: Center(child: leading)),
                 const Gap(Space.md),
                 // flex 0: the title takes its own width, so the snippet's
                 // Expanded gets the rest and sits at the row's end.
@@ -214,7 +214,7 @@ class QueryStatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.hair),
       decoration: BoxDecoration(
         color: c.bgSecondary,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: Radii.pill,
         border: Border.all(color: c.borderSubtle),
       ),
       child: Text(label, style: ts(context.type.uiSmall, c.textSecondary)),

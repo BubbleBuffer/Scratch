@@ -2,8 +2,8 @@
 // small text and full width switches, lock, favourites, copy link, share (with a hub
 // sign-in), duplicate, move to, Ask AI (about the page), undo, page history, deleted pages, delete, import
 // and export, then Send feedback. The switches apply in place; the other rows close the menu
-// and hand their action to the editor. A popover on desktop, a sheet on
-// mobile.
+// and hand their action to the editor. A popover, or a sheet on a compact
+// screen.
 
 import 'package:flutter/widgets.dart';
 
@@ -31,14 +31,14 @@ Future<PageMenuAction?> showPageMenu(BuildContext context, Rect? anchor,
         canUndo: canUndo,
         canAskAi: canAskAi,
         canShare: canShare,
-        sheet: context.touch,
+        sheet: context.sizeClass.isCompact || anchor == null,
         onAction: (a) => Navigator.of(ctx).pop(a),
       );
-  if (context.touch || anchor == null) {
+  if (context.sizeClass.isCompact || anchor == null) {
     return showSheet<PageMenuAction>(context, (ctx) => SheetSurface(children: [body(ctx)]));
   }
   return showPopover<PageMenuAction>(
-      context, anchor, (ctx) => MenuSurface(width: 265, padding: const EdgeInsets.all(Space.xs), child: body(ctx)));
+      context, anchor, (ctx) => MenuSurface(width: PageMenuSize.width, padding: const EdgeInsets.all(Space.xs), child: body(ctx)));
 }
 
 class PageMenu extends StatefulWidget {
@@ -106,7 +106,7 @@ class _PageMenuState extends State<PageMenu> {
     final prefs = pages.prefs(pageId);
     final meta = pages.meta(pageId);
     final m = sheet;
-    final rowH = m ? 48.0 : 28.0;
+    final rowH = m ? PageMenuSize.sheetRow : ControlSize.sm.height;
     final textStyle = ts(m ? ty.body : ty.ui, c.textPrimary, weight: Weight.regular);
     final iconSize = m ? IconSize.xl : IconSize.md;
 
@@ -117,11 +117,11 @@ class _PageMenuState extends State<PageMenu> {
         onTap: onTap,
         radius: m ? 0 : Radii.md,
         padding: EdgeInsets.symmetric(horizontal: m ? Layout.gutter : Space.sm),
-        child: SizedBox(
-          height: rowH,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: rowH),
           child: Row(children: [
-            SizedBox(width: m ? 22 : 20, child: Center(child: icon)),
-            Gap(m ? 14 : 8),
+            SizedBox(width: iconSize.px, child: Center(child: icon)),
+            Gap(m ? Space.md : Space.sm),
             Expanded(
               child: Text(label,
                   maxLines: 1,
@@ -167,13 +167,13 @@ class _PageMenuState extends State<PageMenu> {
                 onTap: _saving ? null : () => pick(name),
                 radius: Radii.md,
                 child: Semantics(label: name, button: true, selected: meta?.color == name, child: Container(
-                  width: m ? 40 : 32, height: m ? 40 : 32,
+                  width: (m ? ControlSize.xl : ControlSize.md).height, height: (m ? ControlSize.xl : ControlSize.md).height,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(Radii.md),
                     border: meta?.color == name ? Border.all(color: c.accent) : null,
                   ),
-                  child: Container(width: 20, height: 20, decoration: BoxDecoration(
+                  child: Container(width: IconSize.lg.px, height: IconSize.lg.px, decoration: BoxDecoration(
                     shape: BoxShape.circle, color: spaceColor(name, c.dark ? Brightness.dark : Brightness.light),
                   )),
                 )),

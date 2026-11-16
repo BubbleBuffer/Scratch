@@ -176,7 +176,7 @@ class _RunnerNamesState extends State<_RunnerNames> {
         name: r.name,
         nameWidget: editing
             ? SizedBox(
-                width: 220,
+                width: SmallPanels.runnerMenu,
                 child: STextField(
                   controller: _name,
                   placeholder: 'Name',

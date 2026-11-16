@@ -87,10 +87,10 @@ Future<void> openChatHit(
     showErrorToast(context, problem);
     return;
   }
-  // The presentation an anchored open uses: the full Agent screen on a phone
+  // The presentation an anchored open uses: the full Agent screen on a compact screen
   // or while its route is open, else the dock.
   final screen =
-      context.touch ||
+      context.sizeClass.isCompact ||
       PageStackScope.of(context).routes
           .any((route) => route.settings.name == agentRouteName);
   await store.openSession(target.sessionId);

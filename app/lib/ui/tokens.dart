@@ -18,3 +18,6 @@ export 'tokens/editor_tokens.dart';
 export 'tokens/type_tokens.dart';
 export 'tokens/calendar_tokens.dart';
 export 'tokens/settings_tokens.dart';
+export 'tokens/color_tokens.dart';
+export 'tokens/agent_tokens.dart';
+export 'tokens/panel_tokens.dart';

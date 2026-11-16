@@ -68,7 +68,7 @@ class ScratchUserMessage extends StatelessWidget {
     return Align(
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: const BoxConstraints(maxWidth: AgentLayout.userBubble),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.sm),
           decoration: BoxDecoration(

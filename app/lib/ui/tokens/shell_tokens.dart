@@ -89,3 +89,29 @@ abstract final class SidebarTree {
   static const double indent = 12, resizeHandle = 6;
   static const ghostOffset = Offset(8, -14);
 }
+
+/// The feedback form: the text's least height, the screenshot's tallest
+/// (compact, wider), and the diagnostics' tallest.
+abstract final class FeedbackForm {
+  static const double text = 96, shotCompact = 140, shot = 120;
+  static const double diagnostics = 240;
+
+  /// The title and buttons around the middle of the compact sheet.
+  static const double sheetChrome = 134;
+
+  /// The form's popover on a wide screen.
+  static const double width = 560;
+}
+
+/// The conflict toast's lift off the page.
+abstract final class ToastShadow {
+  static const lift = [
+    BoxShadow(color: Color(0x47141618), blurRadius: 20, offset: Offset(0, 8)),
+  ];
+}
+
+/// A search query card and its panel: a query row (pointer and touch) and
+/// its leading column.
+abstract final class QueryCardSize {
+  static const double row = 40, rowTouch = 52, lead = 22;
+}

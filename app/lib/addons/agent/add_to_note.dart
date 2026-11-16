@@ -163,7 +163,7 @@ class _AddChatReferenceBoxState extends State<AddChatReferenceBox> {
     final r = widget.reference;
     final pages = context.watch<PagesStore>();
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 520),
+      constraints: const BoxConstraints(maxWidth: AgentSheets.addToNote),
       child: PickerSheet(
         header: Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -318,12 +318,12 @@ class _ShowAsOption extends StatelessWidget {
             const Gap(Space.xs),
             IgnorePointer(
               child: SizedBox(
-                height: 76,
+                height: AgentSheets.previewHeight,
                 width: double.infinity,
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.topLeft,
-                  child: SizedBox(width: 420, child: preview),
+                  child: SizedBox(width: AgentSheets.previewWidth, child: preview),
                 ),
               ),
             ),
@@ -395,7 +395,7 @@ class _NoticeState extends State<_Notice> {
     return Positioned(
       left: 0,
       right: 0,
-      bottom: 24,
+      bottom: Space.xl,
       child: Center(
         child: Container(
           key: const ValueKey('add-notice'),

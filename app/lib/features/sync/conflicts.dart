@@ -437,8 +437,8 @@ enum ConflictRowsLook { list, card, rail }
 Widget _dot(BuildContext context) {
   final c = context.colors;
   return Container(
-    width: 8,
-    height: 8,
+    width: SpaceMark.size,
+    height: SpaceMark.size,
     decoration: BoxDecoration(
       color: spaceColor('apricot', c.dark ? Brightness.dark : Brightness.light),
       borderRadius: BorderRadius.circular(Radii.sm),
@@ -456,9 +456,9 @@ class ConflictCount extends StatelessWidget {
     final c = context.colors;
     final patch = spacePatch('apricot', c.dark ? Brightness.dark : Brightness.light);
     return Container(
-      constraints: const BoxConstraints(minWidth: 20),
+      constraints: const BoxConstraints(minWidth: Sizes.pill),
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-      decoration: BoxDecoration(color: patch?.fill ?? c.accent, borderRadius: BorderRadius.circular(999)),
+      decoration: BoxDecoration(color: patch?.fill ?? c.accent, borderRadius: Radii.pill),
       child: Text('$count', textAlign: TextAlign.center, style: ts(context.type.uiSmall, patch?.ink ?? c.onAccent, weight: Weight.semibold)),
     );
   }
@@ -542,7 +542,7 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
           radius: 0,
           padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 32),
+            constraints: BoxConstraints(minHeight: ControlSize.md.height),
             child: Row(children: [
               _dot(context),
               const Gap(Space.md),
@@ -655,7 +655,7 @@ class _ConflictRailGroupState extends State<ConflictRailGroup> {
         ),
         if (_open)
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 240),
+            constraints: const BoxConstraints(maxHeight: SyncSize.conflictLog),
             child: const SingleChildScrollView(
               padding: EdgeInsets.only(top: Space.xxs, bottom: Space.xs),
               child: ConflictRows(look: ConflictRowsLook.rail),

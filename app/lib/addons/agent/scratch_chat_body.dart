@@ -213,9 +213,9 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
       viewportKey: _reader.historyViewport,
       contentWidth: Layout.contentWidth,
       gutter: 0,
-      rowGap: 14,
+      rowGap: AgentLayout.rowGap,
       gapBefore: gapBefore,
-      padding: padding.copyWith(bottom: padding.bottom + 14),
+      padding: padding.copyWith(bottom: padding.bottom + AgentLayout.rowGap),
     );
   }
 
@@ -354,14 +354,14 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
           : !store.enabled
           ? 'The agent is off. Turn it on in Settings > AI.'
           : store.openError;
-      final pad = widget.panel ? 12.0 : 32.0;
+      final pad = widget.panel ? Space.md : Space.xxl;
       final padding = EdgeInsets.fromLTRB(pad, widget.panel ? Space.lg : Space.xxl, pad, Space.lg);
       final Widget body = signIn
           ? Center(
               child: Padding(
                 padding: EdgeInsets.all(pad),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
+                  constraints: const BoxConstraints(maxWidth: AgentLayout.notice),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -390,7 +390,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               child: Padding(
                 padding: EdgeInsets.all(pad),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
+                  constraints: const BoxConstraints(maxWidth: AgentLayout.notice),
                   child: Text(
                     notice,
                     key: const ValueKey('agent-open-error'),
@@ -404,7 +404,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               child: Padding(
                 padding: EdgeInsets.all(pad),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
+                  constraints: const BoxConstraints(maxWidth: AgentLayout.notice),
                   child: Text(
                     agentEmptyLine,
                     key: const ValueKey('agent-empty'),
@@ -449,8 +449,8 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               viewportKey: _reader.plainViewport,
               contentWidth: Layout.contentWidth,
               gutter: 0,
-              rowGap: 14,
-              padding: padding.copyWith(bottom: padding.bottom + 14),
+              rowGap: AgentLayout.rowGap,
+              padding: padding.copyWith(bottom: padding.bottom + AgentLayout.rowGap),
             );
       final switched = _switchAnchor;
       if (switched != null) {

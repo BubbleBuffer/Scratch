@@ -12,24 +12,24 @@ import '../../state/pages_store.dart';
 import '../../ui/icon_x.dart';
 import '../../ui/ui.dart';
 
-/// Shows the trash next to [anchor] (desktop) or as a screen (mobile).
+/// Shows the trash next to [anchor], or as a screen on a compact screen.
 Future<void> showTrash(BuildContext context, {Rect? anchor}) async {
-  if (context.touch) {
+  if (context.sizeClass.isCompact) {
     await pushScreen<void>(
         context, (_) => const ScreenScaffold(title: 'Trash', body: TrashPanel(key: ValueKey('trash-panel'))),
         name: '/trash');
     return;
   }
   if (anchor == null) {
-    await showModalPanel<void>(context, (_) => const TrashPanel(key: ValueKey('trash-panel')), width: 420, height: 520);
+    await showModalPanel<void>(context, (_) => const TrashPanel(key: ValueKey('trash-panel')), width: TrashSize.width, height: TrashSize.panel);
     return;
   }
   await showPopover<void>(
     context,
     anchor,
     (_) => const MenuSurface(
-      width: 420,
-      child: SizedBox(height: 460, child: TrashPanel(key: ValueKey('trash-panel'))),
+      width: TrashSize.width,
+      child: SizedBox(height: TrashSize.popover, child: TrashPanel(key: ValueKey('trash-panel'))),
     ),
   );
 }
@@ -113,19 +113,20 @@ class _TrashPanelState extends State<TrashPanel> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final ty = context.type;
-    final m = context.touch;
+    // A screen of its own on a compact screen, a panel otherwise.
+    final m = context.sizeClass.isCompact;
     final pages = context.watch<PagesStore>();
     final q = _ctl.text.trim().toLowerCase();
     final items = [
       for (final t in _items ?? const <TrashedPage>[])
         if (q.isEmpty || t.page.title.toLowerCase().contains(q)) t,
     ];
-    final gutter = m ? Layout.gutter : 10.0;
+    final gutter = m ? Layout.gutter : Space.md;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
         padding: EdgeInsets.fromLTRB(gutter, m ? Space.xxs : Space.md, gutter, Space.xs),
         child: InputBox(
-          height: m ? 40 : 28,
+          height: context.metrics.field.height,
           child: Row(children: [
             Icon20(Ico.search, size: m ? IconSize.md : IconSize.xs, color: c.iconTertiary),
             const Gap(Space.xs),
@@ -183,11 +184,11 @@ class _TrashPanelState extends State<TrashPanel> {
       key: ValueKey('trash-row-${p.id}'),
       onTap: () {},
       padding: EdgeInsets.symmetric(horizontal: m ? Layout.gutter : Space.xs),
-      child: SizedBox(
-        height: m ? 56 : (path == null ? 32 : 42),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: m ? TrashSize.rowTouch : (path == null ? TrashSize.row : TrashSize.rowWithPath)),
         child: Row(children: [
           PageIcon(icon: p.icon, size: (m ? IconSize.xl : IconSize.md).px, color: c.iconSecondary),
-          Gap(m ? 12 : 8),
+          Gap(m ? Space.md : Space.sm),
           Expanded(
             child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(displayTitle(p.title, firstLine: firstLine),

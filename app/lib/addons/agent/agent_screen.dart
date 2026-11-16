@@ -65,7 +65,7 @@ class _AgentScreenState extends State<AgentScreen> {
       color: c.desk,
       child: Row(
         children: [
-          if (!context.touch) const Sidebar(agentOpen: true),
+          if (!context.sizeClass.isCompact) const Sidebar(agentOpen: true),
           Expanded(
             child: Column(
               children: [
@@ -75,8 +75,8 @@ class _AgentScreenState extends State<AgentScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: Space.md),
                     child: Row(
                       children: [
-                        if (!context.touch) const SidebarReopenButton(),
-                        if (!context.touch) const CollapsedFeedbackButton(),
+                        if (!context.sizeClass.isCompact) const SidebarReopenButton(),
+                        if (!context.sizeClass.isCompact) const CollapsedFeedbackButton(),
                         Icon20(Ico.comment, size: IconSize.sm, color: c.iconSecondary),
                         const Gap(Space.xs),
                         Text(
@@ -89,7 +89,7 @@ class _AgentScreenState extends State<AgentScreen> {
                         ),
                         const Spacer(),
                         // Phones have no chat list: New chat lives here.
-                        if (context.touch && hubAgentPlatform)
+                        if (context.sizeClass.isCompact && hubAgentPlatform)
                           ListenableBuilder(
                             listenable: store,
                             builder: (context, _) => IconBtn(
@@ -116,9 +116,9 @@ class _AgentScreenState extends State<AgentScreen> {
                       builder: (context, _) => Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (!context.touch) ...[
+                          if (!context.sizeClass.isCompact) ...[
                             SizedBox(
-                              width: 248,
+                              width: AgentLayout.sessions,
                               child: _SessionList(store: store),
                             ),
                             const Gap(Space.md),
@@ -180,7 +180,7 @@ class _SessionListState extends State<_SessionList> {
       row,
       globalRectOf(row),
       (ctx) => MenuList(
-        width: 200,
+        width: AgentLayout.rowMenu,
         children: [
           MenuItem(
             key: const ValueKey('agent-rename'),
@@ -328,8 +328,8 @@ class _SessionRowState extends State<_SessionRow> {
         radius: Radii.md,
         onHoverChanged: (v) => setState(() => _hover = v),
         padding: const EdgeInsets.only(left: Space.md, right: Space.xxs),
-        child: SizedBox(
-          height: 32,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: ControlSize.md.height),
           child: Row(
             children: [
               Expanded(
@@ -383,7 +383,7 @@ class _RenameRow extends StatelessWidget {
       child: CallbackShortcuts(
         bindings: {const SingleActivator(LogicalKeyboardKey.escape): onCancel},
         child: FieldFrame(
-          height: 32,
+          height: ControlSize.md.height,
           child: PlainField(
             key: const ValueKey('agent-rename-field'),
             controller: controller,

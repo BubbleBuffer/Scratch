@@ -55,8 +55,9 @@ abstract final class CalendarMonth {
   static const double chip = 22, chipCheck = 12, dot = 8, smallDot = 4;
 }
 
-/// The week and day time grid: the hour column, an hour's height, the
-/// day's circle in the header, and the all-day row.
+/// The week and day time grid, one logical pixel per minute: the hour
+/// column, an hour's height, the day's circle in the header, and the
+/// all-day row.
 abstract final class CalendarTimeGrid {
   static const double hourColumn = 80, hour = 60, hours = 24 * hour;
   static const double headerDay = 27, allDayMin = 58, allDayMax = 107;

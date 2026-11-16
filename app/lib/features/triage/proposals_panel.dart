@@ -24,7 +24,7 @@ Future<void> showProposals(BuildContext context) {
       if (opener.mounted) openPage(opener, id, title);
     },
   );
-  if (context.touch) {
+  if (context.sizeClass.isCompact) {
     return pushScreen<void>(
       context,
       (ctx) => ScreenScaffold(title: proposalsTitle, body: panel(ctx)),
@@ -40,8 +40,8 @@ Future<void> showProposals(BuildContext context) {
         Expanded(child: panel(ctx)),
       ],
     ),
-    width: 560,
-    height: 600,
+    width: TriageSize.width,
+    height: TriageSize.height,
   );
 }
 
@@ -51,7 +51,7 @@ class _PanelHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      height: 48,
+      constraints: const BoxConstraints(minHeight: TriageSize.header),
       padding: const EdgeInsets.symmetric(horizontal: Space.lg),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
@@ -139,7 +139,7 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
     return ListView.separated(
       key: const ValueKey('proposals-list'),
       padding: EdgeInsets.symmetric(
-        horizontal: context.touch ? Layout.gutter : Space.md,
+        horizontal: context.sizeClass.isCompact ? Layout.gutter : Space.md,
         vertical: Space.sm,
       ),
       itemCount: items.length + applied.length,
@@ -328,7 +328,7 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
       textBaseline: TextBaseline.alphabetic,
       children: [
         SizedBox(
-          width: 76,
+          width: TriageSize.label,
           child: Text(role, style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)),
         ),
         Expanded(

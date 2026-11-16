@@ -44,7 +44,7 @@ Future<RunnerAssignment?> showRunnerPicker(
       anchor: anchor,
       duration: Motion.of(context).fast,
       builder: (ctx) => MenuSurface(
-        width: 300,
+        width: BoardSize.runnerPicker,
         padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.md),
         child: _RunnerPicker(taskId: taskId, assignments: assignments),
       ),
@@ -428,8 +428,8 @@ class _RunnerRow extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: BoardSize.runnerTile,
+                height: BoardSize.runnerTile,
                 decoration: BoxDecoration(
                   color: c.bgPrimary,
                   borderRadius: Radii.ctl,
@@ -520,8 +520,8 @@ class _RadioDot extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      width: 16,
-      height: 16,
+      width: SettingsSize.radio,
+      height: SettingsSize.radio,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: c.bgPrimary,
@@ -533,8 +533,8 @@ class _RadioDot extends StatelessWidget {
       child: selected
           ? Center(
               child: Container(
-                width: 8,
-                height: 8,
+                width: Sizes.dot,
+                height: Sizes.dot,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: c.textPrimary,

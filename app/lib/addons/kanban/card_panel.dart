@@ -403,7 +403,7 @@ class _Prop extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 72,
+          width: BoardSize.factLabel,
           child: Text(
             label,
             style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.semibold),

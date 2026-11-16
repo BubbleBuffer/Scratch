@@ -92,7 +92,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
     // Covered, closed and unrelated sessions cannot move the editor.
     if (!agentRoute &&
         (!app.ui.agentPanelOpen ||
-            context.touch ||
+            context.sizeClass.isCompact ||
             (route != null && !route.isFirst && stack.idOf(route) == null))) {
       return;
     }
@@ -106,7 +106,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
       final current = stack.currentRoute;
       if (current?.settings.name != agentRouteName &&
           (!app.ui.agentPanelOpen ||
-              context.touch ||
+              context.sizeClass.isCompact ||
               (current != null &&
                   !current.isFirst &&
                   stack.idOf(current) == null))) {
@@ -114,7 +114,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
       }
       final target = stack.navigator?.overlay?.context;
       if (target == null || !target.mounted) return;
-      if (context.touch) {
+      if (context.sizeClass.isCompact) {
         _mobileNotice(
           target,
           displayTitle(page.title, firstLine: PageMeta.of(page).firstLine),
@@ -162,7 +162,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
       builder: (context, _) {
         final stack = PageStackScope.of(context);
         final show =
-            !context.touch &&
+            !context.sizeClass.isCompact &&
             store.enabled &&
             app.ui.agentPanelOpen &&
             !stack.routes.any((r) => r.settings.name == agentRouteName);
@@ -185,7 +185,7 @@ class _AgentPanelShellState extends State<AgentPanelShell> {
                 listenable: Listenable.merge([app.ui, stack, store]),
                 builder: (context, _) {
                   final dock =
-                      !context.touch &&
+                      !context.sizeClass.isCompact &&
                       store.enabled &&
                       app.ui.agentPanelOpen &&
                       !stack.routes.any(
@@ -216,7 +216,7 @@ class AgentPanelToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.maybeOf(context);
-    if (app == null || context.touch || !AgentStore.of(app).enabled) {
+    if (app == null || context.sizeClass.isCompact || !AgentStore.of(app).enabled) {
       return const SizedBox.shrink();
     }
     return ListenableBuilder(
@@ -248,7 +248,7 @@ class AgentPanel extends StatelessWidget {
         ),
         child: SingleChildScrollView(
           child: MenuList(
-            width: 280,
+            width: AgentLayout.sessionMenu,
             children: [
               for (final s in store.sessions)
                 MenuItem(
@@ -362,7 +362,7 @@ class AgentPanel extends StatelessWidget {
             left: 0,
             top: 0,
             bottom: 0,
-            width: 6,
+            width: AgentLayout.resizeGrip,
             child: MouseRegion(
               cursor: SystemMouseCursors.resizeLeftRight,
               child: GestureDetector(
@@ -438,9 +438,9 @@ class _MobileAgentNoticeState extends State<_MobileAgentNotice> {
 
   @override
   Widget build(BuildContext context) => Positioned(
-    left: 16,
-    right: 16,
-    bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
+    left: Space.lg,
+    right: Space.lg,
+    bottom: MediaQuery.viewInsetsOf(context).bottom + Space.xl,
     child: MenuSurface(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.sm, Space.sm),

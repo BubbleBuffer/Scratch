@@ -193,7 +193,7 @@ Future<bool> confirmTrustCertificate(
       issuer: issuer,
       onDone: (v) => Navigator.of(ctx).pop(v),
     ),
-    width: 360,
+    width: Widths.notice,
     shrink: true,
   );
   return r ?? false;
@@ -323,7 +323,7 @@ Future<void> showCertificate(
     onTrust: onTrust,
     onRevoke: onRevoke,
   );
-  if (context.touch) return pushSettingsPage(context, 'Certificate', view);
+  if (context.sizeClass.isCompact) return pushSettingsPage(context, 'Certificate', view);
   return showPanel(
     context,
     (_) => SingleChildScrollView(padding: const EdgeInsets.fromLTRB(Space.xxxl, Space.xxl, Space.xxxl, Space.xxl), child: view),
@@ -466,7 +466,7 @@ class _ChainRow extends StatelessWidget {
         radius: Radii.md,
         padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: m ? 44 : 36),
+          constraints: BoxConstraints(minHeight: (m ? ControlSize.xl : ControlSize.lg).height),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: Space.sm),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -525,7 +525,7 @@ class CertFields extends StatelessWidget {
             child: wide
                 ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     SizedBox(
-                      width: 150,
+                      width: SyncSize.certLabel,
                       child: Padding(
                         padding: const EdgeInsets.only(top: Space.hair),
                         child: Text(label, style: ts(context.type.ui, c.textSecondary)),
