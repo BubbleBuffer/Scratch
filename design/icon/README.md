@@ -1,5 +1,7 @@
 # App icon
 
+The suite master (all six icons, the Pawth kit and the standard) lives in BubbleBufferDesign, `iconography/app-icons/`; this folder keeps Scratch's own exports.
+
 The app icon source is `notes-icon.svg` (1280 x 1280): a `background` layer (the cream "Desk" rect `#F2EBDD`) and a "Notebook cat" group, the glyph. The glyph is scaled to **80% of the canvas height** (the user's choice), centred on (640, 640): `matrix(1.197214 0 0 1.197214 -161.751 -198.05)`. Paths are unchanged. `rebuild.sh` rebuilds the source through Pawth (`pawthctl`) with the same transform. `export_icons.py` exports every platform icon from the source.
 
 ## Folders
