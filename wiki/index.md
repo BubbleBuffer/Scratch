@@ -18,11 +18,13 @@ One section per component, each with its own index. Every page is reachable from
 
 ## Read first
 
-1. [Data model](core/data-model.md): pages, blocks, properties and views.
-2. [The Flutter app](app/app-state.md): how the app is built on the core.
-3. [Sync and storage](sync/sync-and-storage.md), then [sync state](sync/sync-state.md): how devices share a vault.
+1. [Architecture](architecture.md): the layers, storage, sync, how the app is extended, and the guarantees.
+2. [Data model](core/data-model.md): pages, blocks, properties and views.
+3. [The Flutter app](app/app-state.md): how the app is built on the core.
+4. [Sync and storage](sync/sync-and-storage.md), then [sync state](sync/sync-state.md): how devices share a vault.
 
 <!-- wiki:children -->
+- [Architecture](architecture.md): The layers of Scratch, what each one does and may depend on, how a vault is stored and synced, how the app is extended, and the behaviours the design guarantees.
 - [Product](product/index.md): What the app does now, how it looks and feels, and the speed measurements behind it.
   - [Settings](product/settings.md): The Settings pages, where each option lives, and how options explain and guard themselves.
 - [Core](core/index.md): The Rust core (vault_core): the data model, state, search queries, the conflict format and folder mounts.
