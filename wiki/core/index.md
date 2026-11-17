@@ -1,6 +1,6 @@
 ---
 type: index
-summary: "The Rust core (vault_core): the data model, state, search queries, the conflict format and folder mounts."
+summary: "The Rust core (vault_core): the data model, the vault, search queries, the conflict format and folder mounts."
 parent: "[[index]]"
 status: current
 ---
@@ -10,8 +10,9 @@ status: current
 These pages describe the Rust core that holds the vault: how pages, blocks and properties are modelled and stored, how search works, how conflicts are represented, and how PC folders are mounted. Plans, proposals and decisions are in the internal wiki (notes vault).
 
 <!-- wiki:children -->
-- [Data model](data-model.md): Everything is a page with blocks and properties; collections group pages; views are queries plus renderers; markdown is the file format.
-- [Core (state)](core-state.md): The built Rust core (vault_core): Loro page documents, properties, collections and queries, trash, links, attachments, history, import, index, bench.
+- [Data model](data-model.md): Pages with a string type, blocks and properties; database pages hold rows with a schema and views; markdown is the file format.
+- [Vault core](vault-core.md): The Rust core (vault_core): Loro page documents, the SQLite index, the writer, properties and queries, trash, links, attachments, history, import.
+- [Search performance measurements](search-measurements.md): Recorded search timings: the 20 ms gate, the A/B acceptance rule, adaptive narrowing and the UI profile runs.
 - [Search queries and live queries](search-queries.md): Search operators (date:, tag:, in:, property filters) parsed into one query spec, filtered search inside the 20 ms budget, and live queries pushed after index commits.
 - [Conflict format v2](conflict-format.md): Approved Block, Subtree and Page conflicts, edit-beats-delete, synced resolutions and undo, journal repair log and vault-wide auto-resolve.
 - [Folder mounts](mounts.md): Any PC folder can be mounted at a vault path; devices see one logical vault, with no symlinks.

@@ -20,15 +20,15 @@ One section per component, each with its own index. Every page is reachable from
 
 1. [Data model](core/data-model.md): pages, blocks, properties and views.
 2. [The Flutter app](app/app-state.md): how the app is built on the core.
-3. [Sync and storage](sync/sync-and-storage.md), then [sync state](sync/sync-state.md): how devices share a vault.
+3. [Sync and storage](sync/sync-and-storage.md), then [vault sync](sync/vault-sync.md): how devices share a vault.
 
 <!-- wiki:children -->
 - [Product](product/index.md): What the app does now, how it looks and feels, and the speed measurements behind it.
   - [Settings](product/settings.md): The Settings pages, where each option lives, and how options explain and guard themselves.
-- [Core](core/index.md): The Rust core (vault_core): the data model, state, search queries, the conflict format and folder mounts.
+- [Core](core/index.md): The Rust core (vault_core): the data model, the vault, search queries, the conflict format and folder mounts.
 - [App](app/index.md): The Flutter app: app state, note types, the add-on architecture, the UI and agent kit, and feedback capture.
 - [Add-on reference](addons/index.md): The compiled-in add-ons, registrations and public APIs.
-- [Sync and Hub](sync/index.md): Sync and storage, the sync state, the Hub server, its deployment and the Android agent through the Hub.
+- [Sync and Hub](sync/index.md): Sync and storage, the sync protocol, the Hub server, its deployment and the Android agent through the Hub.
 - [Integrations](integrations/index.md): Connections to AI assistants and the agent, and note sharing.
 - [Releases](releases/index.md): Where code and CI live, and how Android and Windows builds are made and published.
 - [Decisions](decisions/index.md): Decisions that shape what's built, one line each with its date.
