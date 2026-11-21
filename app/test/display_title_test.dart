@@ -38,7 +38,7 @@ Future<void> mount(WidgetTester tester, AppState state, Widget child) async {
       state: state,
       child: AppTheme(
         colors: AppColors.light,
-        formFactor: FormFactor.desktop,
+        density: Density.pointer,
         child: WidgetsApp(
           color: const Color(0xFFFFFFFF),
           pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(

@@ -32,7 +32,7 @@ Future<RunnerAssignment?> showRunnerPicker(
       (ctx) => SheetSurface(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: Space.md),
             child: _RunnerPicker(taskId: taskId, assignments: assignments),
           ),
         ],
@@ -44,8 +44,8 @@ Future<RunnerAssignment?> showRunnerPicker(
       anchor: anchor,
       duration: Motion.of(context).fast,
       builder: (ctx) => MenuSurface(
-        width: 300,
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+        width: BoardSize.runnerPicker,
+        padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.md),
         child: _RunnerPicker(taskId: taskId, assignments: assignments),
       ),
     ),
@@ -206,16 +206,16 @@ class _RunnerPickerState extends State<_RunnerPicker> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+              padding: const EdgeInsets.fromLTRB(Space.hair, 0, Space.hair, Space.sm),
               child: Text(
                 'Run on',
-                style: ts(const TypeSpec(14, 18, 700), c.textPrimary),
+                style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
               ),
             ),
             if (snap.hasError)
               _Notice(_reasonOf(snap.error))
             else if (snap.connectionState != ConnectionState.done)
-              const SizedBox(height: 56)
+              const Gap(Space.xxxl)
             else if (runners.isEmpty)
               const _Notice('No runners are connected.')
             else
@@ -238,8 +238,8 @@ class _RunnerPickerState extends State<_RunnerPicker> {
               ],
             if (_error != null) _Notice(_error!),
             Container(
-              margin: const EdgeInsets.only(top: 12),
-              padding: const EdgeInsets.only(top: 12),
+              margin: const EdgeInsets.only(top: Space.md),
+              padding: const EdgeInsets.only(top: Space.md),
               decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: c.border)),
               ),
@@ -256,7 +256,7 @@ class _RunnerPickerState extends State<_RunnerPicker> {
                   PrimaryButton(
                     key: const ValueKey('runner-assign'),
                     label: 'Assign',
-                    height: 38,
+                    size: ControlSize.lg,
                     onTap: chosen == null || _busy
                         ? () {}
                         : () => _assign(chosen),
@@ -292,16 +292,16 @@ class _ProjectChoice extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(40, 0, 0, 4),
+      padding: const EdgeInsets.fromLTRB(Space.xxxl, 0, 0, Space.xxs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(0, 2, 0, 4),
+            padding: const EdgeInsets.fromLTRB(0, Space.hair, 0, Space.xxs),
             child: Text(
               'Project',
-              style: ts(const TypeSpec(12.5, 17, 600), c.textSecondary),
+              style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.strong),
             ),
           ),
           _ProjectRow(
@@ -346,13 +346,13 @@ class _ProjectRow extends StatelessWidget {
       child: _FocusRow(
         onTap: onTap,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+          margin: const EdgeInsets.only(bottom: Space.xxs),
+          padding: const EdgeInsets.fromLTRB(Space.sm, Space.xs, Space.sm, Space.xs),
           decoration: BoxDecoration(
             color: selected ? c.bgHover : null,
             borderRadius: Radii.field,
             border: Border.all(
-              color: selected ? c.borderStrong : const Color(0x00000000),
+              color: selected ? c.borderStrong : kTransparent,
             ),
           ),
           child: Row(
@@ -362,10 +362,10 @@ class _ProjectRow extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: ts(const TypeSpec(14, 18, 400), c.textPrimary),
+                  style: ts(context.type.ui, c.textPrimary, weight: Weight.regular),
                 ),
               ),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               _RadioDot(selected: selected),
             ],
           ),
@@ -382,10 +382,10 @@ class _Notice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(2, 6, 2, 0),
+    padding: const EdgeInsets.fromLTRB(Space.hair, Space.xs, Space.hair, 0),
     child: Text(
       text,
-      style: ts(const TypeSpec(12.5, 17, 400), context.colors.textSecondary),
+      style: ts(context.type.uiSmall, context.colors.textSecondary, weight: Weight.regular),
     ),
   );
 }
@@ -416,20 +416,20 @@ class _RunnerRow extends StatelessWidget {
         autofocus: selected,
         onTap: onTap,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.all(8),
+          margin: const EdgeInsets.only(bottom: Space.xxs),
+          padding: const EdgeInsets.all(Space.sm),
           decoration: BoxDecoration(
             color: selected ? c.bgHover : null,
             borderRadius: Radii.field,
             border: Border.all(
-              color: selected ? c.borderStrong : const Color(0x00000000),
+              color: selected ? c.borderStrong : kTransparent,
             ),
           ),
           child: Row(
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: BoardSize.runnerTile,
+                height: BoardSize.runnerTile,
                 decoration: BoxDecoration(
                   color: c.bgPrimary,
                   borderRadius: Radii.ctl,
@@ -438,12 +438,12 @@ class _RunnerRow extends StatelessWidget {
                 child: Center(
                   child: Icon20(
                     r.kind == RunnerKind.hub ? Ico.folder : Ico.terminal,
-                    size: 16,
+                    size: IconSize.sm,
                     color: c.iconSecondary,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const Gap(Space.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -457,13 +457,13 @@ class _RunnerRow extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: ts(
-                              const TypeSpec(14.5, 18, 700),
+                              context.type.ui,
                               c.textPrimary,
-                            ),
+                             weight: Weight.strong),
                           ),
                         ),
                         if (r.isDefault) ...[
-                          const SizedBox(width: 6),
+                          const Gap(Space.xs),
                           const _DefaultBadge(),
                         ],
                       ],
@@ -473,14 +473,14 @@ class _RunnerRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: ts(
-                        const TypeSpec(12.5, 17, 400),
+                        context.type.uiSmall,
                         c.textSecondary,
-                      ),
+                       weight: Weight.regular),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               _RadioDot(selected: selected),
             ],
           ),
@@ -498,14 +498,14 @@ class _DefaultBadge extends StatelessWidget {
     final c = context.colors;
     return Container(
       key: const ValueKey('runner-default-badge'),
-      padding: const EdgeInsets.fromLTRB(5, 2, 5, 3),
+      padding: const EdgeInsets.fromLTRB(Space.xs, Space.hair, Space.xs, Space.xxs),
       decoration: BoxDecoration(
         color: c.bgSecondary,
         borderRadius: Radii.pill,
       ),
       child: Text(
         'default',
-        style: ts(const TypeSpec(10.5, 12, 600), c.textSecondary),
+        style: ts(context.type.micro, c.textSecondary),
       ),
     );
   }
@@ -520,21 +520,21 @@ class _RadioDot extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      width: 16,
-      height: 16,
+      width: SettingsSize.radio,
+      height: SettingsSize.radio,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: c.bgPrimary,
         border: Border.all(
           color: selected ? c.textPrimary : c.borderStrong,
-          width: 1.75,
+          width: Stroke.bold,
         ),
       ),
       child: selected
           ? Center(
               child: Container(
-                width: 8,
-                height: 8,
+                width: Sizes.dot,
+                height: Sizes.dot,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: c.textPrimary,
@@ -591,8 +591,8 @@ class _FocusRowState extends State<_FocusRow> {
         decoration: BoxDecoration(
           borderRadius: Radii.field,
           border: Border.all(
-            color: _highlight ? c.focus : const Color(0x00000000),
-            width: 2,
+            color: _highlight ? c.focus : kTransparent,
+            width: Stroke.bold,
           ),
         ),
         child: GestureDetector(

@@ -15,6 +15,7 @@ import '../../../../registry/property_registry.dart';
 import '../../../../registry/view_registry.dart';
 import '../../../../ui/ui.dart';
 import '../common.dart';
+import '../../../../ui/database/db_tokens.dart';
 
 final listView = ViewType(
   kind: ViewKind.list,
@@ -60,17 +61,17 @@ class _DbListViewState extends State<DbListView> {
   Widget build(BuildContext context) {
     final src = a.store.main;
     final n = math.max(0, src.total);
-    final m = context.mobile;
-    final h = m ? 44.0 : 34.0;
+    final m = context.touch;
+    final h = m ? DbList.rowTouch : DbList.row;
     Widget row(int i) {
       final r = src.rowAt(i);
       if (r == null) return SizedBox(height: h);
       return _ListRow(key: ValueKey(r.id), args: a, row: r, height: h);
     }
 
-    final add = AddRowButton(key: const ValueKey('list-new'), label: 'New page', onTap: _add, height: h - 2);
+    final add = AddRowButton(key: const ValueKey('list-new'), label: 'New page', onTap: _add, size: m ? ControlSize.xl : ControlSize.md);
     // Rows reach 6 into the gutter; a view block in the text column has none.
-    final side = math.max(0.0, a.gutter - 6);
+    final side = math.max(0.0, a.gutter - DbList.reach);
     if (a.inline) {
       final shown = math.min(n, _limit);
       return Padding(
@@ -85,7 +86,7 @@ class _DbListViewState extends State<DbListView> {
     return ListView.builder(
       key: const ValueKey('list-rows'),
       controller: _v,
-      padding: EdgeInsets.fromLTRB(side, 0, side, 120),
+      padding: EdgeInsets.fromLTRB(side, 0, side, Db.endPadding),
       itemCount: n + 1,
       itemExtent: h,
       itemBuilder: (context, i) => i < n ? row(i) : add,
@@ -102,7 +103,7 @@ class _ListRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final a = args;
     final props = [for (final d in a.store.visibleProps(a.view)) if (shownOnCard(row.valueOf(d))) d];
     return Builder(builder: (cell) {
@@ -111,7 +112,7 @@ class _ListRow extends StatelessWidget {
         key: ValueKey('list-${row.title}'),
         onTap: () => a.ctl.openRow(context, row.id, title: row.title),
         radius: Radii.sm,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
         child: SizedBox(
           height: height,
           child: Row(children: [
@@ -119,12 +120,12 @@ class _ListRow extends StatelessWidget {
               flex: 3,
               child: RowTitle(
                 row: row,
-                style: ts(m ? const TypeSpec(16, 22, 500) : const TypeSpec(14, 20, 500), c.textPrimary),
-                iconSize: m ? 20 : 18,
+                style: ts(m ? context.type.body : context.type.ui, c.textPrimary),
+                iconSize: (m ? IconSize.lg : IconSize.md).px,
                 showIcon: a.view.cfg.showIcon,
               ),
             ),
-            const SizedBox(width: 16),
+            const Gap(Space.lg),
             Expanded(
               flex: 4,
               child: ClipRect(
@@ -137,9 +138,9 @@ class _ListRow extends StatelessWidget {
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       for (final d in props)
                         Padding(
-                          padding: const EdgeInsets.only(left: 12),
+                          padding: const EdgeInsets.only(left: Space.md),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 280),
+                            constraints: const BoxConstraints(maxWidth: DbList.value),
                             child: valueOf(context, d, row, CellMode.list),
                           ),
                         ),

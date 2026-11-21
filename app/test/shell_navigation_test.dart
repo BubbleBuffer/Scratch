@@ -17,7 +17,7 @@ Future<void> pumpFrame(WidgetTester tester, String destination) async {
   await tester.pumpWidget(
     AppTheme(
       colors: AppColors.light,
-      formFactor: FormFactor.mobile,
+      density: Density.touch,
       child: WidgetsApp(
         color: AppColors.light.bgPrimary,
         pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(

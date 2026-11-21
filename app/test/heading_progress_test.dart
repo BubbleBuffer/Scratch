@@ -86,7 +86,7 @@ void main() {
           data: const MediaQueryData(),
           child: AppTheme(
             colors: AppColors.light,
-            formFactor: FormFactor.desktop,
+            density: Density.pointer,
             child: Directionality(
               textDirection: TextDirection.ltr,
               child: Center(
@@ -145,7 +145,7 @@ void main() {
           data: MediaQueryData(disableAnimations: reduced),
           child: AppTheme(
             colors: AppColors.light,
-            formFactor: FormFactor.desktop,
+            density: Density.pointer,
             child: Directionality(
               textDirection: TextDirection.ltr,
               child: Center(

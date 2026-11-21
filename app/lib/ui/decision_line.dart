@@ -41,7 +41,7 @@ class DecisionLine extends StatelessWidget {
     );
     if (!boxed) return line;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xs),
       decoration: BoxDecoration(
         color: c.bgSecondary,
         borderRadius: BorderRadius.circular(Radii.md),

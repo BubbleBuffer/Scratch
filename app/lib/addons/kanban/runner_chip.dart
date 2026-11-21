@@ -64,21 +64,21 @@ class RunnerChip extends StatelessWidget {
     };
     final chip = Container(
       key: ValueKey('runner-chip-${a.taskId}'),
-      padding: const EdgeInsets.fromLTRB(8, 4, 10, 5),
+      padding: const EdgeInsets.fromLTRB(Space.sm, Space.xxs, Space.md, Space.xs),
       decoration: BoxDecoration(color: background, borderRadius: Radii.pill),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon20(icon, size: 12, color: c.textSecondary),
-            const SizedBox(width: 5),
+            Icon20(icon, size: IconSize.xs, color: c.textSecondary),
+            const Gap(Space.xs),
           ],
           Flexible(
             child: Text(
               runnerChipText(a),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ts(const TypeSpec(12, 16, 600), c.textPrimary),
+              style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.strong),
             ),
           ),
         ],
@@ -93,22 +93,22 @@ class RunnerChip extends StatelessWidget {
       children: [
         chip,
         if (reason != null) ...[
-          const SizedBox(height: 4),
+          const Gap(Space.xxs),
           Text(
             reason,
-            style: ts(const TypeSpec(12.5, 17, 400), c.textSecondary),
+            style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular),
           ),
         ],
         if (a.outdated) ...[
-          const SizedBox(height: 4),
+          const Gap(Space.xxs),
           Text(
             'Running on an earlier version of the note',
             key: ValueKey('runner-outdated-${a.taskId}'),
-            style: ts(const TypeSpec(12.5, 17, 400), c.textSecondary),
+            style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular),
           ),
         ],
         if (progress != null) ...[
-          const SizedBox(height: 4),
+          const Gap(Space.xxs),
           AppTooltip(
             label: progress,
             child: Text(
@@ -117,9 +117,9 @@ class RunnerChip extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: ts(
-                const TypeSpec(12.5, 17, 400),
+                context.type.uiSmall,
                 a.state == AssignState.running ? c.textSecondary : c.textTertiary,
-              ),
+               weight: Weight.regular),
             ),
           ),
         ],

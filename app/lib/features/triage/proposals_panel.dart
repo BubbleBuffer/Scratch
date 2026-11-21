@@ -24,7 +24,7 @@ Future<void> showProposals(BuildContext context) {
       if (opener.mounted) openPage(opener, id, title);
     },
   );
-  if (context.mobile) {
+  if (context.sizeClass.isCompact) {
     return pushScreen<void>(
       context,
       (ctx) => ScreenScaffold(title: proposalsTitle, body: panel(ctx)),
@@ -40,8 +40,8 @@ Future<void> showProposals(BuildContext context) {
         Expanded(child: panel(ctx)),
       ],
     ),
-    width: 560,
-    height: 600,
+    width: TriageSize.width,
+    height: TriageSize.height,
   );
 }
 
@@ -51,15 +51,15 @@ class _PanelHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      constraints: const BoxConstraints(minHeight: TriageSize.header),
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: c.borderSubtle)),
       ),
       child: Text(
         proposalsTitle,
-        style: ts(context.type.ui, c.textPrimary, weight: 600),
+        style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
       ),
     );
   }
@@ -124,13 +124,13 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
     if (items.isEmpty && applied.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(Space.xl),
           child: widget.store.loaded
               ? Text(
                   proposalsEmpty,
                   key: const ValueKey('proposals-empty'),
                   textAlign: TextAlign.center,
-                  style: ts(ty.ui, c.textSecondary, weight: 400),
+                  style: ts(ty.ui, c.textSecondary, weight: Weight.regular),
                 )
               : const SizedBox.shrink(),
         ),
@@ -139,11 +139,11 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
     return ListView.separated(
       key: const ValueKey('proposals-list'),
       padding: EdgeInsets.symmetric(
-        horizontal: context.mobile ? Layout.gutter : 12,
-        vertical: 8,
+        horizontal: context.sizeClass.isCompact ? Layout.gutter : Space.md,
+        vertical: Space.sm,
       ),
       itemCount: items.length + applied.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const Gap(Space.sm),
       itemBuilder: (_, i) => i < items.length
           ? _entry(context, items[i])
           : _run(context, applied[i - items.length]),
@@ -157,11 +157,11 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
     final busy = _busy.contains(p.id);
     final keep = displayTitle(p.keepTitle);
     final dropped = displayTitle(p.droppedTitle);
-    final small = ts(ty.uiSmall, c.textTertiary, weight: 400);
-    final h = context.mobile ? 42.0 : 32.0;
+    final small = ts(ty.uiSmall, c.textTertiary, weight: Weight.regular);
+    final h = context.metrics.control;
     return Container(
       key: ValueKey('proposal-${p.id}'),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(Space.md),
       decoration: BoxDecoration(
         color: c.bgSecondary,
         borderRadius: Radii.ctl,
@@ -171,7 +171,7 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _titleLine(context, 'Keeps', p.keepId, keep, 'proposal-keep-${p.id}'),
-          const SizedBox(height: 4),
+          const Gap(Space.xxs),
           _titleLine(
             context,
             'Merges in',
@@ -179,26 +179,26 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
             dropped,
             'proposal-drop-${p.id}',
           ),
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           Text(
             p.reason,
             key: ValueKey('proposal-reason-${p.id}'),
-            style: ts(ty.ui, c.textPrimary, weight: 400),
+            style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
           ),
-          const SizedBox(height: 6),
+          const Gap(Space.xs),
           Text(
             merged ? mergedNote(dropped) : mergeConsequence(keep, dropped),
             style: small,
           ),
-          const SizedBox(height: 10),
+          const Gap(Space.md),
           Row(
             children: [
               if (merged) ...[
                 Container(
                   key: ValueKey('proposal-merged-${p.id}'),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
+                    horizontal: Space.sm,
+                    vertical: Space.hair,
                   ),
                   decoration: BoxDecoration(
                     color: c.okBg,
@@ -206,14 +206,14 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
                   ),
                   child: Text(
                     'Merged',
-                    style: ts(ty.uiSmall, c.textPrimary, weight: 600),
+                    style: ts(ty.uiSmall, c.textPrimary, weight: Weight.strong),
                   ),
                 ),
                 const Spacer(),
                 SecondaryButton(
                   key: ValueKey('proposal-undo-${p.id}'),
                   label: 'Undo',
-                  height: h,
+                  size: h,
                   onTap: busy
                       ? null
                       : () => _act(p, 'Undo', widget.store.undoMerge),
@@ -223,16 +223,16 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
                 SecondaryButton(
                   key: ValueKey('proposal-dismiss-${p.id}'),
                   label: 'Dismiss',
-                  height: h,
+                  size: h,
                   onTap: busy
                       ? null
                       : () => _act(p, 'Dismiss', widget.store.dismiss),
                 ),
-                const SizedBox(width: 8),
+                const Gap(Space.sm),
                 PrimaryButton(
                   key: ValueKey('proposal-merge-${p.id}'),
                   label: 'Merge',
-                  height: h,
+                  size: h,
                   onTap: busy ? () {} : () => _act(p, 'Merge', widget.store.merge),
                 ),
               ],
@@ -247,10 +247,10 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
     final c = context.colors;
     final ty = context.type;
     final busy = _busy.contains(run.task);
-    final h = context.mobile ? 42.0 : 32.0;
+    final h = context.metrics.control;
     return Container(
       key: ValueKey('applied-${run.task}'),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(Space.md),
       decoration: BoxDecoration(
         color: c.bgSecondary,
         borderRadius: Radii.ctl,
@@ -261,12 +261,12 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
         children: [
           Text(
             appliedTitle,
-            style: ts(ty.ui, c.textPrimary, weight: 600),
+            style: ts(ty.ui, c.textPrimary, weight: Weight.strong),
           ),
-          const SizedBox(height: 6),
+          const Gap(Space.xs),
           for (final a in run.actions)
             Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.only(bottom: Space.xxs),
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: widget.onOpenPage == null
@@ -282,23 +282,23 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
                           displayTitle(a.targetTitle),
                         )
                       : appliedTag(displayTitle(a.pageTitle), a.target),
-                  style: ts(ty.ui, c.accentText, weight: 400),
+                  style: ts(ty.ui, c.accentText, weight: Weight.regular),
                 ),
               ),
             ),
-          const SizedBox(height: 2),
+          const Gap(Space.hair),
           Text(
             appliedUndoNote,
-            style: ts(ty.uiSmall, c.textTertiary, weight: 400),
+            style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular),
           ),
-          const SizedBox(height: 10),
+          const Gap(Space.md),
           Row(
             children: [
               const Spacer(),
               SecondaryButton(
                 key: ValueKey('applied-undo-${run.task}'),
                 label: 'Undo',
-                height: h,
+                size: h,
                 onTap: busy
                     ? null
                     : () => _act(
@@ -328,8 +328,8 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
       textBaseline: TextBaseline.alphabetic,
       children: [
         SizedBox(
-          width: 76,
-          child: Text(role, style: ts(ty.uiSmall, c.textTertiary, weight: 400)),
+          width: TriageSize.label,
+          child: Text(role, style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)),
         ),
         Expanded(
           child: GestureDetector(
@@ -342,7 +342,7 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ts(ty.ui, c.accentText, weight: 600),
+              style: ts(ty.ui, c.accentText, weight: Weight.strong),
             ),
           ),
         ),

@@ -141,7 +141,7 @@ void main() {
         color: const Color(0xFFFFFFFF),
         builder: (_, child) => AppTheme(
           colors: AppColors.light,
-          formFactor: FormFactor.mobile,
+          density: Density.touch,
           child: child!,
         ),
         onGenerateRoute: (_) => PageRouteBuilder<void>(

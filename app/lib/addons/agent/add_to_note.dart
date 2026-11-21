@@ -163,14 +163,14 @@ class _AddChatReferenceBoxState extends State<AddChatReferenceBox> {
     final r = widget.reference;
     final pages = context.watch<PagesStore>();
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 520),
+      constraints: const BoxConstraints(maxWidth: AgentSheets.addToNote),
       child: PickerSheet(
         header: Padding(
           padding: const EdgeInsets.fromLTRB(
             Layout.gutter,
-            14,
+            Space.lg,
             Layout.gutter,
-            8,
+            Space.sm,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,7 +179,7 @@ class _AddChatReferenceBoxState extends State<AddChatReferenceBox> {
                 'Add “${r.title}” to a note',
                 style: tsDisplay(ty.h3, c.textPrimary),
               ),
-              const SizedBox(height: 2),
+              const Gap(Space.hair),
               Text(r.label, style: ts(ty.uiSmall, c.textTertiary)),
             ],
           ),
@@ -206,7 +206,7 @@ class _AddChatReferenceBoxState extends State<AddChatReferenceBox> {
                           preview: ChatReferenceCard(reference: r),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const Gap(Space.sm),
                       Expanded(
                         child: _ShowAsOption(
                           key: const ValueKey('add-show-link'),
@@ -243,7 +243,7 @@ class _AddChatReferenceBoxState extends State<AddChatReferenceBox> {
                 label: _noteLabel(pages, n),
                 leading: PageIcon(
                   icon: n.icon,
-                  size: 20,
+                  size: IconSize.lg.px,
                   color: c.iconSecondary,
                 ),
                 selected: _target == n.id,
@@ -263,14 +263,14 @@ class _AddChatReferenceBoxState extends State<AddChatReferenceBox> {
           children: [
             SecondaryButton(
               label: 'Cancel',
-              height: 36,
+              size: ControlSize.lg,
               onTap: _busy ? null : () => Navigator.of(context).pop(),
             ),
-            const SizedBox(width: 8),
+            const Gap(Space.sm),
             PrimaryButton(
               key: const ValueKey('add-go'),
               label: 'Add',
-              height: 36,
+              size: ControlSize.lg,
               onTap: () {
                 if (_canAdd) unawaited(_add());
               },
@@ -307,28 +307,28 @@ class _ShowAsOption extends StatelessWidget {
       radius: Radii.lg,
       selected: selected,
       onTap: enabled ? onTap : null,
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(Space.md),
       background: c.bgElevated,
       child: Opacity(
-        opacity: enabled ? 1 : .5,
+        opacity: enabled ? 1 : Alpha.muted,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(name, style: ts(ty.ui, c.textPrimary, weight: 600)),
-            const SizedBox(height: 6),
+            Text(name, style: ts(ty.ui, c.textPrimary, weight: Weight.strong)),
+            const Gap(Space.xs),
             IgnorePointer(
               child: SizedBox(
-                height: 76,
+                height: AgentSheets.previewHeight,
                 width: double.infinity,
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.topLeft,
-                  child: SizedBox(width: 420, child: preview),
+                  child: SizedBox(width: AgentSheets.previewWidth, child: preview),
                 ),
               ),
             ),
             if (hint != null) ...[
-              const SizedBox(height: 6),
+              const Gap(Space.xs),
               Text(hint!, style: ts(ty.uiSmall, c.textTertiary)),
             ],
           ],
@@ -395,12 +395,12 @@ class _NoticeState extends State<_Notice> {
     return Positioned(
       left: 0,
       right: 0,
-      bottom: 24,
+      bottom: Space.xl,
       child: Center(
         child: Container(
           key: const ValueKey('add-notice'),
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: Space.lg),
+          padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.sm),
           decoration: BoxDecoration(
             color: c.rail,
             borderRadius: BorderRadius.circular(Radii.lg),
@@ -411,15 +411,15 @@ class _NoticeState extends State<_Notice> {
               Flexible(
                 child: Text(widget.message, style: ts(ty.ui, c.railInk)),
               ),
-              const SizedBox(width: 12),
+              const Gap(Space.md),
               Hover(
                 key: const ValueKey('add-notice-open'),
                 radius: Radii.sm,
                 onTap: widget.onOpen,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: Space.xs, vertical: Space.hair),
                 child: Text(
                   'Open',
-                  style: ts(ty.ui, c.accentText, weight: 600),
+                  style: ts(ty.ui, c.accentText, weight: Weight.strong),
                 ),
               ),
             ],

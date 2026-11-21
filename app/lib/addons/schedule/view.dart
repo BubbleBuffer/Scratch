@@ -105,7 +105,7 @@ class _SchedulePageState extends State<SchedulePage> {
   @override
   Widget build(BuildContext context) {
     final c = _c!;
-    final mobile = context.mobile;
+    final mobile = context.sizeClass.isCompact;
     final colors = context.colors;
     return ColoredBox(
       color: colors.bgPrimary,
@@ -113,13 +113,13 @@ class _SchedulePageState extends State<SchedulePage> {
         listenable: c,
         builder: (context, _) {
           if (!c.loaded) return const SizedBox.shrink();
-          final gutter = mobile ? Layout.gutter : 48.0;
+          final gutter = mobile ? Layout.gutter : PageChrome.columnMargin;
           return Align(
             alignment: Alignment.topCenter,
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(gutter, mobile ? 16 : 24, gutter, 40),
+              padding: EdgeInsets.fromLTRB(gutter, mobile ? Space.lg : Space.xl, gutter, Space.xxxl),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
+                constraints: const BoxConstraints(maxWidth: ScheduleSize.column),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -128,7 +128,7 @@ class _SchedulePageState extends State<SchedulePage> {
                       controller: widget.titleController,
                       onChanged: widget.onTitleChanged,
                     ),
-                    const SizedBox(height: 12),
+                    const Gap(Space.md),
                     _StatusBand(c: c),
                     _Section(
                       label: 'When',
@@ -166,17 +166,17 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(top: 20),
+      padding: const EdgeInsets.only(top: Space.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           HLine(color: c.thread),
-          const SizedBox(height: 14),
+          const Gap(Space.lg),
           Text(
             label,
-            style: ts(const TypeSpec(15, 20, 650), c.textPrimary),
+            style: ts(context.type.title, c.textPrimary, weight: Weight.display),
           ),
-          const SizedBox(height: 10),
+          const Gap(Space.md),
           child,
         ],
       ),
@@ -207,9 +207,7 @@ class _ScheduleTitleState extends State<_ScheduleTitle> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final style = tsDisplay(
-      context.mobile
-          ? const TypeSpec(28, 34, 700)
-          : const TypeSpec(32, 40, 700),
+      context.type.display,
       c.textPrimary,
     );
     final controller = widget.controller;
@@ -269,12 +267,12 @@ class _WhenSection extends StatelessWidget {
         Text(
           triggerInWords(trigger),
           key: const ValueKey('schedule-words'),
-          style: ts(const TypeSpec(14, 20, 500), colors.textSecondary),
+          style: ts(context.type.ui, colors.textSecondary),
         ),
-        const SizedBox(height: 10),
+        const Gap(Space.md),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: Space.sm,
+          runSpacing: Space.sm,
           children: [
             for (final f in ScheduleFreq.values)
               ChipBtn(
@@ -290,10 +288,10 @@ class _WhenSection extends StatelessWidget {
             'This repeat rule is not one the editor can show (${rule.toText()}).',
           ),
         if (freq == ScheduleFreq.weekly) ...[
-          const SizedBox(height: 10),
+          const Gap(Space.md),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: Space.xs,
+            runSpacing: Space.xs,
             children: [
               for (var i = 0; i < weekdayCodes.length; i++)
                 ChipBtn(
@@ -315,7 +313,7 @@ class _WhenSection extends StatelessWidget {
           ),
         ],
         if (freq == ScheduleFreq.monthly) ...[
-          const SizedBox(height: 10),
+          const Gap(Space.md),
           _LabelledField(
             label: 'Day of month',
             child: MenuField(
@@ -328,7 +326,7 @@ class _WhenSection extends StatelessWidget {
           ),
           if (c.monthDayError != null) _ErrorText(c.monthDayError!),
         ],
-        const SizedBox(height: 10),
+        const Gap(Space.md),
         Row(
           children: [
             Expanded(
@@ -343,7 +341,7 @@ class _WhenSection extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const Gap(Space.md),
             Expanded(
               flex: 2,
               child: _LabelledField(
@@ -359,15 +357,15 @@ class _WhenSection extends StatelessWidget {
           ],
         ),
         if (c.timeError != null) _ErrorText(c.timeError!),
-        const SizedBox(height: 10),
+        const Gap(Space.md),
         Text(
           'If missed',
-          style: ts(const TypeSpec(13, 18, 600), colors.textSecondary),
+          style: ts(context.type.ui, colors.textSecondary, weight: Weight.strong),
         ),
-        const SizedBox(height: 6),
+        const Gap(Space.xs),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: Space.sm,
+          runSpacing: Space.sm,
           children: [
             ChipBtn(
               key: const ValueKey('schedule-missed-latest'),
@@ -399,9 +397,9 @@ class _LabelledField extends StatelessWidget {
     children: [
       Text(
         label,
-        style: ts(const TypeSpec(13, 18, 600), context.colors.textSecondary),
+        style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.strong),
       ),
-      const SizedBox(height: 6),
+      const Gap(Space.xs),
       child,
     ],
   );
@@ -413,16 +411,16 @@ class _ErrorText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 6),
+    padding: const EdgeInsets.only(top: Space.xs),
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
       decoration: BoxDecoration(
         color: context.colors.dangerBg,
         borderRadius: Radii.field,
       ),
       child: Text(
         text,
-        style: ts(const TypeSpec(13, 18, 500), context.colors.textPrimary),
+        style: ts(context.type.ui, context.colors.textPrimary),
       ),
     ),
   );
@@ -443,7 +441,7 @@ class _RunnerSection extends StatelessWidget {
       return Text(
         'No runner is available. Connect a hub in Sync settings.',
         key: const ValueKey('schedule-no-runner'),
-        style: ts(const TypeSpec(14, 20, 450), colors.textSecondary),
+        style: ts(context.type.ui, colors.textSecondary, weight: Weight.regular),
       );
     }
     final now = c.now();
@@ -521,13 +519,13 @@ class _NodeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: Space.xs),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          constraints: const BoxConstraints(minHeight: ScheduleSize.run),
+          padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
           decoration: BoxDecoration(
             color: selected ? c.bgSelectedBlock : c.bgSecondary,
             borderRadius: Radii.field,
@@ -543,11 +541,11 @@ class _NodeRow extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: ts(const TypeSpec(15, 20, 600), c.textPrimary),
+                      style: ts(context.type.title, c.textPrimary, weight: Weight.strong),
                     ),
                     Text(
                       detail,
-                      style: ts(const TypeSpec(13, 18, 450), c.textSecondary),
+                      style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
                     ),
                   ],
                 ),
@@ -555,7 +553,7 @@ class _NodeRow extends StatelessWidget {
               if (selected)
                 Text(
                   'Runner',
-                  style: ts(const TypeSpec(13, 18, 600), c.textSecondary),
+                  style: ts(context.type.ui, c.textSecondary, weight: Weight.strong),
                 ),
             ],
           ),
@@ -583,13 +581,13 @@ class _StepSection extends StatelessWidget {
           Text(
             c.refusal ?? '',
             key: const ValueKey('schedule-step-refusal'),
-            style: ts(const TypeSpec(14, 20, 500), colors.textPrimary),
+            style: ts(context.type.ui, colors.textPrimary),
           ),
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           for (final (i, s) in steps.indexed)
             Text(
               '${i + 1}. ${s.kind} (read-only)',
-              style: ts(const TypeSpec(14, 20, 450), colors.textSecondary),
+              style: ts(context.type.ui, colors.textSecondary, weight: Weight.regular),
             ),
         ],
       );
@@ -623,7 +621,7 @@ class _StepSection extends StatelessWidget {
             if (id != null) await c.setStepParent(id);
           },
         ),
-        const SizedBox(height: 4),
+        const Gap(Space.xxs),
         _LabelledField(
           label: 'Title of the new note',
           child: MenuField(
@@ -635,11 +633,11 @@ class _StepSection extends StatelessWidget {
         ),
         if (preview != null && preview.ok && preview.renderedTitle.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(top: Space.xs),
             child: Text(
               'Preview: ${preview.renderedTitle}',
               key: const ValueKey('schedule-preview'),
-              style: ts(const TypeSpec(13, 18, 450), colors.textSecondary),
+              style: ts(context.type.ui, colors.textSecondary, weight: Weight.regular),
             ),
           ),
         if (preview != null && !preview.ok && preview.reason != null)
@@ -665,13 +663,13 @@ class _PickerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: Space.xs),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          constraints: const BoxConstraints(minHeight: ScheduleSize.run),
+          padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
           decoration: BoxDecoration(
             color: c.bgSecondary,
             borderRadius: Radii.field,
@@ -679,15 +677,15 @@ class _PickerRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Text(label, style: ts(const TypeSpec(14, 20, 600), c.textSecondary)),
-              const SizedBox(width: 12),
+              Text(label, style: ts(context.type.ui, c.textSecondary, weight: Weight.strong)),
+              const Gap(Space.md),
               Expanded(
                 child: Text(
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.end,
-                  style: ts(const TypeSpec(15, 20, 450), c.textPrimary),
+                  style: ts(context.type.ui, c.textPrimary, weight: Weight.regular),
                 ),
               ),
             ],
@@ -721,10 +719,10 @@ class _StatusBand extends StatelessWidget {
         health == ScheduleHealth.runnerOff ||
         health == ScheduleHealth.paused ||
         health == ScheduleHealth.needsAcceptance;
-    final actions = _actionButtons(c, health, compact: !context.mobile);
+    final actions = _actionButtons(c, health, compact: !context.touch);
     return Container(
       key: const ValueKey('schedule-status-band'),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(Space.md),
       decoration: BoxDecoration(
         color: colors.bgSecondary,
         borderRadius: Radii.panel,
@@ -758,39 +756,39 @@ class _StatusBand extends StatelessWidget {
               'Review the schedule, then accept it. Nothing runs until you do.',
             ),
           if (actions.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const Gap(Space.md),
             Align(
               alignment: AlignmentDirectional.centerStart,
               // IntrinsicWidth keeps each button at its own width; the shared
               // secondary button centres its label and would otherwise fill
               // the row, stacking the buttons.
               child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: Space.sm,
+                runSpacing: Space.sm,
                 children: [
                   for (final action in actions) IntrinsicWidth(child: action),
                 ],
               ),
             ),
           ],
-          const SizedBox(height: 12),
+          const Gap(Space.md),
           _BandLine(
             label: waiting ? 'Next run (when active)' : 'Next run',
             stacked: waiting,
             child: Text(
               runs.isEmpty ? 'None scheduled' : runTimeLabel(runs.first),
               key: const ValueKey('schedule-next-run'),
-              style: ts(const TypeSpec(14, 20, 450), colors.textPrimary),
+              style: ts(context.type.ui, colors.textPrimary, weight: Weight.regular),
             ),
           ),
-          const SizedBox(height: 6),
+          const Gap(Space.xs),
           _BandLine(
             label: 'Last run',
             child: last == null
                 ? Text(
                     'Not run yet',
                     key: const ValueKey('schedule-last-run'),
-                    style: ts(const TypeSpec(14, 20, 450), colors.textPrimary),
+                    style: ts(context.type.ui, colors.textPrimary, weight: Weight.regular),
                   )
                 : _LastRunText(last: last),
           ),
@@ -815,10 +813,10 @@ class _BandText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 8),
+    padding: const EdgeInsets.only(top: Space.sm),
     child: Text(
       text,
-      style: ts(const TypeSpec(14, 20, 500), context.colors.textPrimary),
+      style: ts(context.type.ui, context.colors.textPrimary),
     ),
   );
 }
@@ -833,7 +831,7 @@ class _BandLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelStyle = ts(const TypeSpec(13, 18, 600), context.colors.textSecondary);
+    final labelStyle = ts(context.type.ui, context.colors.textSecondary, weight: Weight.strong);
     if (stacked) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -847,7 +845,7 @@ class _BandLine extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 72,
+          width: ScheduleSize.actions,
           child: Text(label, style: labelStyle),
         ),
         Expanded(child: child),
@@ -868,7 +866,7 @@ class _LastRunText extends StatelessWidget {
       return Text(
         'Failed$when. ${last.error ?? 'The run did not finish.'}',
         key: const ValueKey('schedule-last-run'),
-        style: ts(const TypeSpec(14, 20, 500), colors.textPrimary),
+        style: ts(context.type.ui, colors.textPrimary),
       );
     }
     final page = last.page;
@@ -878,7 +876,7 @@ class _LastRunText extends StatelessWidget {
           child: Text(
             '${last.result == 'created' ? 'Created' : last.result}$when',
             key: const ValueKey('schedule-last-run'),
-            style: ts(const TypeSpec(14, 20, 450), colors.textPrimary),
+            style: ts(context.type.ui, colors.textPrimary, weight: Weight.regular),
           ),
         ),
         if (page != null)
@@ -902,7 +900,7 @@ List<Widget> _actionButtons(
   required bool compact,
 }) {
   if (c.def.runner == null) return const [];
-  final height = compact ? 34.0 : 42.0;
+  final height = compact ? ControlSize.lg : ControlSize.xl;
   final busy = c.busy;
   final paused = health == ScheduleHealth.paused;
   if (health == ScheduleHealth.needsAcceptance) {
@@ -910,7 +908,7 @@ List<Widget> _actionButtons(
       PrimaryButton(
         key: const ValueKey('schedule-accept'),
         label: 'Accept',
-        height: height,
+        size: height,
         onTap: () => c.accept(),
       ),
     ];
@@ -921,13 +919,13 @@ List<Widget> _actionButtons(
       SecondaryButton(
         key: const ValueKey('schedule-pause'),
         label: paused ? 'Resume' : 'Pause',
-        height: height,
+        size: height,
         onTap: busy ? null : () => c.setPaused(!paused),
       ),
       SecondaryButton(
         key: const ValueKey('schedule-run-now'),
         label: 'Run now',
-        height: height,
+        size: height,
         onTap: busy ? null : () => c.runNow(),
       ),
     ];

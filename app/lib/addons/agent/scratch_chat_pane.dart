@@ -10,7 +10,6 @@
 // slot. Sign-in has no composer.
 
 import 'package:agent_kit/agent_kit.dart';
-import 'package:bb_ui/bb_ui.dart' as bb show FormFactor;
 import 'package:flutter/widgets.dart';
 
 import '../../ui/ui.dart';
@@ -103,7 +102,7 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
     final store = widget.store;
     final c = context.colors;
     final panel = widget.panel;
-    final pad = panel ? 12.0 : 32.0;
+    final pad = panel ? Space.md : Space.xxl;
     final title = widget.title;
     return Container(
       decoration: BoxDecoration(
@@ -115,9 +114,7 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
         borderRadius: Radii.panel,
         child: BbThemeScope(
           brightness: c.dark ? Brightness.dark : Brightness.light,
-          formFactor: context.mobile
-              ? bb.FormFactor.mobile
-              : bb.FormFactor.desktop,
+          density: context.density,
           child: AgentChatPane(
             key: const ValueKey('agent-kit-pane'),
             backend: backend,
@@ -131,7 +128,7 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
             showCrewStrip: false,
             showHeader: !panel && title != null,
             headerBuilder: (context, _) => Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 10),
+              padding: const EdgeInsets.fromLTRB(Space.xl, Space.md, Space.xl, Space.md),
               child: Text(
                 title ?? '',
                 maxLines: 1,
@@ -140,7 +137,7 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
               ),
             ),
             metrics: PaneMetrics(
-              dockPadding: EdgeInsets.only(bottom: panel ? 12 : 20),
+              dockPadding: EdgeInsets.only(bottom: panel ? Space.md : Space.xl),
               dockGutter: pad,
             ),
             transcriptActions: scratchTranscriptActions(context, store),
@@ -154,7 +151,7 @@ class _ScratchChatPaneState extends State<ScratchChatPane> {
                 AgentRuntimeCard(store: store),
                 if (store.pendingApprovals.isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: Space.sm),
                     child: AgentApprovalBars(
                       store: store,
                       draft: slot.controller,
@@ -197,9 +194,9 @@ class _ShellState extends State<_Shell> {
     if (store.pendingApprovals.isEmpty) return const SizedBox.shrink();
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: Layout.contentWidth + 64),
+        constraints: const BoxConstraints(maxWidth: Layout.contentWidth + AgentLayout.columnRoom),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(pad, 0, pad, 8),
+          padding: EdgeInsets.fromLTRB(pad, 0, pad, Space.sm),
           child: AgentApprovalBars(store: store, draft: _draft),
         ),
       ),
@@ -214,7 +211,7 @@ class _ShellState extends State<_Shell> {
         final store = widget.store;
         final c = context.colors;
         final signIn = store.requiresHubSignIn;
-        final pad = widget.panel ? 12.0 : 32.0;
+        final pad = widget.panel ? Space.md : Space.xxl;
         return Container(
           decoration: BoxDecoration(
             color: c.bgPrimary,
@@ -228,7 +225,7 @@ class _ShellState extends State<_Shell> {
               children: [
                 if (!widget.panel && widget.title != null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 10),
+                    padding: const EdgeInsets.fromLTRB(Space.xl, Space.md, Space.xl, Space.md),
                     child: Text(
                       widget.title!,
                       maxLines: 1,
@@ -244,14 +241,14 @@ class _ShellState extends State<_Shell> {
                   Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(
-                        maxWidth: Layout.contentWidth + 64,
+                        maxWidth: Layout.contentWidth + AgentLayout.columnRoom,
                       ),
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
                           pad,
                           0,
                           pad,
-                          widget.panel ? 12 : 20,
+                          widget.panel ? Space.md : Space.xl,
                         ),
                         child: scratch.AgentComposer(
                           store: store,

@@ -61,7 +61,7 @@ void registerEmbedBlock(AddonContext ctx) {
             key: ValueKey('empty-embed-${b.node.id}'),
             onTap: () => b.host.openBlockPicker(b.node, b.context),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.md),
               child: Text(
                 'Choose a note to embed',
                 style: ts(b.type.ui, b.colors.textTertiary),

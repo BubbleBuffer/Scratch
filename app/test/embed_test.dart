@@ -64,7 +64,7 @@ Widget frame(Widget child) => MediaQuery(
     textDirection: TextDirection.ltr,
     child: AppTheme(
       colors: AppColors.light,
-      formFactor: FormFactor.desktop,
+      density: Density.pointer,
       child: DefaultTextStyle(
         style: const TextStyle(fontSize: 16),
         child: Align(

@@ -31,7 +31,7 @@ Future<List<ChatRefChat>> _loadOne() async => [
 /// Wraps [child] the way a page does: theme and a navigator for the panels.
 Widget _app(Widget Function(BuildContext) home) => AppTheme(
   colors: AppColors.light,
-  formFactor: FormFactor.desktop,
+  density: Density.pointer,
   child: WidgetsApp(
     color: AppColors.light.bgPrimary,
     pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(
@@ -73,7 +73,7 @@ void main() {
       await tester.pumpWidget(
         AppTheme(
           colors: AppColors.light,
-          formFactor: FormFactor.desktop,
+          density: Density.pointer,
           child: WidgetsApp(
             color: AppColors.light.bgPrimary,
             pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(

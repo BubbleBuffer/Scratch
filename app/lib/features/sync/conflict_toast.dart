@@ -115,27 +115,27 @@ class _ConflictToastState extends State<_ConflictToast> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.sizeClass.isCompact;
     final undo = widget.undo;
     return Positioned(
-      left: widget.area.left + (m ? 16 : 24),
-      right: widget.area.right + (m ? 16 : 24),
-      bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
+      left: widget.area.left + (m ? Space.lg : Space.xl),
+      right: widget.area.right + (m ? Space.lg : Space.xl),
+      bottom: MediaQuery.viewInsetsOf(context).bottom + Space.xl,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: const BoxConstraints(maxWidth: Widths.form),
           child: Container(
             key: const ValueKey('conflict-toast'),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
             decoration: BoxDecoration(
               color: c.rail,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: const [BoxShadow(color: Color(0x47141618), blurRadius: 20, offset: Offset(0, 8))],
+              borderRadius: BorderRadius.circular(Radii.lg),
+              boxShadow: ToastShadow.lift,
             ),
             child: Row(children: [
-              Expanded(child: Text(widget.message, style: tsRaw(14, 20, 400, c.railInk))),
+              Expanded(child: Text(widget.message, style: ts(context.type.ui, c.railInk, weight: Weight.regular))),
               if (undo != null) ...[
-                const SizedBox(width: 16),
+                const Gap(Space.lg),
                 Semantics(
                   button: true,
                   label: conflictUndo,
@@ -143,9 +143,9 @@ class _ConflictToastState extends State<_ConflictToast> {
                     key: const ValueKey('conflict-toast-undo'),
                     onTap: _undo,
                     radius: Radii.sm,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
                     // The dark theme accent: the rail is dark in both themes.
-                    child: Text(conflictUndo, style: tsRaw(14, 20, 700, AppColors.darkTheme.accent)),
+                    child: Text(conflictUndo, style: ts(context.type.ui, AppColors.darkTheme.accent, weight: Weight.strong)),
                   ),
                 ),
               ],

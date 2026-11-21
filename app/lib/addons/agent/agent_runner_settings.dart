@@ -4,6 +4,7 @@
 // tool set ("What it may do": Read, Write or Everything). Everything else
 // on the page depends on the runner chosen here.
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
 
 import '../../core/tool_sets.dart';
@@ -45,7 +46,7 @@ class RunAiOnSetting extends StatelessWidget {
     final chosen = phone ? AgentHost.hub : chosenRunner(store);
     return Padding(
       key: const ValueKey('agent-host'),
-      padding: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.only(top: Space.lg),
       child: SChoices<AgentHost>(
         value: chosen,
         keyOf: (h) => ValueKey('agent-host-${h.runner}'),
@@ -90,7 +91,7 @@ class HubModelSetting extends StatelessWidget {
       label: 'Model',
       desc: _modelDesc,
       help: _modelHelp('the hub'),
-      stack: context.mobile,
+      stack: context.sizeClass.isCompact,
       control: SSelect<String?>(
         key: const ValueKey('agent-hub-model'),
         title: 'Model',
@@ -142,7 +143,7 @@ class ComputerModelSetting extends StatelessWidget {
             : Text(
                 store.modelLabel(stored),
                 key: const ValueKey('agent-computer-model-stored'),
-                style: tsRaw(13, 18, 400, c.textSecondary),
+                style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
               ),
       );
     }
@@ -151,7 +152,7 @@ class ComputerModelSetting extends StatelessWidget {
       label: 'Model',
       desc: _modelDesc,
       help: _modelHelp('this computer'),
-      stack: context.mobile,
+      stack: context.sizeClass.isCompact,
       control: SSelect<String>(
         key: const ValueKey('agent-computer-model'),
         title: 'Model',
@@ -188,7 +189,10 @@ class RunnerToolSetSetting extends StatelessWidget {
   Widget build(BuildContext context) {
     final set = store.vaultDefaults.toolSetFor(runner);
     final onHub = runner == AgentHost.hub;
-    final computer = !onHub && !context.mobile;
+    // A runner on this computer, not on a phone or tablet.
+    final computer = !onHub &&
+        defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS;
     String title(String s) => switch (s) {
       'read' => 'Read',
       'write' => 'Write',
@@ -205,7 +209,7 @@ class RunnerToolSetSetting extends StatelessWidget {
       key: ValueKey('agent-tool-set-${runner.runner}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 14),
+        const Gap(Space.lg),
         SChoices<String>(
           value: set,
           keyOf: (s) => ValueKey('agent-tool-set-${runner.runner}-$s'),
@@ -214,7 +218,7 @@ class RunnerToolSetSetting extends StatelessWidget {
         ),
         if (onHub)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: Space.sm),
             child: Text(
               'Jobs use it at once; hub chats after the hub restarts (an update or reboot).',
               style: sHint(context),

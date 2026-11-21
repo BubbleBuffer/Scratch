@@ -156,38 +156,6 @@ class PageStackScope extends InheritedNotifier<PageStackNavigator> {
       context.dependOnInheritedWidgetOfExactType<PageStackScope>()?.notifier;
 }
 
-/// Where sheets sit on the desk (x from the rail's right edge).
-abstract final class PileGeometry {
-  /// The desk margin left of and above every sheet.
-  static const margin = 12.0;
-
-  /// The spine of the sheet directly below the top one.
-  static const spine = 58.0;
-
-  /// One older sheet's paper edge, and how many of them show at most.
-  static const edge = 4.0;
-  static const maxEdges = 3;
-
-  /// The paper edges shown in a pile [depth] pages deep (Home not counted).
-  static int edges(int depth) => depth < 2 ? 0 : math.min(depth - 2, maxEdges);
-
-  /// The left of the spine in a pile [depth] deep (2 or more).
-  static double spineLeft(int depth) => margin + edges(depth) * edge;
-
-  /// The left of the top sheet in a pile [depth] deep.
-  static double topLeft(int depth) =>
-      depth <= 1 ? margin : spineLeft(depth) + spine;
-
-  /// The left of sheet [index] (1 is the bottom one) in a pile [depth] deep.
-  /// The sheet below the top one sits under the spine; older ones step back
-  /// one paper edge each, down to the margin.
-  static double sheetLeft(int index, int depth) {
-    if (index >= depth) return topLeft(depth);
-    final below = depth - 1 - index;
-    return margin + math.max(0, edges(depth) - below) * edge;
-  }
-}
-
 /// A page's name where pages are listed: its title, else the first line of
 /// its body (live while it is open on the stack, else the stored
 /// [firstLine]), else "Untitled".
@@ -266,7 +234,7 @@ class PageStackHome extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) {
-    if (context.mobile) return child;
+    if (context.sizeClass.isCompact) return child;
     final stack = PageStackScope.of(context);
     final covered = stack.pages.isNotEmpty;
     final animation = ModalRoute.of(context)?.secondaryAnimation;
@@ -297,8 +265,8 @@ class SheetCover extends StatelessWidget {
           Positioned.fill(
             child: IgnorePointer(
               child: ColoredBox(
-                color: (c.dark ? const Color(0xFF000000) : c.textPrimary)
-                    .withValues(alpha: (c.dark ? .16 : .035) * progress),
+                color: (c.dark ? PageDim.dark : c.textPrimary)
+                    .withValues(alpha: (c.dark ? PageDim.darkAlpha : PageDim.lightAlpha) * progress),
               ),
             ),
           ),
@@ -376,7 +344,7 @@ class _PageStackChromeState extends State<PageStackChrome> {
 
   @override
   Widget build(BuildContext context) {
-    if (context.mobile) return widget.child;
+    if (context.sizeClass.isCompact) return widget.child;
     // No store scope before the vault opens: there is no pile to show yet.
     final tree = context.maybeWatch<TreeStore>();
     if (tree == null) return widget.child;
@@ -440,7 +408,7 @@ class _PageStackChromeState extends State<PageStackChrome> {
                         decoration: BoxDecoration(
                           color: c.bgPrimary,
                           borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(4),
+                            topLeft: Radius.circular(Radii.sm),
                           ),
                           border: Border(
                             top: BorderSide(color: c.border),
@@ -493,8 +461,8 @@ class _PageStackChromeState extends State<PageStackChrome> {
               ),
             ),
             Positioned(
-              left: spineLeft + PileGeometry.spine + 6,
-              top: PileGeometry.margin + 8,
+              left: spineLeft + PileGeometry.spine + Space.xs,
+              top: PileGeometry.margin + Space.sm,
               child: Focus(
                 focusNode: _fanFocus,
                 onKeyEvent: (_, event) {
@@ -592,7 +560,7 @@ class _SpineState extends State<_Spine> {
     final c = context.colors;
     final patch = widget.patch;
     final fill = patch?.fill ?? widget.surface;
-    const radius = BorderRadius.only(topLeft: Radius.circular(16));
+    const radius = BorderRadius.only(topLeft: PileGeometry.corner);
     final label = pageLabel(
       PageStackScope.maybeOf(context),
       widget.id,
@@ -600,7 +568,7 @@ class _SpineState extends State<_Spine> {
       firstLine: context.watch<PagesStore>().meta(widget.id)?.firstLine ?? '',
     );
     final style = tsDisplay(
-      const TypeSpec(15, 18, 640),
+      context.type.title,
       patch?.ink ?? c.textPrimary,
     );
     return Semantics(
@@ -639,7 +607,7 @@ class _SpineState extends State<_Spine> {
               borderRadius: radius,
               color: _hover
                   ? Color.alphaBlend(
-                      (patch?.ink ?? c.accent).withValues(alpha: .12),
+                      (patch?.ink ?? c.accent).withValues(alpha: Alpha.tint),
                       fill,
                     )
                   : fill,
@@ -647,15 +615,15 @@ class _SpineState extends State<_Spine> {
             foregroundDecoration: _focus
                 ? BoxDecoration(
                     borderRadius: radius,
-                    border: Border.all(color: c.focus, width: 2),
+                    border: Border.all(color: c.focus, width: Stroke.bold),
                   )
                 : null,
-            padding: const EdgeInsets.only(top: 18, bottom: 18),
+            padding: const EdgeInsets.only(top: Space.lg, bottom: Space.lg),
             child: Column(
               children: [
                 Container(
-                  width: 30,
-                  height: 30,
+                  width: PileGeometry.spineTile,
+                  height: PileGeometry.spineTile,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: patch?.fill ?? c.bgSecondary,
@@ -664,27 +632,27 @@ class _SpineState extends State<_Spine> {
                   ),
                   child: PageIcon(
                     icon: widget.icon,
-                    size: 20,
+                    size: IconSize.lg.px,
                     color: patch?.ink ?? c.iconSecondary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const Gap(Space.md),
                 Flexible(
                   child: RotatedBox(
                     quarterTurns: 3,
                     child: Container(
                       // Moss needs its original backing to preserve AA on hover.
-                      padding: patch?.fill == const Color(0xFF5F7062)
+                      padding: patch?.fill == ProfileColors.light.spacePatchMossFill
                           ? const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
+                              horizontal: Space.xxs,
+                              vertical: Space.hair,
                             )
                           : EdgeInsets.zero,
                       decoration: BoxDecoration(
-                        color: patch?.fill == const Color(0xFF5F7062)
+                        color: patch?.fill == ProfileColors.light.spacePatchMossFill
                             ? patch!.fill
-                            : const Color(0x00000000),
-                        borderRadius: BorderRadius.circular(4),
+                            : kTransparent,
+                        borderRadius: BorderRadius.circular(Radii.sm),
                       ),
                       child: Text(
                         label.text,
@@ -726,8 +694,8 @@ class _FanList extends StatelessWidget {
       constraints: BoxConstraints(maxHeight: math.max(120, maxH - 40)),
       child: MenuSurface(
         key: const ValueKey('stack-fan'),
-        width: 280,
-        padding: const EdgeInsets.all(6),
+        width: Widths.panel,
+        padding: const EdgeInsets.all(Space.xs),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -743,7 +711,7 @@ class _FanList extends StatelessWidget {
                     final style = ts(
                       ty.ui,
                       c.textPrimary,
-                      weight: identical(e.$1, top) ? 700 : 400,
+                      weight: identical(e.$1, top) ? Weight.strong : Weight.regular,
                     );
                     return Semantics(
                       button: true,
@@ -758,19 +726,19 @@ class _FanList extends StatelessWidget {
                         selected: identical(e.$1, top),
                         radius: Radii.sm,
                         lift: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: SizedBox(
-                          height: 32,
+                        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: ControlSize.md.height),
                           child: Row(
                             children: [
                               if (e.$2 == 'home')
                                 SizedBox(
-                                  width: 22,
-                                  height: 22,
+                                  width: SpaceTile.size,
+                                  height: SpaceTile.size,
                                   child: Center(
                                     child: Icon20(
                                       Ico.home,
-                                      size: 18,
+                                      size: IconSize.md,
                                       color: c.iconSecondary,
                                     ),
                                   ),
@@ -779,11 +747,10 @@ class _FanList extends StatelessWidget {
                                 SpaceIconTile(
                                   icon: e.$4,
                                   patch: e.$5,
-                                  size: 22,
-                                  glyphSize: 16,
+                                  glyphSize: IconSize.sm.px,
                                   color: c.iconSecondary,
                                 ),
-                              const SizedBox(width: 8),
+                              const Gap(Space.sm),
                               Expanded(
                                 child: Text(
                                   label.text,
@@ -800,7 +767,7 @@ class _FanList extends StatelessWidget {
                                   style: ts(
                                     ty.uiSmall,
                                     c.textTertiary,
-                                    weight: 400,
+                                    weight: Weight.regular,
                                   ),
                                 ),
                             ],

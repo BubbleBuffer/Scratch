@@ -45,7 +45,7 @@ Future<String?> showAskAi(BuildContext context, {required String pageId, String?
       },
       onCancel: () => Navigator.of(ctx).pop(),
     ),
-    width: 520,
+    width: SmallPanels.askAi,
     shrink: true,
   );
 }
@@ -122,21 +122,21 @@ class _AskAiBoxState extends State<AskAiBox> {
     final where = askAiNote(s);
     final sel = widget.selection?.trim() ?? '';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+      padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.xl, Space.lg),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          const AiMark(size: 18),
-          const SizedBox(width: 8),
-          Text('Ask AI', style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary)),
+          AiMark(size: IconSize.md.px),
+          const Gap(Space.sm),
+          Text('Ask AI', style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display)),
         ]),
-        const SizedBox(height: 12),
+        const Gap(Space.md),
         if (sel.isNotEmpty) ...[
           Text(sel.length > 160 ? '“${sel.substring(0, 160)}…”' : '“$sel”',
               key: const ValueKey('ask-ai-selection'),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: tsRaw(13, 18, 400, c.textSecondary)),
-          const SizedBox(height: 8),
+              style: ts(context.type.ui, c.textSecondary, weight: Weight.regular)),
+          const Gap(Space.sm),
         ],
         SettingsField(
           fieldKey: const ValueKey('ask-ai-field'),
@@ -145,14 +145,14 @@ class _AskAiBoxState extends State<AskAiBox> {
           autofocus: true,
           onSubmitted: (_) => _submit(),
         ),
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
         Text(_error ?? where,
             key: const ValueKey('ask-ai-note'),
-            style: tsRaw(12, 16, 400, _error != null ? c.inlineCodeText : c.textTertiary)),
-        const SizedBox(height: 14),
+            style: ts(context.type.uiSmall, _error != null ? c.inlineCodeText : c.textTertiary, weight: Weight.regular)),
+        const Gap(Space.lg),
         Row(mainAxisAlignment: MainAxisAlignment.end, children: [
           TextBtn('Cancel', onTap: widget.onCancel, color: c.textSecondary),
-          const SizedBox(width: 8),
+          const Gap(Space.sm),
           PrimaryButton(key: const ValueKey('ask-ai-send'), label: _sending ? 'Asking…' : 'Ask', onTap: _submit),
         ]),
       ]),
@@ -162,14 +162,15 @@ class _AskAiBoxState extends State<AskAiBox> {
 
 /// The AI mark: a four-pointed sparkle.
 class AiMark extends StatelessWidget {
-  const AiMark({super.key, this.size = 20, this.color});
-  final double size;
+  const AiMark({super.key, this.size, this.color});
+
+  /// The mark's box; [IconSize.lg] by default.
+  final double? size;
   final Color? color;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: size,
-        height: size,
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: size ?? IconSize.lg.px,
         child: CustomPaint(painter: _SparklePainter(color ?? context.colors.iconPrimary)),
       );
 }

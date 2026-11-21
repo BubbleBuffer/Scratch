@@ -15,6 +15,7 @@ import '../../ui/database/db_icons.dart';
 import 'property_menu.dart';
 import '../../ui/database/values.dart';
 import '../../ui/database/widgets.dart';
+import '../../ui/database/db_tokens.dart';
 
 /// The title as a property definition (for filters and sorts).
 const titleDef = PropDef(key: BuiltinKeys.title, name: 'Name', kind: PropKind.text, options: [], config: '');
@@ -62,20 +63,20 @@ class _PropPickerState extends State<_PropPicker> {
       MenuField(
         key: const ValueKey('prop-picker-search'),
         placeholder: widget.placeholder,
-        autofocus: !context.mobile,
+        autofocus: !context.touch,
         onChanged: (s) => setState(() => q = s.trim().toLowerCase()),
         onSubmitted: (_) {
           if (shown.isNotEmpty) Navigator.of(context).pop(shown.first.key);
         },
       ),
-      const SizedBox(height: 4),
+      const Gap(Space.xxs),
       Flexible(
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             for (var i = 0; i < shown.length; i++)
               dbItem(context, shown[i].name, shown[i].key == BuiltinKeys.title ? DbIco.title : propIcon(shown[i]),
                   key: ValueKey('pick-${shown[i].name}'),
-                  selected: i == 0 && !context.mobile,
+                  selected: i == 0 && !context.touch,
                   onTap: () => Navigator.of(context).pop(shown[i].key)),
           ]),
         ),
@@ -175,17 +176,17 @@ class _RuleEditor extends StatelessWidget {
         return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             Padding(
-              padding: const EdgeInsets.only(left: 4),
+              padding: const EdgeInsets.only(left: Space.xxs),
               child: Text(propName(store, r.prop), style: ts(context.type.uiSmall, context.colors.textSecondary)),
             ),
-            const SizedBox(width: 4),
+            const Gap(Space.xxs),
             _OpButton(store: store, rule: r, onChanged: save),
             const Spacer(),
             Builder(
               builder: (b) => IconBtn(Ico.more,
                   key: const ValueKey('rule-more'),
-                  size: 24,
-                  glyph: 16,
+                  size: ControlSize.xs,
+                  glyph: IconSize.sm,
                   semanticLabel: 'Rule options',
                   onTap: () async {
                     final pick = await showPanel<String>(
@@ -225,7 +226,7 @@ class _RuleEditor extends StatelessWidget {
                   }),
             ),
           ]),
-          const SizedBox(height: 4),
+          const Gap(Space.xxs),
           if (opNeedsValue(r.op)) _valueInput(context, store, r, save),
         ]);
       },
@@ -291,7 +292,7 @@ class _OpButton extends StatelessWidget {
 // ----------------------------------------------------------- advanced filter
 
 Future<void> showAdvancedFilter(BuildContext context, Rect rect, CollectionStore s) =>
-    showPanel<void>(context, rect, (ctx) => _AdvancedFilter(store: s), width: context.mobile ? 360 : 560);
+    showPanel<void>(context, rect, (ctx) => _AdvancedFilter(store: s), width: Widths.palette);
 
 class _AdvancedFilter extends StatelessWidget {
   const _AdvancedFilter({required this.store});
@@ -329,7 +330,7 @@ class _AdvancedFilter extends StatelessWidget {
 
         return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           ..._rows(context, root, const [], save, root),
-          const SizedBox(height: 4),
+          const Gap(Space.xxs),
           Row(children: [
             Builder(
               builder: (b) => TextBtn('+ Add filter rule',
@@ -366,7 +367,7 @@ class _AdvancedFilter extends StatelessWidget {
       final child = group.children[i];
       final p = [...path, i];
       final lead = i == 0
-          ? Text('Where', style: ts(context.type.ui, context.colors.textSecondary, weight: 400))
+          ? Text('Where', style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.regular))
           : i == 1
               ? Builder(
                   builder: (b) => ChipBtn(
@@ -379,7 +380,7 @@ class _AdvancedFilter extends StatelessWidget {
                   ),
                 )
               : Text(group.kind == FilterKind.or ? 'Or' : 'And',
-                  style: ts(context.type.ui, context.colors.textSecondary, weight: 400));
+                  style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.regular));
       Widget body;
       if (child.kind == FilterKind.cond && child.cond != null) {
         final r = child.cond!;
@@ -400,9 +401,9 @@ class _AdvancedFilter extends StatelessWidget {
               },
             ),
           ),
-          const SizedBox(width: 4),
+          const Gap(Space.xxs),
           _OpButton(store: store, rule: r, onChanged: (c) => save(_replace(root, p, Filters.cond(c.prop, c.op, c.value)))),
-          const SizedBox(width: 4),
+          const Gap(Space.xxs),
           if (opNeedsValue(r.op))
             Expanded(
               child: Builder(
@@ -417,14 +418,14 @@ class _AdvancedFilter extends StatelessWidget {
             const Spacer(),
           IconBtn(Ico.close,
               key: ValueKey('adv-remove-${p.join('-')}'),
-              size: 24,
-              glyph: 14,
+              size: ControlSize.xs,
+              glyph: IconSize.xs,
               semanticLabel: 'Remove rule',
               onTap: () => save(_replace(root, p, null))),
         ]);
       } else {
         body = Container(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(Space.xs),
           decoration: BoxDecoration(
             color: context.colors.bgHover,
             borderRadius: BorderRadius.circular(Radii.md),
@@ -441,9 +442,9 @@ class _AdvancedFilter extends StatelessWidget {
         );
       }
       out.add(Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.symmetric(vertical: Space.hair),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 64, height: 28, child: Align(alignment: Alignment.centerLeft, child: lead)),
+          ConstrainedBox(constraints: BoxConstraints(minWidth: Db.filterLead, maxWidth: Db.filterLead, minHeight: ControlSize.sm.height), child: Align(alignment: Alignment.centerLeft, child: lead)),
           Expanded(child: body),
         ]),
       ));
@@ -498,7 +499,7 @@ Future<void> sortButton(BuildContext anchor, CollectionStore s) async {
 }
 
 Future<void> showSortEditor(BuildContext context, Rect rect, CollectionStore s) =>
-    showPanel<void>(context, rect, (ctx) => _SortEditor(store: s), width: context.mobile ? 360 : 420);
+    showPanel<void>(context, rect, (ctx) => _SortEditor(store: s), width: Widths.form);
 
 class _SortEditor extends StatelessWidget {
   const _SortEditor({required this.store});
@@ -517,7 +518,7 @@ class _SortEditor extends StatelessWidget {
         return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           for (var i = 0; i < sorts.length; i++)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(vertical: Space.hair),
               child: Row(children: [
                 Builder(
                   builder: (b) => ChipBtn(
@@ -536,7 +537,7 @@ class _SortEditor extends StatelessWidget {
                     },
                   ),
                 ),
-                const SizedBox(width: 6),
+                const Gap(Space.xs),
                 Builder(
                   builder: (b) => ChipBtn(
                     key: ValueKey('sort-dir-$i'),
@@ -563,13 +564,13 @@ class _SortEditor extends StatelessWidget {
                 const Spacer(),
                 IconBtn(Ico.close,
                     key: ValueKey('sort-remove-$i'),
-                    size: 24,
-                    glyph: 14,
+                    size: ControlSize.xs,
+                    glyph: IconSize.xs,
                     semanticLabel: 'Remove sort',
                     onTap: () => save([...sorts]..removeAt(i))),
               ]),
             ),
-          const SizedBox(height: 4),
+          const Gap(Space.xxs),
           Builder(
             builder: (b) => dbItem(context, 'Add sort', null, ico: Ico.plus, key: const ValueKey('sort-add'), onTap: () async {
               final key = await pickProperty(b, globalRectOf(b), store,

@@ -17,11 +17,11 @@ class SpaceDot extends StatelessWidget {
     return color == null
         ? const SizedBox.shrink()
         : Container(
-            width: 8,
-            height: 8,
+            width: SpaceMark.size,
+            height: SpaceMark.size,
             decoration: BoxDecoration(
               color: color,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(SpaceMark.radius),
             ),
           );
   }
@@ -33,7 +33,7 @@ class SpaceIconTile extends StatelessWidget {
     super.key,
     this.icon,
     this.patch,
-    this.size = 22,
+    this.size = SpaceTile.size,
     this.glyphSize,
     this.color,
   });
@@ -55,7 +55,7 @@ class SpaceIconTile extends StatelessWidget {
       alignment: Alignment.center,
       child: PageIcon(
         icon: icon,
-        size: glyphSize ?? size * .7,
+        size: glyphSize ?? size * SpaceTile.glyphShare,
         color: patch!.ink,
       ),
     );

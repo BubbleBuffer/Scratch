@@ -7,6 +7,8 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
+import '../../ui/tokens.dart';
+
 enum QrEcc {
   low(1),
   medium(0),
@@ -294,7 +296,11 @@ class _Matrix {
 
   void drawCodewords(List<int> data) {
     var i = 0;
+    // The QR standard's column pairs, skipping the timing column (6): grid
+    // positions, not design values.
+    // ignore: bb_lints/tokens_only
     for (var right = size - 1; right >= 1; right -= 2) {
+      // ignore: bb_lints/tokens_only
       if (right == 6) right = 5;
       for (var vert = 0; vert < size; vert++) {
         for (var j = 0; j < 2; j++) {
@@ -383,7 +389,7 @@ class _Matrix {
 /// Paints [code] with a light quiet zone of four modules, dark modules in
 /// [color] on [background].
 class QrView extends StatelessWidget {
-  const QrView({super.key, required this.code, this.size = 184, this.color = const Color(0xFF000000), this.background = const Color(0xFFFFFFFF)});
+  const QrView({super.key, required this.code, this.size = SyncSize.qr, this.color = QrInk.dark, this.background = QrInk.light});
   final QrCode code;
   final double size;
   final Color color, background;

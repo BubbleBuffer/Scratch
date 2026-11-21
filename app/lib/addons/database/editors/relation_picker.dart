@@ -12,6 +12,7 @@ import '../../../ui/ui.dart';
 import '../../../ui/database/config.dart';
 import '../../../ui/database/values.dart';
 import '../../../ui/database/widgets.dart';
+import '../../../ui/database/db_tokens.dart';
 
 /// The name of linked page [id]: its [title], else the first line of its
 /// body (stored meta, see [PagesStore.meta]), else "Untitled".
@@ -60,7 +61,7 @@ class RelationCell extends StatelessWidget {
           for (final id in ids)
             Row(mainAxisSize: MainAxisSize.min, children: [
               PageIcon(icon: RelationTitles.of(id)?.$2, size: style.fontSize! + 2, color: c.iconSecondary),
-              const SizedBox(width: 4),
+              const Gap(Space.xxs),
               Flexible(
                 child: Text(
                   _linkedName(pages, id, RelationTitles.of(id)?.$1 ?? ''),
@@ -75,8 +76,8 @@ class RelationCell extends StatelessWidget {
             ]),
         ];
         return wrap
-            ? Wrap(spacing: 8, runSpacing: 4, children: items)
-            : ClipRect(child: Row(children: [for (final w in items) Padding(padding: const EdgeInsets.only(right: 8), child: w)]));
+            ? Wrap(spacing: Space.sm, runSpacing: Space.xxs, children: items)
+            : ClipRect(child: Row(children: [for (final w in items) Padding(padding: const EdgeInsets.only(right: Space.sm), child: w)]));
       },
     );
   }
@@ -138,7 +139,7 @@ class _RelationPickerState extends State<_RelationPicker> {
       MenuField(
         key: const ValueKey('relation-search'),
         placeholder: 'Link or create a page…',
-        autofocus: !context.mobile,
+        autofocus: !context.touch,
         onChanged: (s) {
           query = s.trim();
           _search();
@@ -149,21 +150,21 @@ class _RelationPickerState extends State<_RelationPicker> {
         for (final id in ids)
           MenuItem(
             label: _linkedName(pages, id, RelationTitles.of(id)?.$1 ?? ''),
-            leading: PageIcon(icon: RelationTitles.of(id)?.$2, size: 18, color: c.iconSecondary),
-            trailing: Icon20(Ico.close, size: 14, color: c.iconTertiary),
+            leading: PageIcon(icon: RelationTitles.of(id)?.$2, size: IconSize.md.px, color: c.iconSecondary),
+            trailing: Icon20(Ico.close, size: IconSize.xs, color: c.iconTertiary),
             onTap: () => _toggle(id),
           ),
       ],
       const MenuHeader('Pages'),
       ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 280),
+        constraints: const BoxConstraints(maxHeight: Db.relationList),
         child: ListView(shrinkWrap: true, children: [
           for (final r in rows)
             if (!ids.contains(r.id) && r.id != widget.args.value.text)
               MenuItem(
                 key: ValueKey('relation-${r.title}'),
                 label: _linkedName(pages, r.id, r.title),
-                leading: PageIcon(icon: r.icon, size: 18, color: c.iconSecondary),
+                leading: PageIcon(icon: r.icon, size: IconSize.md.px, color: c.iconSecondary),
                 onTap: () => _toggle(r.id),
               ),
         ]),

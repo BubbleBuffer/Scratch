@@ -10,6 +10,7 @@ import '../../../registry/block_registry.dart';
 import '../../../state/app_state.dart';
 import '../../../ui/icon_x.dart';
 import '../../../ui/ui.dart';
+import '../../../ui/database/db_tokens.dart';
 
 /// The core's kind name of an inline database block.
 const databaseKind = 'database';
@@ -30,8 +31,8 @@ Widget _body(BlockContext b) {
         host.setTarget(n, id);
       }).whenComplete(() => _creating.remove(n.id));
     }
-    return SizedBox(
-      height: 40,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: Db.tabBar),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text('Creating…', style: ts(b.type.body, b.colors.textTertiary)),

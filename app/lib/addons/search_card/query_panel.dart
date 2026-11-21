@@ -24,10 +24,10 @@ const queryPanelRows = 6;
 const _undoMessageFor = Duration(seconds: 6);
 
 /// The panel's width on desktop.
-const queryPanelWidth = 420.0;
+const queryPanelWidth = Widths.form;
 
 /// Opens the panel for [watch]: a popover under [anchor] on desktop, a bottom
-/// sheet on phone. [onOpenInSearch] and [onShowAsBlock] run after the panel
+/// sheet on a compact screen. [onOpenInSearch] and [onShowAsBlock] run after the panel
 /// has closed.
 Future<void> showQueryPanel(
   BuildContext context, {
@@ -44,7 +44,7 @@ Future<void> showQueryPanel(
         onOpenInSearch: onOpenInSearch,
         onShowAsBlock: onShowAsBlock,
       );
-  if (context.mobile) {
+  if (context.sizeClass.isCompact) {
     return showSheet<void>(context, (ctx) => panel(ctx, mobile: true));
   }
   return showPopover<void>(
@@ -166,16 +166,16 @@ class _QueryPanelState extends State<QueryPanel> {
         : visible.take(queryPanelRows).toList();
     final more = visible.length - shown.length;
     final header = Container(
-      padding: const EdgeInsets.fromLTRB(12, 6, 10, 6),
-      constraints: const BoxConstraints(minHeight: 44),
+      padding: const EdgeInsets.fromLTRB(Space.md, Space.xs, Space.md, Space.xs),
+      constraints: BoxConstraints(minHeight: ControlSize.xl.height),
       decoration: BoxDecoration(
         color: widget.mobile ? c.bgPrimary : c.bgSecondary,
         border: Border(bottom: BorderSide(color: c.borderSubtle)),
       ),
       child: Row(
         children: [
-          Icon20(Ico.search, size: 16, color: c.textTertiary),
-          const SizedBox(width: 6),
+          Icon20(Ico.search, size: IconSize.sm, color: c.textTertiary),
+          const Gap(Space.xs),
           Expanded(
             child: Text.rich(
               highlightQuery(
@@ -188,7 +188,7 @@ class _QueryPanelState extends State<QueryPanel> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: 6),
+          const Gap(Space.xs),
           QueryCountBadge(total: watch.count),
         ],
       ),
@@ -217,7 +217,7 @@ class _QueryPanelState extends State<QueryPanel> {
             Align(
               alignment: Alignment.centerLeft,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+                padding: const EdgeInsets.fromLTRB(Space.sm, 0, Space.sm, Space.xs),
                 child: TextBtn(
                   'Show $more more',
                   key: const ValueKey('query-panel-more'),
@@ -237,10 +237,10 @@ class _QueryPanelState extends State<QueryPanel> {
         : null;
     final footer = Container(
       padding: EdgeInsets.fromLTRB(
-        widget.mobile ? 14 : 12,
-        8,
-        widget.mobile ? 14 : 12,
-        10,
+        widget.mobile ? Space.lg : Space.md,
+        Space.sm,
+        widget.mobile ? Space.lg : Space.md,
+        Space.md,
       ),
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: c.borderSubtle)),
@@ -252,7 +252,7 @@ class _QueryPanelState extends State<QueryPanel> {
             key: const ValueKey('query-panel-open-search'),
             onTap: () => _close(widget.onOpenInSearch),
           ),
-          const SizedBox(width: 18),
+          const Gap(Space.lg),
           TextBtn(
             'Show as a block',
             key: const ValueKey('query-panel-as-block'),
@@ -323,7 +323,7 @@ class _UndoMessage extends StatelessWidget {
     final c = context.colors;
     return Container(
       key: const ValueKey('query-panel-message'),
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.sm),
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: c.borderSubtle)),
       ),

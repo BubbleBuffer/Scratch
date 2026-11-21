@@ -414,7 +414,7 @@ TextSpan _span(
   if (run.marks.contains(_Mark.code)) {
     style = ts(ty.code, c.inlineCodeText, mono: true).copyWith(backgroundColor: c.inlineCodeBg);
   } else {
-    if (run.marks.contains(_Mark.bold)) style = style.copyWith(fontWeight: FontWeight.w700);
+    if (run.marks.contains(_Mark.bold)) style = weightedRun(style, Weight.strong);
     if (run.marks.contains(_Mark.italic)) style = style.copyWith(fontStyle: FontStyle.italic);
   }
   if (run.marks.contains(_Mark.link)) {
@@ -439,7 +439,7 @@ Widget _cell(
 ) {
   final runs = _inlineRuns(markdown, pages: pages);
   return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
     child: Text.rich(
       TextSpan(
         style: base,
@@ -542,7 +542,7 @@ class _TableViewState extends State<_TableView> {
     final ty = context.type;
     final table = widget.table;
     final pages = widget.pages;
-    final head = widget.style.copyWith(fontWeight: FontWeight.w600);
+    final head = weightedRun(widget.style, Weight.strong);
     final rule = BorderSide(color: c.borderSubtle);
     _pruneAfterFrame(_keysOf(table));
     // The layout runs inside the border, so the width it reads is the width

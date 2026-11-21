@@ -55,7 +55,7 @@ Future<void> _pump(WidgetTester tester, {bool mobile = false}) async {
   await tester.pumpWidget(
     AppTheme(
       colors: AppColors.light,
-      formFactor: mobile ? FormFactor.mobile : FormFactor.desktop,
+      density: mobile ? Density.touch : Density.pointer,
       child: WidgetsApp(
         color: const Color(0xFFFFFFFF),
         navigatorKey: _navKey,

@@ -45,7 +45,7 @@ Widget chatCard(BuildContext context, NoteArgs args) {
   if (_wholeChatId(args) != null) return chatEmbed(context, args);
   return args.target == null
       ? Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(Space.md),
           child: chatChip(context, args),
         )
       : chatEmbed(context, args);
@@ -98,7 +98,7 @@ String? _wholeChatId(NoteArgs args) {
 }
 
 Widget _placeholder(BuildContext context, String text) => Container(
-  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
   decoration: BoxDecoration(
     color: context.colors.bgSecondary,
     borderRadius: Radii.ctl,
@@ -274,7 +274,7 @@ class _ChatSessionCardState extends State<ChatSessionCard> {
                     colour: _bandColour(context, chatRefBandFor(chapter.id)),
                     small: true,
                     oneLine: true,
-                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    padding: const EdgeInsets.symmetric(vertical: Space.xxs),
                   ),
               ],
             ),

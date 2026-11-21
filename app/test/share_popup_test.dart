@@ -120,10 +120,10 @@ Future<void> pumpPopup(
         textDirection: TextDirection.ltr,
         child: AppTheme(
           colors: colors,
-          formFactor: mobile ? FormFactor.mobile : FormFactor.desktop,
+          density: mobile ? Density.touch : Density.pointer,
           child: DefaultTextStyle(
             style: ts(
-              mobile ? TypeScale.mobile.body : TypeScale.desktop.body,
+              mobile ? TypeScale.touch.body : TypeScale.pointer.body,
               colors.textPrimary,
             ),
             child: ColoredBox(

@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../../registry/addon_registry.dart';
 import '../../registry/note_type_registry.dart';
 import '../../ui/note_preview.dart';
+import '../../ui/tokens.dart';
 
 class DocumentAddon extends Addon {
   const DocumentAddon();
@@ -20,7 +21,7 @@ Widget _embed(BuildContext context, NoteArgs args) => Column(
   crossAxisAlignment: CrossAxisAlignment.stretch,
   children: [
     Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.sm),
       child: noteChip(context, args),
     ),
     args.editor,

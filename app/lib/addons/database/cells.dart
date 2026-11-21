@@ -8,19 +8,19 @@ import '../../core/models.dart' hide StatusGroup;
 import '../../registry/property_registry.dart';
 import '../../ui/ui.dart';
 import '../../ui/database/config.dart';
-import '../../ui/database/db_theme.dart';
+import '../../ui/database/db_tokens.dart';
 import '../../ui/database/values.dart';
 import '../../ui/database/widgets.dart';
 
 /// The value text style of [mode].
-TextStyle cellStyle(BuildContext context, CellMode mode, {Color? color, int weight = 400}) {
+TextStyle cellStyle(BuildContext context, CellMode mode, {Color? color, Weight weight = Weight.regular}) {
   final c = context.colors;
-  final m = context.mobile;
+  final m = context.touch;
   final spec = switch (mode) {
-    CellMode.table => m ? const TypeSpec(16, 20, 400) : const TypeSpec(14, 21, 400),
-    CellMode.card => const TypeSpec(12, 18, 400),
-    CellMode.list => const TypeSpec(14, 21, 400),
-    CellMode.page => m ? const TypeSpec(15, 20, 400) : const TypeSpec(14, 20, 400),
+    CellMode.table => m ? context.type.title : context.type.ui,
+    CellMode.card => context.type.uiSmall,
+    CellMode.list => context.type.ui,
+    CellMode.page => context.type.ui,
   };
   return ts(spec, color ?? c.textPrimary, weight: weight);
 }
@@ -57,14 +57,14 @@ Widget pillsCell(CellArgs a) {
           group: status ? statusGroupOf(a.def, o.id) : null, small: small) else Pill(id, small: small),
   ];
   if (a.wrap || a.mode == CellMode.page || a.mode == CellMode.card) {
-    return Wrap(spacing: a.mode == CellMode.card ? 6 : 8, runSpacing: 6, children: pills);
+    return Wrap(spacing: a.mode == CellMode.card ? Space.xs : Space.sm, runSpacing: Space.xs, children: pills);
   }
   return ClipRect(
     child: OverflowBox(
       alignment: Alignment.centerLeft,
       maxWidth: double.infinity,
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        for (var i = 0; i < pills.length; i++) ...[if (i > 0) const SizedBox(width: 6), pills[i]],
+        for (var i = 0; i < pills.length; i++) ...[if (i > 0) const Gap(Space.xs), pills[i]],
       ]),
     ),
   );
@@ -94,7 +94,7 @@ Color hintColor(BuildContext context) => context.colors.textTertiary;
 
 /// The checkbox cell.
 Widget checkboxCell(CellArgs a) {
-  final size = a.mode == CellMode.card ? 14.0 : (a.context.mobile ? 18.0 : 16.0);
+  final size = a.mode == CellMode.card ? Db.cardCheckbox : (a.context.touch ? Db.touchCheckbox : Db.checkbox);
   return DbCheckbox(checked: a.value.kind == ValueKind.checkbox && a.value.checked, size: size);
 }
 

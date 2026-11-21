@@ -24,25 +24,25 @@ Widget _decorate(BlockContext b, Widget text) {
             final missing = !loading && (a == null || a.path.isEmpty);
             return Hover(
               radius: Radii.sm,
-              child: SizedBox(
-                height: 28,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: ControlSize.sm.height),
                 child: Row(children: [
-                  const SizedBox(width: 2),
-                  IconX(Ix.file, size: 18, color: c.iconSecondary),
-                  const SizedBox(width: 6),
+                  const Gap(Space.hair),
+                  IconX(Ix.file, size: IconSize.md.px, color: c.iconSecondary),
+                  const Gap(Space.xs),
                   Flexible(
                     child: Text(name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: tsRaw(16, 20.8, 400, missing ? c.textTertiary : c.textPrimary)),
+                        style: ts(context.type.body, missing ? c.textTertiary : c.textPrimary)),
                   ),
                   if (size.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    Text(size, style: tsRaw(12, 16, 400, c.textTertiary)),
+                    const Gap(Space.xs),
+                    Text(size, style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.regular)),
                   ],
                   if (missing) ...[
-                    const SizedBox(width: 6),
-                    Text('not on this device', style: tsRaw(12, 16, 400, c.textTertiary)),
+                    const Gap(Space.xs),
+                    Text('not on this device', style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.regular)),
                   ],
                 ]),
               ),
@@ -68,4 +68,4 @@ const fileBlock = BlockType(
   group: 'Media',
 );
 
-double _top(BlockContext b) => (b.mobile ? 3 : 2) + 2;
+double _top(BlockContext b) => BlockRhythm.pad(b.touch) + Space.hair;

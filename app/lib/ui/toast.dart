@@ -36,7 +36,7 @@ class _Toast extends StatefulWidget {
 }
 
 class _ToastState extends State<_Toast> {
-  late final Timer _timer = Timer(const Duration(seconds: 4), widget.remove);
+  late final Timer _timer = Timer(Motion.toast, widget.remove);
   @override
   void initState() {
     super.initState();
@@ -53,15 +53,15 @@ class _ToastState extends State<_Toast> {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Positioned(
-      left: 24,
-      right: 24,
-      bottom: MediaQuery.viewInsetsOf(context).bottom + 80,
+      left: Space.xl,
+      right: Space.xl,
+      bottom: MediaQuery.viewInsetsOf(context).bottom + ToastPlacement.bottom,
       child: IgnorePointer(
         child: Align(
           alignment: Alignment.bottomCenter,
           child: Container(
             key: ValueKey(widget.name),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
             decoration: BoxDecoration(
               color: c.textPrimary,
               borderRadius: Radii.panel,

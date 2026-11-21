@@ -1232,7 +1232,7 @@ class PageEditorState extends State<PageScreen>
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => addChild(n),
-        child: const SizedBox(height: 28),
+        child: SizedBox(height: ControlSize.sm.height),
       );
     }
     return Column(
@@ -1316,7 +1316,7 @@ class PageEditorState extends State<PageScreen>
     if (readOnly) return;
     final e = await showEmojiPicker(
       context,
-      anchor: context.mobile ? null : globalRectOf(anchor),
+      anchor: context.sizeClass.isCompact ? null : globalRectOf(anchor),
       removable: false,
     );
     if (e == null || e.isEmpty || !mounted || doc?.byId[n.id] == null) return;
@@ -1326,7 +1326,7 @@ class PageEditorState extends State<PageScreen>
   @override
   Future<void> openBlockPicker(Node n, BuildContext anchor) async {
     if (readOnly) return;
-    final a = context.mobile ? null : globalRectOf(anchor);
+    final a = context.sizeClass.isCompact ? null : globalRectOf(anchor);
     final Future<String?> pick = switch (n.kind) {
       Kinds.image => pickAttachment(context, a, image: true),
       Kinds.file => pickAttachment(context, a, image: false),
@@ -1432,7 +1432,7 @@ class PageEditorState extends State<PageScreen>
       _safeSetState(() => mentionId = null);
     }
     if (_pending.isNotEmpty) _pending.clear();
-    if (!context.mobile) {
+    if (!context.touch) {
       SchedulerBinding.instance.addPostFrameCallback(
         (_) => _updateSelectionToolbar(),
       );
@@ -2270,9 +2270,9 @@ class PageEditorState extends State<PageScreen>
     final a = _caretRect(n, offset);
     if (a == null) return;
     final stack = stackKey.currentContext?.findRenderObject() as RenderBox?;
-    if (context.mobile && stack != null && scroll.hasClients) {
+    if (context.touch && stack != null && scroll.hasClients) {
       // Keep room for four rows of the menu below the caret line.
-      final need = a.bottom + 8 + 4 * 44 + 46 + 8 - stack.size.height;
+      final need = a.bottom + Space.sm + SoftKeyboardMenu.keepRows * SoftKeyboardMenu.row + SoftKeyboardMenu.header + Space.sm - stack.size.height;
       if (need > 0 &&
           scroll.offset + need <= scroll.position.maxScrollExtent + 0.5) {
         scroll.jumpTo(scroll.offset + need);
@@ -3006,7 +3006,7 @@ class PageEditorState extends State<PageScreen>
       current = n.color;
     }
     final String? v;
-    if (context.mobile) {
+    if (context.sizeClass.isCompact) {
       v = await showSheet<String>(
         context,
         (ctx) => ColorMenu(
@@ -3096,7 +3096,7 @@ class PageEditorState extends State<PageScreen>
     final n = dragNode;
     final stack = stackKey.currentContext?.findRenderObject() as RenderBox?;
     if (d == null || n == null || stack == null) return;
-    int? gap;
+    int? slot;
     double? y, x;
     Node? beside;
     var right = false;
@@ -3111,12 +3111,12 @@ class PageEditorState extends State<PageScreen>
       final h = box.size.height;
       if (global.dy >= top && global.dy < top + h) {
         final before = global.dy < top + h / 2;
-        gap = r.node.visIndex + (before ? 0 : 1);
+        slot = r.node.visIndex + (before ? 0 : 1);
         y = stack.globalToLocal(Offset(0, before ? top : top + h)).dy;
         x = r.node.depth * Layout.indent;
         // Near the right edge of a top-level block (or the left edge of
         // a column list): columns.
-        if (geo != null && !context.mobile && _canDropBeside(r.node)) {
+        if (geo != null && !context.touch && _canDropBeside(r.node)) {
           final textRight = geo.textLeft + geo.textWidth;
           final edge = math.min(64.0, geo.textWidth / 5);
           final t = stack.globalToLocal(Offset(0, top)).dy;
@@ -3151,8 +3151,8 @@ class PageEditorState extends State<PageScreen>
     }
     setState(() {
       dragPos = stack.globalToLocal(global);
-      if (gap != null) {
-        dropGap = gap;
+      if (slot != null) {
+        dropGap = slot;
         dropY = y;
         dropX = x;
         dropBeside = beside;
@@ -3298,7 +3298,7 @@ class PageEditorState extends State<PageScreen>
 
   void _marqueeDown(PointerDownEvent e) {
     _pointerDown = true;
-    if (context.mobile || e.buttons != kPrimaryButton || doc == null) return;
+    if (context.touch || e.buttons != kPrimaryButton || doc == null) return;
     final stack = stackKey.currentContext?.findRenderObject() as RenderBox?;
     if (stack == null) return;
     final local = stack.globalToLocal(e.position);
@@ -3352,7 +3352,7 @@ class PageEditorState extends State<PageScreen>
     } else if (start != null && selected.isNotEmpty && menuBlockId == null) {
       setState(() => selected.clear());
     }
-    if (!context.mobile) {
+    if (!context.touch) {
       SchedulerBinding.instance.addPostFrameCallback(
         (_) => _updateSelectionToolbar(),
       );
@@ -3417,10 +3417,10 @@ class PageEditorState extends State<PageScreen>
     loadUs: p.loadUs,
   );
 
-  /// The page's "•••" menu: a popover on desktop, a sheet on mobile.
+  /// The page's "•••" menu: a popover, or a sheet on a compact screen.
   Future<void> _openPageMenu(BuildContext anchor) async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final rect = context.mobile ? null : globalRectOf(anchor);
+    final rect = context.sizeClass.isCompact ? null : globalRectOf(anchor);
     final a = await showPageMenu(
       context,
       rect,
@@ -3495,16 +3495,16 @@ class PageEditorState extends State<PageScreen>
   // ---------------------------------------------------------------------
   // Build.
 
-  Geo _geo(double width, bool mobile) {
+  Geo _geo(double width, bool compact) {
     if (widget.embedded) {
-      final gutter = mobile ? 18.0 : 30.0;
+      final gutter = compact ? PageChrome.embeddedGutterCompact : PageChrome.embeddedGutter;
       return Geo(gutter, math.max(0, width - 2 * gutter));
     }
-    if (mobile) return Geo(Layout.gutter, width - 2 * Layout.gutter);
+    if (compact) return Geo(Layout.gutter, width - 2 * Layout.gutter);
     final full = prefs.fullWidth;
     final col = full
-        ? width - 2 * 96
-        : math.min(Layout.contentWidth, width - 2 * 48);
+        ? width - 2 * PageChrome.fullWidthMargin
+        : math.min(Layout.contentWidth, width - 2 * PageChrome.columnMargin);
     final left = (width - col) / 2 + 6;
     return Geo(left, col - 12);
   }
@@ -3512,7 +3512,8 @@ class PageEditorState extends State<PageScreen>
   @override
   Widget build(BuildContext context) {
     _scheduleEditorFocus();
-    final mobile = context.mobile;
+    final mobile = context.touch;
+    final compact = context.sizeClass.isCompact;
     final mq = MediaQuery.of(context);
     final inset = mq.viewInsets.bottom;
     final showKb = mobile && focusedId != null && inset > 0;
@@ -3534,7 +3535,7 @@ class PageEditorState extends State<PageScreen>
         if (box == null) return;
         final dpr = mq.devicePixelRatio;
         final o = box.localToGlobal(Offset.zero);
-        final g = _geo(box.size.width, mobile);
+        final g = _geo(box.size.width, compact);
         Bakeoff.instance.log(
           'layout page text-x=${((o.dx + g.textLeft + 150) * dpr).round()} '
           'text-y=${((o.dy + box.size.height * 0.45) * dpr).round()} '
@@ -3620,16 +3621,16 @@ class PageEditorState extends State<PageScreen>
     );
     Widget band() => SizedBox(
       key: ValueKey('page-space-band-${widget.pageId}'),
-      height: 6,
+      height: PageChrome.band,
       width: double.infinity,
       child: ColoredBox(color: patch!.fill),
     );
     final column = Column(
       children: [
-        if (patch != null && !mobile) band(),
+        if (patch != null && !compact) band(),
         if (!preview || widget.navigationPreview)
-          mobile ? _mobileBar(context) : _desktopBar(context),
-        if (patch != null && mobile) band(),
+          compact ? _mobileBar(context) : _desktopBar(context),
+        if (patch != null && compact) band(),
         if (!preview) ConflictToplines(pageId: widget.pageId),
         if (readOnly && !preview) _lockedBanner(context),
         Expanded(
@@ -3666,13 +3667,13 @@ class PageEditorState extends State<PageScreen>
       _embeddedOverlayUpdatePending = false;
       if (!mounted) return;
       final show =
-          (context.mobile &&
+          (context.touch &&
               focusedId != null &&
               MediaQuery.viewInsetsOf(context).bottom > 0) ||
           slashId != null ||
           mentionId != null ||
           linkTarget != null ||
-          (!context.mobile && (selRect != null || menuBlockId != null));
+          (!context.touch && (selRect != null || menuBlockId != null));
       if (show && !_embeddedOverlay.isShowing) _embeddedOverlay.show();
       if (!show && _embeddedOverlay.isShowing) _embeddedOverlay.hide();
     });
@@ -3690,10 +3691,10 @@ class PageEditorState extends State<PageScreen>
     final mq = MediaQuery.of(context);
     final inset = mq.viewInsets.bottom;
     final showKb = focusedId != null && inset > 0;
-    final bottom = inset + (showKb ? Layout.keyboardToolbarHeight : 0) + 8;
+    final bottom = inset + (showKb ? Layout.keyboardToolbarHeight : 0) + Space.sm;
     final maxHeight = math.min(
-      5.5 * 44 + 46,
-      math.max(120.0, mq.size.height - bottom - 80),
+      SoftKeyboardMenu.maxHeight,
+      math.max(SoftKeyboardMenu.floor, mq.size.height - bottom - SoftKeyboardMenu.topClearance),
     );
     return Stack(
       children: [
@@ -3706,8 +3707,8 @@ class PageEditorState extends State<PageScreen>
           ),
         if (slashId != null)
           Positioned(
-            left: 8,
-            right: 8,
+            left: Space.sm,
+            right: Space.sm,
             bottom: bottom,
             child: TextFieldTapRegion(
               child: SlashMenu(
@@ -3724,8 +3725,8 @@ class PageEditorState extends State<PageScreen>
           ),
         if (mentionId != null)
           Positioned(
-            left: 8,
-            right: 8,
+            left: Space.sm,
+            right: Space.sm,
             bottom: bottom,
             child: TextFieldTapRegion(
               child: MentionMenu(
@@ -3740,8 +3741,8 @@ class PageEditorState extends State<PageScreen>
           ),
         if (linkTarget != null)
           Positioned(
-            left: 8,
-            right: 8,
+            left: Space.sm,
+            right: Space.sm,
             bottom: bottom,
             child: Center(
               child: LinkBox(initial: _linkInitial, onDone: _linkDone),
@@ -3755,23 +3756,23 @@ class PageEditorState extends State<PageScreen>
     final c = context.colors;
     return Container(
       key: const ValueKey('locked-banner'),
-      height: 32,
+      constraints: BoxConstraints(minHeight: ControlSize.md.height),
       alignment: Alignment.center,
       color: c.bgSecondary,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconX(Ix.lock, size: 14, color: c.iconSecondary),
-          const SizedBox(width: 6),
+          IconX(Ix.lock, size: IconSize.xs.px, color: c.iconSecondary),
+          const Gap(Space.xs),
           Text(
             'Page is locked',
-            style: ts(context.type.ui, c.textSecondary, weight: 400),
+            style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
           ),
-          const SizedBox(width: 8),
+          const Gap(Space.sm),
           TextBtn(
             'Unlock',
             key: const ValueKey('unlock'),
-            height: 24,
+            size: ControlSize.xs,
             color: c.accentText,
             onTap: () {
               _meta.updatePrefs(widget.pageId, (p) => p.locked = false);
@@ -3793,21 +3794,16 @@ class PageEditorState extends State<PageScreen>
             key: ValueKey('select-$key'),
             onTap: onTap,
             radius: Radii.md,
-            child: SizedBox(
-              height: 52,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: PageChrome.selectBar),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   icon,
-                  const SizedBox(height: 2),
+                  const Gap(Space.hair),
                   Text(
                     label,
-                    style: tsRaw(
-                      11,
-                      14,
-                      500,
-                      onTap == null ? c.textDisabled : c.textSecondary,
-                    ),
+                    style: ts(context.type.caption, onTap == null ? c.textDisabled : c.textSecondary, weight: Weight.strong),
                   ),
                 ],
               ),
@@ -3826,19 +3822,19 @@ class PageEditorState extends State<PageScreen>
         children: [
           btn(
             'delete',
-            Icon20(Ico.trash, size: 22, color: c.iconSecondary),
+            Icon20(Ico.trash, size: IconSize.xl, color: c.iconSecondary),
             'Delete',
             has ? () => _deleteBlocks(_selectedTops()) : null,
           ),
           btn(
             'duplicate',
-            Icon20(Ico.duplicate, size: 22, color: c.iconSecondary),
+            Icon20(Ico.duplicate, size: IconSize.xl, color: c.iconSecondary),
             'Duplicate',
             has ? () => _duplicate(_selectedTops()) : null,
           ),
           btn(
             'turn-into',
-            Icon20(Ico.turnInto, size: 22, color: c.iconSecondary),
+            Icon20(Ico.turnInto, size: IconSize.xl, color: c.iconSecondary),
             'Turn into',
             n == null
                 ? null
@@ -3854,7 +3850,7 @@ class PageEditorState extends State<PageScreen>
           ),
           btn(
             'color',
-            IconX(Ix.color, size: 22, color: c.iconSecondary),
+            IconX(Ix.color, size: IconSize.xl.px, color: c.iconSecondary),
             'Color',
             n == null
                 ? null
@@ -3871,13 +3867,13 @@ class PageEditorState extends State<PageScreen>
           ),
           btn(
             'up',
-            Icon20(Ico.arrowUp, size: 22, color: c.iconSecondary),
+            Icon20(Ico.arrowUp, size: IconSize.xl, color: c.iconSecondary),
             'Up',
             has ? () => _moveBlocks(_selectedTops(), -1) : null,
           ),
           btn(
             'down',
-            Icon20(Ico.arrowDown, size: 22, color: c.iconSecondary),
+            Icon20(Ico.arrowDown, size: IconSize.xl, color: c.iconSecondary),
             'Down',
             has ? () => _moveBlocks(_selectedTops(), 1) : null,
           ),
@@ -3893,7 +3889,7 @@ class PageEditorState extends State<PageScreen>
     bool showKb,
   ) {
     final c = context.colors;
-    final mobile = context.mobile;
+    final mobile = context.sizeClass.isCompact;
     final mq = MediaQuery.of(context);
     if (preview && !widget.navigationPreview) {
       return ColoredBox(color: c.bgPrimary, child: column);
@@ -3983,13 +3979,13 @@ class PageEditorState extends State<PageScreen>
                         decoration: BoxDecoration(
                           color: c.bgPrimary,
                           borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(16),
+                            topLeft: PileGeometry.corner,
                           ),
                           boxShadow: c.stack,
                         ),
                         child: ClipRRect(
                           borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(16),
+                            topLeft: PileGeometry.corner,
                           ),
                           child: LayoutBuilder(
                             builder: (context, sheetBox) {
@@ -4020,7 +4016,7 @@ class PageEditorState extends State<PageScreen>
   }
 
   Widget _buildList(BuildContext context, Doc d) {
-    final mobile = context.mobile;
+    final mobile = context.sizeClass.isCompact;
     return LayoutBuilder(
       builder: (context, box) {
         final geo = _geo(box.maxWidth, mobile);
@@ -4104,7 +4100,7 @@ class PageEditorState extends State<PageScreen>
               if (implicitChildren)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.only(left: geo.textLeft, top: 8),
+                    padding: EdgeInsets.only(left: geo.textLeft, top: Space.sm),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: PageChildrenView(
@@ -4124,8 +4120,8 @@ class PageEditorState extends State<PageScreen>
                     child: Padding(
                       padding: EdgeInsets.only(
                         left: geo.textLeft,
-                        top: 8,
-                        right: 24,
+                        top: Space.sm,
+                        right: Space.xl,
                       ),
                       child: IgnorePointer(
                         child: Column(
@@ -4147,13 +4143,13 @@ class PageEditorState extends State<PageScreen>
                                         : Brightness.light,
                                   )!,
                             ),
-                            const SizedBox(height: 10),
+                            const Gap(Space.md),
                             Text(
                               'Nothing here yet. Start typing, or press / for blocks.',
                               style: ts(
                                 context.type.body,
                                 context.colors.textSecondary,
-                                weight: 400,
+                                weight: Weight.regular,
                               ),
                             ),
                           ],
@@ -4177,10 +4173,10 @@ class PageEditorState extends State<PageScreen>
                   onTap: _tapBelow,
                   child: SizedBox(
                     height: widget.embedded
-                        ? 36
+                        ? PageChrome.tapBelowEmbedded
                         : mobile
-                        ? 160
-                        : math.max(160, box.maxHeight * 0.3),
+                        ? PageChrome.tapBelow
+                        : math.max(PageChrome.tapBelow, box.maxHeight * PageChrome.tapBelowShare),
                   ),
                 ),
               ),
@@ -4219,10 +4215,10 @@ class PageEditorState extends State<PageScreen>
   Widget _header(BuildContext context, Geo geo, double width) {
     final c = context.colors;
     final ty = context.type;
-    final mobile = context.mobile;
+    final mobile = context.sizeClass.isCompact;
     final style = tsDisplay(ty.pageTitle, c.textPrimary);
     final title = Padding(
-      padding: EdgeInsets.only(bottom: mobile ? 8 : 12),
+      padding: EdgeInsets.only(bottom: mobile ? Space.sm : Space.md),
       child: Stack(
         children: [
           if (titleCtl.text.isEmpty)
@@ -4260,7 +4256,7 @@ class PageEditorState extends State<PageScreen>
     );
     return Padding(
       padding: EdgeInsets.only(
-        top: _page?.cover != null ? 0 : (mobile ? 8 : 0),
+        top: _page?.cover != null ? 0 : (mobile ? Space.sm : 0),
       ),
       child: PageHeader(
         pageId: widget.pageId,
@@ -4292,7 +4288,7 @@ class PageEditorState extends State<PageScreen>
     );
   }
 
-  Widget _moreButton({double size = 28, double glyph = 20}) => Builder(
+  Widget _moreButton({ControlSize size = ControlSize.sm, IconSize glyph = IconSize.lg}) => Builder(
     builder: (b) => IconBtn(
       Ico.more,
       key: const ValueKey('page-menu'),
@@ -4310,7 +4306,7 @@ class PageEditorState extends State<PageScreen>
     return SizedBox(
       height: Layout.topbarHeight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: Space.md),
         child: Row(
           children: [
             const SidebarReopenButton(),
@@ -4329,9 +4325,9 @@ class PageEditorState extends State<PageScreen>
             if (_page != null)
               Text(
                 'Edited ${relativeTime(_page!.updatedMs.toInt()).replaceFirst('Just now', 'just now')}',
-                style: ts(ty.ui, c.textTertiary, weight: 400),
+                style: ts(ty.ui, c.textTertiary, weight: Weight.regular),
               ),
-            const SizedBox(width: 8),
+            const Gap(Space.sm),
             IconBtn(
               Ico.star,
               key: const ValueKey('page-favorite'),
@@ -4340,7 +4336,7 @@ class PageEditorState extends State<PageScreen>
               color: _favorite ? c.accent : c.iconPrimary,
               semanticLabel: 'Favorite',
             ),
-            const SizedBox(width: 2),
+            const Gap(Space.hair),
             const AddonHeaderActions(),
             _moreButton(),
             IconBtn(
@@ -4367,11 +4363,11 @@ class PageEditorState extends State<PageScreen>
         color: c.bgPrimary,
         border: Border(
           bottom: BorderSide(
-            color: _scrolled ? c.borderSubtle : const Color(0x00000000),
+            color: _scrolled ? c.borderSubtle : kTransparent,
           ),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
       child: Row(
         children: [
           IconBtn(
@@ -4385,22 +4381,21 @@ class PageEditorState extends State<PageScreen>
                 Navigator.of(context).maybePop();
               }
             },
-            size: 44,
-            glyph: 24,
+            size: ControlSize.xl,
+            glyph: IconSize.xl,
             color: c.iconPrimary,
             semanticLabel: 'Back',
           ),
           SpaceIconTile(
             icon: _page?.icon,
-            size: 22,
-            glyphSize: 18,
+            glyphSize: IconSize.md.px,
             patch: spacePatch(
               headingProgressSpaceColor,
               c.dark ? Brightness.dark : Brightness.light,
             ),
             color: c.iconSecondary,
           ),
-          const SizedBox(width: 6),
+          const Gap(Space.xs),
           Expanded(
             child: Text(
               label.text,
@@ -4429,12 +4424,12 @@ class PageEditorState extends State<PageScreen>
               Ico.star,
               key: const ValueKey('page-favorite'),
               onTap: _toggleFavorite,
-              size: 44,
-              glyph: 22,
+              size: ControlSize.xl,
+              glyph: IconSize.xl,
               color: _favorite ? c.accent : c.iconPrimary,
               semanticLabel: _favorite ? 'Remove from favorites' : 'Favorite',
             ),
-            _moreButton(size: 44, glyph: 22),
+            _moreButton(size: ControlSize.xl, glyph: IconSize.xl),
             const AddonHeaderActions(),
           ],
         ],
@@ -4485,7 +4480,7 @@ class PageEditorState extends State<PageScreen>
     final free = a == null
         ? size.height * 0.5
         : size.height - 8 - (a.bottom + 8);
-    return clampD(free, 3 * 44 + 46, 5.5 * 44 + 46);
+    return clampD(free, SoftKeyboardMenu.minHeight, SoftKeyboardMenu.maxHeight);
   }
 
   List<Widget> _overlays(
@@ -4496,7 +4491,8 @@ class PageEditorState extends State<PageScreen>
     bool screenOverlay = false,
   }) {
     if (d == null) return const [];
-    final mobile = context.mobile;
+    final mobile = context.touch;
+    final compact = context.sizeClass.isCompact;
     final c = context.colors;
     final out = <Widget>[];
     final stackBox = stackKey.currentContext?.findRenderObject() as RenderBox?;
@@ -4544,8 +4540,8 @@ class PageEditorState extends State<PageScreen>
             child: Container(
               key: const ValueKey('marquee'),
               decoration: BoxDecoration(
-                color: c.accent.withValues(alpha: 0.08),
-                border: Border.all(color: c.accent.withValues(alpha: 0.3)),
+                color: c.accent.withValues(alpha: Alpha.tint),
+                border: Border.all(color: c.accent.withValues(alpha: Alpha.wash)),
               ),
             ),
           ),
@@ -4563,20 +4559,20 @@ class PageEditorState extends State<PageScreen>
         Positioned.fromRect(
           rect: side,
           child: IgnorePointer(
-            child: Container(color: c.accent.withValues(alpha: 0.45)),
+            child: Container(color: c.accent.withValues(alpha: Alpha.muted)),
           ),
         ),
       );
     } else if (!screenOverlay && dragNode != null && dropY != null) {
-      final geo = _geo(size.width, mobile);
+      final geo = _geo(size.width, compact);
       out.add(
         Positioned(
-          left: geo.textLeft + (dropX ?? 0) - 2,
-          top: dropY! - 2,
-          width: geo.textWidth - (dropX ?? 0) + 4,
-          height: 4,
+          left: geo.textLeft + (dropX ?? 0) - Space.hair,
+          top: dropY! - Space.hair,
+          width: geo.textWidth - (dropX ?? 0) + Space.xxs,
+          height: Space.xxs,
           child: IgnorePointer(
-            child: Container(color: c.accent.withValues(alpha: 0.45)),
+            child: Container(color: c.accent.withValues(alpha: Alpha.muted)),
           ),
         ),
       );
@@ -4587,13 +4583,13 @@ class PageEditorState extends State<PageScreen>
           : 1;
       out.add(
         Positioned(
-          left: dragPos!.dx + 12,
-          top: dragPos!.dy - 12,
+          left: dragPos!.dx + Space.md,
+          top: dragPos!.dy - Space.md,
           child: IgnorePointer(
             child: Opacity(
-              opacity: 0.4,
+              opacity: Alpha.wash,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
+                constraints: const BoxConstraints(maxWidth: Widths.notice),
                 child: Text(
                   count > 1
                       ? '$count blocks'
@@ -4625,7 +4621,7 @@ class PageEditorState extends State<PageScreen>
           grouped: !slashTurnInto,
           maxHeight: mobile
               ? _mobileMenuHeight(size, slashAnchor)
-              : menuHeight(menuRect(slashAnchor), 400),
+              : menuHeight(menuRect(slashAnchor), EditorMenu.slashHeight),
         ),
       );
       out.add(_placeMenu(menu, menuRect(slashAnchor), size, mobile));
@@ -4642,7 +4638,7 @@ class PageEditorState extends State<PageScreen>
           onHover: (i) => setState(() => mentionIndex = i),
           maxHeight: mobile
               ? _mobileMenuHeight(size, mentionAnchor)
-              : menuHeight(menuRect(mentionAnchor), 360),
+              : menuHeight(menuRect(mentionAnchor), Heights.list),
         ),
       );
       out.add(_placeMenu(menu, menuRect(mentionAnchor), size, mobile));
@@ -4659,8 +4655,8 @@ class PageEditorState extends State<PageScreen>
         linkTarget == null &&
         !readOnly) {
       final r = menuRect(selRect)!;
-      final top = r.top - 8 - SelectionToolbar.height;
-      final desiredTop = top < 4 ? r.bottom + 8 : top;
+      final top = r.top - Space.sm - SelectionToolbar.height;
+      final desiredTop = top < Space.xxs ? r.bottom + Space.sm : top;
       out.add(
         Positioned(
           left: clampD(r.left, 8, math.max(8, size.width - 360)),
@@ -4693,7 +4689,7 @@ class PageEditorState extends State<PageScreen>
       final box = LinkBox(initial: _linkInitial, onDone: _linkDone);
       if (mobile) {
         out.add(
-          Positioned(left: 8, right: 8, bottom: 8, child: Center(child: box)),
+          Positioned(left: Space.sm, right: Space.sm, bottom: Space.sm, child: Center(child: box)),
         );
       } else {
         final a = menuRect(linkAnchor) ?? const Rect.fromLTWH(100, 100, 10, 10);
@@ -4701,8 +4697,8 @@ class PageEditorState extends State<PageScreen>
           Positioned(
             left: clampD(a.left, 8, math.max(8, size.width - 330)),
             top: screenOverlay
-                ? clampD(a.bottom + 8, 8, math.max(8, size.height - 56))
-                : a.bottom + 8,
+                ? clampD(a.bottom + Space.sm, Space.sm, math.max(Space.sm, size.height - Space.xxxl))
+                : a.bottom + Space.sm,
             child: box,
           ),
         );
@@ -4754,16 +4750,16 @@ class PageEditorState extends State<PageScreen>
   }
 
   Widget _placeMenu(Widget menu, Rect? a, Size size, bool mobile) {
-    if (mobile) return Positioned(left: 8, right: 8, bottom: 8, child: menu);
+    if (mobile) return Positioned(left: Space.sm, right: Space.sm, bottom: Space.sm, child: menu);
     if (a == null) {
       return const Positioned(left: 0, top: 0, child: SizedBox.shrink());
     }
-    final below = size.height - a.bottom - 8;
-    final showAbove = below < 240 && a.top > below;
-    final left = clampD(a.left - 6, 8, math.max(8, size.width - 324 - 8));
+    final below = size.height - a.bottom - Space.sm;
+    final showAbove = below < EditorMenu.flipBelow && a.top > below;
+    final left = clampD(a.left - Space.xs, Space.sm, math.max(Space.sm, size.width - EditorMenu.width - Space.sm));
     return showAbove
-        ? Positioned(left: left, bottom: size.height - a.top + 6, child: menu)
-        : Positioned(left: left, top: a.bottom + 6, child: menu);
+        ? Positioned(left: left, bottom: size.height - a.top + Space.xs, child: menu)
+        : Positioned(left: left, top: a.bottom + Space.xs, child: menu);
   }
 }
 
@@ -4790,7 +4786,7 @@ class _TurnIntoSheet extends StatelessWidget {
         for (final t in blockRegistry.turnIntoTypes)
           SheetItem(
             key: ValueKey('sheet-kind-${t.kind}'),
-            leading: KindIcon(t, size: 22, color: c.iconPrimary),
+            leading: KindIcon(t, size: IconSize.xl.px, color: c.iconPrimary),
             label: t.label,
             selected: t.kind == kind,
             onTap: () =>

@@ -89,7 +89,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     final docked =
         open != null &&
         !widget.inline &&
-        !context.mobile &&
+        !context.sizeClass.isCompact &&
         _columnOf(open.id) != null;
     final board = ListenableBuilder(
       listenable: widget.noteTypes ?? noteTypeRegistry,
@@ -111,7 +111,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
       listenable: _source,
       builder: (context, _) {
         final open = _open;
-        if (open == null || widget.inline || context.mobile) return keyed;
+        if (open == null || widget.inline || context.sizeClass.isCompact) return keyed;
         final column = _columnOf(open.id);
         if (column == null) return keyed;
         return Row(
@@ -167,7 +167,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
   /// Opening a card shows its panel: beside the board on desktop, a bottom
   /// sheet on a phone. An embedded board has none and opens the note.
   void _showCard(BuildContext context, BoardCard card) {
-    if (context.mobile) {
+    if (context.sizeClass.isCompact) {
       showSheet<void>(
         context,
         (sheet) => SheetSurface(
@@ -200,7 +200,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     final c = context.colors;
     return Container(
       key: const ValueKey('kanban-card-panel'),
-      width: 320,
+      width: Widths.dialog,
       decoration: BoxDecoration(
         color: c.bgPrimary,
         border: Border(left: BorderSide(color: c.border)),
@@ -321,7 +321,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
               final assignment = runners.of(cardId);
               if (assignment == null) return const SizedBox.shrink();
               return Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.sm),
                 child: Semantics(
                   container: true,
                   child: RunnerChip(assignment: assignment),
@@ -336,10 +336,10 @@ class _KanbanBoardState extends State<KanbanBoard> {
   /// note without one already shows its first line as its title).
   Widget _fallback(BuildContext context, String title, String firstLine) {
     final c = context.colors;
-    final mobile = context.mobile;
+    final mobile = context.touch;
     final showLine = title.trim().isNotEmpty && firstLine.trim().isNotEmpty;
     return Padding(
-      padding: EdgeInsets.fromLTRB(10, mobile ? 10 : 8, 10, mobile ? 10 : 8),
+      padding: EdgeInsets.fromLTRB(Space.md, mobile ? Space.md : Space.sm, Space.md, mobile ? Space.md : Space.sm),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,9 +347,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
           Text(
             displayTitle(title, firstLine: firstLine),
             style: ts(
-              mobile
-                  ? const TypeSpec(15, 20, 500)
-                  : const TypeSpec(14, 20, 500),
+              context.type.ui,
               c.textPrimary,
             ),
           ),
@@ -358,7 +356,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
               firstLine.trim(),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: ts(const TypeSpec(13, 18, 400), c.textSecondary),
+              style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
             ),
         ],
       ),
@@ -378,7 +376,7 @@ class _KanbanBoardState extends State<KanbanBoard> {
     FocusNode? restoreFocus,
   ) {
     final source = _source;
-    final phone = context.mobile;
+    final phone = context.touch;
     final runners = RunnerScope.maybeOf(context);
     final others = [
       for (final other in source.columns)
@@ -592,7 +590,7 @@ class _CardShellState extends State<_CardShell> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final phone = context.mobile;
+    final phone = context.touch;
     final focused = BoardCardFocus.maybeOf(context)?.focused ?? false;
     final shown = phone || _hovered || focused;
     final content = widget.lifted
@@ -602,7 +600,7 @@ class _CardShellState extends State<_CardShell> {
             children: [
               Expanded(child: widget.body),
               Padding(
-                padding: EdgeInsets.only(top: phone ? 2 : 4, right: 4),
+                padding: EdgeInsets.only(top: phone ? Space.hair : Space.xxs, right: Space.xxs),
                 child: ExcludeFocus(
                   excluding: !shown,
                   child: Opacity(
@@ -616,8 +614,8 @@ class _CardShellState extends State<_CardShell> {
                         child: IconBtn(
                           Ico.more,
                           key: widget.menuKey,
-                          size: phone ? 40 : 28,
-                          glyph: 20,
+                          size: phone ? ControlSize.xl : ControlSize.sm,
+                          glyph: IconSize.lg,
                           color: c.iconTertiary,
                           semanticLabel: 'Card menu',
                           onTap: _openMenu,
@@ -673,21 +671,21 @@ class KanbanPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mobile = context.mobile;
+    final mobile = context.sizeClass.isCompact;
     return ColoredBox(
       color: context.colors.desk,
       child: LayoutBuilder(
         builder: (context, box) {
           final gutter = mobile
               ? Layout.gutter
-              : (box.maxWidth >= 900 ? 96.0 : 48.0);
+              : (box.maxWidth >= PageChrome.wideAt ? PageChrome.fullWidthMargin : PageChrome.columnMargin);
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   gutter,
-                  mobile ? 16 : 12,
+                  mobile ? Space.lg : Space.md,
                   gutter,
                   0,
                 ),
@@ -697,7 +695,7 @@ class KanbanPage extends StatelessWidget {
                   onChanged: onTitleChanged,
                 ),
               ),
-              SizedBox(height: mobile ? 12 : 10),
+              const Gap(Space.md),
               Expanded(
                 child: KanbanBoard(
                   pageId: pageId,
@@ -736,9 +734,7 @@ class _KanbanTitleState extends State<_KanbanTitle> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final style = tsDisplay(
-      context.mobile
-          ? const TypeSpec(28, 34, 700)
-          : const TypeSpec(32, 40, 700),
+      context.type.display,
       c.textPrimary,
     );
     final controller = widget.controller;

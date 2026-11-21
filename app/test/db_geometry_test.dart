@@ -5,6 +5,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/ui/database/values.dart' show ViewDefX;
+import 'package:notes_app/ui/tokens.dart' show Layout;
 
 import 'db_harness.dart';
 
@@ -123,20 +124,20 @@ void main() {
     });
   }
 
-  dbTest('phone: inline and page titles both sit at x=18', (tester) async {
+  dbTest('phone: inline and page titles both sit at the gutter', (tester) async {
     await pumpDb(tester, mobile: true);
     await openPage(tester, 'Planning');
-    _expectX(tester, byKey('db-inline-title'), 18, 'inline title');
-    _expectX(tester, byKey('page-title'), 18, 'host page title');
+    _expectX(tester, byKey('db-inline-title'), Layout.gutter, 'inline title');
+    _expectX(tester, byKey('page-title'), Layout.gutter, 'host page title');
     _expectX(
       tester,
       editableText('Projects for this quarter:'),
-      18,
+      Layout.gutter,
       'inline body',
     );
     await openView(tester, 'Table');
-    _expectX(tester, byKey('page-title').last, 18, 'page title');
-    _expectX(tester, _header('Name'), 18, 'view block table header');
+    _expectX(tester, byKey('page-title').last, Layout.gutter, 'page title');
+    _expectX(tester, _header('Name'), Layout.gutter, 'view block table header');
   });
 
   // ------------------------------------------------- row vs header border

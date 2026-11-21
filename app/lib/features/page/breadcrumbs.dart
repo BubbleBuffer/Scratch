@@ -48,30 +48,29 @@ class Breadcrumbs extends StatelessWidget {
       String? icon,
       String title,
       VoidCallback? onTap, {
-      double maxWidth = 160,
+      double maxWidth = CrumbSize.crumb,
       bool database = false,
     }) {
       final patch = patchFor(key);
       final id = key == 'crumb-current' ? pageId : key.substring(6);
       final label = pageLabelOf(context, id, title);
-      final style = ts(ty.ui, c.textPrimary, weight: onTap == null ? 700 : 400);
+      final style = ts(ty.ui, c.textPrimary, weight: onTap == null ? Weight.strong : Weight.regular);
       final glyph = database && (icon == null || icon.isEmpty)
           ? patch == null
-                ? DbIcon(DbIco.database, size: 16, color: c.iconSecondary)
+                ? DbIcon(DbIco.database, size: IconSize.sm.px, color: c.iconSecondary)
                 : Container(
-                    width: 22,
-                    height: 22,
+                    width: SpaceTile.size,
+                    height: SpaceTile.size,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: patch.fill,
                       borderRadius: Radii.ctl,
                     ),
-                    child: DbIcon(DbIco.database, size: 16, color: patch.ink),
+                    child: DbIcon(DbIco.database, size: IconSize.sm.px, color: patch.ink),
                   )
           : SpaceIconTile(
               icon: icon,
-              size: 22,
-              glyphSize: 16,
+              glyphSize: IconSize.sm.px,
               color: c.iconSecondary,
               patch: patch,
             );
@@ -79,14 +78,14 @@ class Breadcrumbs extends StatelessWidget {
         key: ValueKey(key),
         radius: Radii.sm,
         onTap: onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: SizedBox(
-          height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: ControlSize.xs.height),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               glyph,
-              const SizedBox(width: 6),
+              const Gap(Space.xs),
               ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxWidth),
                 child: Text(
@@ -105,8 +104,8 @@ class Breadcrumbs extends StatelessWidget {
     }
 
     Widget slash() => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 1),
-      child: Text('/', style: ts(ty.ui, c.textTertiary, weight: 400)),
+      padding: const EdgeInsets.symmetric(horizontal: Space.hair),
+      child: Text('/', style: ts(ty.ui, c.textTertiary, weight: Weight.regular)),
     );
 
     final out = <Widget>[];
@@ -125,14 +124,14 @@ class Breadcrumbs extends StatelessWidget {
       if (collapsed && i == 0) {
         out.add(
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text('…', style: ts(ty.ui, c.textTertiary, weight: 400)),
+            padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+            child: Text('…', style: ts(ty.ui, c.textTertiary, weight: Weight.regular)),
           ),
         );
         out.add(slash());
       }
     }
-    out.add(crumb('crumb-current', icon, title, null, maxWidth: 280));
+    out.add(crumb('crumb-current', icon, title, null, maxWidth: CrumbSize.current));
     // A narrow window clips the trail rather than overflowing the bar.
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,

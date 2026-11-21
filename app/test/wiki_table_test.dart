@@ -95,10 +95,10 @@ Widget _sized(double width, Widget child) => Align(
   child: SizedBox(width: width, child: child),
 );
 
-Widget _app(Widget child, {FormFactor formFactor = FormFactor.desktop}) =>
+Widget _app(Widget child, {Density density = Density.pointer}) =>
     AppTheme(
       colors: AppColors.light,
-      formFactor: formFactor,
+      density: density,
       child: WidgetsApp(
         color: AppColors.light.bgPrimary,
         pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(
@@ -113,7 +113,7 @@ Future<void> _pumpTable(
   WidgetTester tester,
   String text, {
   double width = 700,
-  FormFactor formFactor = FormFactor.desktop,
+  Density density = Density.pointer,
   List<BMark> marks = const [],
   BlockHost? host,
 }) async {
@@ -126,7 +126,7 @@ Future<void> _pumpTable(
           builder: (context) => _render(context, node, tableBlock, host: host),
         ),
       ),
-      formFactor: formFactor,
+      density: density,
     ),
   );
 }

@@ -8,20 +8,20 @@ import '../../../core/models.dart' hide StatusGroup;
 import '../../../registry/property_registry.dart';
 import '../../../ui/ui.dart';
 import '../../../ui/database/config.dart';
-import '../../../ui/database/db_theme.dart';
+import '../../../ui/database/db_tokens.dart';
 import '../../../ui/database/values.dart';
 import '../../../ui/database/widgets.dart';
 
 /// The colour a new option gets: the palette in turn, skipping Default.
 String nextOptionColor(List<SelectOption> options) => tagColors[1 + options.length % (tagColors.length - 1)];
 
-/// Opens the option picker for [a]: over the cell on desktop (its chips
-/// where the cell's were), a sheet on mobile.
+/// Opens the option picker for [a]: over the cell (its chips where the
+/// cell's were), or a sheet on a compact screen.
 Future<void> editOptions(EditArgs a) => showOverCell<void>(
       a.context,
       a.anchor,
-      (ctx) => ctx.mobile ? OptionPicker(args: a) : Padding(padding: const EdgeInsets.all(6), child: OptionPicker(args: a)),
-      width: a.anchor.width < 300 ? 300 : a.anchor.width,
+      (ctx) => ctx.sizeClass.isCompact ? OptionPicker(args: a) : Padding(padding: const EdgeInsets.all(Space.xs), child: OptionPicker(args: a)),
+      width: a.anchor.width < Db.optionEditor ? Db.optionEditor : a.anchor.width,
     );
 
 class OptionPicker extends StatefulWidget {
@@ -133,24 +133,24 @@ class _OptionPickerState extends State<OptionPicker> {
             onTap: () => _pick(o.id),
             radius: Radii.md,
             selected: selected.contains(o.id),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
             child: SizedBox(
-              height: context.mobile ? 44 : 28,
+              height: context.metrics.row.height,
               child: Row(children: [
                 ReorderableDragStartListener(
                   index: i,
                   child: MouseRegion(
                     cursor: SystemMouseCursors.grab,
-                    child: SizedBox(width: 18, child: Icon20(Ico.grip, size: 14, color: c.iconTertiary)),
+                    child: SizedBox(width: Db.swatch, child: Icon20(Ico.grip, size: IconSize.xs, color: c.iconTertiary)),
                   ),
                 ),
-                const SizedBox(width: 4),
+                const Gap(Space.xxs),
                 Expanded(child: Align(alignment: Alignment.centerLeft, child: Pill(o.name, color: o.color, status: status,
                     group: status ? statusGroupOf(def, o.id) : null))),
                 IconBtn(Ico.more,
                     key: ValueKey('opt-more-${o.name}'),
-                    size: 22,
-                    glyph: 16,
+                    size: ControlSize.xs,
+                    glyph: IconSize.sm,
                     onTap: () => _editOption(rowCtx, o),
                     semanticLabel: 'Edit option'),
               ]),
@@ -182,14 +182,14 @@ class _OptionPickerState extends State<OptionPicker> {
 
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
-        constraints: const BoxConstraints(minHeight: 34),
-        padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+        constraints: const BoxConstraints(minHeight: Db.optionRow),
+        padding: const EdgeInsets.fromLTRB(Space.xs, Space.xxs, Space.xs, Space.xxs),
         decoration: BoxDecoration(
           color: c.bgSecondary,
           borderRadius: Radii.field,
           border: Border.all(color: c.borderTranslucent),
         ),
-        child: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        child: Wrap(spacing: Space.xs, runSpacing: Space.xxs, crossAxisAlignment: WrapCrossAlignment.center, children: [
           for (final id in selected)
             if (def.option(id) case final o?)
               Row(mainAxisSize: MainAxisSize.min, children: [
@@ -198,19 +198,19 @@ class _OptionPickerState extends State<OptionPicker> {
                 if (multi)
                   Hover(
                     onTap: () => _pick(id),
-                    radius: 3,
-                    child: Icon20(Ico.close, size: 14, color: c.iconTertiary),
+                    radius: Radii.sm,
+                    child: Icon20(Ico.close, size: IconSize.xs, color: c.iconTertiary),
                   ),
               ]),
           ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 80, maxWidth: 260),
+            constraints: const BoxConstraints(minWidth: Db.optionFieldMin, maxWidth: Db.optionFieldMax),
             child: IntrinsicWidth(
               child: PlainField(
                 key: const ValueKey('option-query'),
                 controller: _query,
                 focusNode: _queryFocus,
-                autofocus: !context.mobile,
-                style: ts(ty.ui, c.textPrimary, weight: 400),
+                autofocus: !context.touch,
+                style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
                 placeholder: selected.isEmpty ? 'Search for an option…' : '',
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (s) {
@@ -226,11 +226,11 @@ class _OptionPickerState extends State<OptionPicker> {
           ),
         ]),
       ),
-      const SizedBox(height: 6),
+      const Gap(Space.xs),
       Padding(
-        padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
+        padding: const EdgeInsets.fromLTRB(Space.xxs, Space.hair, Space.xxs, Space.xxs),
         child: Text('Select an option or create one',
-            style: ts(ty.uiSmall, c.textTertiary, weight: 400)),
+            style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)),
       ),
       Flexible(child: SingleChildScrollView(child: list)),
       if (q.isNotEmpty && !exact)
@@ -238,11 +238,11 @@ class _OptionPickerState extends State<OptionPicker> {
           key: const ValueKey('option-create'),
           onTap: () => _create(_query.text.trim()),
           radius: Radii.md,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: Space.sm),
           child: SizedBox(
-            height: context.mobile ? 44 : 28,
+            height: context.metrics.row.height,
             child: Row(children: [
-              Text('Create ', style: ts(ty.ui, c.textSecondary, weight: 400)),
+              Text('Create ', style: ts(ty.ui, c.textSecondary, weight: Weight.regular)),
               Flexible(child: Pill(_query.text.trim(), color: nextOptionColor(def.options), status: status)),
             ]),
           ),
@@ -285,7 +285,7 @@ class _OptionEditorState extends State<OptionEditor> {
     final c = context.colors;
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         MenuField(key: const ValueKey('option-name'), controller: _name, onSubmitted: (_) => _done()),
-        const SizedBox(height: 4),
+        const Gap(Space.xxs),
         dbItem(context, 'Delete', null,
             key: const ValueKey('option-delete'),
             ico: Ico.trash,
@@ -297,15 +297,15 @@ class _OptionEditorState extends State<OptionEditor> {
             key: ValueKey('color-$col'),
             label: colorLabel(col),
             leading: Container(
-              width: 18,
-              height: 18,
+              width: Db.swatch,
+              height: Db.swatch,
               decoration: BoxDecoration(
                 color: c.tag(col).bg,
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(Radii.sm),
                 border: Border.all(color: c.borderTranslucent),
               ),
             ),
-            trailing: col == color ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+            trailing: col == color ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
             onTap: () {
               setState(() => color = col);
               _done();

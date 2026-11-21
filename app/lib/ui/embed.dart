@@ -174,7 +174,7 @@ class _EmbedNoteState extends State<EmbedNote> {
         final data = snapshot.data;
         if (data == null || data.id != widget.targetId) {
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.sm),
             child: Text(
               snapshot.connectionState == ConnectionState.waiting
                   ? 'Loading note…'
@@ -224,7 +224,7 @@ class _EmbedNoteState extends State<EmbedNote> {
   );
 
   Widget _unknown(BuildContext context, NoteArgs args) => Container(
-    padding: const EdgeInsets.all(12),
+    padding: const EdgeInsets.all(Space.md),
     decoration: BoxDecoration(
       color: context.colors.bgSecondary,
       borderRadius: BorderRadius.circular(Radii.sm),
@@ -233,12 +233,12 @@ class _EmbedNoteState extends State<EmbedNote> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         noteChip(context, args),
-        const SizedBox(height: 6),
+        const Gap(Space.xs),
         Text(
           'Unsupported note type (${args.pageType})',
           style: ts(context.type.uiSmall, context.colors.textTertiary),
         ),
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
         args.editor,
       ],
     ),

@@ -16,7 +16,7 @@ import '../../src/rust/api/types.dart';
 import '../../state/app_state.dart';
 import '../../state/pages_store.dart' show firstLineOfTexts;
 import '../../ui/board/board_source.dart';
-import '../../ui/database/db_theme.dart';
+import '../../ui/database/db_tokens.dart';
 import '../../ui/ui.dart';
 import 'add_card.dart';
 import 'data.dart';

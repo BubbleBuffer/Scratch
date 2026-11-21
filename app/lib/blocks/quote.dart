@@ -7,8 +7,8 @@ import '../registry/block_registry.dart';
 import '../ui/ui.dart';
 
 Widget _decorate(BlockContext b, Widget text) => Container(
-      decoration: BoxDecoration(border: Border(left: BorderSide(color: b.colors.textPrimary, width: 3))),
-      padding: const EdgeInsets.only(left: 14),
+      decoration: BoxDecoration(border: Border(left: BorderSide(color: b.colors.textPrimary, width: Stroke.seam))),
+      padding: const EdgeInsets.only(left: Space.lg),
       child: text,
     );
 

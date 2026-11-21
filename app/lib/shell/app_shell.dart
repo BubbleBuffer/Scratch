@@ -1,9 +1,11 @@
 // The app shell: WidgetsApp (no Material), the theme from the tokens
-// (following the system brightness unless forced), the form factor from the
-// window width, the same tokens for the kit's widgets, and the registered
-// commands' keyboard shortcuts.
+// (following the system brightness unless forced), the density from the
+// platform (touch on phones and tablets, pointer on desktop), the size class
+// from the window width, the same tokens for the kit's widgets, and the
+// registered commands' keyboard shortcuts.
 
 import 'package:agent_kit/agent_kit.dart' show BbThemeScope;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
 
 import '../feedback/feedback_host.dart';
@@ -14,6 +16,13 @@ import 'addon_panels.dart';
 import 'navigation.dart';
 import 'page_stack.dart';
 
+/// The size class of a window [width] wide. The wide frame (the sidebar
+/// beside the page pile) needs more room than bb_ui's medium width, so the
+/// shell counts a window narrower than [ShellLayout.compactBelow] as compact.
+SizeClass shellSizeClass(double width) => width < ShellLayout.compactBelow
+    ? SizeClass.compact
+    : SizeClass.forWidth(width);
+
 class NotesShell extends StatefulWidget {
   const NotesShell({
     super.key,
@@ -21,9 +30,13 @@ class NotesShell extends StatefulWidget {
     this.forceDark,
     this.navigatorKey,
     this.wrap,
+    this.density,
   });
   final Widget home;
   final bool? forceDark;
+
+  /// How the user points; null follows the platform.
+  final Density? density;
   final GlobalKey<NavigatorState>? navigatorKey;
 
   /// Wraps everything below the theme (the app scope goes here).
@@ -60,15 +73,14 @@ class _NotesShellState extends State<NotesShell> {
             widget.forceDark ??
             MediaQuery.platformBrightnessOf(context) == Brightness.dark;
         final colors = dark ? AppColors.darkTheme : AppColors.light;
-        final form = FormFactor.forWidth(MediaQuery.sizeOf(context).width);
-        final type = form == FormFactor.mobile
-            ? TypeScale.mobile
-            : TypeScale.desktop;
+        final density =
+            widget.density ?? Density.forPlatform(defaultTargetPlatform);
+        final width = MediaQuery.sizeOf(context).width;
         Widget app = AppTheme(
           colors: colors,
-          formFactor: form,
+          density: density,
           child: DefaultTextStyle(
-            style: ts(type.body, colors.textPrimary),
+            style: ts(density.type.body, colors.textPrimary),
             child: ScrollConfiguration(
               behavior: const AppScrollBehavior(),
               child: DefaultSelectionStyle(
@@ -89,7 +101,7 @@ class _NotesShellState extends State<NotesShell> {
                     // read the same tokens through this scope.
                     child: BbThemeScope(
                       brightness: dark ? Brightness.dark : Brightness.light,
-                      formFactor: form,
+                      density: density,
                       child: FeedbackHost(
                         navigatorKey: navKey,
                         child: AddonPanelShell(
@@ -103,6 +115,7 @@ class _NotesShellState extends State<NotesShell> {
             ),
           ),
         );
+        app = SizeClassScope(sizeClass: shellSizeClass(width), child: app);
         app = PageStackScope(stack: _stack, child: app);
         if (widget.wrap != null) app = widget.wrap!(app);
         return app;

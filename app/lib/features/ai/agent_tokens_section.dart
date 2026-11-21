@@ -314,7 +314,7 @@ class _AgentTokensSectionState extends State<AgentTokensSection> {
         title: 'Access tokens',
         intro:
             'Each token lets one app reach your vault through your hub, over MCP or the notes command. Revoke a token to cut that app off. Any device signed in to the hub can manage them.',
-        children: [const SizedBox(height: 12), body],
+        children: [const Gap(Space.md), body],
       ),
     );
   }
@@ -322,7 +322,7 @@ class _AgentTokensSectionState extends State<AgentTokensSection> {
   Widget _secret(BuildContext context, CreatedAgentToken made) {
     return Padding(
       key: const ValueKey('agent-token-created'),
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: Space.md),
       child: SNotice(
         'Token **${made.info.name}** created. Copy it now. The hub keeps only a hash, so it can’t be shown again.',
         actions: [

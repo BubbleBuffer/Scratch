@@ -16,7 +16,7 @@ Widget textFilterValue(FilterValueArgs a) => MenuField(
       key: ValueKey('filter-value-${a.def.key}'),
       initial: a.value.kind == ValueKind.empty ? '' : a.value.text,
       placeholder: 'Type a value…',
-      autofocus: !a.context.mobile,
+      autofocus: !a.context.touch,
       onChanged: (s) => a.onChanged(Values.text(s)),
     );
 
@@ -24,7 +24,7 @@ Widget numberFilterValue(FilterValueArgs a) => MenuField(
       key: ValueKey('filter-value-${a.def.key}'),
       initial: a.value.kind == ValueKind.number ? _num(a.value.number) : '',
       placeholder: 'Type a value…',
-      autofocus: !a.context.mobile,
+      autofocus: !a.context.touch,
       onChanged: (s) {
         final n = parseNumber(s);
         a.onChanged(n == null ? Values.empty : Values.number(n));
@@ -55,7 +55,7 @@ class _OptionFilter extends StatelessWidget {
                   ? statusGroupOf(a.def, o.id)
                   : null),
           selected: picked.contains(o.id),
-          trailing: picked.contains(o.id) ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+          trailing: picked.contains(o.id) ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
           onTap: () => a.onChanged(switch (a.def.kind) {
             PropKind.multiSelect => Values.multi([o.id]),
             PropKind.status => Values.status(o.id),

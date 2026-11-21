@@ -14,6 +14,7 @@ import '../../../ui/database/widgets.dart';
 import '../../../registry/property_registry.dart';
 import '../../../state/app_state.dart';
 import '../../../ui/ui.dart';
+import '../../../ui/database/db_tokens.dart';
 
 /// Attachment names by id, loaded once.
 class AttachmentNames {
@@ -62,33 +63,33 @@ class FilesCell extends StatelessWidget {
       builder: (context, _, _) {
         final tag = tagStyle(context, 'default');
         final small = mode == CellMode.card || mode == CellMode.list;
-        final style = cellStyle(context, mode).copyWith(fontSize: small ? 12 : 14, color: tag.text);
+        final style = ts(small ? context.type.uiSmall : context.type.ui, tag.text, weight: Weight.regular);
         final chips = [
           for (final id in ids)
             Container(
               key: ValueKey('file-chip-$id'),
-              height: small ? 18 : 20,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+              constraints: BoxConstraints(minHeight: small ? Db.smallPillHeight : Sizes.pill),
+              padding: const EdgeInsets.symmetric(horizontal: Space.xs),
               decoration: BoxDecoration(color: tag.bg, borderRadius: BorderRadius.circular(Radii.sm)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                DbIcon(DbIco.files, size: small ? 12 : 14, color: context.colors.iconSecondary),
-                const SizedBox(width: 4),
+                DbIcon(DbIco.files, size: IconSize.xs.px, color: context.colors.iconSecondary),
+                const Gap(Space.xxs),
                 Flexible(
                   child: Text(AttachmentNames.of(id),
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: style.copyWith(height: 1.2)),
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
                 ),
               ]),
             ),
         ];
         if (wrap || mode == CellMode.page || mode == CellMode.card) {
-          return Wrap(spacing: 6, runSpacing: 6, children: chips);
+          return Wrap(spacing: Space.xs, runSpacing: Space.xs, children: chips);
         }
         return ClipRect(
           child: OverflowBox(
             alignment: Alignment.centerLeft,
             maxWidth: double.infinity,
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              for (var i = 0; i < chips.length; i++) ...[if (i > 0) const SizedBox(width: 6), chips[i]],
+              for (var i = 0; i < chips.length; i++) ...[if (i > 0) const Gap(Space.xs), chips[i]],
             ]),
           ),
         );
@@ -124,8 +125,8 @@ class _FilesEditorState extends State<_FilesEditor> {
           MenuItem(
             key: ValueKey('file-item-$id'),
             label: AttachmentNames.of(id),
-            leading: DbIcon(DbIco.files, size: 18, color: c.iconSecondary),
-            trailing: Icon20(Ico.close, size: 14, color: c.iconTertiary),
+            leading: DbIcon(DbIco.files, size: IconSize.md.px, color: c.iconSecondary),
+            trailing: Icon20(Ico.close, size: IconSize.xs, color: c.iconTertiary),
             onTap: () => _set([...ids]..remove(id)),
           ),
         if (ids.isNotEmpty) const MenuSeparator(),

@@ -130,11 +130,11 @@ class _RunnerSettingState extends State<_RunnerSetting> {
           ),
           if (runner.error != null)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.only(top: Space.sm),
               child: Text(
                 'The runner did not change: ${runner.error}',
                 key: const ValueKey('schedule-runner-error'),
-                style: tsRaw(13, 18, 450, colors.textSecondary),
+                style: ts(context.type.ui, colors.textSecondary, weight: Weight.regular),
               ),
             ),
         ],

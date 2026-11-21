@@ -15,8 +15,8 @@ class EmojiPicker extends StatefulWidget {
     super.key,
     required this.onPick,
     this.onRemove,
-    this.width = 408,
-    this.height = 356,
+    this.width = EmojiPickerSize.width,
+    this.height = EmojiPickerSize.height,
   });
   final ValueChanged<String> onPick;
   final VoidCallback? onRemove;
@@ -63,12 +63,8 @@ class _EmojiPickerState extends State<EmojiPicker> {
       ];
       sections.add((hits.isEmpty ? 'No results' : 'Results', hits));
     }
-    const cell = 32.0;
-    final emojiStyle = TextStyle(
-      fontSize: 22,
-      height: 1,
-      fontFamilyFallback: emojiFallback,
-    );
+    const cell = EmojiPickerSize.cell;
+    final glyphStyle = emojiStyle(EmojiPickerSize.glyph, emojiFallback);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -76,20 +72,20 @@ class _EmojiPickerState extends State<EmojiPicker> {
       children: [
         // Tabs.
         Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          height: EmojiPickerSize.tabBar,
+          padding: const EdgeInsets.symmetric(horizontal: Space.sm),
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: c.border)),
           ),
           child: Row(
             children: [
               Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 6),
+                height: EmojiPickerSize.tabBar,
+                padding: const EdgeInsets.symmetric(horizontal: Space.xs),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(color: c.textPrimary, width: 2),
+                    bottom: BorderSide(color: c.textPrimary, width: Stroke.bold),
                   ),
                 ),
                 child: Text('Emoji', style: ts(ty.ui, c.textPrimary)),
@@ -107,55 +103,55 @@ class _EmojiPickerState extends State<EmojiPicker> {
         ),
         // Filter and random.
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.md, Space.xxs),
           child: Row(
             children: [
               Expanded(
                 child: FieldFrame(
-                  height: 28,
+                  height: ControlSize.sm.height,
                   child: PlainField(
                     key: const ValueKey('emoji-filter'),
                     controller: _query,
                     focusNode: _focus,
-                    autofocus: !context.mobile,
-                    style: ts(ty.ui, c.textPrimary, weight: 400),
+                    autofocus: !context.touch,
+                    style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
                     placeholder: 'Filter…',
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               Hover(
                 key: const ValueKey('emoji-random'),
                 onTap: _random,
                 radius: Radii.md,
                 child: Container(
-                  width: 28,
-                  height: 28,
+                  width: ControlSize.sm.height,
+                  height: ControlSize.sm.height,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     border: Border.all(color: c.border),
                     borderRadius: Radii.ctl,
                   ),
-                  child: Text('🎲', style: emojiStyle.copyWith(fontSize: 16)),
+                  child: Text('🎲', style: emojiStyle(EmojiPickerSize.dice, emojiFallback)),
                 ),
               ),
             ],
           ),
         ),
         SizedBox(
-          height: widget.height - 40 - 42,
+          height: widget.height - EmojiPickerSize.tabBar - EmojiPickerSize.filterRow,
           child: CustomScrollView(
             slivers: [
               for (final (name, list) in sections) ...[
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                    padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.xxs),
                     child: Text(name, style: ts(ty.uiSmall, c.textSecondary)),
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: Space.md),
                   sliver: SliverGrid(
                     gridDelegate:
                         const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -167,14 +163,14 @@ class _EmojiPickerState extends State<EmojiPicker> {
                         key: ValueKey('emoji-${list[i]}'),
                         radius: Radii.sm,
                         onTap: () => widget.onPick(list[i]),
-                        child: Center(child: Text(list[i], style: emojiStyle)),
+                        child: Center(child: Text(list[i], style: glyphStyle)),
                       ),
                       childCount: list.length,
                     ),
                   ),
                 ),
               ],
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              const SliverToBoxAdapter(child: SizedBox(height: Space.sm)),
             ],
           ),
         ),
@@ -183,14 +179,14 @@ class _EmojiPickerState extends State<EmojiPicker> {
   }
 }
 
-/// Shows the emoji picker by [anchor] (desktop) or as a sheet (mobile).
+/// Shows the emoji picker by [anchor], or as a sheet on a compact screen.
 /// Completes with the emoji, '' for "Remove", or null when dismissed.
 Future<String?> showEmojiPicker(
   BuildContext context, {
   Rect? anchor,
   bool removable = true,
 }) {
-  if (context.mobile || anchor == null) {
+  if (context.sizeClass.isCompact || anchor == null) {
     return showSheet<String>(
       context,
       (ctx) => SheetSurface(
@@ -198,7 +194,7 @@ Future<String?> showEmojiPicker(
           EmojiPicker(
             key: const ValueKey('emoji-picker'),
             width: MediaQuery.of(ctx).size.width,
-            height: MediaQuery.of(ctx).size.height * 0.6,
+            height: MediaQuery.of(ctx).size.height * EmojiPickerSize.sheetShare,
             onPick: (e) => Navigator.of(ctx).pop(e),
             onRemove: removable ? () => Navigator.of(ctx).pop('') : null,
           ),
@@ -210,7 +206,7 @@ Future<String?> showEmojiPicker(
     context,
     anchor,
     (ctx) => MenuSurface(
-      width: 408,
+      width: EmojiPickerSize.width,
       child: EmojiPicker(
         key: const ValueKey('emoji-picker'),
         onPick: (e) => Navigator.of(ctx).pop(e),

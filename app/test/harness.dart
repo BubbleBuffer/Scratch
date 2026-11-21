@@ -907,7 +907,7 @@ Future<void> tapAndSettle(
 }
 
 Future<void> openShowcase(WidgetTester tester) async {
-  final mobile = tester.element(find.byType(HomeScreen)).mobile;
+  final mobile = tester.element(find.byType(HomeScreen)).sizeClass.isCompact;
   if (mobile) await openMobileTree(tester);
   // Recent cards no longer appear in Today. Open the canonical page row.
   final page = find.byKey(

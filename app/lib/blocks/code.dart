@@ -20,17 +20,17 @@ String _label(Node n) {
 
 Widget _decorate(BlockContext b, Widget text) => Container(
       decoration: BoxDecoration(color: b.colors.bgSecondary, borderRadius: BorderRadius.circular(Radii.sm)),
-      padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
+      padding: const EdgeInsets.fromLTRB(Space.lg, Space.xxl, Space.lg, Space.lg),
       child: Stack(clipBehavior: Clip.none, children: [
         Positioned(
           left: 0,
           right: 0,
-          top: -24,
+          top: -CodeBlockParts.label,
           child: Text(
             _label(b.node),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: ts(TypeScale.desktop.uiSmall, b.colors.textSecondary, weight: 400),
+            style: ts(TypeScale.pointer.uiSmall, b.colors.textSecondary, weight: Weight.regular),
           ),
         ),
         LayoutBuilder(

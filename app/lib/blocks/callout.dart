@@ -31,17 +31,17 @@ Widget _decorate(BlockContext b, Widget text) {
       borderRadius: Radii.panel,
     ),
     padding: EdgeInsets.fromLTRB(
-      12,
-      b.mobile ? 12 : 16,
-      16,
-      b.mobile ? 12 : 16,
+      Space.md,
+      b.touch ? Space.md : Space.lg,
+      Space.lg,
+      b.touch ? Space.md : Space.lg,
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // The emoji is centred on the first line of text.
         SizedBox(
-          height: 32,
+          height: CalloutParts.icon,
           child: Builder(
             builder: (anchor) => Hover(
               key: ValueKey('callout-icon-${n.id}'),
@@ -49,24 +49,19 @@ Widget _decorate(BlockContext b, Widget text) {
               background: b.colors.bgPrimary,
               onTap: () => b.host.openEmojiPicker(n, anchor),
               child: SizedBox(
-                width: 32,
-                height: 32,
+                width: CalloutParts.icon,
+                height: CalloutParts.icon,
                 child: Center(
                   child: Text(
                     icon,
-                    style: TextStyle(
-                      fontSize: 17,
-                      height: 1,
-                      fontFamily: sansFamily,
-                      fontFamilyFallback: emojiFallback,
-                    ),
+                    style: emojiStyle(CalloutParts.emoji, emojiFallback),
                   ),
                 ),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const Gap(Space.sm),
         Expanded(child: text),
       ],
     ),
@@ -77,14 +72,14 @@ Widget _decorate(BlockContext b, Widget text) {
       paper,
       Positioned(
         left: 0,
-        top: 14,
-        bottom: 14,
-        width: 3,
+        top: CalloutParts.barInset,
+        bottom: CalloutParts.barInset,
+        width: Stroke.seam,
         child: IgnorePointer(
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: patch.fill,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(Radii.sm),
             ),
           ),
         ),
@@ -94,7 +89,9 @@ Widget _decorate(BlockContext b, Widget text) {
 }
 
 double _handleTop(BlockContext b) =>
-    (b.mobile ? 3 : 2) + (b.mobile ? 12 : 16) + (32 - 24) / 2;
+    BlockRhythm.pad(b.touch) +
+    (b.touch ? Space.md : Space.lg) +
+    (CalloutParts.icon - BlockRhythm.handleLine) / 2;
 
 const calloutBlock = BlockType(
   kind: Kinds.callout,

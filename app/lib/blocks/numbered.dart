@@ -42,7 +42,7 @@ Widget _decorate(BlockContext b, Widget text) => markerRow(
       Align(
         alignment: Alignment.centerRight,
         child: Padding(
-          padding: const EdgeInsets.only(right: 2),
+          padding: const EdgeInsets.only(right: Space.hair),
           child: Text(numberLabel(b.node.number, b.node.depth), style: b.style.copyWith(decoration: TextDecoration.none)),
         ),
       ),

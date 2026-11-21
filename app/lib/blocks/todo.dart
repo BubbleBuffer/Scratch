@@ -32,28 +32,28 @@ Widget _decorate(BlockContext b, Widget text) {
     checked: n.checked,
     fill: patch?.fill,
     ink: patch?.ink,
-    size: todoBoxSize,
+    size: ListMarker.todoBox,
     onChanged: (_) => b.host.toggleChecked(n),
   );
   // The box sits in the 24 px marker column, centred on the first line, with
-  // [todoTextGap] between it and the text.
-  const inset = (24 - todoBoxSize) / 2;
+  // [ListMarker.todoGap] between it and the text.
+  const inset = (ListMarker.column - ListMarker.todoBox) / 2;
   return Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       SizedBox(
-        width: 24,
+        width: ListMarker.column,
         height: b.lineHeight,
         child: Center(child: box),
       ),
-      const SizedBox(width: todoTextGap - inset),
+      const Gap(ListMarker.todoGap - inset),
       Expanded(child: text),
     ],
   );
 }
 
 /// The to-do box's size and the gap between it and the text.
-const todoBoxSize = 22.0, todoTextGap = 8.0;
+const todoBoxSize = ListMarker.todoBox, todoTextGap = ListMarker.todoGap;
 
 const todoBlock = BlockType(
   kind: Kinds.todo,

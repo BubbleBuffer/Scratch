@@ -95,7 +95,7 @@ Future<AiRunner?> showTriageRunnerChoice(
       projectTitle: projectTitle,
       onPick: (r) => Navigator.of(ctx).pop(r),
     ),
-    width: 380,
+    width: TriageSize.start,
     shrink: true,
   );
 }
@@ -125,24 +125,24 @@ class _RunnerChoice extends StatelessWidget {
     final c = context.colors;
     final ty = context.type;
     return Padding(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(Space.lg),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Run Triage on', style: ts(ty.ui, c.textPrimary, weight: 600)),
-          const SizedBox(height: 4),
+          Text('Run Triage on', style: ts(ty.ui, c.textPrimary, weight: Weight.strong)),
+          const Gap(Space.xxs),
           Text(
             triageIntro(projectTitle),
-            style: ts(ty.uiSmall, c.textTertiary, weight: 400),
+            style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular),
           ),
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           for (final r in list.runners)
             PanelRow(
               key: ValueKey('triage-runner-${r.id}'),
               onTap: () => onPick(r),
-              child: SizedBox(
-                height: 56,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: TriageSize.runner),
                 child: Row(
                   children: [
                     Expanded(
@@ -154,11 +154,11 @@ class _RunnerChoice extends StatelessWidget {
                             r.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: ts(ty.ui, c.textPrimary, weight: 400),
+                            style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
                           ),
                           Text(
                             _state(r),
-                            style: ts(ty.uiSmall, c.textTertiary, weight: 400),
+                            style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular),
                           ),
                         ],
                       ),
@@ -166,13 +166,13 @@ class _RunnerChoice extends StatelessWidget {
                     if (r.id == list.defaultRunnerId)
                       Text(
                         'Default',
-                        style: ts(ty.uiSmall, c.textTertiary, weight: 400),
+                        style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular),
                       ),
                   ],
                 ),
               ),
             ),
-          const SizedBox(height: 4),
+          const Gap(Space.xxs),
         ],
       ),
     );

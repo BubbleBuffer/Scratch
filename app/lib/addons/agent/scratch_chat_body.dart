@@ -168,7 +168,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
     // The row gap sits above the item inside its slot (none above the first).
     return switched == null || item == null || at < 0
         ? null
-        : TranscriptAnchor(item, -(switched.y - (at == 0 ? 0 : 14)));
+        : TranscriptAnchor(item, -(switched.y - (at == 0 ? 0 : AgentLayout.rowGap)));
   }
 
   /// The compacted transcript: summary cards, the hairline and the live end.
@@ -195,14 +195,14 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
     final entry = switched == null ? null : built.entryOf[switched.id];
     bool card(String? id) => id != null && id.startsWith('history-');
     double? gapBefore(String? previous, String id) =>
-        card(previous) || card(id) ? 24 : null;
+        card(previous) || card(id) ? Space.xl : null;
     if (switched != null && entry != null) {
       // A card opens at its top; a message where it was, the gap above it
       // being part of its slot.
       final at = built.entries.indexWhere((e) => e.id == entry);
       final gap = at <= 0
           ? 0.0
-          : gapBefore(built.entries[at - 1].id, entry) ?? 14.0;
+          : gapBefore(built.entries[at - 1].id, entry) ?? AgentLayout.rowGap;
       initial = TranscriptAnchor(entry, card(entry) ? 0 : -(switched.y - gap));
     }
     return TranscriptList(
@@ -213,9 +213,9 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
       viewportKey: _reader.historyViewport,
       contentWidth: Layout.contentWidth,
       gutter: 0,
-      rowGap: 14,
+      rowGap: AgentLayout.rowGap,
       gapBefore: gapBefore,
-      padding: padding.copyWith(bottom: padding.bottom + 14),
+      padding: padding.copyWith(bottom: padding.bottom + AgentLayout.rowGap),
     );
   }
 
@@ -354,14 +354,14 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
           : !store.enabled
           ? 'The agent is off. Turn it on in Settings > AI.'
           : store.openError;
-      final pad = widget.panel ? 12.0 : 32.0;
-      final padding = EdgeInsets.fromLTRB(pad, widget.panel ? 14 : 28, pad, 16);
+      final pad = widget.panel ? Space.md : Space.xxl;
+      final padding = EdgeInsets.fromLTRB(pad, widget.panel ? Space.lg : Space.xxl, pad, Space.lg);
       final Widget body = signIn
           ? Center(
               child: Padding(
                 padding: EdgeInsets.all(pad),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
+                  constraints: const BoxConstraints(maxWidth: AgentLayout.notice),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -371,7 +371,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
                         textAlign: TextAlign.center,
                         style: ts(context.type.body, c.textSecondary),
                       ),
-                      const SizedBox(height: 16),
+                      const Gap(Space.lg),
                       PrimaryButton(
                         key: const ValueKey('agent-sign-in'),
                         label: 'Sign in',
@@ -390,7 +390,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               child: Padding(
                 padding: EdgeInsets.all(pad),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
+                  constraints: const BoxConstraints(maxWidth: AgentLayout.notice),
                   child: Text(
                     notice,
                     key: const ValueKey('agent-open-error'),
@@ -404,7 +404,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               child: Padding(
                 padding: EdgeInsets.all(pad),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
+                  constraints: const BoxConstraints(maxWidth: AgentLayout.notice),
                   child: Text(
                     agentEmptyLine,
                     key: const ValueKey('agent-empty'),
@@ -449,8 +449,8 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               viewportKey: _reader.plainViewport,
               contentWidth: Layout.contentWidth,
               gutter: 0,
-              rowGap: 14,
-              padding: padding.copyWith(bottom: padding.bottom + 14),
+              rowGap: AgentLayout.rowGap,
+              padding: padding.copyWith(bottom: padding.bottom + AgentLayout.rowGap),
             );
       final switched = _switchAnchor;
       if (switched != null) {
@@ -481,7 +481,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               (store.hostInfo?.projects ?? false) &&
               store.state?.session.projectId != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              padding: const EdgeInsets.fromLTRB(Space.xl, Space.md, Space.xl, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: SelectButton<String>(
@@ -506,7 +506,7 @@ class _ScratchChatBodyState extends State<ScratchChatBody>
               store.compactedFor == store.openId &&
               hasHistoryCards(store.compacted))
             Padding(
-              padding: EdgeInsets.fromLTRB(pad, 4, pad, 0),
+              padding: EdgeInsets.fromLTRB(pad, Space.xxs, pad, 0),
               child: Align(
                 alignment: Alignment.centerRight,
                 child: ChatSettingsButton(store: store),
