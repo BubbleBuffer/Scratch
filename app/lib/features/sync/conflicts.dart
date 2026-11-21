@@ -459,7 +459,7 @@ class ConflictCount extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: Sizes.pill),
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       decoration: BoxDecoration(color: patch?.fill ?? c.accent, borderRadius: Radii.pill),
-      child: Text('$count', textAlign: TextAlign.center, style: ts(context.type.uiSmall, patch?.ink ?? c.onAccent, weight: Weight.semibold)),
+      child: Text('$count', textAlign: TextAlign.center, style: ts(context.type.uiSmall, patch?.ink ?? c.accentInk, weight: Weight.strong)),
     );
   }
 }

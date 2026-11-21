@@ -74,7 +74,7 @@ class _CodeCellRowState extends State<CodeCellRow> {
                     ),
                     child: Text(
                       label,
-                      style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.semibold),
+                      style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.strong),
                     ),
                   ),
                 ],

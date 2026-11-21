@@ -360,7 +360,7 @@ class _WhenSection extends StatelessWidget {
         const Gap(Space.md),
         Text(
           'If missed',
-          style: ts(context.type.ui, colors.textSecondary, weight: Weight.semibold),
+          style: ts(context.type.ui, colors.textSecondary, weight: Weight.strong),
         ),
         const Gap(Space.xs),
         Wrap(
@@ -397,7 +397,7 @@ class _LabelledField extends StatelessWidget {
     children: [
       Text(
         label,
-        style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.semibold),
+        style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.strong),
       ),
       const Gap(Space.xs),
       child,
@@ -541,7 +541,7 @@ class _NodeRow extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: ts(context.type.title, c.textPrimary, weight: Weight.semibold),
+                      style: ts(context.type.title, c.textPrimary, weight: Weight.strong),
                     ),
                     Text(
                       detail,
@@ -553,7 +553,7 @@ class _NodeRow extends StatelessWidget {
               if (selected)
                 Text(
                   'Runner',
-                  style: ts(context.type.ui, c.textSecondary, weight: Weight.semibold),
+                  style: ts(context.type.ui, c.textSecondary, weight: Weight.strong),
                 ),
             ],
           ),
@@ -677,7 +677,7 @@ class _PickerRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Text(label, style: ts(context.type.ui, c.textSecondary, weight: Weight.semibold)),
+              Text(label, style: ts(context.type.ui, c.textSecondary, weight: Weight.strong)),
               const Gap(Space.md),
               Expanded(
                 child: Text(
@@ -831,7 +831,7 @@ class _BandLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelStyle = ts(context.type.ui, context.colors.textSecondary, weight: Weight.semibold);
+    final labelStyle = ts(context.type.ui, context.colors.textSecondary, weight: Weight.strong);
     if (stacked) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

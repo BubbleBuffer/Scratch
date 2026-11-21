@@ -252,7 +252,7 @@ void main() {
               find.byKey(const ValueKey('check-calico-one')),
             );
             expect(box.fill ?? colors.accent, patch?.fill ?? colors.accent);
-            expect(box.ink ?? colors.onAccent, patch?.ink ?? colors.onAccent);
+            expect(box.ink ?? colors.accentInk, patch?.ink ?? colors.accentInk);
             final titleTile = tester.widget<Container>(
               find.descendant(
                 of: find.byKey(const ValueKey('page-icon')),

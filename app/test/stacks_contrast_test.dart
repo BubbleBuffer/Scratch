@@ -103,7 +103,7 @@ void main() {
         reason: 'today date number',
       );
       expect(
-        contrastRatio(c.onAccent, c.accent),
+        contrastRatio(c.accentInk, c.accent),
         greaterThanOrEqualTo(4.5),
         reason: 'accent action',
       );

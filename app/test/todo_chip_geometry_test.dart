@@ -32,8 +32,7 @@ void main() {
         final plain = TextPainter(text: TextSpan(text: text, style: base), textDirection: TextDirection.ltr, textScaler: textScaler)..layout();
         final lineHeight = plain.computeLineMetrics().single.height;
         plain.dispose();
-        final label = TextPainter(text: TextSpan(text: 'Thursday', style: base.copyWith(
-            fontSize: base.fontSize! * 0.8, height: 1.25, fontWeight: FontWeight.w500)), textDirection: TextDirection.ltr, textScaler: textScaler)..layout();
+        final label = TextPainter(text: TextSpan(text: 'Thursday', style: dateChipStyle(base, AppColors.light.textSecondary)), textDirection: TextDirection.ltr, textScaler: textScaler)..layout();
         final targetWidth = label.width + 10;
         label.dispose();
         final cases = [

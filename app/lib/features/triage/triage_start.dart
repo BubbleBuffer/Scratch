@@ -130,7 +130,7 @@ class _RunnerChoice extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Run Triage on', style: ts(ty.ui, c.textPrimary, weight: Weight.semibold)),
+          Text('Run Triage on', style: ts(ty.ui, c.textPrimary, weight: Weight.strong)),
           const Gap(Space.xxs),
           Text(
             triageIntro(projectTitle),

@@ -247,7 +247,7 @@ class _TimelineViewState extends State<TimelineView> {
                 Text(
                   '${monthName(firstDay.month)} ${firstDay.year}',
                   key: const ValueKey('timeline-month'),
-                  style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold),
+                  style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
                 ),
                 const Spacer(),
                 Builder(
@@ -562,7 +562,7 @@ class _HeaderPainter extends CustomPainter {
     final last = ((offset + viewport) / dw).ceil() + 1;
     // The header is drawn at fixed offsets, at the pointer sizes.
     final small = ts(TypeScale.pointer.uiSmall, colors.textTertiary, weight: Weight.regular);
-    final month = ts(TypeScale.pointer.ui, colors.textPrimary, weight: Weight.semibold);
+    final month = ts(TypeScale.pointer.ui, colors.textPrimary, weight: Weight.strong);
     final step = dw >= 30 ? 1 : 7;
     for (var i = first; i <= last; i++) {
       final d = origin.add(i);
@@ -580,7 +580,7 @@ class _HeaderPainter extends CustomPainter {
           canvas,
           '${d.day}',
           Offset(x + dw / 2, 26),
-          ts(TypeScale.pointer.uiSmall, colors.bgPrimary, weight: Weight.semibold),
+          ts(TypeScale.pointer.uiSmall, colors.bgPrimary, weight: Weight.strong),
           center: true,
         );
       } else if (step == 1 || d.weekday0Sunday() == 1) {

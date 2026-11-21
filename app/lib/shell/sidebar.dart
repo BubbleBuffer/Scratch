@@ -783,7 +783,7 @@ class _SectionLabel extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: Layout.sidebarRowHeight),
         child: Align(
           alignment: Alignment.centerLeft,
-          child: Text(text, style: ts(context.type.uiSmall, c.railMuted, weight: Weight.bold)),
+          child: Text(text, style: ts(context.type.uiSmall, c.railMuted, weight: Weight.strong)),
         ),
       ),
     );
@@ -909,7 +909,7 @@ class _ProposalsRow extends StatelessWidget {
                   ),
                   child: Text(
                     '$n',
-                    style: ts(context.type.caption, c.onAccent, weight: Weight.bold),
+                    style: ts(context.type.caption, c.accentInk, weight: Weight.strong),
                   ),
                 ),
         );
@@ -979,7 +979,7 @@ class _NavRowState extends State<_NavRow> {
                   style: ts(
                     ty.ui,
                     widget.selected || _hover ? c.railInk : c.railMuted,
-                    weight: widget.selected ? Weight.bold : Weight.regular,
+                    weight: widget.selected ? Weight.strong : Weight.regular,
                   ),
                 ),
               ),
@@ -1103,7 +1103,7 @@ class _TreeRowViewState extends State<_TreeRowView> {
               widget.selected || _hover || widget.menuOpen
                   ? c.railInk
                   : c.railMuted,
-              weight: widget.selected ? Weight.bold : Weight.regular,
+              weight: widget.selected ? Weight.strong : Weight.regular,
             ),
           );
 

@@ -298,7 +298,7 @@ class _SharePopupState extends State<SharePopup> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Share', style: ts(context.type.body, c.textPrimary, weight: Weight.medium)),
+          Text('Share', style: ts(context.type.body, c.textPrimary, weight: Weight.strong)),
           const Gap(Space.hair),
           Text(
             displayTitle(widget.pageTitle),
@@ -606,7 +606,7 @@ class _SegmentHalf extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ts(context.type.ui, selected ? c.onAccent : c.textSecondary, weight: Weight.semibold),
+              style: ts(context.type.ui, selected ? c.accentInk : c.textSecondary, weight: Weight.strong),
             ),
           ),
         ),

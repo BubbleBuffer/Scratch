@@ -222,7 +222,7 @@ class _TodayViewState extends State<TodayView> {
               color: c.iconSecondary,
             ),
             const Gap(Space.xxs),
-            Text('$label · ', style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.semibold)),
+            Text('$label · ', style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.strong)),
             Text('$count', style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.regular)),
           ],
         ),
@@ -414,7 +414,7 @@ class _TodayViewState extends State<TodayView> {
               child: Text(
                 'Done · ${done.length}',
                 key: const ValueKey('today-done'),
-                style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.semibold),
+                style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.strong),
               ),
             ),
           for (final item in shownDone) _card(item, store),

@@ -57,7 +57,7 @@ class PageLinkRow extends StatelessWidget {
               child: Text(title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: ts(context.type.title, gone ? c.textTertiary : c.textPrimary, weight: Weight.medium)),
+                  style: ts(context.type.title, gone ? c.textTertiary : c.textPrimary, weight: Weight.strong)),
             ),
           ),
         ]),

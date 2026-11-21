@@ -284,7 +284,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
             children: [
               Text(
                 weekdays[day.weekday - 1].substring(0, 3),
-                style: ts(context.type.caption, selected ? ink : c.textSecondary, weight: Weight.medium),
+                style: ts(context.type.caption, selected ? ink : c.textSecondary, weight: Weight.strong),
               ),
               const Gap(Space.hair),
               Container(

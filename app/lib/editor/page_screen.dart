@@ -3803,7 +3803,7 @@ class PageEditorState extends State<PageScreen>
                   const Gap(Space.hair),
                   Text(
                     label,
-                    style: ts(context.type.caption, onTap == null ? c.textDisabled : c.textSecondary, weight: Weight.medium),
+                    style: ts(context.type.caption, onTap == null ? c.textDisabled : c.textSecondary, weight: Weight.strong),
                   ),
                 ],
               ),

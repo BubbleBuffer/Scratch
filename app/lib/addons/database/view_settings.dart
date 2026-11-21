@@ -103,7 +103,7 @@ class LayoutGrid extends StatelessWidget {
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 DbIcon(layoutIcon(k), size: IconSize.lg.px, color: fg),
                 const Gap(Space.xs),
-                Text(viewLabel(k), style: ts(context.type.uiSmall, fg, weight: sel ? Weight.semibold : Weight.regular)),
+                Text(viewLabel(k), style: ts(context.type.uiSmall, fg, weight: sel ? Weight.strong : Weight.regular)),
               ]),
             ),
           ),
@@ -297,7 +297,7 @@ class _ViewSettingsState extends State<ViewSettings> {
     return _col([
       Padding(
         padding: const EdgeInsets.fromLTRB(Space.hair, Space.hair, Space.hair, Space.xs),
-        child: Text('View settings', style: ts(context.type.ui, context.colors.textPrimary, weight: Weight.semibold)),
+        child: Text('View settings', style: ts(context.type.ui, context.colors.textPrimary, weight: Weight.strong)),
       ),
       Padding(
         padding: const EdgeInsets.only(bottom: Space.xxs),

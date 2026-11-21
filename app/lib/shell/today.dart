@@ -119,7 +119,7 @@ class _TodayCaptureState extends State<TodayCapture> {
                 padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.sm),
                 child: Text(
                   value ? 'Task' : 'Note',
-                  style: ts(context.type.uiSmall, task == value ? c.textPrimary : c.textSecondary, weight: Weight.semibold),
+                  style: ts(context.type.uiSmall, task == value ? c.textPrimary : c.textSecondary, weight: Weight.strong),
                 ),
               ),
             ),
@@ -156,7 +156,7 @@ class _TodayCaptureState extends State<TodayCapture> {
                   ),
             child: Text(
               'Open',
-              style: ts(context.type.ui, c.accentText, weight: Weight.semibold).copyWith(decoration: TextDecoration.underline),
+              style: ts(context.type.ui, c.accentText, weight: Weight.strong).copyWith(decoration: TextDecoration.underline),
             ),
           ),
         ),
@@ -211,12 +211,12 @@ class _TodayCaptureState extends State<TodayCapture> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon20(Ico.plus, size: IconSize.md, color: c.onAccent),
+                  Icon20(Ico.plus, size: IconSize.md, color: c.accentInk),
                   if (!widget.mobile) ...[
                     const Gap(Space.xs),
                     Text(
                       _saving ? 'Adding…' : 'Add',
-                      style: ts(context.type.ui, c.onAccent, weight: Weight.bold),
+                      style: ts(context.type.ui, c.accentInk, weight: Weight.strong),
                     ),
                   ],
                 ],
@@ -321,7 +321,7 @@ class WeekStrip extends StatelessWidget {
                       children: [
                         Text(
                           weekdays[day.weekday - 1].substring(0, 3),
-                          style: ts(context.type.caption, sameDay(day, store.today) ? c.bgPrimary : c.textSecondary, weight: Weight.semibold),
+                          style: ts(context.type.caption, sameDay(day, store.today) ? c.bgPrimary : c.textSecondary, weight: Weight.strong),
                         ),
                         const Gap(Space.hair),
                         Text(
@@ -582,7 +582,7 @@ class _AgendaDayState extends State<AgendaDay>
   Widget _chip(String label, Color background) => Container(
     padding: const EdgeInsets.fromLTRB(Space.sm, Space.xxs, Space.sm, Space.xs),
     decoration: BoxDecoration(color: background, borderRadius: Radii.pill),
-    child: Text(label, style: ts(context.type.uiSmall, context.colors.textPrimary, weight: Weight.semibold)),
+    child: Text(label, style: ts(context.type.uiSmall, context.colors.textPrimary, weight: Weight.strong)),
   );
 
   Widget _task(
@@ -823,7 +823,7 @@ class _AgendaDayState extends State<AgendaDay>
                 math.max(
                   textWidth(
                         items[index].title,
-                        ts(context.type.uiSmall, c.textPrimary, weight: Weight.bold),
+                        ts(context.type.uiSmall, c.textPrimary, weight: Weight.strong),
                       ) +
                       8,
                   textWidth(timeRange(items[index]), timeStyle) + 8,
@@ -922,7 +922,7 @@ class _AgendaDayState extends State<AgendaDay>
                           offset: Offset(nowX > width - DayTimeline.nowFlipZone ? -DayTimeline.nowFlip : DayTimeline.nowLabelGap, -DayTimeline.nowLift),
                           child: Text(
                             'now ${_time(nowMs)}',
-                            style: ts(context.type.uiSmall, c.accentText, weight: Weight.bold),
+                            style: ts(context.type.uiSmall, c.accentText, weight: Weight.strong),
                           ),
                         ),
                         Container(width: Stroke.bold, height: DayTimeline.nowLine, color: c.accentText),
@@ -974,7 +974,7 @@ class _AgendaDayState extends State<AgendaDay>
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
-                            style: ts(context.type.uiSmall, past(items[index]) ? c.textSecondary : c.textPrimary, weight: Weight.bold),
+                            style: ts(context.type.uiSmall, past(items[index]) ? c.textSecondary : c.textPrimary, weight: Weight.strong),
                           ),
                           Text(
                             '${timeRange(items[index])}${next == index && !context.sizeClass.isCompact && !positions[index].countdownLine ? ' · ${_until(items[index].startMs.toInt() - nowMs)}' : ''}',
@@ -1022,7 +1022,7 @@ class _AgendaDayState extends State<AgendaDay>
 
   Widget _label(String text) => Padding(
     padding: const EdgeInsets.only(top: Space.md, bottom: Space.xxs),
-    child: Text(text, style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.bold)),
+    child: Text(text, style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.strong)),
   );
   Widget _more(String group, int remaining, VoidCallback? onTap) => Align(
     alignment: Alignment.centerLeft,
@@ -1216,7 +1216,7 @@ class _AgendaDayState extends State<AgendaDay>
                         allDone
                             ? 'All done'
                             : '${done.length} done${store.isToday ? ' today' : ''}',
-                        style: ts(context.type.ui, c.textSecondary, weight: Weight.bold),
+                        style: ts(context.type.ui, c.textSecondary, weight: Weight.strong),
                       ),
                       const Gap(Space.xs),
                       Icon20(
@@ -1396,7 +1396,7 @@ class InMotion extends StatelessWidget {
                         item.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: ts(context.type.title, c.textPrimary, weight: Weight.bold),
+                        style: ts(context.type.title, c.textPrimary, weight: Weight.strong),
                       ),
                       Text(
                         '${item.done} of ${item.total} done',

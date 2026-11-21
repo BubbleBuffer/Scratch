@@ -261,7 +261,7 @@ class QueryCountBadge extends StatelessWidget {
       style: ts(
         context.type.uiSmall,
         total == 0 ? c.textTertiary : c.textSecondary,
-        weight: Weight.semibold,
+        weight: Weight.strong,
       ),
     );
   }

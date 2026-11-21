@@ -340,7 +340,7 @@ class _SessionRowState extends State<_SessionRow> {
                   style: ts(
                     context.type.ui,
                     c.textPrimary,
-                    weight: widget.selected ? Weight.bold : Weight.regular,
+                    weight: widget.selected ? Weight.strong : Weight.regular,
                   ),
                 ),
               ),

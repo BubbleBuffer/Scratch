@@ -72,7 +72,7 @@ class ShortItemCard extends StatelessWidget {
       style: ts(
         context.type.ui,
         titleColor,
-        weight: Weight.semibold,
+        weight: Weight.strong,
       ).copyWith(decoration: item.done ? TextDecoration.lineThrough : null),
     );
     final time = dateLabel;

@@ -111,7 +111,7 @@ InlineSpan sRich(String text, TextStyle style) {
   if (parts.length == 1) return TextSpan(text: text, style: style);
   return TextSpan(style: style, children: [
     for (var i = 0; i < parts.length; i++)
-      TextSpan(text: parts[i], style: i.isOdd ? weightedRun(style, Weight.bold) : null),
+      TextSpan(text: parts[i], style: i.isOdd ? weightedRun(style, Weight.strong) : null),
   ]);
 }
 
@@ -169,7 +169,7 @@ class SSection extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: Space.sm),
             decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Semantics(header: true, child: Text(title!, style: tsDisplay(context.type.title, c.textPrimary, weight: Weight.semibold))),
+              Semantics(header: true, child: Text(title!, style: tsDisplay(context.type.title, c.textPrimary, weight: Weight.strong))),
               if (intro != null) ...[
                 const Gap(Space.xxs),
                 Text.rich(sRich(intro!, sDesc(context))),
@@ -446,7 +446,7 @@ class _HelpNote extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text.rich(TextSpan(style: style, children: [
-          TextSpan(text: 'When to change it: ', style: weightedRun(style, Weight.bold).copyWith(color: c.textPrimary)),
+          TextSpan(text: 'When to change it: ', style: weightedRun(style, Weight.strong).copyWith(color: c.textPrimary)),
           TextSpan(text: help),
         ])),
         if (extra != null) ...[const Gap(Space.xs), Text(extra!, style: style)],
@@ -465,7 +465,7 @@ class SReason extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final style = ts(context.type.ui, c.accentText, weight: Weight.semibold);
+    final style = ts(context.type.ui, c.accentText, weight: Weight.strong);
     return Row(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
       Padding(padding: const EdgeInsets.only(top: Space.hair), child: SIcon(Sx.lock, size: IconSize.xs, color: c.accentText)),
       const Gap(Space.xs),
@@ -511,7 +511,7 @@ class SLink extends StatelessWidget {
         child: GestureDetector(
           onTap: onTap,
           child: Text(label,
-              style: ts(context.type.ui, c.accentText, weight: Weight.semibold).copyWith(
+              style: ts(context.type.ui, c.accentText, weight: Weight.strong).copyWith(
                 decoration: TextDecoration.underline,
                 decorationColor: c.accentText,
               )),
@@ -623,7 +623,7 @@ class SButton extends StatelessWidget {
     final c = context.colors;
     final off = onTap == null;
     final fg = switch (kind) {
-      SButtonKind.primary => c.onAccent,
+      SButtonKind.primary => c.accentInk,
       SButtonKind.quiet => c.textSecondary,
       SButtonKind.danger => c.dangerText,
       SButtonKind.normal => c.textPrimary,
@@ -651,7 +651,7 @@ class SButton extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 if (icon != null) ...[SIcon(icon!, color: fg), const Gap(Space.xs)],
-                Text(label, style: ts(context.type.ui, fg, weight: Weight.bold)),
+                Text(label, style: ts(context.type.ui, fg, weight: Weight.strong)),
               ]),
             ),
           ),
@@ -812,7 +812,7 @@ class SSegmented<T> extends StatelessWidget {
               background: o == value ? c.bgPrimary : null,
               border: o == value ? Border(bottom: BorderSide(color: c.accent, width: Stroke.bold)) : null,
               padding: EdgeInsets.symmetric(horizontal: Space.md, vertical: context.touch ? Space.sm : Space.xs),
-              child: Text(labelOf(o), style: ts(context.type.ui, o == value ? c.textPrimary : c.textSecondary, weight: o == value ? Weight.semibold : Weight.medium)),
+              child: Text(labelOf(o), style: ts(context.type.ui, o == value ? c.textPrimary : c.textSecondary, weight: o == value ? Weight.strong : Weight.regular)),
             ),
           ),
       ]),
@@ -883,7 +883,7 @@ class _ChoiceCard<T> extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               if (choice.icon != null) ...[SIcon(choice.icon!, color: c.textSecondary), const Gap(Space.sm)],
-              Expanded(child: Text(choice.title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold))),
+              Expanded(child: Text(choice.title, style: ts(context.type.ui, c.textPrimary, weight: Weight.strong))),
               const Gap(Space.sm),
               Container(
                 width: SettingsSize.radio,
@@ -1015,7 +1015,7 @@ class SEditor extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.lg),
       decoration: BoxDecoration(color: c.bgPrimary, borderRadius: Radii.field, border: Border.all(color: c.accent)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
+        Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.strong)),
         if (desc != null) ...[const Gap(Space.xxs), Text(desc!, style: sDesc(context))],
         ...children,
         const Gap(Space.lg),
@@ -1096,7 +1096,7 @@ class SItem extends StatelessWidget {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: Space.xs, runSpacing: Space.hair, children: [
-              nameWidget ?? Text(name, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
+              nameWidget ?? Text(name, style: ts(context.type.ui, c.textPrimary, weight: Weight.strong)),
               for (final t in tags) STag(t),
               ?status,
             ]),
@@ -1165,7 +1165,7 @@ class SStatus extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Container(width: SettingsSize.statusDot, height: SettingsSize.statusDot, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
         const Gap(Space.xs),
-        Text(label, style: ts(context.type.uiSmall, kind == SStatusKind.off ? c.textSecondary : c.textPrimary, weight: Weight.bold)),
+        Text(label, style: ts(context.type.uiSmall, kind == SStatusKind.off ? c.textSecondary : c.textPrimary, weight: Weight.strong)),
       ]),
     );
   }
@@ -1182,7 +1182,7 @@ class STag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Space.xs, vertical: Space.hair),
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(Radii.sm), border: Border.all(color: c.border)),
-      child: Text(text, style: ts(context.type.caption, c.textSecondary, weight: Weight.semibold)),
+      child: Text(text, style: ts(context.type.caption, c.textSecondary, weight: Weight.strong)),
     );
   }
 }
@@ -1203,7 +1203,7 @@ class SEmpty extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SIcon(icon, size: IconSize.xl, color: c.textTertiary),
         const Gap(Space.sm),
-        Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
+        Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.strong)),
         const Gap(Space.xxs),
         Text(text, style: sDesc(context)),
         if (action != null) ...[const Gap(Space.md), action!],
@@ -1293,7 +1293,7 @@ class SStatusCard extends StatelessWidget {
         const Gap(Space.lg),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: ts(context.type.title, c.textPrimary, weight: Weight.bold)),
+            Text(title, style: ts(context.type.title, c.textPrimary, weight: Weight.strong)),
             const Gap(Space.hair),
             Text(text, style: sDesc(context)),
           ]),
@@ -1342,7 +1342,7 @@ class _SAdvancedState extends State<SAdvanced> {
                 child: SIcon(Sx.chevronRight, color: c.textTertiary),
               ),
               const Gap(Space.xs),
-              Text(widget.title, style: tsDisplay(context.type.title, c.textSecondary, weight: Weight.semibold)),
+              Text(widget.title, style: tsDisplay(context.type.title, c.textSecondary, weight: Weight.strong)),
               if (widget.summary != null) ...[
                 const Gap(Space.sm),
                 Flexible(child: Text(widget.summary!, overflow: TextOverflow.ellipsis, style: sHint(context))),
@@ -1430,7 +1430,7 @@ class SPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final m = context.sizeClass.isCompact;
-    final statusText = Text(status, style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.semibold));
+    final statusText = Text(status, style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.strong));
     return Container(
       margin: const EdgeInsets.only(top: Space.lg),
       decoration: BoxDecoration(color: c.bgPrimary, borderRadius: Radii.field, border: Border.all(color: c.border)),
@@ -1456,7 +1456,7 @@ class SPanel extends StatelessWidget {
               const Gap(Space.md),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, style: tsDisplay(context.type.title, c.textPrimary, weight: Weight.semibold)),
+                  Text(title, style: tsDisplay(context.type.title, c.textPrimary, weight: Weight.strong)),
                   const Gap(Space.hair),
                   Text(desc, style: ts(context.type.ui, c.textTertiary, weight: Weight.regular)),
                   if (m) ...[const Gap(Space.xxs), statusText],

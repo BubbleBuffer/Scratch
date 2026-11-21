@@ -213,7 +213,7 @@ class MobileSettingsScaffold extends StatelessWidget {
                             child: Row(mainAxisSize: MainAxisSize.min, children: [
                               SIcon(Sx.chevronLeft, size: IconSize.lg, color: c.textSecondary),
                               const Gap(Space.hair),
-                              Text(title, style: ts(context.type.title, c.textSecondary, weight: Weight.semibold)),
+                              Text(title, style: ts(context.type.title, c.textSecondary, weight: Weight.strong)),
                             ]),
                           ),
                         ),
@@ -335,7 +335,7 @@ class _NavGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(Space.md, Space.lg, Space.md, Space.xxs),
-    child: Text(label, style: ts(context.type.caption, context.colors.textTertiary, weight: Weight.bold)),
+    child: Text(label, style: ts(context.type.caption, context.colors.textTertiary, weight: Weight.strong)),
   );
 }
 
@@ -373,7 +373,7 @@ class _NavItem extends StatelessWidget {
               const Gap(Space.md),
               Expanded(
                 child: Text(section.label,
-                    style: ts(context.type.ui, selected ? c.textPrimary : c.textSecondary, weight: selected ? Weight.semibold : Weight.medium)),
+                    style: ts(context.type.ui, selected ? c.textPrimary : c.textSecondary, weight: selected ? Weight.strong : Weight.regular)),
               ),
               if (badge != null) _Badge(badge!),
             ]),
@@ -434,7 +434,7 @@ class SettingsPage extends StatelessWidget {
         if (group != null) {
           rows.add(Padding(
             padding: const EdgeInsets.fromLTRB(Layout.gutter, Space.xl, Layout.gutter, Space.xs),
-            child: Text(group, style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.bold)),
+            child: Text(group, style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.strong)),
           ));
         }
       }
@@ -468,7 +468,7 @@ class SettingsPage extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(Layout.gutter, 0, Layout.gutter, Space.xxs),
           child: Semantics(
             header: true,
-            child: Text('Settings', style: tsDisplay(context.type.h2, c.textPrimary, weight: Weight.bold)),
+            child: Text('Settings', style: tsDisplay(context.type.h2, c.textPrimary, weight: Weight.displayStrong)),
           ),
         ),
         ...rows,

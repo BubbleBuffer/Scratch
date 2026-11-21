@@ -524,7 +524,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 child: Text(
                   'Today',
-                  style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold),
+                  style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
                 ),
               ),
               const SizedBox(height: Layout.minTapTarget, child: Center(child: SyncIndicator())),
@@ -619,7 +619,7 @@ class ShellMobileFrame extends StatelessWidget {
                           width: ControlSize.xxl.height,
                           height: ControlSize.xxl.height,
                           child: Center(
-                            child: Icon20(Ico.plus, size: IconSize.xl, color: c.onAccent),
+                            child: Icon20(Ico.plus, size: IconSize.xl, color: c.accentInk),
                           ),
                         ),
                       ),
@@ -685,7 +685,7 @@ class _MobileDock extends StatelessWidget {
                   ),
                   Text(
                     label,
-                    style: ts(context.type.caption, destinationId == id ? c.accentText : c.textSecondary, weight: Weight.medium),
+                    style: ts(context.type.caption, destinationId == id ? c.accentText : c.textSecondary, weight: Weight.strong),
                   ),
                 ],
               ),
@@ -830,7 +830,7 @@ class _PagesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xxs),
-    child: Text(label, style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.bold)),
+    child: Text(label, style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.strong)),
   );
 }
 

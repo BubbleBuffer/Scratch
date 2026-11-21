@@ -49,7 +49,7 @@ class UnsupportedCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(message, style: ts(type.ui, c.textPrimary, weight: Weight.medium)),
+                  Text(message, style: ts(type.ui, c.textPrimary, weight: Weight.strong)),
                   const Gap(Space.hair),
                   Text(
                     detail,

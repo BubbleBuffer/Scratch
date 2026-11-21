@@ -117,7 +117,7 @@ class _BacklinksBarState extends State<BacklinksBar> {
           padding: const EdgeInsets.only(left: Space.hair, bottom: Space.xxs),
           child: Text(
             'Linked from',
-            style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.medium),
+            style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.strong),
           ),
         ),
         for (final r in shown)

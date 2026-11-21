@@ -314,7 +314,7 @@ class _ShowAsOption extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(name, style: ts(ty.ui, c.textPrimary, weight: Weight.semibold)),
+            Text(name, style: ts(ty.ui, c.textPrimary, weight: Weight.strong)),
             const Gap(Space.xs),
             IgnorePointer(
               child: SizedBox(
@@ -419,7 +419,7 @@ class _NoticeState extends State<_Notice> {
                 padding: const EdgeInsets.symmetric(horizontal: Space.xs, vertical: Space.hair),
                 child: Text(
                   'Open',
-                  style: ts(ty.ui, c.accentText, weight: Weight.semibold),
+                  style: ts(ty.ui, c.accentText, weight: Weight.strong),
                 ),
               ),
             ],

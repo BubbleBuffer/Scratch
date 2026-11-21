@@ -242,14 +242,14 @@ class _BoardViewState extends State<BoardView> {
         style: ts(
           context.type.ui,
           c.textPrimary,
-          weight: Weight.medium,
+          weight: Weight.strong,
         ),
       );
     }
     if (gd.kind == PropKind.checkbox) {
       return Text(
         label,
-        style: ts(context.type.ui, c.textPrimary, weight: Weight.medium),
+        style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
       );
     }
     return Flexible(
@@ -364,7 +364,7 @@ class _HiddenColumn extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Hidden groups',
-                style: ts(context.type.ui, c.textTertiary, weight: Weight.medium),
+                style: ts(context.type.ui, c.textTertiary, weight: Weight.strong),
               ),
             ),
           ),

@@ -721,7 +721,7 @@ class _BoardColumnState extends State<_BoardColumn> {
                         style: ts(
                           context.type.ui,
                           g.color ?? c.textPrimary,
-                          weight: Weight.medium,
+                          weight: Weight.strong,
                         ),
                       ),
                     ),

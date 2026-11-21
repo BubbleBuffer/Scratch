@@ -143,7 +143,7 @@ class SelectionToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    Widget glyph(String s, BMarkKind k, {FontStyle? style, TextDecoration? deco, Weight weight = Weight.semibold}) {
+    Widget glyph(String s, BMarkKind k, {FontStyle? style, TextDecoration? deco, Weight weight = Weight.strong}) {
       final on = active.contains(k);
       return Hover(
         key: ValueKey('fmt-${k.name}'),
@@ -193,10 +193,10 @@ class SelectionToolbar extends StatelessWidget {
             semanticLabel: active.contains(BMarkKind.link) ? 'Edit link' : 'Add link',
             color: active.contains(BMarkKind.link) ? c.accent : c.iconPrimary),
         const VLine(),
-        glyph('B', BMarkKind.bold, weight: Weight.bold),
-        glyph('i', BMarkKind.italic, style: FontStyle.italic, weight: Weight.medium),
-        glyph('U', BMarkKind.underline, deco: TextDecoration.underline, weight: Weight.medium),
-        glyph('S', BMarkKind.strike, deco: TextDecoration.lineThrough, weight: Weight.medium),
+        glyph('B', BMarkKind.bold, weight: Weight.strong),
+        glyph('i', BMarkKind.italic, style: FontStyle.italic, weight: Weight.regular),
+        glyph('U', BMarkKind.underline, deco: TextDecoration.underline, weight: Weight.regular),
+        glyph('S', BMarkKind.strike, deco: TextDecoration.lineThrough, weight: Weight.regular),
         Semantics(
           button: true,
           label: 'Code',
@@ -330,7 +330,7 @@ class KeyboardToolbar extends StatelessWidget {
         key, Icon20(i, size: IconSize.xl, color: onTap == null ? c.textDisabled : c.iconSecondary), onTap, on: on, tip: tip);
     Widget btnX(Ix i, VoidCallback? onTap, String key, {bool on = false, String? tip}) => box(
         key, IconX(i, size: IconSize.xl.px, color: onTap == null ? c.textDisabled : c.iconSecondary), onTap, on: on, tip: tip);
-    Widget glyph(String s, BMarkKind k, {FontStyle? style, TextDecoration? deco, Weight weight = Weight.semibold}) {
+    Widget glyph(String s, BMarkKind k, {FontStyle? style, TextDecoration? deco, Weight weight = Weight.strong}) {
       final on = active.contains(k);
       return box(
         k.name,
@@ -345,10 +345,10 @@ class KeyboardToolbar extends StatelessWidget {
     final items = switch (mode) {
       KbMode.format => <Widget>[
           btn(Ico.chevronLeft, () => onMode(KbMode.main), 'back', tip: 'Back'),
-          glyph('B', BMarkKind.bold, weight: Weight.bold),
-          glyph('i', BMarkKind.italic, style: FontStyle.italic, weight: Weight.medium),
-          glyph('U', BMarkKind.underline, deco: TextDecoration.underline, weight: Weight.medium),
-          glyph('S', BMarkKind.strike, deco: TextDecoration.lineThrough, weight: Weight.medium),
+          glyph('B', BMarkKind.bold, weight: Weight.strong),
+          glyph('i', BMarkKind.italic, style: FontStyle.italic, weight: Weight.regular),
+          glyph('U', BMarkKind.underline, deco: TextDecoration.underline, weight: Weight.regular),
+          glyph('S', BMarkKind.strike, deco: TextDecoration.lineThrough, weight: Weight.regular),
           btn(Ico.code, () => onMark(BMarkKind.code), 'code', on: active.contains(BMarkKind.code), tip: 'Code'),
           btn(Ico.link, onLink, 'link',
               on: active.contains(BMarkKind.link), tip: active.contains(BMarkKind.link) ? 'Edit link' : 'Add link'),
@@ -367,7 +367,7 @@ class KeyboardToolbar extends StatelessWidget {
         ],
       KbMode.main => <Widget>[
           btn(Ico.plus, onAdd, 'add', tip: 'Add block'),
-          box('format', Text('Aa', style: ts(context.type.body, c.iconSecondary, weight: Weight.medium)), () => onMode(KbMode.format)),
+          box('format', Text('Aa', style: ts(context.type.body, c.iconSecondary, weight: Weight.strong)), () => onMode(KbMode.format)),
           btn(Ico.turnInto, onTurnInto, 'turn-into', tip: 'Turn into'),
           btn(Ico.todo, () => onKind(Kinds.todo), 'todo', on: kind == Kinds.todo, tip: 'To-do list'),
           btn(Ico.bullets, () => onKind(Kinds.bulleted), 'bullets', on: kind == Kinds.bulleted, tip: 'Bulleted list'),

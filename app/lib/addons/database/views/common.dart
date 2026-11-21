@@ -175,7 +175,7 @@ class OpenChip extends StatelessWidget {
             ),
             const Gap(Space.xxs),
           ],
-          Text(label, style: eyebrowStyle(context.type.caption, c.textTertiary, weight: Weight.semibold)),
+          Text(label, style: eyebrowStyle(context.type.caption, c.textTertiary, weight: Weight.strong)),
         ]),
       ),
     );

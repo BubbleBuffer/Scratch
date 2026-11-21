@@ -85,7 +85,7 @@ class ChatSettingsPanel extends StatelessWidget {
             children: [
               Text(
                 'Chat settings',
-                style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.semibold),
+                style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.strong),
               ),
               const Gap(Space.md),
               Row(
@@ -141,7 +141,7 @@ class _Segments extends StatelessWidget {
                     style: ts(
                       context.type.uiSmall,
                       on ? c.textPrimary : c.textSecondary,
-                      weight: on ? Weight.semibold : Weight.regular,
+                      weight: on ? Weight.strong : Weight.regular,
                     ),
                     children: [
                       if (trial != null)

@@ -7,6 +7,8 @@
 // before the mention (the text itself stays the page title, so offsets
 // do not change).
 
+import 'dart:math' as math;
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
@@ -358,17 +360,31 @@ TextSpan markedSpan(
                   (targetWidth - prefixPainter.width - tailPainter.width) /
                       tail.length
             : base.letterSpacing;
+        final prefixWidth = prefixPainter.width;
         prefixPainter.dispose();
         tailPainter.dispose();
         chip.dispose();
         // A chip has one presentation regardless of overlapping bold/code
         // marks; their stored ranges still apply when the block is edited.
         final baseSize = base.fontSize ?? InlineMark.fallback.fontSize!;
+        var tailSize = _dateTailSize(textScaler, baseSize, scale);
+        if (scale < 1 && tail.isNotEmpty) {
+          // Glyph widths do not scale exactly with the size: measure the
+          // shrunk tail once and correct the size by what is left over.
+          final shrunk = TextPainter(
+            text: TextSpan(text: tail, style: coveredRun(base, fontSize: tailSize)),
+            textDirection: TextDirection.ltr,
+            textScaler: textScaler,
+          )..layout();
+          final needed = targetWidth - prefixWidth;
+          if (shrunk.width > 0) {
+            tailSize = math.min(baseSize, tailSize * needed / shrunk.width);
+          }
+          shrunk.dispose();
+        }
         s = coveredRun(
           base,
-          fontSize: a < prefixEnd
-              ? baseSize
-              : _dateTailSize(textScaler, baseSize, scale),
+          fontSize: a < prefixEnd ? baseSize : tailSize,
           height: base.height ?? InlineMark.fallbackLine,
           letterSpacing: tail.isEmpty
               ? soloSpacing

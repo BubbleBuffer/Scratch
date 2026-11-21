@@ -30,11 +30,13 @@ void main() {
         ).fontVariations!)
           axis.axis: axis.value,
       };
-      expect(axes(NumeralSize.lg.spec), {'opsz': 44, 'wdth': 90, 'wght': 640});
-      expect(axes(TypeScale.pointer.micro), {'opsz': 12, 'wdth': 90, 'wght': 640});
+      final display = Weight.display.axis, strong = Weight.displayStrong.axis;
+      const wdth = 90.0;
+      expect(axes(NumeralSize.lg.spec), {'opsz': 44, 'wdth': wdth, 'wght': display});
+      expect(axes(TypeScale.pointer.micro), {'opsz': 12, 'wdth': wdth, 'wght': display});
       expect(
-        axes(TypeScale.pointer.display, weight: Weight.bold),
-        {'opsz': 32, 'wdth': 90, 'wght': 700},
+        axes(TypeScale.pointer.display, weight: Weight.displayStrong),
+        {'opsz': TypeScale.pointer.display.size, 'wdth': wdth, 'wght': strong},
       );
     },
   );
@@ -54,11 +56,7 @@ void main() {
     await tester.pumpWidget(sample(false));
     expect(
       [durations.fast, durations.standard, durations.sheet],
-      [
-        const Duration(milliseconds: 150),
-        const Duration(milliseconds: 220),
-        const Duration(milliseconds: 250),
-      ],
+      [Motion.fast, Motion.standard, Motion.sheet],
     );
     await tester.pumpWidget(sample(true));
     expect(durations.reduced, isTrue);

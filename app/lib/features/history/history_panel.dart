@@ -192,7 +192,7 @@ class _HistoryPanelState extends State<HistoryPanel> {
             constraints: const BoxConstraints(minHeight: HistorySize.row),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(i == 0 ? '${_time(t)}  ·  Current' : _time(t),
-                  style: ts(ty.ui, c.textPrimary, weight: i == _selected ? Weight.semibold : Weight.medium)),
+                  style: ts(ty.ui, c.textPrimary, weight: i == _selected ? Weight.strong : Weight.regular)),
               Text('${v[i].summary} · ${_device(v[i].device)}',
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(ty.uiSmall, c.textTertiary, weight: Weight.regular)),
             ]),

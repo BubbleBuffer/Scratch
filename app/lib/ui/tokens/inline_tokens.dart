@@ -34,9 +34,9 @@ TextStyle inlineMarkStyle(
   Color? decorationColor,
   Color? color,
 }) => TextStyle(
-  fontWeight: bold
-      ? Weight.semibold.fontWeight
-      : (mention ? Weight.medium.fontWeight : null),
+  // Two UI weights: a bold mark is strong; a mention keeps the text's
+  // weight and stands out by its underline and icon.
+  fontWeight: bold ? Weight.strong.fontWeight : null,
   fontStyle: italic ? FontStyle.italic : null,
   decoration: decoration,
   decorationColor: decorationColor,
@@ -73,13 +73,13 @@ TextStyle coveredRun(
 TextStyle queryLabelStyle(TextStyle base) => base.copyWith(
   fontSize: (base.fontSize ?? InlineMark.fallback.fontSize!) * InlineMark.queryScale,
   height: InlineMark.queryLine,
-  fontWeight: Weight.medium.fontWeight,
+  fontWeight: Weight.strong.fontWeight,
   decoration: TextDecoration.none,
 );
 
 /// A query chip label's leading count.
 TextStyle queryCountStyle(TextStyle label, Color color) =>
-    label.copyWith(color: color, fontWeight: Weight.bold.fontWeight);
+    label.copyWith(color: color, fontWeight: Weight.strong.fontWeight);
 
 /// A date chip's label.
 TextStyle dateChipStyle(TextStyle base, Color color) => base.copyWith(
@@ -87,7 +87,7 @@ TextStyle dateChipStyle(TextStyle base, Color color) => base.copyWith(
   height: InlineMark.dateLine,
   color: color,
   decoration: TextDecoration.none,
-  fontWeight: Weight.medium.fontWeight,
+  fontWeight: Weight.strong.fontWeight,
 );
 
 /// [run] at [weight]: a bold mark, or a table's header row, over text whose

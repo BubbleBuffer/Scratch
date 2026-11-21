@@ -153,7 +153,7 @@ class _KanbanCardPanelState extends State<KanbanCardPanel> {
                   child: Text(
                     widget.title,
                     key: const ValueKey('kanban-panel-title'),
-                    style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.bold),
+                    style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.displayStrong),
                   ),
                 ),
                 if (widget.firstLine.trim().isNotEmpty)
@@ -406,7 +406,7 @@ class _Prop extends StatelessWidget {
           width: BoardSize.factLabel,
           child: Text(
             label,
-            style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.semibold),
+            style: ts(context.type.ui, context.colors.textSecondary, weight: Weight.strong),
           ),
         ),
         Expanded(child: child),

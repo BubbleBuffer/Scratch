@@ -617,7 +617,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                   style: ts(
                     context.type.uiSmall,
                     context.colors.textPrimary,
-                    weight: _period == period ? Weight.bold : Weight.medium,
+                    weight: _period == period ? Weight.strong : Weight.regular,
                   ),
                 ),
               ),
@@ -1022,7 +1022,7 @@ class _CalendarChip extends StatelessWidget {
                 Text(
                   'Agent',
                   semanticsLabel: 'Assigned to Agent',
-                  style: ts(context.type.micro, context.colors.textSecondary, weight: Weight.bold),
+                  style: ts(context.type.micro, context.colors.textSecondary, weight: Weight.strong),
                 ),
             ],
           ),
@@ -1310,11 +1310,11 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                             style: ts(
                               context.type.item,
                               today
-                                  ? context.colors.onAccent
+                                  ? context.colors.accentInk
                                   : day.month != month.month
                                   ? context.colors.textTertiary
                                   : context.colors.textSecondary,
-                              weight: today ? Weight.bold : Weight.medium,
+                              weight: today ? Weight.strong : Weight.regular,
                             ),
                           ),
                         ),
@@ -1388,7 +1388,7 @@ class _MonthHeading extends SliverPersistentHeaderDelegate {
       color: colors.bgPrimary,
       border: Border(bottom: BorderSide(color: colors.border)),
     ),
-    child: Text(title, style: ts(type, colors.textSecondary, weight: Weight.bold)),
+    child: Text(title, style: ts(type, colors.textSecondary, weight: Weight.strong)),
   );
   @override
   bool shouldRebuild(_MonthHeading old) =>
@@ -1462,7 +1462,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                               '${day.day}',
                               style: tsDisplay(
                                 context.type.h3,
-                                sameDay(day, now) ? c.onAccent : c.textPrimary,
+                                sameDay(day, now) ? c.accentInk : c.textPrimary,
                               ),
                             ),
                           ),
@@ -1492,7 +1492,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                   padding: const EdgeInsets.only(top: Space.sm),
                   child: Text(
                     'All day',
-                    style: ts(context.type.micro, c.textTertiary, weight: Weight.medium),
+                    style: ts(context.type.micro, c.textTertiary, weight: Weight.strong),
                   ),
                 ),
               ),
@@ -1577,7 +1577,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                                 ),
                                 child: Text(
                                   'now ${calendarTime(minute)}',
-                                  style: ts(context.type.micro, c.accentText, weight: Weight.bold),
+                                  style: ts(context.type.micro, c.accentText, weight: Weight.strong),
                                 ),
                               ),
                             ),
@@ -1718,7 +1718,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                     '${item.assignee == 'agent' ? 'Agent · ' : ''}${segment.continued ? 'Continued · ' : ''}${calendarTime(segment.startMinute)}${size.maxHeight > 42 ? ' – ${calendarTime(segment.endMinute)}' : ''}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: ts(context.type.micro, context.colors.textSecondary, weight: Weight.medium),
+                    style: ts(context.type.micro, context.colors.textSecondary, weight: Weight.strong),
                   ),
                   if (size.maxHeight > 25) ...[
                     const Gap(Space.xxs),
@@ -1731,7 +1731,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                         ),
                         overflow: TextOverflow.ellipsis,
                         style:
-                            ts(context.type.uiSmall, item.done ? context.colors.textTertiary : context.colors.textPrimary, weight: Weight.semibold).copyWith(
+                            ts(context.type.uiSmall, item.done ? context.colors.textTertiary : context.colors.textPrimary, weight: Weight.strong).copyWith(
                               decoration: item.done
                                   ? TextDecoration.lineThrough
                                   : null,
@@ -1822,7 +1822,7 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
                     style: ts(
                       context.type.ui,
                       context.colors.textPrimary,
-                      weight: Weight.bold,
+                      weight: Weight.strong,
                     ),
                   ),
                 ),

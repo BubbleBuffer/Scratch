@@ -240,7 +240,7 @@ class DatabaseViewState extends State<DatabaseView> {
     final v = store.view;
     _inlineTitle ??= TextEditingController(text: store.title);
     if (!_titleFocus.hasFocus && _inlineTitle!.text != store.title && store.loaded) _inlineTitle!.text = store.title;
-    final style = ts(context.type.h3, c.textPrimary, weight: Weight.bold);
+    final style = ts(context.type.h3, c.textPrimary, weight: Weight.strong);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
       Padding(
         padding: EdgeInsets.only(left: widget.left, right: Space.sm),
@@ -309,7 +309,7 @@ class DatabaseViewState extends State<DatabaseView> {
 
   double _tabWidth(BuildContext context, ViewDef v) {
     final tp = TextPainter(
-      text: TextSpan(text: v.name, style: ts(context.type.ui, context.colors.textPrimary, weight: Weight.medium)),
+      text: TextSpan(text: v.name, style: ts(context.type.ui, context.colors.textPrimary, weight: Weight.strong)),
       textDirection: TextDirection.ltr,
       maxLines: 1,
     )..layout(maxWidth: Db.tabLabel);
@@ -422,7 +422,7 @@ class DatabaseViewState extends State<DatabaseView> {
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: Db.tabLabel),
                 child: Text(v.name,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, fg, weight: active ? Weight.semibold : Weight.medium)),
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, fg, weight: active ? Weight.strong : Weight.regular)),
               ),
             ]),
           ),
@@ -513,7 +513,7 @@ class DatabaseViewState extends State<DatabaseView> {
 
   Widget _newButton(BuildContext context) {
     final c = context.colors;
-    final ink = c.onAccent;
+    final ink = c.accentInk;
     const r =Radii.ctl;
     return ClipRRect(
       borderRadius: r,
@@ -528,9 +528,9 @@ class DatabaseViewState extends State<DatabaseView> {
               radius: 0,
               hoverColor: c.bgHover,
               padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-              child: Center(child: Text('New', style: ts(context.type.ui, ink, weight: Weight.bold))),
+              child: Center(child: Text('New', style: ts(context.type.ui, ink, weight: Weight.strong))),
             ),
-            Container(width: Stroke.hair, height: ControlSize.sm.height, color: c.onAccent.withValues(alpha: Alpha.tint)),
+            Container(width: Stroke.hair, height: ControlSize.sm.height, color: c.accentInk.withValues(alpha: Alpha.tint)),
             Builder(
               builder: (b) => Hover(
                 key: const ValueKey('db-new-menu'),
@@ -681,7 +681,7 @@ class DatabaseViewState extends State<DatabaseView> {
                   const Gap(Space.sm),
                   Flexible(
                     child: Text(v.name,
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.title, c.textPrimary, weight: Weight.semibold)),
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.title, c.textPrimary, weight: Weight.strong)),
                   ),
                   const Gap(Space.xs),
                   Icon20(Ico.chevronDown, size: IconSize.sm, color: c.iconTertiary),
@@ -803,7 +803,7 @@ class _ViewsSheet extends StatelessWidget {
           child: Stack(children: [
             Center(
               child: Text('${views.length} ${views.length == 1 ? 'view' : 'views'}',
-                  style: ts(context.type.title, c.textPrimary, weight: Weight.semibold)),
+                  style: ts(context.type.title, c.textPrimary, weight: Weight.strong)),
             ),
             Positioned(
               right: Space.sm,

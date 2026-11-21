@@ -190,7 +190,7 @@ class _RunnerNamesState extends State<_RunnerNames> {
                 key: ValueKey('runner-name-${r.id}'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: ts(context.type.ui, c.textPrimary, weight: Weight.bold),
+                style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
               ),
         trailing: [
           if (editing)

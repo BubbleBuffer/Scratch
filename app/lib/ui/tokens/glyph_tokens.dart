@@ -25,7 +25,7 @@ TextStyle letterMarkStyle(double box, Color color, {bool toggle = false}) {
     fontSize: size,
     height: box * LetterMark.line / size,
     leadingDistribution: TextLeadingDistribution.even,
-    fontWeight: Weight.semibold.fontWeight,
+    fontWeight: Weight.strong.fontWeight,
     color: color,
     decoration: TextDecoration.none,
   );

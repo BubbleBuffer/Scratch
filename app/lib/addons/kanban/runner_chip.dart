@@ -78,7 +78,7 @@ class RunnerChip extends StatelessWidget {
               runnerChipText(a),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.semibold),
+              style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.strong),
             ),
           ),
         ],

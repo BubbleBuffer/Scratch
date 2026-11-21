@@ -54,7 +54,7 @@ class Breadcrumbs extends StatelessWidget {
       final patch = patchFor(key);
       final id = key == 'crumb-current' ? pageId : key.substring(6);
       final label = pageLabelOf(context, id, title);
-      final style = ts(ty.ui, c.textPrimary, weight: onTap == null ? Weight.bold : Weight.regular);
+      final style = ts(ty.ui, c.textPrimary, weight: onTap == null ? Weight.strong : Weight.regular);
       final glyph = database && (icon == null || icon.isEmpty)
           ? patch == null
                 ? DbIcon(DbIco.database, size: IconSize.sm.px, color: c.iconSecondary)

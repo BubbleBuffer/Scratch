@@ -388,7 +388,7 @@ class _HeaderCellState extends State<_HeaderCell> {
                           col.def?.name ?? 'Name',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: ts(context.type.ui, c.textSecondary, weight: Weight.semibold),
+                          style: ts(context.type.ui, c.textSecondary, weight: Weight.strong),
                         ),
                       ),
                     ],
@@ -770,7 +770,7 @@ class _CalcCellState extends State<_CalcCell> {
                 if (calc != null) ...[
                   Text(
                     calc.short.toUpperCase(),
-                    style: eyebrowStyle(context.type.caption, c.textTertiary, weight: Weight.medium),
+                    style: eyebrowStyle(context.type.caption, c.textTertiary, weight: Weight.strong),
                   ),
                   const Gap(Space.xs),
                   Flexible(

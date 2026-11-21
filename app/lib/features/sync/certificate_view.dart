@@ -161,7 +161,7 @@ class CertificateProblem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(title, key: messageKey, style: ts(context.type.ui, c.inlineCodeText, weight: Weight.semibold)),
+        Text(title, key: messageKey, style: ts(context.type.ui, c.inlineCodeText, weight: Weight.strong)),
         const Gap(Space.xxs),
         Text(body, style: ts(context.type.ui, c.textSecondary, weight: Weight.regular)),
         const Gap(Space.md),
@@ -399,7 +399,7 @@ class _CertificateViewState extends State<CertificateView> {
           Text('Certificate', style: ts(context.type.h3, c.textPrimary)),
           const Gap(Space.lg),
         ],
-        Text(w.host, key: const ValueKey('cert-host'), style: ts(context.type.body, c.textPrimary, weight: Weight.semibold)),
+        Text(w.host, key: const ValueKey('cert-host'), style: ts(context.type.body, c.textPrimary, weight: Weight.strong)),
         const Gap(Space.hair),
         Text(status,
             key: const ValueKey('cert-status'),
@@ -508,7 +508,7 @@ class CertFields extends StatelessWidget {
           'until',
           Text(
             expired ? '${formatCertDate(cert.notAfterMs)} · Expired' : formatCertDate(cert.notAfterMs),
-            style: expired ? ts(context.type.ui, c.inlineCodeText, weight: Weight.semibold) : value,
+            style: expired ? ts(context.type.ui, c.inlineCodeText, weight: Weight.strong) : value,
           ),
         ),
       ('SHA-256 fingerprint', 'sha256', FingerprintBox(formatFingerprint(cert.sha256), textKey: ValueKey('$keyPrefix-sha256-text'))),

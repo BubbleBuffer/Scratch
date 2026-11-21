@@ -136,7 +136,7 @@ class _DatePickerState extends State<DatePicker> {
         const Gap(Space.xs),
         Expanded(
             child: Text('${monthName(month.month)} ${month.year}',
-                key: const ValueKey('date-month'), style: ts(ty.ui, c.textPrimary, weight: Weight.semibold))),
+                key: const ValueKey('date-month'), style: ts(ty.ui, c.textPrimary, weight: Weight.strong))),
         TextBtn('Today', size: ControlSize.xs, color: c.textSecondary, onTap: () => setState(() => month = Day(today.year, today.month, 1))),
         IconBtn(Ico.chevronLeft,
             key: const ValueKey('date-prev'),
@@ -259,13 +259,13 @@ class _DatePickerState extends State<DatePicker> {
                 style: ts(
                   context.type.ui,
                   picked
-                      ? c.onAccent
+                      ? c.accentInk
                       : d == today
                           ? c.todayRed
                           : inMonth
                               ? c.textPrimary
                               : c.textTertiary,
-                  weight: d == today || picked ? Weight.semibold : Weight.regular,
+                  weight: d == today || picked ? Weight.strong : Weight.regular,
                 )),
           ),
         ),

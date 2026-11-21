@@ -59,7 +59,7 @@ class _PanelHeader extends StatelessWidget {
       ),
       child: Text(
         proposalsTitle,
-        style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold),
+        style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
       ),
     );
   }
@@ -206,7 +206,7 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
                   ),
                   child: Text(
                     'Merged',
-                    style: ts(ty.uiSmall, c.textPrimary, weight: Weight.semibold),
+                    style: ts(ty.uiSmall, c.textPrimary, weight: Weight.strong),
                   ),
                 ),
                 const Spacer(),
@@ -261,7 +261,7 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
         children: [
           Text(
             appliedTitle,
-            style: ts(ty.ui, c.textPrimary, weight: Weight.semibold),
+            style: ts(ty.ui, c.textPrimary, weight: Weight.strong),
           ),
           const Gap(Space.xs),
           for (final a in run.actions)
@@ -342,7 +342,7 @@ class _ProposalsPanelState extends State<ProposalsPanel> {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ts(ty.ui, c.accentText, weight: Weight.semibold),
+              style: ts(ty.ui, c.accentText, weight: Weight.strong),
             ),
           ),
         ),

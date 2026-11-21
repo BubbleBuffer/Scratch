@@ -188,7 +188,7 @@ class RuntimePackageCard extends StatelessWidget {
             child: compact
                 ? Row(
                     children: [
-                      Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
+                      Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.strong)),
                       const Gap(Space.sm),
                       Expanded(child: text),
                     ],
@@ -197,7 +197,7 @@ class RuntimePackageCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.bold)),
+                      Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.strong)),
                       const Gap(Space.hair),
                       text,
                     ],

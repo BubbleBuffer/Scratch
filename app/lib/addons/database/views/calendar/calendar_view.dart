@@ -180,7 +180,7 @@ class _CalendarViewState extends State<CalendarView> {
               style: ts(
                 m ? context.type.title : context.type.ui,
                 c.textPrimary,
-                weight: Weight.semibold,
+                weight: Weight.strong,
               ),
             ),
             const Spacer(),
@@ -501,7 +501,7 @@ class _CalendarViewState extends State<CalendarView> {
                                                 : (d.month != _month.month
                                                       ? c.textTertiary
                                                       : c.textPrimary),
-                                            weight: d == today ? Weight.semibold : Weight.regular,
+                                            weight: d == today ? Weight.strong : Weight.regular,
                                           ),
                                         ),
                                       ),
@@ -548,7 +548,7 @@ class _CalendarViewState extends State<CalendarView> {
               padding: const EdgeInsets.symmetric(horizontal: Space.xxs),
               child: Text(
                 formatDay(sel),
-                style: ts(context.type.title, c.textSecondary, weight: Weight.semibold),
+                style: ts(context.type.title, c.textSecondary, weight: Weight.strong),
               ),
             ),
             const Gap(Space.xxs),
@@ -583,7 +583,7 @@ class _CalendarViewState extends State<CalendarView> {
                             displayTitle(e.page.title, firstLine: untitledLine(context, e.page)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: ts(context.type.body, c.textPrimary, weight: Weight.medium),
+                            style: ts(context.type.body, c.textPrimary, weight: Weight.strong),
                           ),
                         ),
                       ],
@@ -688,7 +688,7 @@ class _DayCellState extends State<_DayCell> {
                         child: Center(
                           child: Text(
                             label,
-                            style: ts(context.type.ui, c.bgPrimary, weight: Weight.semibold),
+                            style: ts(context.type.ui, c.bgPrimary, weight: Weight.strong),
                           ),
                         ),
                       )

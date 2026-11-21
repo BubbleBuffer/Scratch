@@ -209,7 +209,7 @@ class _RunnerPickerState extends State<_RunnerPicker> {
               padding: const EdgeInsets.fromLTRB(Space.hair, 0, Space.hair, Space.sm),
               child: Text(
                 'Run on',
-                style: ts(context.type.ui, c.textPrimary, weight: Weight.bold),
+                style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
               ),
             ),
             if (snap.hasError)
@@ -301,7 +301,7 @@ class _ProjectChoice extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(0, Space.hair, 0, Space.xxs),
             child: Text(
               'Project',
-              style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.semibold),
+              style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.strong),
             ),
           ),
           _ProjectRow(
@@ -459,7 +459,7 @@ class _RunnerRow extends StatelessWidget {
                             style: ts(
                               context.type.ui,
                               c.textPrimary,
-                             weight: Weight.bold),
+                             weight: Weight.strong),
                           ),
                         ),
                         if (r.isDefault) ...[

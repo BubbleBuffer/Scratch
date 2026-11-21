@@ -52,7 +52,7 @@ class Pill extends StatelessWidget {
           child: Text(label.isEmpty ? ' ' : label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ts(context.type.uiSmall, st.text, weight: Weight.semibold)),
+              style: ts(context.type.uiSmall, st.text, weight: Weight.strong)),
         ),
       ]),
     );
@@ -335,7 +335,7 @@ class ChipBtn extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: Db.chipLabel),
             child: Text(label,
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.uiSmall, fg, weight: Weight.medium)),
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.uiSmall, fg, weight: Weight.strong)),
           ),
           if (chevron) ...[const Gap(Space.hair), Icon20(Ico.chevronDown, size: IconSize.xs, color: fg)],
         ]),
@@ -352,7 +352,7 @@ Widget menuBack(BuildContext context, String title, VoidCallback onBack) {
     child: Row(children: [
       IconBtn(Ico.chevronLeft, onTap: onBack, size: ControlSize.xs, glyph: IconSize.sm, semanticLabel: 'Back'),
       const Gap(Space.xxs),
-      Expanded(child: Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold))),
+      Expanded(child: Text(title, style: ts(context.type.ui, c.textPrimary, weight: Weight.strong))),
     ]),
   );
 }

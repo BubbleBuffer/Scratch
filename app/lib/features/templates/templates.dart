@@ -146,7 +146,7 @@ class _TemplateTopState extends State<_TemplateTop> {
       padding: const EdgeInsets.symmetric(horizontal: Space.xs, vertical: Space.xxs),
       child: Text(
         label,
-        style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.medium),
+        style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.strong),
       ),
     );
     return Container(
@@ -360,7 +360,7 @@ class _PageStartersState extends State<PageStarters> {
                             style: ts(
                               context.type.uiSmall,
                               c.textTertiary,
-                              weight: Weight.medium,
+                              weight: Weight.strong,
                             ),
                           ),
                         ],

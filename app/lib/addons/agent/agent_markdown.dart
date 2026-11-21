@@ -184,7 +184,7 @@ class _BlockView extends StatelessWidget {
       'heading2' ||
       'toggleheading2' => text(ts(context.type.h3, c.textPrimary)),
       'heading3' ||
-      'toggleheading3' => text(ts(context.type.body, c.textPrimary, weight: Weight.semibold)),
+      'toggleheading3' => text(ts(context.type.body, c.textPrimary, weight: Weight.strong)),
       'code' => CodeBox(b.text),
       'divider' => Padding(
         padding: const EdgeInsets.symmetric(vertical: Space.xs),

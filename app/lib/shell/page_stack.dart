@@ -711,7 +711,7 @@ class _FanList extends StatelessWidget {
                     final style = ts(
                       ty.ui,
                       c.textPrimary,
-                      weight: identical(e.$1, top) ? Weight.bold : Weight.regular,
+                      weight: identical(e.$1, top) ? Weight.strong : Weight.regular,
                     );
                     return Semantics(
                       button: true,

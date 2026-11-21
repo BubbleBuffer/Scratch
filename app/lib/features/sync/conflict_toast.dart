@@ -145,7 +145,7 @@ class _ConflictToastState extends State<_ConflictToast> {
                     radius: Radii.sm,
                     padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
                     // The dark theme accent: the rail is dark in both themes.
-                    child: Text(conflictUndo, style: ts(context.type.ui, AppColors.darkTheme.accent, weight: Weight.bold)),
+                    child: Text(conflictUndo, style: ts(context.type.ui, AppColors.darkTheme.accent, weight: Weight.strong)),
                   ),
                 ),
               ],

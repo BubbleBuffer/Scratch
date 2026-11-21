@@ -237,12 +237,12 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
                       const Spacer(),
                       Text(
                         'Calendar',
-                        style: ts(context.type.micro, colors.textTertiary, weight: Weight.medium),
+                        style: ts(context.type.micro, colors.textTertiary, weight: Weight.strong),
                       ),
                       const Gap(Space.sm),
                       Text(
                         'Today',
-                        style: ts(context.type.micro, colors.textTertiary, weight: Weight.medium),
+                        style: ts(context.type.micro, colors.textTertiary, weight: Weight.strong),
                       ),
                       const Gap(Space.xxl),
                     ],
@@ -364,7 +364,7 @@ class _CalendarCategoriesPanelState extends State<CalendarCategoriesPanel> {
       style: ts(
         context.type.uiSmall,
         context.colors.textSecondary,
-        weight: Weight.bold,
+        weight: Weight.strong,
       ),
     ),
   );

@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/editor/page_screen.dart';
 import 'package:notes_app/addons/agent/api.dart';
 import 'package:notes_app/src/rust/api/types.dart';
+import 'package:notes_app/ui/tokens.dart' show Weight;
 
 import 'agent_test.dart' show openAgentScreen, openAgentStore;
 import 'agent_chat_partb_test.dart' show showWidget;
@@ -244,7 +245,7 @@ Default run
       return found;
     }
 
-    expect(styleOf('seeds')?.fontWeight, FontWeight.w600);
+    expect(styleOf('seeds')?.fontWeight, Weight.strong.fontWeight);
     expect(styleOf('Friday')?.fontStyle, FontStyle.italic);
     expect(styleOf('water()')?.backgroundColor, isNotNull);
   });

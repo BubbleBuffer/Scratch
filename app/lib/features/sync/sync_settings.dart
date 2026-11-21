@@ -743,7 +743,7 @@ class TrustedCertificatesSettings extends StatelessWidget {
     final org = [?name.o, ?name.ou].join(' · ');
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(cn ?? host,
-          key: ValueKey('cert-pin-title-$origin'), style: ts(context.type.ui, c.textPrimary, weight: Weight.semibold)),
+          key: ValueKey('cert-pin-title-$origin'), style: ts(context.type.ui, c.textPrimary, weight: Weight.strong)),
       if (cn != null && org.isNotEmpty) ...[
         const Gap(Space.hair),
         Text(org, key: ValueKey('cert-pin-org-$origin'), style: sHint(context)),
