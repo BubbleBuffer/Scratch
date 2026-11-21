@@ -15,5 +15,5 @@ plugins:
   bb_lints:
     git:
       url: https://github.com/BubbleBuffer/bb-ui
-      ref: b93bdbca27dff32a2060744afd770cec2047203e
+      ref: 7c92a358a57656271ff8174ecef41d4a49dc0794
       path: packages/bb_lints

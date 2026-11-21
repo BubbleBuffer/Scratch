@@ -33,19 +33,19 @@ No widget writes a number for spacing, sizes, type, strokes, opacity, colour or 
 
 - Shared values come from bb_tokens: `Space`, `ControlSize`, `IconSize`, `Stroke`, `Alpha`, `Radii`, `Widths`, `Heights`, `Sizes`, `Motion`, the type roles (`context.type.ui`, `.item`, `.uiSmall`...) and `Weight`.
 - Scratch's own values have names in `app/lib/ui/tokens/` (exported by `ui/tokens.dart`; the lint accepts raw values in `*_tokens.dart` files): `shell_tokens` (pile, home, compact dock and tree, sidebar, toasts, search, feedback), `editor_tokens` (block rhythm, handles, columns, headings, block parts, page chrome and header, editor menus), `inline_tokens` (inline marks and chips), `today_tokens`, `calendar_tokens`, `settings_tokens` (the settings family, sync, trash, QR), `agent_tokens`, `panel_tokens`, `picker_tokens`, `board_tokens`, `space_tokens`, `type_tokens`, `glyph_tokens`, `art_tokens` and the colours: `block_color_tokens` (block palette), `color_tokens` (image overlays, cover swatches). The database's are in `ui/database/db_tokens.dart`.
-- The shell (`shell/app_shell.dart`) sets the `Density` from the platform (`Density.forPlatform`: touch on Android and iOS, pointer on desktop; `NotesShell.density` overrides it in tests) and a `SizeClassScope` from the window width (`shellSizeClass`: below 768, the old breakpoint, the window counts as compact because the sidebar beside the page pile needs the room; bb_ui's medium and expanded above). The kit's `BbThemeScope` takes the same density.
+- The shell (`shell/app_shell.dart`) sets the `Density` from the platform (`Density.forPlatform`: touch on Android and iOS, pointer on desktop; `NotesShell.density` overrides it in tests) and a `SizeClassScope` from the window width (`shellSizeClass`: below 768, the old breakpoint, the window counts as compact because the sidebar beside the page pile needs the room; bb_ui's medium and expanded above). bb_ui's own overlays that follow the window (`SelectButton`, `showPickerSheet`, the command palette) use bb_ui's 600 breakpoint, so between 600 and 768 they open as popovers or panels while the shell shows its compact layout. The kit's `BbThemeScope` takes the same density.
 - `context.mobile` is gone. Layout decisions (the compact home and its dock, stack navigation, sheets instead of popovers, full screens instead of panels, stacked rows, gutters) read `context.sizeClass.isCompact`; sizes, hover, long presses, the soft keyboard's toolbar and native text selection read `context.touch` or `context.metrics`. A narrow desktop window gets the compact layout with pointer sizes; a tablet the wide layout with touch sizes. `BlockContext` has `touch` and `compact`.
 - Text-bearing rows and buttons take a minimum height, not a fixed one.
 
 ## The pin
 
-`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui commit `1e3863a` (bb-ui 0.8, branch `claude/modest-mendel-d4av4y`; re-pin to the `v0.8.0` tag once it is released). Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
+`app/pubspec.yaml` declares `bb_ui` as a git dependency pinned to bb-ui commit `7c92a35` (bb-ui 0.8.0 on main, the commit the `v0.8.0` tag names). Its URL, ref and package path must match agent-kit's explicit bb_ui dependency:
 
 ```yaml
   bb_ui:
     git:
       url: https://github.com/BubbleBuffer/bb-ui
-      ref: 1e3863ac3c9a0123fb5e502e890005701423a586
+      ref: 7c92a358a57656271ff8174ecef41d4a49dc0794
       path: packages/bb_ui
 ```
 
@@ -61,7 +61,7 @@ To try an unreleased kit change, point `ref:` at a branch or commit for a draft 
 
 ## The chat pane's packages
 
-The agent chat's outline and the Agent chat pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit 0.20.0 (commit `88db604`, agent-kit pull request #70; re-pin to the `v0.20.0` tag's commit once it is released). `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
+The agent chat's outline and the Agent chat pane (`app/lib/addons/agent/kit_*.dart`, see [Agent](../addons/agent.md)) use `agent_kit` and `agent_kit_core`, which `app/pubspec.yaml` declares directly. Both move together to the full commit SHA of agent-kit 0.20.0 (commit `3aaaf51`, the `v0.20.0` release). `agent_kit` depends on `agent_kit_core` by path, so pub resolves it as git at that commit and a tag ref on the direct core dependency fails version solving. Its bb_ui dependency is an explicit git dependency on the separate bb-ui repository; Scratch uses the same declaration for its own direct bb_ui import.
 
 ## The chat outline
 

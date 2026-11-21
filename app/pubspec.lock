@@ -5,8 +5,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/agent_kit"
-      ref: "88db604e1f3e370ed53866490c4804540681c251"
-      resolved-ref: "88db604e1f3e370ed53866490c4804540681c251"
+      ref: "3aaaf5106b19195d2e8a6d035aee8549212c3634"
+      resolved-ref: "3aaaf5106b19195d2e8a6d035aee8549212c3634"
       url: "https://github.com/BubbleBuffer/agent-kit.git"
     source: git
     version: "0.20.0"
@@ -14,8 +14,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/agent_kit_core"
-      ref: "88db604e1f3e370ed53866490c4804540681c251"
-      resolved-ref: "88db604e1f3e370ed53866490c4804540681c251"
+      ref: "3aaaf5106b19195d2e8a6d035aee8549212c3634"
+      resolved-ref: "3aaaf5106b19195d2e8a6d035aee8549212c3634"
       url: "https://github.com/BubbleBuffer/agent-kit.git"
     source: git
     version: "0.20.0"
@@ -79,8 +79,8 @@ packages:
     dependency: transitive
     description:
       path: "packages/bb_tokens"
-      ref: "1e3863ac3c9a0123fb5e502e890005701423a586"
-      resolved-ref: "1e3863ac3c9a0123fb5e502e890005701423a586"
+      ref: "7c92a358a57656271ff8174ecef41d4a49dc0794"
+      resolved-ref: "7c92a358a57656271ff8174ecef41d4a49dc0794"
       url: "https://github.com/BubbleBuffer/bb-ui"
     source: git
     version: "0.8.0"
@@ -88,8 +88,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/bb_ui"
-      ref: "1e3863ac3c9a0123fb5e502e890005701423a586"
-      resolved-ref: "1e3863ac3c9a0123fb5e502e890005701423a586"
+      ref: "7c92a358a57656271ff8174ecef41d4a49dc0794"
+      resolved-ref: "7c92a358a57656271ff8174ecef41d4a49dc0794"
       url: "https://github.com/BubbleBuffer/bb-ui"
     source: git
     version: "0.8.0"
