@@ -16,7 +16,7 @@ import '../../ui/ui.dart';
 import '../../ui/database/config.dart';
 import 'controller.dart';
 import '../../ui/database/db_icons.dart';
-import '../../ui/database/db_theme.dart';
+import '../../ui/database/db_tokens.dart';
 import 'editors/option_picker.dart';
 import 'filter_editor.dart';
 import '../../ui/database/values.dart';
@@ -49,7 +49,7 @@ class _TypePickerState extends State<TypePicker> {
     Widget item(PropertyType t) => dbItem(context, t.label, t.icon,
         key: ValueKey('type-${t.kind.name}'),
         selected: t.kind == widget.current,
-        trailing: t.kind == widget.current ? Icon20(Ico.check, size: 16, color: context.colors.iconPrimary) : null,
+        trailing: t.kind == widget.current ? Icon20(Ico.check, size: IconSize.sm, color: context.colors.iconPrimary) : null,
         onTap: () => widget.onPick(t.kind));
     final basic = [for (final t in types) if (!t.advanced) item(t)];
     final adv = [for (final t in types) if (t.advanced) item(t)];
@@ -57,10 +57,10 @@ class _TypePickerState extends State<TypePicker> {
       MenuField(
         key: const ValueKey('type-search'),
         placeholder: 'Search for a property type…',
-        autofocus: !context.mobile,
+        autofocus: !context.touch,
         onChanged: (s) => setState(() => q = s.trim().toLowerCase()),
       ),
-      const SizedBox(height: 4),
+      const Gap(Space.xxs),
       Flexible(
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -194,7 +194,7 @@ class _PropertyMenuState extends State<PropertyMenu> {
           MenuItem(
             key: ValueKey('choice-$id'),
             label: label,
-            trailing: id == current ? Icon20(Ico.check, size: 16, color: context.colors.iconPrimary) : null,
+            trailing: id == current ? Icon20(Ico.check, size: IconSize.sm, color: context.colors.iconPrimary) : null,
             onTap: () {
               pick(id);
               setState(() => page = _Page.edit);
@@ -204,15 +204,15 @@ class _PropertyMenuState extends State<PropertyMenu> {
 
   Widget _nameRow(BuildContext context) => Row(children: [
         Container(
-          width: 28,
-          height: 28,
+          width: ControlSize.sm.height,
+          height: ControlSize.sm.height,
           decoration: BoxDecoration(border: Border.all(color: context.colors.borderTranslucent), borderRadius: BorderRadius.circular(Radii.md)),
-          child: Center(child: DbIcon(propIcon(def), size: 16, color: context.colors.iconSecondary)),
+          child: Center(child: DbIcon(propIcon(def), size: IconSize.sm.px, color: context.colors.iconSecondary)),
         ),
-        const SizedBox(width: 6),
+        const Gap(Space.xs),
         Expanded(
           child: def == null
-              ? Text('Name', style: ts(context.type.ui, context.colors.textPrimary, weight: 400))
+              ? Text('Name', style: ts(context.type.ui, context.colors.textPrimary, weight: Weight.regular))
               : MenuField(key: const ValueKey('prop-name'), controller: _name, onSubmitted: (_) => _close()),
         ),
       ]);
@@ -226,7 +226,7 @@ class _PropertyMenuState extends State<PropertyMenu> {
     final wrapped = v != null && (v.cfg.wrap || v.cfg.wrapped.contains(_key));
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _nameRow(context),
-      const SizedBox(height: 4),
+      const Gap(Space.xxs),
       if (d != null)
         dbItem(context, 'Edit property', DbIco.sliders,
             key: const ValueKey('prop-edit'), onTap: () => setState(() => page = _Page.edit)),
@@ -237,8 +237,8 @@ class _PropertyMenuState extends State<PropertyMenu> {
           MenuItem(
             key: ValueKey('vis-${pv.name}'),
             label: pv.label,
-            leading: DbIcon(pv == PropVisibility.hidden ? DbIco.eyeOff : DbIco.eye, size: 20, color: context.colors.iconPrimary),
-            trailing: d.cfg.visibility == pv ? Icon20(Ico.check, size: 16, color: context.colors.iconPrimary) : null,
+            leading: DbIcon(pv == PropVisibility.hidden ? DbIco.eyeOff : DbIco.eye, size: IconSize.lg.px, color: context.colors.iconPrimary),
+            trailing: d.cfg.visibility == pv ? Icon20(Ico.check, size: IconSize.sm, color: context.colors.iconPrimary) : null,
             onTap: () {
               final c = d.cfg..visibility = pv;
               _save(d.copyWith(config: c.encode()));
@@ -308,7 +308,7 @@ class _PropertyMenuState extends State<PropertyMenu> {
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       menuBack(context, 'Edit property', () => setState(() => page = _Page.main)),
       _nameRow(context),
-      const SizedBox(height: 4),
+      const Gap(Space.xxs),
       Builder(
         builder: (b) => dbItem(context, 'Type', null,
             ico: Ico.turnInto,
@@ -334,8 +334,8 @@ class _PropertyMenuState extends State<PropertyMenu> {
           const Expanded(child: MenuHeader('Options')),
           IconBtn(Ico.plus,
               key: const ValueKey('prop-add-option'),
-              size: 22,
-              glyph: 16,
+              size: ControlSize.xs,
+              glyph: IconSize.sm,
               semanticLabel: 'Add an option',
               onTap: () => _save(d.copyWith(options: [
                     ...d.options,
@@ -345,7 +345,7 @@ class _PropertyMenuState extends State<PropertyMenu> {
         if (d.kind == PropKind.status)
           for (final g in StatusGroup.values) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 2),
+              padding: const EdgeInsets.fromLTRB(Space.sm, Space.xxs, Space.sm, Space.hair),
               child: Text(g.label, style: ts(context.type.uiSmall, c.textSecondary)),
             ),
             for (final o in d.options)
@@ -367,7 +367,7 @@ class _PropertyMenuState extends State<PropertyMenu> {
               child: Row(children: [
                 ReorderableDragStartListener(
                   index: i,
-                  child: SizedBox(width: 18, height: 28, child: Icon20(Ico.grip, size: 14, color: c.iconTertiary)),
+                  child: SizedBox(width: IconSize.md.px, height: ControlSize.sm.height, child: Icon20(Ico.grip, size: IconSize.xs, color: c.iconTertiary)),
                 ),
                 Expanded(child: _optionRow(context, d, d.options[i])),
               ]),
@@ -402,9 +402,9 @@ class _PropertyMenuState extends State<PropertyMenu> {
             return def!;
           }),
           radius: Radii.md,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+          padding: const EdgeInsets.symmetric(horizontal: Space.xs),
           child: SizedBox(
-            height: context.mobile ? 44 : 28,
+            height: context.metrics.row.height,
             child: Row(children: [
               Expanded(
                 child: Align(alignment: Alignment.centerLeft, child: Pill(o.name, color: o.color, status: d.kind == PropKind.status,
@@ -413,8 +413,8 @@ class _PropertyMenuState extends State<PropertyMenu> {
                       : null)),
               ),
               if (d.kind == PropKind.status)
-                Text(colorLabel(o.color), style: ts(context.type.uiSmall, context.colors.textTertiary, weight: 400)),
-              Icon20(Ico.chevronRight, size: 14, color: context.colors.iconTertiary),
+                Text(colorLabel(o.color), style: ts(context.type.uiSmall, context.colors.textTertiary, weight: Weight.regular)),
+              Icon20(Ico.chevronRight, size: IconSize.xs, color: context.colors.iconTertiary),
             ]),
           ),
         ),

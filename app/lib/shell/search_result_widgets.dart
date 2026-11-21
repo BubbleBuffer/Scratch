@@ -31,7 +31,7 @@ bb.SearchResult searchResultOf(
   List<String> terms = const [],
 }) {
   final c = context.colors;
-  final m = context.mobile;
+  final m = context.touch;
   final snippet = hit.snippet.replaceAll('\n', ' ').trim();
   final rowId = hitRowId(hit);
   if (isExternalHit(hit)) {
@@ -82,7 +82,7 @@ bb.SearchResult searchResultOf(
     snippetHighlights: bb.termHighlights(shownSnippet, terms),
     leading: PageIcon(
       icon: meta?.icon,
-      size: m ? 22 : 20,
+      size: context.metrics.icon.px,
       color: c.iconSecondary,
     ),
     rowKey: ValueKey('hit-$rowId'),
@@ -104,7 +104,7 @@ class SearchResultRow extends StatelessWidget {
   final List<String> terms;
 
   /// The row's height.
-  static double extent(bool mobile) => bb.SearchResultRow.extent(mobile);
+  static double extent(Metrics metrics) => bb.SearchResultRow.extent(metrics);
 
   @override
   Widget build(BuildContext context) => bb.SearchResultRow(
@@ -120,14 +120,15 @@ class SearchResultsList extends StatelessWidget {
     super.key,
     required this.sections,
     required this.onPick,
-    required this.mobile,
+    this.showActive,
     this.active,
     this.terms = const [],
     this.padding = EdgeInsets.zero,
   });
   final List<SearchSection> sections;
   final ValueChanged<Hit> onPick;
-  final bool mobile;
+  /// Whether [active] is marked; by default only with a pointer.
+  final bool? showActive;
   final int? active;
   final List<String> terms;
   final EdgeInsets padding;
@@ -137,7 +138,7 @@ class SearchResultsList extends StatelessWidget {
     final (shared, hitOf) = searchSectionsOf(context, sections, terms: terms);
     return bb.SearchResultsList(
       sections: shared,
-      mobile: mobile,
+      showActive: showActive,
       active: active,
       padding: padding,
       onPick: (result) => onPick(hitOf[result]!),

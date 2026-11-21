@@ -5,20 +5,20 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/agent_kit"
-      ref: e19afa4432b19a8d75cf8afabc109a1c362972cf
-      resolved-ref: e19afa4432b19a8d75cf8afabc109a1c362972cf
+      ref: f6d0c374f2092d5c679395ed5be1a3bc91405eb7
+      resolved-ref: f6d0c374f2092d5c679395ed5be1a3bc91405eb7
       url: "https://github.com/BubbleBuffer/agent-kit.git"
     source: git
-    version: "0.17.3"
+    version: "0.21.0"
   agent_kit_core:
     dependency: "direct main"
     description:
       path: "packages/agent_kit_core"
-      ref: e19afa4432b19a8d75cf8afabc109a1c362972cf
-      resolved-ref: e19afa4432b19a8d75cf8afabc109a1c362972cf
+      ref: f6d0c374f2092d5c679395ed5be1a3bc91405eb7
+      resolved-ref: f6d0c374f2092d5c679395ed5be1a3bc91405eb7
       url: "https://github.com/BubbleBuffer/agent-kit.git"
     source: git
-    version: "0.17.3"
+    version: "0.21.0"
   android_file_picker:
     dependency: transitive
     description:
@@ -79,20 +79,20 @@ packages:
     dependency: transitive
     description:
       path: "packages/bb_tokens"
-      ref: dd8611aab76f103cad7bcb43414f9ac3fcb3234c
-      resolved-ref: dd8611aab76f103cad7bcb43414f9ac3fcb3234c
+      ref: "012d9f283b8378fb7197c6238e7068dfd3205c30"
+      resolved-ref: "012d9f283b8378fb7197c6238e7068dfd3205c30"
       url: "https://github.com/BubbleBuffer/bb-ui"
     source: git
-    version: "0.7.2"
+    version: "0.9.1"
   bb_ui:
     dependency: "direct main"
     description:
       path: "packages/bb_ui"
-      ref: "v0.7.2"
-      resolved-ref: dd8611aab76f103cad7bcb43414f9ac3fcb3234c
+      ref: "012d9f283b8378fb7197c6238e7068dfd3205c30"
+      resolved-ref: "012d9f283b8378fb7197c6238e7068dfd3205c30"
       url: "https://github.com/BubbleBuffer/bb-ui"
     source: git
-    version: "0.7.2"
+    version: "0.9.1"
   boolean_selector:
     dependency: transitive
     description:

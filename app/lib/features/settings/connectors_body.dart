@@ -11,6 +11,7 @@
 // Which panels are open is [connectorPanels], so other pages can open one
 // before jumping here ([showMcpServers]); it is cleared when this page goes.
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
 
 import '../../addons/agent/api.dart'
@@ -58,6 +59,8 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
 
   @override
   Widget build(BuildContext context) {
+    final desktop = defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS;
     final app = context.app;
     final agent = AgentStore.of(app);
     return ListenableBuilder(
@@ -96,7 +99,7 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
           intro:
               'Connectors link Scratch with other tools, both ways. Scratch’s agent can use outside tools, and outside AI apps can use your vault.',
           children: [
-            const SizedBox(height: 10),
+            const Gap(Space.md),
             SPanel(
               headerKey: const ValueKey('connectors-tools'),
               icon: Sx.wrench,
@@ -112,7 +115,7 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
                       child: McpServersSettings(store: agent),
                     )
                   : Padding(
-                      padding: const EdgeInsets.only(top: 12),
+                      padding: const EdgeInsets.only(top: Space.md),
                       child: Text(_onComputer, style: sDesc(context)),
                     ),
             ),
@@ -130,9 +133,9 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Its `notes setup` commands run in a desktop terminal.
-                  if (!context.mobile) const ConnectAgentSection(first: true),
+                  if (desktop) const ConnectAgentSection(first: true),
                   AgentTokensSection(
-                    first: context.mobile,
+                    first: !desktop,
                     onCount: (n) {
                       if (mounted && n != _tokens) setState(() => _tokens = n);
                     },
@@ -152,7 +155,7 @@ class _ConnectorsBodyState extends State<ConnectorsBody> {
               child: computer
                   ? _HubPanel(signedIn: signedIn, agent: agent)
                   : Padding(
-                      padding: const EdgeInsets.only(top: 12),
+                      padding: const EdgeInsets.only(top: Space.md),
                       child: Text(_onComputer, style: sDesc(context)),
                     ),
             ),

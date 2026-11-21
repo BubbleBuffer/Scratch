@@ -1,7 +1,7 @@
 // View settings (the sliders button of the toolbar): the view's name, the
 // layout picker, property visibility and order, filter, sort, group, the
 // layout's own options, where pages open, and duplicate or delete. A
-// popover on desktop, a sheet on mobile. Also the layout picker used to add
+// popover, or a sheet on a compact screen. Also the layout picker used to add
 // a view, and the active tab's menu.
 
 import 'package:flutter/widgets.dart';
@@ -19,6 +19,7 @@ import 'filter_editor.dart';
 import 'property_menu.dart';
 import '../../ui/database/values.dart';
 import '../../ui/database/widgets.dart';
+import '../../ui/database/db_tokens.dart';
 
 /// The icon of layout [k].
 DbIco layoutIcon(ViewKind k) => viewRegistry.of(k)?.icon ?? switch (k) {
@@ -88,21 +89,21 @@ class LayoutGrid extends StatelessWidget {
       final fg = sel ? c.accent : c.textSecondary;
       return Expanded(
         child: Padding(
-          padding: const EdgeInsets.all(3),
+          padding: const EdgeInsets.all(Space.xxs),
           child: Hover(
             key: ValueKey('layout-${k.name}'),
             onTap: () => onPick(k),
             radius: Radii.md,
             child: Container(
-              height: 62,
+              constraints: const BoxConstraints(minHeight: Db.layoutTile),
               decoration: BoxDecoration(
-                border: Border.all(color: sel ? c.accent : c.border, width: sel ? 1.5 : 1),
+                border: Border.all(color: sel ? c.accent : c.border, width: sel ? Stroke.regular : Stroke.hair),
                 borderRadius: BorderRadius.circular(Radii.md),
               ),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                DbIcon(layoutIcon(k), size: 20, color: fg),
-                const SizedBox(height: 6),
-                Text(viewLabel(k), style: ts(context.type.uiSmall, fg, weight: sel ? 600 : 400)),
+                DbIcon(layoutIcon(k), size: IconSize.lg.px, color: fg),
+                const Gap(Space.xs),
+                Text(viewLabel(k), style: ts(context.type.uiSmall, fg, weight: sel ? Weight.strong : Weight.regular)),
               ]),
             ),
           ),
@@ -149,11 +150,11 @@ Future<void> showViewMenu(BuildContext anchor, DbController ctl, ViewDef v) {
     globalRectOf(anchor),
     (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-        padding: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.only(bottom: Space.xxs),
         child: MenuField(
           key: const ValueKey('view-name'),
           controller: name,
-          leading: DbIcon(layoutIcon(v.kind), size: 16, color: ctx.colors.iconSecondary),
+          leading: DbIcon(layoutIcon(v.kind), size: IconSize.sm.px, color: ctx.colors.iconSecondary),
           onSubmitted: (_) => Navigator.of(ctx).pop(),
         ),
       ),
@@ -162,7 +163,7 @@ Future<void> showViewMenu(BuildContext anchor, DbController ctl, ViewDef v) {
         dbItem(ctx, viewLabel(k), layoutIcon(k),
             key: ValueKey('view-layout-${k.name}'),
             selected: k == v.kind,
-            trailing: k == v.kind ? Icon20(Ico.check, size: 16, color: ctx.colors.accent) : null, onTap: () {
+            trailing: k == v.kind ? Icon20(Ico.check, size: IconSize.sm, color: ctx.colors.accent) : null, onTap: () {
           Navigator.of(ctx).pop();
           final cur = store.views.where((x) => x.id == v.id).firstOrNull ?? v;
           changeLayout(store, cur, k);
@@ -295,15 +296,15 @@ class _ViewSettingsState extends State<ViewSettings> {
     final group = store.groupDef;
     return _col([
       Padding(
-        padding: const EdgeInsets.fromLTRB(2, 2, 2, 6),
-        child: Text('View settings', style: ts(context.type.ui, context.colors.textPrimary, weight: 600)),
+        padding: const EdgeInsets.fromLTRB(Space.hair, Space.hair, Space.hair, Space.xs),
+        child: Text('View settings', style: ts(context.type.ui, context.colors.textPrimary, weight: Weight.strong)),
       ),
       Padding(
-        padding: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.only(bottom: Space.xxs),
         child: MenuField(
           key: const ValueKey('settings-name'),
           controller: _name,
-          leading: DbIcon(layoutIcon(v.kind), size: 16, color: context.colors.iconSecondary),
+          leading: DbIcon(layoutIcon(v.kind), size: IconSize.sm.px, color: context.colors.iconSecondary),
         ),
       ),
       dbItem(context, 'Layout', layoutIcon(v.kind),
@@ -341,8 +342,9 @@ class _ViewSettingsState extends State<ViewSettings> {
           key: const ValueKey('settings-agenda'),
           trailing: menuValue(context, _agendaLoaded ? agendaSettingsLabel(store.schema, _agenda) : '…'),
           onTap: () => setState(() => page = _Page.agenda)),
-      // Desktop opens every row as a sheet; the setting stays in the config.
-      if (context.mobile)
+      // A wider screen opens every row as a sheet; the setting stays in the
+      // config.
+      if (context.sizeClass.isCompact)
         dbItem(context, 'Open pages in', DbIco.peekSide,
           key: const ValueKey('settings-open-in'),
           trailing: menuValue(context, _openLabel(v.cfg.openIn(v.kind))),
@@ -384,7 +386,7 @@ class _ViewSettingsState extends State<ViewSettings> {
         menuBack(context, 'Layout', () => setState(() => page = _Page.main)),
         LayoutGrid(current: v.kind, onPick: (k) => changeLayout(store, v, k)),
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+          padding: const EdgeInsets.fromLTRB(Space.xxs, Space.sm, Space.xxs, Space.xxs),
           child: Text(_layoutHelp[v.kind] ?? '', style: ts(context.type.uiSmall, context.colors.textTertiary)),
         ),
         ..._layoutOptions(context, v),
@@ -406,7 +408,7 @@ class _ViewSettingsState extends State<ViewSettings> {
             ? null
             : DbIconBtn(visible ? DbIco.eye : DbIco.eyeOff,
                 key: ValueKey('toggle-${d.name}'),
-                size: 24,
+                size: ControlSize.xs,
                 color: visible ? c.iconSecondary : c.iconTertiary,
                 label: visible ? 'Hide' : 'Show',
                 onTap: () => store.updateView(v.copyWith(
@@ -422,7 +424,7 @@ class _ViewSettingsState extends State<ViewSettings> {
       row(null, true),
       if (shown.isNotEmpty)
         ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 320),
+          constraints: const BoxConstraints(maxHeight: Db.settingsList),
           child: ReorderableList(
             shrinkWrap: true,
             itemCount: shown.length,
@@ -465,7 +467,7 @@ class _ViewSettingsState extends State<ViewSettings> {
       for (final d in candidates)
         dbItem(context, d.name, propIcon(d),
             key: ValueKey('group-by-${d.name}'),
-            trailing: v.groupBy == d.key ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+            trailing: v.groupBy == d.key ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
             onTap: () => store.updateView(v.copyWith(groupBy: d.key))),
       if (store.groupDef != null) ...[
         const MenuSeparator(),
@@ -483,7 +485,7 @@ class _ViewSettingsState extends State<ViewSettings> {
           dbItem(context, g.group.label.isEmpty ? 'No ${store.groupDef!.name}' : g.group.label, null,
               key: ValueKey('group-vis-${g.key}'),
               trailing: DbIcon(cfg.hiddenGroups.contains(g.key) ? DbIco.eyeOff : DbIco.eye,
-                  size: 16, color: cfg.hiddenGroups.contains(g.key) ? c.iconTertiary : c.iconSecondary),
+                  size: IconSize.sm.px, color: cfg.hiddenGroups.contains(g.key) ? c.iconTertiary : c.iconSecondary),
               onTap: () => store.updateConfig(v, (c) {
                     final h = c.hiddenGroups;
                     h.contains(g.key) ? h.remove(g.key) : h.add(g.key);
@@ -501,21 +503,21 @@ class _ViewSettingsState extends State<ViewSettings> {
       for (final role in AgendaRole.values)
         dbItem(context, role == AgendaRole.auto ? agendaSettingsLabel(store.schema, const AgendaSettings(role: AgendaRole.auto)) : agendaRoleLabel(role), null,
           key: ValueKey('agenda-role-${role.name}'),
-          trailing: _agenda.role == role ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+          trailing: _agenda.role == role ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
           onTap: !_agendaLoaded || _agendaSaving ? null : () => _saveAgenda(AgendaSettings(role: role, dateProp: _agenda.dateProp))),
       const MenuSeparator(),
       const MenuHeader('Date property'),
       dbItem(context, 'First date property', DbIco.date,
           key: const ValueKey('agenda-date-first'),
           trailing: _agenda.dateProp == null || !dates.any((p) => p.key == _agenda.dateProp)
-              ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+              ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
           onTap: !_agendaLoaded || _agendaSaving ? null : () => _saveAgenda(AgendaSettings(role: _agenda.role))),
       for (final prop in dates)
         dbItem(context, prop.name, DbIco.date,
           key: ValueKey('agenda-date-${prop.key}'),
-          trailing: _agenda.dateProp == prop.key ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+          trailing: _agenda.dateProp == prop.key ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
           onTap: !_agendaLoaded || _agendaSaving ? null : () => _saveAgenda(AgendaSettings(role: _agenda.role, dateProp: prop.key))),
-      if (_agendaError != null) Padding(padding: const EdgeInsets.all(8), child: Text(_agendaError!, style: ts(context.type.uiSmall, c.inlineCodeText))),
+      if (_agendaError != null) Padding(padding: const EdgeInsets.all(Space.sm), child: Text(_agendaError!, style: ts(context.type.uiSmall, c.inlineCodeText))),
     ]);
   }
 
@@ -531,7 +533,7 @@ class _ViewSettingsState extends State<ViewSettings> {
       ])
         dbItem(context, _openLabel(o), icon,
             key: ValueKey('open-in-${o.name}'),
-            trailing: o == cur ? Icon20(Ico.check, size: 16, color: c.iconPrimary) : null,
+            trailing: o == cur ? Icon20(Ico.check, size: IconSize.sm, color: c.iconPrimary) : null,
             onTap: () => store.updateConfig(v, (c) => c.openInValue = o)),
     ]);
   }

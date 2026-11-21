@@ -123,7 +123,7 @@ Future<void> mount(
   await tester.pumpWidget(
     AppTheme(
       colors: AppColors.light,
-      formFactor: mobile ? FormFactor.mobile : FormFactor.desktop,
+      density: mobile ? Density.touch : Density.pointer,
       child: WidgetsApp(
         color: const Color(0xFFFFFFFF),
         onGenerateRoute: (_) => PageRouteBuilder<void>(
@@ -379,7 +379,7 @@ void main() {
           onGenerateRoute: (_) => PageRouteBuilder<void>(
             pageBuilder: (context, a, b) => AppTheme(
               colors: AppColors.light,
-              formFactor: FormFactor.desktop,
+              density: Density.pointer,
               child: SingleChildScrollView(
                 child: BoardRenderer(
                   source: source,

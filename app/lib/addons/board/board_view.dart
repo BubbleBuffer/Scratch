@@ -10,7 +10,7 @@ import '../../core/models.dart';
 import '../../registry/note_type_registry.dart';
 import '../../ui/database/config.dart';
 import '../../ui/database/db_icons.dart';
-import '../../ui/database/db_theme.dart';
+import '../../ui/database/db_tokens.dart';
 import '../database/api.dart';
 import '../../ui/database/values.dart';
 import '../../ui/database/widgets.dart';
@@ -73,7 +73,7 @@ Future<void> _pickPreview(BuildContext ctx, Rect rect, ViewArgs a) async {
             key: ValueKey('preview-$id'),
             label: _previewLabel(id),
             trailing: a.view.cfg.preview == id
-                ? Icon20(Ico.check, size: 16, color: c.colors.iconPrimary)
+                ? Icon20(Ico.check, size: IconSize.sm, color: c.colors.iconPrimary)
                 : null,
             onTap: () => Navigator.of(c).pop(id),
           ),
@@ -97,7 +97,7 @@ Future<void> _pickSize(BuildContext ctx, Rect rect, ViewArgs a) async {
             key: ValueKey('size-${v.name}'),
             label: _sizeLabel(v.name),
             trailing: a.view.cfg.cardSize == v
-                ? Icon20(Ico.check, size: 16, color: c.colors.iconPrimary)
+                ? Icon20(Ico.check, size: IconSize.sm, color: c.colors.iconPrimary)
                 : null,
             onTap: () => Navigator.of(c).pop(v),
           ),
@@ -145,11 +145,11 @@ class _BoardViewState extends State<BoardView> {
   }
 
   double get _colWidth {
-    final m = context.mobile;
+    final m = context.sizeClass.isCompact;
     return switch (a.view.cfg.cardSize) {
-      CardSize.small => m ? 220.0 : 220.0,
-      CardSize.medium => m ? 276.0 : Db.boardColumn,
-      CardSize.large => m ? 300.0 : 340.0,
+      CardSize.small => Db.boardColumnSmall,
+      CardSize.medium => Db.boardColumn,
+      CardSize.large => m ? Db.boardColumnLargeCompact : Db.boardColumnLarge,
     };
   }
 
@@ -240,16 +240,16 @@ class _BoardViewState extends State<BoardView> {
       return Text(
         'No ${gd.name}',
         style: ts(
-          context.mobile ? const TypeSpec(15, 20, 500) : context.type.ui,
+          context.type.ui,
           c.textPrimary,
-          weight: 500,
+          weight: Weight.strong,
         ),
       );
     }
     if (gd.kind == PropKind.checkbox) {
       return Text(
         label,
-        style: ts(context.type.ui, c.textPrimary, weight: 500),
+        style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
       );
     }
     return Flexible(
@@ -294,7 +294,7 @@ class _BoardViewState extends State<BoardView> {
         if (propertyRegistry.of(d.kind)?.groupable ?? false) d,
     ];
     return Padding(
-      padding: EdgeInsets.fromLTRB(a.gutter, 24, a.gutter, 24),
+      padding: EdgeInsets.fromLTRB(a.gutter, Space.xl, a.gutter, Space.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -303,10 +303,10 @@ class _BoardViewState extends State<BoardView> {
             'Group the board by a property',
             style: ts(context.type.ui, c.textSecondary),
           ),
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: Space.xs,
+            runSpacing: Space.xs,
             children: [
               for (final d in cands)
                 ChipBtn(
@@ -353,18 +353,18 @@ class _HiddenColumn extends StatelessWidget {
     final a = state.a;
     final gd = a.store.groupDef!;
     return SizedBox(
-      width: 220,
+      width: Widths.popover,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            height: 34,
+          ConstrainedBox(
+            constraints: BoxConstraints(minHeight: ControlSize.lg.height),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Hidden groups',
-                style: ts(context.type.ui, c.textTertiary, weight: 500),
+                style: ts(context.type.ui, c.textTertiary, weight: Weight.strong),
               ),
             ),
           ),
@@ -377,9 +377,9 @@ class _HiddenColumn extends StatelessWidget {
                     cfg.hiddenGroups = {...cfg.hiddenGroups}..remove(g.key),
               ),
               radius: Radii.md,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: SizedBox(
-                height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: ControlSize.md.height),
                 child: Row(
                   children: [
                     if (g.key.isEmpty)
@@ -398,7 +398,7 @@ class _HiddenColumn extends StatelessWidget {
                               : null,
                         ),
                       ),
-                    const SizedBox(width: 6),
+                    const Gap(Space.xs),
                     Text(
                       '${g.group.count}',
                       style: ts(context.type.ui, c.textTertiary),

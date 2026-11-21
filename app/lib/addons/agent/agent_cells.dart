@@ -37,19 +37,19 @@ class _CodeCellRowState extends State<CodeCellRow> {
             key: ValueKey('agent-${cell.id}-toggle'),
             onTap: () => setState(() => _open = !_open),
             borderRadius: Radii.field,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: SizedBox(
-              height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: ControlSize.lg.height),
               child: Row(
                 children: [
                   Icon20(
                     _open ? Ico.chevronDown : Ico.chevronRight,
-                    size: 14,
+                    size: IconSize.xs,
                     color: c.iconTertiary,
                   ),
-                  const SizedBox(width: 6),
-                  Icon20(Ico.code, size: 16, color: c.iconSecondary),
-                  const SizedBox(width: 8),
+                  const Gap(Space.xs),
+                  Icon20(Ico.code, size: IconSize.sm, color: c.iconSecondary),
+                  const Gap(Space.sm),
                   Expanded(
                     child: Text(
                       cell.firstLine,
@@ -58,15 +58,15 @@ class _CodeCellRowState extends State<CodeCellRow> {
                       style: ts(context.type.code, c.textSecondary, mono: true),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const Gap(Space.sm),
                   if (cell.status == CellStatus.running) ...[
-                    Spinner(size: 12, color: c.iconTertiary),
-                    const SizedBox(width: 6),
+                    Spinner(size: IconSize.xs, color: c.iconTertiary),
+                    const Gap(Space.xs),
                   ],
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 1,
+                      horizontal: Space.xs,
+                      vertical: Space.hair,
                     ),
                     decoration: BoxDecoration(
                       color: bg,
@@ -74,7 +74,7 @@ class _CodeCellRowState extends State<CodeCellRow> {
                     ),
                     child: Text(
                       label,
-                      style: tsRaw(12, 18, 600, c.textPrimary),
+                      style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.strong),
                     ),
                   ),
                 ],
@@ -83,7 +83,7 @@ class _CodeCellRowState extends State<CodeCellRow> {
           ),
           if (_open)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              padding: const EdgeInsets.fromLTRB(Space.sm, 0, Space.sm, Space.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -92,12 +92,12 @@ class _CodeCellRowState extends State<CodeCellRow> {
                     textKey: ValueKey('agent-${cell.id}-code'),
                   ),
                   if (cell.result != null) ...[
-                    const SizedBox(height: 8),
+                    const Gap(Space.sm),
                     Text(
                       'Result',
                       style: ts(context.type.uiSmall, c.textTertiary),
                     ),
-                    const SizedBox(height: 4),
+                    const Gap(Space.xxs),
                     CodeBox(
                       cell.result!,
                       textKey: ValueKey('agent-${cell.id}-result'),

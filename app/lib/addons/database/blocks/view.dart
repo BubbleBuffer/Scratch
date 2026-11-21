@@ -22,6 +22,7 @@ import '../../../state/collection_store.dart';
 import '../../../ui/database/values.dart';
 import '../../../ui/icon_x.dart';
 import '../database_view.dart';
+import '../../../ui/database/db_tokens.dart';
 
 /// The core's kind name of a view block.
 const viewKind = 'view';
@@ -207,7 +208,7 @@ class _ViewBlockGroupState extends State<ViewBlockGroup> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_ready) return const SizedBox(height: 120);
+    if (!_ready) return const SizedBox(height: Db.loading);
     final source = _sourceOf(_active);
     return DatabaseView(
       key: ValueKey('view-blocks-$_firstId-$source'),

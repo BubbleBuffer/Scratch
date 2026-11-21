@@ -6,9 +6,15 @@ import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'hover.dart';
+import 'icons.dart';
 import 'lucide.dart';
 import 'tokens.dart';
 import 'tooltip.dart';
+
+/// An [Ico] at any [size], where [Icon20] takes a step of the icon scale: a
+/// glyph that fills a box sized by its parent.
+Widget icoAt(Ico icon, double size, Color color, {double stroke = Stroke.regular}) =>
+    LucideIcon(lucideWeight(icoGlyphs[icon]!, size, stroke), size: size, color: color);
 
 enum Ix {
   triangle,
@@ -98,17 +104,22 @@ const _ixFill = <Ix, List<Offset>>{
 };
 
 class IconX extends StatelessWidget {
-  const IconX(this.icon, {super.key, this.size = 20, required this.color, this.stroke = 1.5});
+  const IconX(this.icon, {super.key, this.size, required this.color, this.stroke = Stroke.regular});
   final Ix icon;
-  final double size;
+
+  /// The icon's box; [IconSize.lg] by default. Any size, so a glyph can
+  /// scale with the box it fills.
+  final double? size;
   final Color color;
 
   /// Line weight in px; picks the nearest Lucide weight.
   final double stroke;
 
   @override
-  Widget build(BuildContext context) => LucideIcon(lucideWeight(ixGlyphs[icon]!, size, stroke),
-      size: size, color: color, fill: _ixFill[icon]);
+  Widget build(BuildContext context) {
+    final size = this.size ?? IconSize.lg.px;
+    return LucideIcon(lucideWeight(ixGlyphs[icon]!, size, stroke), size: size, color: color, fill: _ixFill[icon]);
+  }
 }
 
 /// A square button with an [Ix] icon (the counterpart of IconBtn).
@@ -116,8 +127,8 @@ class IconBtnX extends StatelessWidget {
   const IconBtnX(this.icon,
       {super.key,
       this.onTap,
-      this.size = 28,
-      this.glyph = 20,
+      this.size = ControlSize.sm,
+      this.glyph = IconSize.lg,
       this.color,
       this.radius = Radii.md,
       this.selected = false,
@@ -126,7 +137,9 @@ class IconBtnX extends StatelessWidget {
       this.command});
   final Ix icon;
   final VoidCallback? onTap;
-  final double size, glyph, radius;
+  final ControlSize size;
+  final IconSize glyph;
+  final double radius;
   final Color? color;
   final bool selected;
   final String? semanticLabel;
@@ -150,9 +163,9 @@ class IconBtnX extends StatelessWidget {
         selected: selected,
         selectedColor: c.bgPressed,
         child: SizedBox(
-          width: size,
-          height: size,
-          child: Center(child: IconX(icon, size: glyph, color: color ?? c.iconSecondary)),
+          width: size.height,
+          height: size.height,
+          child: Center(child: IconX(icon, size: glyph.px, color: color ?? c.iconSecondary)),
         ),
       ),
     );

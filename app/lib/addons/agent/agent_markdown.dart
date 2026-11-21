@@ -176,24 +176,24 @@ class _BlockView extends StatelessWidget {
     final c = context.colors;
     final type = context.type;
     final b = block;
-    final indent = b.depth * 22.0;
+    final indent = b.depth * AgentSheets.listMarker;
     Widget text(TextStyle style) => _MarkedText(b.text, b.marks, style);
     final body = ts(type.body, c.textPrimary);
     final Widget view = switch (b.kind) {
       'heading1' || 'toggleheading1' => text(ts(type.h3, c.textPrimary)),
       'heading2' ||
-      'toggleheading2' => text(ts(const TypeSpec(18, 25, 600), c.textPrimary)),
+      'toggleheading2' => text(ts(context.type.h3, c.textPrimary)),
       'heading3' ||
-      'toggleheading3' => text(ts(const TypeSpec(16, 24, 600), c.textPrimary)),
+      'toggleheading3' => text(ts(context.type.body, c.textPrimary, weight: Weight.strong)),
       'code' => CodeBox(b.text),
       'divider' => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Container(height: 1, color: c.divider),
+        padding: const EdgeInsets.symmetric(vertical: Space.xs),
+        child: Container(height: Stroke.hair, color: c.divider),
       ),
       'quote' => Container(
-        padding: const EdgeInsets.only(left: 14),
+        padding: const EdgeInsets.only(left: Space.lg),
         decoration: BoxDecoration(
-          border: Border(left: BorderSide(color: c.borderStrong, width: 3)),
+          border: Border(left: BorderSide(color: c.borderStrong, width: Stroke.seam)),
         ),
         child: text(ts(type.body, c.textSecondary)),
       ),
@@ -201,7 +201,7 @@ class _BlockView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 22,
+            width: AgentSheets.listMarker,
             child: Text(
               switch (b.kind) {
                 'numbered' => '$number.',
@@ -337,7 +337,7 @@ class CodeBox extends StatelessWidget {
         color: c.bgSecondary,
         borderRadius: BorderRadius.circular(Radii.sm),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
       child: LayoutBuilder(
         builder: (context, box) => SingleChildScrollView(
           scrollDirection: Axis.horizontal,

@@ -221,7 +221,8 @@ class _Topline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    // Stacked on a compact screen, in a row otherwise.
+    final m = context.sizeClass.isCompact;
     final sync = context.read<SyncStore>();
     final k = conflict;
     final key = _scopeKey(k);
@@ -256,10 +257,10 @@ class _Topline extends StatelessWidget {
                   color: c.accentText),
           ];
 
-    final text = Text(_scopeCopy(sync, k), style: tsRaw(14, 20, 400, c.textSecondary));
+    final text = Text(_scopeCopy(sync, k), style: ts(context.type.ui, c.textSecondary, weight: Weight.regular));
     final actions = Row(mainAxisSize: MainAxisSize.min, children: [
       for (var i = 0; i < acts.length; i++) ...[
-        if (i > 0) const SizedBox(width: 16),
+        if (i > 0) const Gap(Space.lg),
         acts[i],
       ],
     ]);
@@ -268,18 +269,18 @@ class _Topline extends StatelessWidget {
     return Container(
       key: ValueKey('conflict-banner-${k.id}'),
       padding: m
-          ? const EdgeInsets.symmetric(horizontal: 18, vertical: 8)
-          : const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          ? const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.sm)
+          : const EdgeInsets.symmetric(horizontal: Space.xl, vertical: Space.md),
       decoration: BoxDecoration(color: c.bgSecondary, border: Border(bottom: BorderSide(color: c.borderSubtle))),
       child: m
           ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
               text,
-              const SizedBox(height: 2),
+              const Gap(Space.hair),
               Align(alignment: Alignment.centerRight, child: actions),
             ])
           : Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               Expanded(child: text),
-              const SizedBox(width: 16),
+              const Gap(Space.lg),
               actions,
             ]),
     );
@@ -359,8 +360,8 @@ class _MergedLabel extends StatelessWidget {
     if (shown == null) return const SizedBox.shrink();
     final label = _sideLabel(sync, conflict, shown);
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 2),
-      child: Text(label, style: tsRaw(12, 16, 500, c.textTertiary)),
+      padding: const EdgeInsets.only(top: Space.xxs, bottom: Space.hair),
+      child: Text(label, style: ts(context.type.uiSmall, c.textTertiary)),
     );
   }
 }
@@ -372,7 +373,6 @@ class _OtherVersion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
     final sync = context.read<SyncStore>();
     final k = conflict;
     final alt = _blockOtherIndex(k);
@@ -382,21 +382,21 @@ class _OtherVersion extends StatelessWidget {
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_sideLabel(sync, k, alt), style: tsRaw(12, 16, 500, c.textTertiary)),
+          Text(_sideLabel(sync, k, alt), style: ts(context.type.uiSmall, c.textTertiary)),
           if (text != null)
             GestureDetector(
               key: ValueKey('use-$id-$alt'),
               behavior: HitTestBehavior.opaque,
               onTap: () => _resolve(context, k, _useSide(alt), message: _usedLine(sync, k, alt), undo: true),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(vertical: Space.hair),
                 child: Text(text.isEmpty ? conflictEmptyBlock : text,
-                    style: m ? tsRaw(16, 22, 400, c.textTertiary) : tsRaw(16, 24, 400, c.textTertiary)),
+                    style: ts(context.type.body, c.textTertiary)),
               ),
             ),
         ]),
       ),
-      const SizedBox(width: 8),
+      const Gap(Space.sm),
       TextBtn(conflictOk,
           key: ValueKey('keep-$id'),
           onTap: () => _resolve(context, k, _keep()),
@@ -437,11 +437,11 @@ enum ConflictRowsLook { list, card, rail }
 Widget _dot(BuildContext context) {
   final c = context.colors;
   return Container(
-    width: 8,
-    height: 8,
+    width: SpaceMark.size,
+    height: SpaceMark.size,
     decoration: BoxDecoration(
       color: spaceColor('apricot', c.dark ? Brightness.dark : Brightness.light),
-      borderRadius: BorderRadius.circular(2),
+      borderRadius: BorderRadius.circular(Radii.sm),
     ),
   );
 }
@@ -456,10 +456,10 @@ class ConflictCount extends StatelessWidget {
     final c = context.colors;
     final patch = spacePatch('apricot', c.dark ? Brightness.dark : Brightness.light);
     return Container(
-      constraints: const BoxConstraints(minWidth: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 7),
-      decoration: BoxDecoration(color: patch?.fill ?? c.accent, borderRadius: BorderRadius.circular(999)),
-      child: Text('$count', textAlign: TextAlign.center, style: tsRaw(12, 16, 600, patch?.ink ?? c.onAccent)),
+      constraints: const BoxConstraints(minWidth: Sizes.pill),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+      decoration: BoxDecoration(color: patch?.fill ?? c.accent, borderRadius: Radii.pill),
+      child: Text('$count', textAlign: TextAlign.center, style: ts(context.type.uiSmall, patch?.ink ?? c.accentInk, weight: Weight.strong)),
     );
   }
 }
@@ -499,12 +499,12 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
       decoration: BoxDecoration(
         color: c.bgPrimary,
         border: Border.all(color: c.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Radii.sheet),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (var i = 0; i < rows.length; i++) ...[
-          if (i > 0) Container(height: 1, color: c.borderSubtle),
+          if (i > 0) Container(height: Stroke.hair, color: c.borderSubtle),
           rows[i],
         ],
       ]),
@@ -530,7 +530,7 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
             sub: summary,
             trailing: [
               Text(when, style: sHint(context)),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               SButton('Review', onTap: open),
             ],
           ),
@@ -540,22 +540,22 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
           key: ValueKey('conflict-home-page-$p'),
           onTap: open,
           radius: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 32),
+            constraints: BoxConstraints(minHeight: ControlSize.md.height),
             child: Row(children: [
               _dot(context),
-              const SizedBox(width: 12),
+              const Gap(Space.md),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(15, 20, 500, c.textPrimary)),
-                  const SizedBox(height: 2),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.textPrimary)),
+                  const Gap(Space.hair),
                   Text('$summary · $when',
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(12.5, 17, 400, c.textTertiary)),
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.uiSmall, c.textTertiary, weight: Weight.regular)),
                 ]),
               ),
-              const SizedBox(width: 12),
-              Icon20(Ico.chevronRight, size: 16, color: c.iconTertiary),
+              const Gap(Space.md),
+              Icon20(Ico.chevronRight, size: IconSize.sm, color: c.iconTertiary),
             ]),
           ),
         );
@@ -564,16 +564,16 @@ class _ConflictRowsState extends State<ConflictRows> with _PageTitles {
           key: ValueKey('conflict-rail-page-$p'),
           onTap: open,
           borderRadius: Radii.ctl,
-          hoverColor: c.rail2.withValues(alpha: .55),
-          padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+          hoverColor: c.rail2.withValues(alpha: Alpha.muted),
+          padding: const EdgeInsets.fromLTRB(Space.md, Space.xs, Space.sm, Space.xs),
           child: Row(children: [
             _dot(context),
-            const SizedBox(width: 10),
+            const Gap(Space.md),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(14, 20, 500, c.railInk)),
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.railInk)),
                 Text('$summary · $when',
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(12, 16, 400, c.railMuted)),
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.uiSmall, c.railMuted, weight: Weight.regular)),
               ]),
             ),
           ]),
@@ -596,13 +596,13 @@ class ConflictHomeSection extends StatelessWidget {
     if (count == 0) return const SizedBox.shrink();
     return Padding(
       key: const ValueKey('conflict-home'),
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 0),
+      padding: const EdgeInsets.fromLTRB(Space.lg, Space.xl, Space.lg, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
-          Expanded(child: Text(conflictsSectionTitle, style: tsRaw(13, 16, 500, c.textSecondary))),
+          Expanded(child: Text(conflictsSectionTitle, style: ts(context.type.uiSmall, c.textSecondary))),
           ConflictCount(count, key: const ValueKey('conflict-home-count')),
         ]),
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
         const ConflictRows(look: ConflictRowsLook.card),
       ]),
     );
@@ -629,35 +629,35 @@ class _ConflictRailGroupState extends State<ConflictRailGroup> {
     if (count == 0) return const SizedBox.shrink();
     return Container(
       key: const ValueKey('conflict-rail'),
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+      margin: const EdgeInsets.only(top: Space.xxs),
+      padding: const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.sm, Space.xxs),
       decoration: BoxDecoration(border: Border(top: BorderSide(color: c.railLine))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
         Hover(
           key: const ValueKey('conflict-rail-toggle'),
           onTap: () => setState(() => _open = !_open),
           borderRadius: Radii.ctl,
-          hoverColor: c.rail2.withValues(alpha: .55),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          hoverColor: c.rail2.withValues(alpha: Alpha.muted),
+          padding: const EdgeInsets.symmetric(horizontal: Space.sm),
           child: SizedBox(
             height: Layout.sidebarRowHeight - 2,
             child: Row(children: [
               _dot(context),
-              const SizedBox(width: 10),
+              const Gap(Space.md),
               Expanded(
                 child: Text(conflictsSectionTitle,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(14, 20, 400, c.railInk)),
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.railInk, weight: Weight.regular)),
               ),
-              const SizedBox(width: 8),
+              const Gap(Space.sm),
               ConflictCount(count, key: const ValueKey('conflict-rail-count')),
             ]),
           ),
         ),
         if (_open)
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 240),
+            constraints: const BoxConstraints(maxHeight: SyncSize.conflictLog),
             child: const SingleChildScrollView(
-              padding: EdgeInsets.only(top: 4, bottom: 6),
+              padding: EdgeInsets.only(top: Space.xxs, bottom: Space.xs),
               child: ConflictRows(look: ConflictRowsLook.rail),
             ),
           ),
@@ -706,12 +706,12 @@ class _ConflictLogState extends State<ConflictLog> with _PageTitles {
     final log = [...sync.conflictLog]..sort((a, b) => _logTime(b).compareTo(_logTime(a)));
     if (log.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.only(top: Space.md),
         child: Text(conflictsRecentNone, key: const ValueKey('no-conflict-log'), style: sDesc(context)),
       );
     }
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: Space.md),
       child: SList(children: [
         for (final k in log)
           Hover(

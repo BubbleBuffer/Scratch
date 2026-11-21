@@ -1,5 +1,5 @@
-// Columns: a column list holds column blocks side by side (46px apart); each column's blocks are ordinary rows. On mobile the
-// columns stack. The `/` menu offers "2 columns" and "3 columns", which the
+// Columns: a column list holds column blocks side by side (46px apart); each column's blocks are ordinary rows. On a compact
+// screen the columns stack. The `/` menu offers "2 columns" and "3 columns", which the
 // editor builds (see PageEditorState.insertColumns).
 
 import 'package:flutter/widgets.dart';
@@ -7,19 +7,20 @@ import 'package:flutter/widgets.dart';
 import '../core/models.dart';
 import '../registry/block_registry.dart';
 import '../ui/icon_x.dart';
+import '../ui/tokens.dart';
 
 /// Space between columns.
-const columnGap = 46.0;
+const columnGap = BlockColumns.gap;
 
 /// Room left of each column's blocks for their drag handles (desktop).
-const columnGutter = 48.0;
+const columnGutter = BlockColumns.gutter;
 
 Widget _body(BlockContext b) {
   final cols = [for (final c in b.node.children) if (c.kind == Kinds.column) c];
-  if (cols.isEmpty) return const SizedBox(height: 24);
+  if (cols.isEmpty) return const SizedBox(height: BlockRhythm.placeholder);
   return LayoutBuilder(builder: (context, box) {
     final w = box.maxWidth;
-    if (b.mobile) {
+    if (b.compact) {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (final c in cols) b.host.nestedBlocks(c, w, 0),
       ]);

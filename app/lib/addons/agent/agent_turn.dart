@@ -41,7 +41,7 @@ class AgentTurnView extends StatelessWidget {
       children: [
         for (final text in turn.texts)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: Space.md),
             child: KeyedSubtree(
               key: ValueKey('agent-msg-${text.id}'),
               child: kit.AssistantProse(
@@ -52,7 +52,7 @@ class AgentTurnView extends StatelessWidget {
           ),
         if (turn.streaming.trim().isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: Space.md),
             child: KeyedSubtree(
               key: const ValueKey('agent-msg-live'),
               child: kit.AssistantProse(
@@ -67,7 +67,7 @@ class AgentTurnView extends StatelessWidget {
           ),
         for (final edit in turn.edits)
           Padding(
-            padding: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.only(bottom: Space.xs),
             child: AgentEditRow(
               key: ValueKey('agent-edit-row-${edit.id}'),
               edit: edit,
@@ -79,11 +79,11 @@ class AgentTurnView extends StatelessWidget {
           AgentWorkRow(key: ValueKey('agent-work-${turn.id}'), turn: turn),
         if (turn.live)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: Space.sm),
             child: Row(
               children: [
-                Spinner(size: 13, color: c.iconTertiary),
-                const SizedBox(width: 8),
+                Spinner(size: IconSize.xs, color: c.iconTertiary),
+                const Gap(Space.sm),
                 Expanded(
                   child: Text(
                     'Working${(store.latestActivitySummary ?? turn.activity.lastOrNull?.summary ?? '').isEmpty ? '' : ' · ${store.latestActivitySummary ?? turn.activity.last.summary}'}',
@@ -98,14 +98,14 @@ class AgentTurnView extends StatelessWidget {
           ),
         if (turn.run?.status == 'cancelled')
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: Space.sm),
             child: kit.NoticeLineView(
               kit.NoticeLine(id: '${turn.id}-stopped', text: 'Stopped.'),
             ),
           ),
         if ((turn.run?.error ?? '').isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: Space.sm),
             child: kit.NoticeLineView(
               kit.NoticeLine(
                 id: '${turn.id}-error',
@@ -245,7 +245,7 @@ class AgentWorkRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 6),
+    padding: const EdgeInsets.only(left: Space.xs),
     child: kit.ActivityGroupView(
       _group(),
       initiallyOpen: false,
@@ -278,14 +278,14 @@ class _CodeDisclosureState extends State<CodeDisclosure> {
         child: TextBtn(
           _code ? 'Hide code' : 'Show code',
           key: ValueKey('agent-work-${widget.id}-code'),
-          height: 28,
+          size: ControlSize.sm,
           onTap: () => setState(() => _code = !_code),
         ),
       ),
       if (_code)
         for (final cell in widget.cells)
           Padding(
-            padding: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.only(bottom: Space.xs),
             child: CodeCellRow(key: ValueKey('agent-${cell.id}'), cell: cell),
           ),
     ],

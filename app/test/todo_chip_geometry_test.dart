@@ -17,7 +17,7 @@ void main() {
         await tester.runAsync(loadFonts);
         sansFamily = 'Atkinson Hyperlegible Next';
         monoFamily = 'Fragment Mono';
-        final base = ts(mobile ? TypeScale.mobile.body : TypeScale.desktop.body, AppColors.light.textPrimary);
+        final base = ts(mobile ? TypeScale.touch.body : TypeScale.pointer.body, AppColors.light.textPrimary);
         late BuildContext editableContext;
         await tester.pumpWidget(MediaQuery(
           data: MediaQueryData(textScaler: textScaler),
@@ -32,8 +32,7 @@ void main() {
         final plain = TextPainter(text: TextSpan(text: text, style: base), textDirection: TextDirection.ltr, textScaler: textScaler)..layout();
         final lineHeight = plain.computeLineMetrics().single.height;
         plain.dispose();
-        final label = TextPainter(text: TextSpan(text: 'Thursday', style: base.copyWith(
-            fontSize: base.fontSize! * 0.8, height: 1.25, fontWeight: FontWeight.w500)), textDirection: TextDirection.ltr, textScaler: textScaler)..layout();
+        final label = TextPainter(text: TextSpan(text: 'Thursday', style: dateChipStyle(base, AppColors.light.textSecondary)), textDirection: TextDirection.ltr, textScaler: textScaler)..layout();
         final targetWidth = label.width + 10;
         label.dispose();
         final cases = [

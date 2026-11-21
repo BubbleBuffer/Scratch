@@ -148,14 +148,14 @@ class _TaskNoteState extends State<TaskNote> {
       return Column(
         children: [
           ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: context.mobile ? 280 : 340),
+            constraints: BoxConstraints(maxHeight: context.sizeClass.isCompact ? CalendarScreen.noteHeaderTouch : CalendarScreen.noteHeader),
             child: SingleChildScrollView(
               child: Align(
                 alignment: Alignment.center,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
+                  constraints: const BoxConstraints(maxWidth: Widths.content),
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+                    padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.xl, Space.md),
                     child: data != null && _calendars != null
                         ? Column(
                             mainAxisSize: MainAxisSize.min,
@@ -190,12 +190,12 @@ class _TaskNoteState extends State<TaskNote> {
             if (data.checkbox)
               StacksCheckbox(
                 checked: data.done,
-                size: 16,
+                size: IconSize.sm.px,
                 onChanged: _busy ? null : (_) => _toggle(),
               )
             else
-              Icon20(Ico.todo, size: 16, color: context.colors.iconTertiary),
-            const SizedBox(width: 6),
+              Icon20(Ico.todo, size: IconSize.sm, color: context.colors.iconTertiary),
+            const Gap(Space.xs),
             Flexible(
               child: Text(
                 displayTitle(args.title),
@@ -236,7 +236,7 @@ class _TaskNoteState extends State<TaskNote> {
   }
 
   Widget _status(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(12),
+    padding: const EdgeInsets.all(Space.md),
     child: Row(
       children: [
         Expanded(

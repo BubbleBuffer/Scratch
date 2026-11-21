@@ -7,6 +7,8 @@
 // before the mention (the text itself stays the page title, so offsets
 // do not change).
 
+import 'dart:math' as math;
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
@@ -16,7 +18,7 @@ import '../registry/addon_registry.dart' show AddonInlineMark;
 import '../ui/block_colors.dart';
 import '../ui/icons.dart';
 import '../ui/tokens.dart';
-import '../ui/database/db_theme.dart';
+import '../ui/database/db_tokens.dart';
 import 'todo_dates.dart';
 
 class RichController extends TextEditingController {
@@ -263,31 +265,27 @@ TextSpan markedSpan(
           TextDecoration.lineThrough,
         if (link || mention || under || composingHere) TextDecoration.underline,
       ];
-      s = TextStyle(
-        fontWeight: bold ? FontWeight.w600 : (mention ? FontWeight.w500 : null),
-        fontStyle: italic ? FontStyle.italic : null,
+      s = inlineMarkStyle(
+        style,
+        bold: bold,
+        italic: italic,
+        mention: mention,
+        code: code,
+        underlined: link || mention,
         decoration: decos.isEmpty ? null : TextDecoration.combine(decos),
         decorationColor: link
             ? c.accentText
-            : (mention ? c.textSecondary.withValues(alpha: 0.6) : null),
-        decorationThickness: link || mention ? 1 : null,
+            : (mention ? c.textSecondary.withValues(alpha: Alpha.muted) : null),
         color: code
             ? c.inlineCodeText
             : (color ??
                   (link
                       ? c.accentText
                       : (date != null ? c.textSecondary : null))),
-        fontFamily: code ? monoFamily : null,
-        fontFamilyFallback: code ? monoFallback : null,
-        fontSize: code && style?.fontSize != null
-            ? style!.fontSize! * 0.85
-            : null,
       );
     }
     if (gapAt.contains(b) && a == mentionGapChar(t, b)) {
-      s = (s ?? const TextStyle()).copyWith(
-        letterSpacing: (style?.letterSpacing ?? 0) + mentionGap,
-      );
+      s = spacedRun(s ?? const TextStyle(), (style?.letterSpacing ?? 0) + mentionGap);
     }
     var segment = t.substring(a, b);
     String? semantics;
@@ -301,14 +299,13 @@ TextSpan markedSpan(
         // The chip's covered text is its fallback. It is drawn transparent
         // and spread so its width is the chip's: [MarkPainter] paints the
         // live label over the space.
-        final base = style ?? const TextStyle(fontSize: 16);
+        final base = style ?? InlineMark.fallback;
         final covered = t.substring(mark.start, mark.end);
         final spare =
             queryChipWidth(label, base, textScaler) -
             _textWidth(covered.replaceAll(' ', ' '), base, textScaler);
-        s = base.copyWith(
-          color: const Color(0x00000000),
-          decoration: TextDecoration.none,
+        s = coveredRun(
+          base,
           letterSpacing:
               (base.letterSpacing ?? 0) + spare / covered.runes.length,
         );
@@ -325,7 +322,7 @@ TextSpan markedSpan(
         final prefixEnd = _datePrefixEnd(t, mark.start, mark.end);
         final prefix = t.substring(mark.start, prefixEnd);
         final tail = t.substring(prefixEnd, mark.end).replaceAll(' ', '\u00a0');
-        final base = style ?? const TextStyle(fontSize: 16);
+        final base = style ?? InlineMark.fallback;
         final prefixPainter = TextPainter(
           text: TextSpan(text: prefix, style: base),
           textDirection: TextDirection.ltr,
@@ -339,7 +336,7 @@ TextSpan markedSpan(
         final chip = TextPainter(
           text: TextSpan(
             text: label,
-            style: _chipTextStyle(base, c.textSecondary),
+            style: dateChipStyle(base, c.textSecondary),
           ),
           textDirection: TextDirection.ltr,
           textScaler: textScaler,
@@ -363,18 +360,32 @@ TextSpan markedSpan(
                   (targetWidth - prefixPainter.width - tailPainter.width) /
                       tail.length
             : base.letterSpacing;
+        final prefixWidth = prefixPainter.width;
         prefixPainter.dispose();
         tailPainter.dispose();
         chip.dispose();
         // A chip has one presentation regardless of overlapping bold/code
         // marks; their stored ranges still apply when the block is edited.
-        s = base.copyWith(
-          color: const Color(0x00000000),
-          decoration: TextDecoration.none,
-          fontSize: a < prefixEnd
-              ? (base.fontSize ?? 16)
-              : _dateTailSize(textScaler, base.fontSize ?? 16, scale),
-          height: base.height ?? 1.5,
+        final baseSize = base.fontSize ?? InlineMark.fallback.fontSize!;
+        var tailSize = _dateTailSize(textScaler, baseSize, scale);
+        if (scale < 1 && tail.isNotEmpty) {
+          // Glyph widths do not scale exactly with the size: measure the
+          // shrunk tail once and correct the size by what is left over.
+          final shrunk = TextPainter(
+            text: TextSpan(text: tail, style: coveredRun(base, fontSize: tailSize)),
+            textDirection: TextDirection.ltr,
+            textScaler: textScaler,
+          )..layout();
+          final needed = targetWidth - prefixWidth;
+          if (shrunk.width > 0) {
+            tailSize = math.min(baseSize, tailSize * needed / shrunk.width);
+          }
+          shrunk.dispose();
+        }
+        s = coveredRun(
+          base,
+          fontSize: a < prefixEnd ? baseSize : tailSize,
+          height: base.height ?? InlineMark.fallbackLine,
           letterSpacing: tail.isEmpty
               ? soloSpacing
               : (a < prefixEnd ? base.letterSpacing : tailSpacing),
@@ -394,14 +405,6 @@ TextSpan markedSpan(
 // around its label.
 const _queryIcon = 15.0, _queryGap = 5.0, _queryPadLeft = 7.0, _queryPadRight = 9.0;
 
-/// The label's style: the mockup's 15 px medium weight.
-TextStyle queryLabelStyle(TextStyle base) => base.copyWith(
-  fontSize: (base.fontSize ?? 16) * 0.94,
-  height: 1.4,
-  fontWeight: FontWeight.w500,
-  decoration: TextDecoration.none,
-);
-
 /// The label's runs. A leading count is bold and accented, as in the mockup.
 /// A zero count ("no open #work tasks") reads in the tertiary colour.
 TextSpan queryLabelSpan(String label, TextStyle style, AppColors c) {
@@ -416,7 +419,7 @@ TextSpan queryLabelSpan(String label, TextStyle style, AppColors c) {
     children: [
       TextSpan(
         text: count.group(1),
-        style: style.copyWith(color: c.accentText, fontWeight: FontWeight.w700),
+        style: queryCountStyle(style, c.accentText),
       ),
       TextSpan(text: count.group(2)),
     ],
@@ -458,14 +461,6 @@ int _datePrefixEnd(String text, int start, int end) {
       text.codeUnitAt(start + 1) <= 0xDFFF;
   return start + (pair ? 2 : 1);
 }
-
-TextStyle _chipTextStyle(TextStyle base, Color color) => base.copyWith(
-  fontSize: (base.fontSize ?? 16) * 0.8,
-  height: 1.25,
-  color: color,
-  decoration: TextDecoration.none,
-  fontWeight: FontWeight.w500,
-);
 
 const _chipPaddingX = 5.0, _chipPaddingY = 1.0;
 
@@ -543,7 +538,7 @@ class MarkPainter extends CustomPainter {
         canvas.drawRRect(
           RRect.fromRectAndRadius(
             Rect.fromLTRB(r.left - 2, r.top + 1, r.right + 2, r.bottom - 1),
-            const Radius.circular(4),
+            const Radius.circular(Radii.sm),
           ),
           paint,
         );
@@ -572,7 +567,7 @@ class MarkPainter extends CustomPainter {
       );
       if (boxes.isEmpty) continue;
       final box = boxes.first.toRect();
-      final base = re.text?.style ?? const TextStyle(fontSize: 16);
+      final base = re.text?.style ?? InlineMark.fallback;
       final tp = _layout(
         queryLabelSpan(label, queryLabelStyle(base), colors),
         textScaler,
@@ -583,13 +578,13 @@ class MarkPainter extends CustomPainter {
         queryChipWidth(label, base, textScaler),
         tp.height + 2,
       );
-      final rrect = RRect.fromRectAndRadius(chip, const Radius.circular(6));
+      final rrect = RRect.fromRectAndRadius(chip, const Radius.circular(Radii.md));
       canvas.drawRRect(rrect, Paint()..color = colors.bgSecondary);
       canvas.drawRRect(
         rrect,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
+          ..strokeWidth = Stroke.hair
           ..color = colors.border,
       );
       paintIco(
@@ -602,7 +597,7 @@ class MarkPainter extends CustomPainter {
           _queryIcon,
         ),
         colors.textTertiary,
-        stroke: 1.3,
+        stroke: Stroke.regular,
       );
       tp.paint(
         canvas,
@@ -683,11 +678,11 @@ class MarkPainter extends CustomPainter {
       final box = boxes.first.toRect();
       final overdue = !controller.todoChecked && todoDateDistance(day) < 0;
       final tag = colors.tag(overdue ? 'red' : 'gray');
-      final base = re.text?.style ?? const TextStyle(fontSize: 16);
+      final base = re.text?.style ?? InlineMark.fallback;
       final tp = TextPainter(
         text: TextSpan(
           text: todoDateLabel(day),
-          style: _chipTextStyle(
+          style: dateChipStyle(
             base,
             overdue ? tag.text : colors.textSecondary,
           ),
@@ -702,7 +697,7 @@ class MarkPainter extends CustomPainter {
         tp.height + 2 * _chipPaddingY,
       );
       canvas.drawRRect(
-        RRect.fromRectAndRadius(chip, const Radius.circular(4)),
+        RRect.fromRectAndRadius(chip, const Radius.circular(Radii.sm)),
         Paint()..color = tag.bg,
       );
       tp.paint(
@@ -742,18 +737,14 @@ class MarkPainter extends CustomPainter {
         final tp = TextPainter(
           text: TextSpan(
             text: emoji,
-            style: TextStyle(
-              fontSize: icon * 0.85,
-              height: 1,
-              fontFamilyFallback: emojiFallback,
-            ),
+            style: emojiIconStyle(icon, emojiFallback),
           ),
           textDirection: TextDirection.ltr,
         )..layout();
         tp.paint(canvas, r.center - Offset(tp.width / 2, tp.height / 2));
         tp.dispose();
       } else {
-        paintIco(canvas, Ico.page, r, colors.iconSecondary, stroke: 1.3);
+        paintIco(canvas, Ico.page, r, colors.iconSecondary, stroke: Stroke.regular);
       }
     }
   }

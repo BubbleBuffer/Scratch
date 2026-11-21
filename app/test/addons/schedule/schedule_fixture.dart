@@ -117,7 +117,7 @@ Future<void> pumpSchedule(
       debugShowCheckedModeBanner: false,
       builder: (context, _) => AppTheme(
         colors: colors,
-        formFactor: mobile ? FormFactor.mobile : FormFactor.desktop,
+        density: mobile ? Density.touch : Density.pointer,
         child: ScheduleScope(
           storage: storage,
           child: ScheduleBackendScope(

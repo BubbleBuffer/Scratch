@@ -130,7 +130,7 @@ class _RollupSettingsState extends State<_RollupSettings> {
           MenuHeader(title),
           if (items.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(Space.sm),
               child: Text('No properties to choose', style: ts(context.type.uiSmall, context.colors.textTertiary)),
             ),
           Flexible(
@@ -140,7 +140,7 @@ class _RollupSettingsState extends State<_RollupSettings> {
                   MenuItem(
                     key: ValueKey('rollup-choice-$label'),
                     label: label,
-                    trailing: v == current ? Icon20(Ico.check, size: 16, color: context.colors.iconPrimary) : null,
+                    trailing: v == current ? Icon20(Ico.check, size: IconSize.sm, color: context.colors.iconPrimary) : null,
                     onTap: () {
                       Navigator.of(ctx).maybePop();
                       pick(v);
@@ -159,7 +159,7 @@ class _RollupSettingsState extends State<_RollupSettings> {
     final rel = _relation;
     final fn = d.cfg.rollupFunction;
     final fnLabel = rollupFunctions.firstWhere((f) => f.$1 == fn, orElse: () => rollupFunctions.first).$2;
-    Widget icon(DbIco i) => DbIcon(i, size: context.mobile ? 22 : 20, color: c.iconPrimary);
+    Widget icon(DbIco i) => DbIcon(i, size: context.metrics.icon.px, color: c.iconPrimary);
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       settingsRow(context, 'Relation',
           key: const ValueKey('rollup-relation'),

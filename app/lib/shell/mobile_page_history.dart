@@ -306,7 +306,7 @@ class MobilePageHistoryState extends State<MobilePageHistoryScreen>
                 ? history.entries[neighborIndex].snapshot
                 : null;
             return MobileNavigationGesture(
-              enabled: context.mobile && !_busy,
+              enabled: context.touch && !_busy,
               canStart: () => !(editor?.navigationBlocked ?? true),
               onStart: _start,
               onUpdate: _update,

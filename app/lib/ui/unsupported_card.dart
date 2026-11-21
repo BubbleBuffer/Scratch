@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import 'app_name.dart';
 import 'tokens.dart';
+import 'layout.dart';
 
 /// The card for a block kind this version does not know. It is read-only and
 /// does nothing on tap, so it has no hover or lift. The first line says the
@@ -23,7 +24,7 @@ class UnsupportedCard extends StatelessWidget {
       excludeSemantics: true,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.md, Space.md),
         decoration: BoxDecoration(
           color: c.bgPrimary,
           border: Border.all(color: c.border),
@@ -34,11 +35,11 @@ class UnsupportedCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 1, right: 10),
+              padding: const EdgeInsets.only(top: Space.hair, right: Space.md),
               child: Image.asset(
                 'assets/icons/app_icon_64.png',
-                width: 20,
-                height: 20,
+                width: IconSize.lg.px,
+                height: IconSize.lg.px,
                 filterQuality: FilterQuality.medium,
                 excludeFromSemantics: true,
               ),
@@ -48,8 +49,8 @@ class UnsupportedCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(message, style: ts(type.ui, c.textPrimary, weight: 500)),
-                  const SizedBox(height: 2),
+                  Text(message, style: ts(type.ui, c.textPrimary, weight: Weight.strong)),
+                  const Gap(Space.hair),
                   Text(
                     detail,
                     maxLines: 1,

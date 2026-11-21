@@ -20,7 +20,7 @@ Future<void> _pump(WidgetTester tester, {required VoidCallback onTap, bool dark 
   await tester.pumpWidget(
     AppTheme(
       colors: dark ? AppColors.darkTheme : AppColors.light,
-      formFactor: FormFactor.desktop,
+      density: Density.pointer,
       child: WidgetsApp(
         color: const Color(0xFFFFFFFF),
         builder: (context, _) => Overlay(

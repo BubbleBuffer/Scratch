@@ -207,8 +207,8 @@ class MobileHomePanelsState extends State<MobileHomePanels>
                   behavior: HitTestBehavior.opaque,
                   onTap: () => _settle(0),
                   child: ColoredBox(
-                    color: (c.dark ? const Color(0xFF000000) : c.textPrimary)
-                        .withValues(alpha: (c.dark ? .4 : .2) * scrim),
+                    color: (c.dark ? PageDim.dark : c.textPrimary)
+                        .withValues(alpha: (c.dark ? PageDim.scrimDark : PageDim.scrimLight) * scrim),
                   ),
                 ),
               ),

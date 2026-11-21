@@ -32,7 +32,7 @@ Future<String?> showTaskComposer(
     },
   );
   final String? id;
-  if (context.mobile) {
+  if (context.sizeClass.isCompact) {
     id = await showSheet<String>(
       context,
       (routeContext) => Padding(
@@ -46,8 +46,8 @@ Future<String?> showTaskComposer(
     id = await showModalPanel<String>(
       context,
       (routeContext) => SingleChildScrollView(child: content(routeContext)),
-      width: 460,
-      height: 680,
+      width: CalendarScreen.quickTaskWidth,
+      height: CalendarScreen.quickTaskHeight,
       shrink: true,
     );
   }

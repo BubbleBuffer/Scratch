@@ -18,7 +18,7 @@ Widget themed(Widget child, {bool reduced = false}) => MediaQuery(
   data: MediaQueryData(disableAnimations: reduced),
   child: AppTheme(
     colors: AppColors.light,
-    formFactor: FormFactor.desktop,
+    density: Density.pointer,
     child: Directionality(
       textDirection: TextDirection.ltr,
       child: Center(child: child),
@@ -252,7 +252,7 @@ void main() {
               find.byKey(const ValueKey('check-calico-one')),
             );
             expect(box.fill ?? colors.accent, patch?.fill ?? colors.accent);
-            expect(box.ink ?? colors.onAccent, patch?.ink ?? colors.onAccent);
+            expect(box.ink ?? colors.accentInk, patch?.ink ?? colors.accentInk);
             final titleTile = tester.widget<Container>(
               find.descendant(
                 of: find.byKey(const ValueKey('page-icon')),

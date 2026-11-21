@@ -84,9 +84,9 @@ Future<void> pumpSection(WidgetTester t) async {
         textDirection: TextDirection.ltr,
         child: AppTheme(
           colors: colors,
-          formFactor: FormFactor.desktop,
+          density: Density.pointer,
           child: DefaultTextStyle(
-            style: ts(TypeScale.desktop.body, colors.textPrimary),
+            style: ts(TypeScale.pointer.body, colors.textPrimary),
             child: ColoredBox(
               color: colors.bgPrimary,
               child: const SingleChildScrollView(

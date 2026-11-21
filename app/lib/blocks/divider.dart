@@ -7,11 +7,11 @@ import '../registry/block_registry.dart';
 import '../ui/ui.dart';
 
 Widget _body(BlockContext b) => SizedBox(
-      height: 13,
-      child: Center(child: Container(height: 1, color: b.colors.divider)),
+      height: DividerBlock.row,
+      child: Center(child: Container(height: Stroke.hair, color: b.colors.divider)),
     );
 
-double _handleTop(BlockContext b) => -5.5;
+double _handleTop(BlockContext b) => DividerBlock.handleTop;
 
 const dividerBlock = BlockType(
   kind: Kinds.divider,

@@ -18,7 +18,7 @@ Widget themed(Widget child, {required bool dark}) => MediaQuery(
   data: const MediaQueryData(size: Size(600, 800)),
   child: AppTheme(
     colors: dark ? AppColors.darkTheme : AppColors.light,
-    formFactor: FormFactor.desktop,
+    density: Density.pointer,
     child: Directionality(
       textDirection: TextDirection.ltr,
       child: Center(child: SizedBox(width: 560, child: child)),

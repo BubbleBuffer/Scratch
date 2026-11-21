@@ -229,7 +229,7 @@ class _QueryCardState extends State<QueryCard> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+                  padding: const EdgeInsets.fromLTRB(Space.sm, 0, Space.sm, Space.xs),
                   child: TextBtn(
                     'Show $more more',
                     key: ValueKey('query-more-${widget.block.node.id}'),
@@ -283,7 +283,7 @@ class _QueryCardState extends State<QueryCard> {
           onTap: _startEdit,
           borderRadius: BorderRadius.circular(Radii.sm),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: Space.xs, vertical: Space.xxs),
             child: Text.rich(
               highlightQuery(
                 query.isEmpty ? 'Search query' : query,
@@ -299,8 +299,8 @@ class _QueryCardState extends State<QueryCard> {
       );
     }
     return Container(
-      constraints: const BoxConstraints(minHeight: 44),
-      padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+      constraints: BoxConstraints(minHeight: ControlSize.xl.height),
+      padding: const EdgeInsets.fromLTRB(Space.md, Space.xs, Space.xs, Space.xs),
       decoration: BoxDecoration(
         color: c.bgSecondary,
         border: !_collapsed && !_editing && hasRows
@@ -309,12 +309,12 @@ class _QueryCardState extends State<QueryCard> {
       ),
       child: Row(
         children: [
-          Icon20(Ico.search, size: 16, color: c.textTertiary),
-          const SizedBox(width: 6),
+          Icon20(Ico.search, size: IconSize.sm, color: c.textTertiary),
+          const Gap(Space.xs),
           Expanded(child: field),
-          const SizedBox(width: 6),
+          const Gap(Space.xs),
           QueryCountBadge(total: count),
-          const SizedBox(width: 2),
+          const Gap(Space.hair),
           if (showInlineMenuItem) ...[
             FocusFrame(
               onActivate: () => _openOverflow(context),
@@ -323,15 +323,15 @@ class _QueryCardState extends State<QueryCard> {
                 onTap: () => _openOverflow(context),
                 borderRadius: BorderRadius.circular(Radii.sm),
                 child: SizedBox(
-                  width: 28,
-                  height: 28,
+                  width: ControlSize.sm.height,
+                  height: ControlSize.sm.height,
                   child: Center(
-                    child: Icon20(Ico.more, size: 16, color: c.iconSecondary),
+                    child: Icon20(Ico.more, size: IconSize.sm, color: c.iconSecondary),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 2),
+            const Gap(Space.hair),
           ],
           FocusFrame(
             onActivate: () => setState(() => _collapsed = !_collapsed),
@@ -340,12 +340,12 @@ class _QueryCardState extends State<QueryCard> {
               onTap: () => setState(() => _collapsed = !_collapsed),
               borderRadius: BorderRadius.circular(Radii.sm),
               child: SizedBox(
-                width: 28,
-                height: 28,
+                width: ControlSize.sm.height,
+                height: ControlSize.sm.height,
                 child: Center(
                   child: RotatedBox(
                     quarterTurns: _collapsed ? 1 : 0,
-                    child: Icon20(Ico.chevronDown, size: 16, color: c.iconSecondary),
+                    child: Icon20(Ico.chevronDown, size: IconSize.sm, color: c.iconSecondary),
                   ),
                 ),
               ),
@@ -360,7 +360,7 @@ class _QueryCardState extends State<QueryCard> {
     final c = context.colors;
     final small = ts(context.type.uiSmall, c.textTertiary);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.sm),
       child: Row(
         children: [
           Expanded(child: Text('Updates as notes change', style: small)),

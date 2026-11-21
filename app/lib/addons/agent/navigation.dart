@@ -25,7 +25,7 @@ Future<void> openAgent(BuildContext context) async {
   nav.popUntil((r) => r.isFirst);
   await nav.push(
     pageRoute(
-      (ctx) => context.mobile && hubAgentPlatform
+      (ctx) => context.sizeClass.isCompact && hubAgentPlatform
           ? ColoredBox(
               color: ctx.colors.desk,
               child: Padding(
@@ -37,7 +37,7 @@ Future<void> openAgent(BuildContext context) async {
             )
           : const AgentScreen(),
       motion: Motion.of(context),
-      mobile: context.mobile,
+      slide: context.sizeClass.isCompact,
       settings: const RouteSettings(name: agentRouteName),
     ),
   );
@@ -47,7 +47,7 @@ Future<void> openAgent(BuildContext context) async {
 Future<void> toggleAgentPanel(BuildContext context) async {
   final app = AppScope.maybeOf(context);
   if (app == null || !AgentStore.of(app).enabled) return;
-  if (context.mobile) {
+  if (context.sizeClass.isCompact) {
     unawaited(openAgent(context));
     return;
   }
@@ -61,7 +61,7 @@ Future<void> askAgent(BuildContext context) async {
   final app = AppScope.maybeOf(context);
   if (app == null || !AgentStore.of(app).enabled) return;
   EditorFocus.forApp(app).requestComposer();
-  if (context.mobile) {
+  if (context.sizeClass.isCompact) {
     unawaited(openAgent(context));
   } else {
     app.ui
@@ -88,7 +88,7 @@ Future<void> openAgentPage(
   final stack = PageStackScope.of(context);
   // The root overlay survives removal of the full-screen chat route.
   final pageContext = stack.navigator?.overlay?.context ?? context;
-  if (!context.mobile) {
+  if (!context.sizeClass.isCompact) {
     app.ui
       ..agentPanelOpen = true
       ..agentSessionId = store.openId

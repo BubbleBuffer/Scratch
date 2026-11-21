@@ -173,7 +173,7 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
               onSubmitted: (_) => _saveName(),
             ),
           ),
-          const SizedBox(width: 8),
+          const Gap(Space.sm),
           SButton(
             'Cancel',
             key: const ValueKey('host-relay-rename-cancel'),
@@ -183,7 +183,7 @@ class _HostRelayDetailsState extends State<HostRelayDetails> {
               _renameError = null;
             }),
           ),
-          const SizedBox(width: 4),
+          const Gap(Space.xxs),
           SButton(
             'Save',
             key: const ValueKey('host-relay-rename-save'),

@@ -198,13 +198,13 @@ class _AgentComposerState extends State<AgentComposer> {
   kit.MentionRowLook _look(BuildContext context, kit.KitRef ref) {
     final it = _found['${ref.kind}-${ref.id}'];
     if (it == null || it.isChat) return const kit.MentionRowLook();
-    final m = context.mobile;
+    final m = context.touch;
     // An untitled page shows its first line, live while it is open.
     final stored = context.watch<PagesStore>().meta(it.id)?.firstLine ?? '';
     final live = PageStackScope.maybeOf(context)?.firstLines[it.id];
     final line = live != null && live.trim().isNotEmpty ? live : stored;
     return kit.MentionRowLook(
-      leading: PageIcon(icon: it.icon, size: m ? 22 : 20),
+      leading: PageIcon(icon: it.icon, size: (m ? IconSize.xl : IconSize.lg).px),
       label: displayTitle(it.label, firstLine: line),
       firstLine: it.label.trim().isEmpty && line.trim().isNotEmpty,
     );

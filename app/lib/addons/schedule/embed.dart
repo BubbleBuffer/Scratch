@@ -12,6 +12,7 @@ import 'controller.dart';
 import 'format.dart';
 import 'storage.dart';
 import 'view.dart' show runTimeLabel, scheduleHealthLabel;
+import '../../ui/layout.dart';
 
 class ScheduleEmbedCard extends StatefulWidget {
   const ScheduleEmbedCard({
@@ -71,7 +72,7 @@ class _ScheduleEmbedCardState extends State<ScheduleEmbedCard> {
           behavior: HitTestBehavior.opaque,
           onTap: () => openPage(context, widget.pageId, ''),
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(Space.md),
             decoration: BoxDecoration(
               color: c.bgSecondary,
               borderRadius: Radii.panel,
@@ -88,10 +89,10 @@ class _ScheduleEmbedCardState extends State<ScheduleEmbedCard> {
                         displayTitle(widget.title),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: ts(const TypeSpec(15, 20, 650), c.textPrimary),
+                        style: ts(context.type.title, c.textPrimary, weight: Weight.display),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const Gap(Space.sm),
                     Pill(
                       scheduleHealthLabel(ctl.health),
                       status: true,
@@ -99,20 +100,20 @@ class _ScheduleEmbedCardState extends State<ScheduleEmbedCard> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const Gap(Space.xxs),
                 Text(
                   '${triggerInWords(trigger)} · $runnerText',
                   key: const ValueKey('schedule-embed-words'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: ts(const TypeSpec(13, 18, 450), c.textSecondary),
+                  style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
                 ),
-                const SizedBox(height: 2),
+                const Gap(Space.hair),
                 Text(
                   runs.isEmpty
                       ? 'No next run'
                       : 'Next: ${runTimeLabel(runs.first)}',
-                  style: ts(const TypeSpec(13, 18, 450), c.textSecondary),
+                  style: ts(context.type.ui, c.textSecondary, weight: Weight.regular),
                 ),
               ],
             ),

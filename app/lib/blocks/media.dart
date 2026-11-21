@@ -10,7 +10,7 @@ import '../ui/icon_x.dart';
 import '../ui/ui.dart';
 
 /// Caption text: 14/19.6 textSecondary.
-TextStyle captionStyle(Node n, AppColors c, TypeScale ty) => tsRaw(14, 19.6, 400, c.textSecondary);
+TextStyle captionStyle(Node n, AppColors c, TypeScale ty) => ts(ty.ui, c.textSecondary, weight: Weight.regular);
 
 /// [content] with the caption [text] under it.
 Widget withCaption(BlockContext b, Widget content, Widget text) {
@@ -19,11 +19,11 @@ Widget withCaption(BlockContext b, Widget content, Widget text) {
     GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => b.host.selectBlock(b.node),
-      onLongPress: b.mobile ? () => b.host.onLongPress(b.node) : null,
+      onLongPress: b.touch ? () => b.host.onLongPress(b.node) : null,
       child: content,
     ),
     if (show)
-      Padding(padding: const EdgeInsets.only(top: 6), child: text)
+      Padding(padding: const EdgeInsets.only(top: Space.xs), child: text)
     else
       // Kept in the tree (zero height) so the caption can take focus.
       ClipRect(
@@ -50,15 +50,15 @@ class EmptyMediaRow extends StatelessWidget {
       radius: Radii.sm,
       hoverColor: c.bgPressed,
       child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        constraints: const BoxConstraints(minHeight: MediaBlock.emptyRow),
+        padding: const EdgeInsets.symmetric(horizontal: Space.md),
         decoration: BoxDecoration(color: c.bgHover, borderRadius: BorderRadius.circular(Radii.sm)),
         child: Row(children: [
-          IconX(icon, size: 22, color: c.iconSecondary),
-          const SizedBox(width: 10),
+          IconX(icon, size: IconSize.xl.px, color: c.iconSecondary),
+          const Gap(Space.md),
           Flexible(
             child: Text(label,
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.textSecondary, weight: 400)),
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.ui, c.textSecondary, weight: Weight.regular)),
           ),
         ]),
       ),

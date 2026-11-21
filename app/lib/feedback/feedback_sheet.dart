@@ -13,6 +13,7 @@ import '../ui/icons.dart';
 import '../ui/sheet.dart';
 import '../ui/tokens.dart';
 import '../ui/mobile_selection.dart';
+import '../ui/layout.dart';
 
 class FeedbackSheet extends StatefulWidget {
   const FeedbackSheet({
@@ -45,7 +46,7 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
   /// The phone sheet height outside its scrolling middle: the top and bottom
   /// padding, the handle, the title, the gaps and the buttons. Measured on the
   /// 375x812 shots; the bottom safe-area inset is taken off at build time.
-  static const _phoneChrome = 134.0;
+  static const _phoneChrome = FeedbackForm.sheetChrome;
 
   @override
   void dispose() {
@@ -71,10 +72,11 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final ty = context.type;
-    final mobile = context.mobile;
+    // A sheet on a compact screen, a panel otherwise.
+    final mobile = context.sizeClass.isCompact;
     final title = Text(
       'Send feedback',
-      style: tsDisplay(const TypeSpec(19, 24, 640), c.textPrimary),
+      style: tsDisplay(context.type.h3, c.textPrimary, weight: Weight.display),
     );
     // The part that scrolls: the text, the screenshot and the diagnostics.
     final scrolling = Column(
@@ -82,7 +84,7 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 96),
+          constraints: const BoxConstraints(minHeight: FeedbackForm.text),
           child: FieldFrame(
             child: Stack(
               children: [
@@ -105,8 +107,8 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
                   cursorColor: c.textPrimary,
                   backgroundCursorColor: c.textTertiary,
                   selectionColor: c.textSelection,
-                  cursorWidth: 1.5,
-                  autofocus: !mobile,
+                  cursorWidth: Stroke.regular,
+                  autofocus: !context.touch,
                   keyboardType: TextInputType.multiline,
                   textInputAction: TextInputAction.newline,
                   selectionControls: selectionControlsFor(context),
@@ -120,24 +122,24 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
           ),
         ),
         if (_screenshot case final shot?) ...[
-          const SizedBox(height: 12),
-          _thumbnail(context, shot, maxHeight: mobile ? 140 : 120),
+          const Gap(Space.md),
+          _thumbnail(context, shot, maxHeight: mobile ? FeedbackForm.shotCompact : FeedbackForm.shot),
         ],
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
         Hover(
           key: const ValueKey('feedback-diagnostics-toggle'),
           onTap: () => setState(() => _detailsOpen = !_detailsOpen),
           borderRadius: Radii.ctl,
-          child: SizedBox(
-            height: 32,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: ControlSize.md.height),
             child: Row(
               children: [
                 Icon20(
                   _detailsOpen ? Ico.chevronDown : Ico.chevronRight,
-                  size: 16,
+                  size: IconSize.sm,
                   color: c.iconTertiary,
                 ),
-                const SizedBox(width: 6),
+                const Gap(Space.xs),
                 Text('Diagnostics', style: ts(ty.uiSmall, c.textSecondary)),
               ],
             ),
@@ -146,9 +148,9 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
         if (_detailsOpen)
           Container(
             key: const ValueKey('feedback-diagnostics'),
-            constraints: const BoxConstraints(maxHeight: 240),
+            constraints: const BoxConstraints(maxHeight: FeedbackForm.diagnostics),
             width: double.infinity,
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(Space.md),
             decoration: BoxDecoration(
               color: c.bgSecondary,
               borderRadius: Radii.ctl,
@@ -172,7 +174,7 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
             onTap: () => Navigator.of(context).pop(),
           ),
         ),
-        const SizedBox(width: 8),
+        const Gap(Space.sm),
         Expanded(
           child: PrimaryButton(
             key: const ValueKey('feedback-send'),
@@ -187,14 +189,14 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
       // capped to the room the sheet has: the title and buttons stay in view.
       final media = MediaQuery.of(context);
       final room =
-          media.size.height * 0.85 - _phoneChrome - media.padding.bottom;
+          media.size.height * Layout.sheetHeight - _phoneChrome - media.padding.bottom;
       return SheetSurface(
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Layout.gutter),
             child: title,
           ),
-          const SizedBox(height: 12),
+          const Gap(Space.md),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Layout.gutter),
             child: ConstrainedBox(
@@ -202,13 +204,13 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
               child: SingleChildScrollView(child: scrolling),
             ),
           ),
-          const SizedBox(height: 16),
+          const Gap(Space.lg),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               Layout.gutter,
               0,
               Layout.gutter,
-              8,
+              Space.sm,
             ),
             child: buttons,
           ),
@@ -217,15 +219,15 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
     }
     // The dialog height is capped by its panel, so only the middle scrolls.
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(Space.xl),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           title,
-          const SizedBox(height: 12),
+          const Gap(Space.md),
           Flexible(child: SingleChildScrollView(child: scrolling)),
-          const SizedBox(height: 16),
+          const Gap(Space.lg),
           buttons,
         ],
       ),
@@ -245,7 +247,7 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
       child: Stack(
         children: [
           Container(
-            padding: const EdgeInsets.all(1),
+            padding: const EdgeInsets.all(Space.hair),
             decoration: BoxDecoration(
               border: Border.all(color: c.border),
               borderRadius: Radii.ctl,
@@ -263,18 +265,18 @@ class _FeedbackSheetState extends State<FeedbackSheet> {
             ),
           ),
           Positioned(
-            top: 4,
-            right: 4,
+            top: Space.xxs,
+            right: Space.xxs,
             child: Hover(
               key: const ValueKey('feedback-remove-screenshot'),
               onTap: () => setState(() => _screenshot = null),
               borderRadius: Radii.ctl,
               background: c.bgPrimary,
               child: SizedBox(
-                width: 28,
-                height: 28,
+                width: ControlSize.sm.height,
+                height: ControlSize.sm.height,
                 child: Center(
-                  child: Icon20(Ico.close, size: 16, color: c.iconPrimary),
+                  child: Icon20(Ico.close, size: IconSize.sm, color: c.iconPrimary),
                 ),
               ),
             ),

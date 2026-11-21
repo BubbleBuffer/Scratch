@@ -136,13 +136,17 @@ class BlockContext {
 
   AppColors get colors => context.colors;
   TypeScale get type => context.type;
-  bool get mobile => context.mobile;
+  /// Whether the user points by touch: sizes, long presses, no hover.
+  bool get touch => context.touch;
+
+  /// Whether the page has a compact screen's room.
+  bool get compact => context.sizeClass.isCompact;
   bool get readOnly => host is ReadOnlyBlockHost;
 }
 
 TextStyle _bodyStyle(Node n, AppColors c, TypeScale ty) =>
     ts(ty.body, c.textPrimary);
-double _noMargin(bool mobile) => 0;
+double _noMargin(bool touch) => 0;
 
 class BlockType {
   const BlockType({
@@ -236,7 +240,7 @@ class BlockType {
   final TextStyle Function(Node n, AppColors c, TypeScale ty) textStyle;
 
   /// Extra space above the block (headings).
-  final double Function(bool mobile) topMargin;
+  final double Function(bool touch) topMargin;
 
   /// Wraps the block's text (list markers, quote bar, code box).
   final Widget Function(BlockContext b, Widget text)? decorate;

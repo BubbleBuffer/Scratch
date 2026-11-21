@@ -40,7 +40,7 @@ class _States extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     return ColoredBox(
       color: c.bgPrimary,
       child: Padding(
@@ -53,7 +53,7 @@ class _States extends StatelessWidget {
               height: Layout.topbarHeight,
               decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.borderSubtle))),
               child: Row(children: [
-                SizedBox(width: m ? 90 : 120, child: Text(p.name, style: ts(context.type.ui, c.textSecondary, weight: 400))),
+                SizedBox(width: m ? 90 : 120, child: Text(p.name, style: ts(context.type.ui, c.textSecondary, weight: Weight.regular))),
                 SyncIndicatorView(phase: p, showLabel: !m, onTap: (_) {}),
                 if (!m) ...[const SizedBox(width: 24), SyncIndicatorView(phase: p, showLabel: false, onTap: (_) {})],
               ]),

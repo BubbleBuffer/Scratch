@@ -31,7 +31,7 @@ Future<void> openCalendar(BuildContext context, {DateTime? day}) async {
     pageRoute(
       (_) => const VaultCalendarScreen(),
       motion: Motion.of(context),
-      mobile: context.mobile,
+      slide: context.sizeClass.isCompact,
       settings: const RouteSettings(name: calendarRouteName),
     ),
   );
@@ -229,7 +229,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
   void _shortcuts() => showPickerSheet<void>(
     context,
     (ctx) => Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(Space.xl),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -238,7 +238,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
             'Keyboard shortcuts',
             style: tsDisplay(ctx.type.h3, ctx.colors.textPrimary),
           ),
-          const SizedBox(height: 18),
+          const Gap(Space.lg),
           for (final pair in const [
             ('T', 'Back to today'),
             ('M / W / D', 'Month / week / day'),
@@ -250,11 +250,11 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
             ('?', 'Keyboard shortcuts'),
           ])
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 7),
+              padding: const EdgeInsets.symmetric(vertical: Space.sm),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 100,
+                    width: CalendarScreen.shortcutKey,
                     child: Text(
                       pair.$1,
                       style: ts(
@@ -369,7 +369,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
       (ctx) => AnimatedBuilder(
         animation: _store!,
         builder: (ctx, _) => Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(Space.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -389,9 +389,9 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const Gap(Space.md),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 360),
+                constraints: const BoxConstraints(maxHeight: CalendarScreen.shortcutList),
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
@@ -401,7 +401,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const Gap(Space.lg),
               SecondaryButton(
                 label: 'New task',
                 onTap: () {
@@ -419,7 +419,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
   }
 
   Widget _empty(BuildContext ctx) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 22),
+    padding: const EdgeInsets.symmetric(vertical: Space.xl),
     child: Text(
       'Nothing planned',
       style: ts(ctx.type.ui, ctx.colors.textSecondary),
@@ -429,7 +429,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     if (_store == null) return const SizedBox.shrink();
-    final mobile = context.mobile;
+    final mobile = context.sizeClass.isCompact;
     final compactDesktop = !mobile && MediaQuery.sizeOf(context).width < 1120;
     final c = context.colors;
     final title = _period == VaultCalendarPeriod.day
@@ -440,7 +440,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
       focusNode: _focus,
       onKeyEvent: _key,
       child: Container(
-        margin: mobile ? EdgeInsets.zero : const EdgeInsets.all(14),
+        margin: mobile ? EdgeInsets.zero : const EdgeInsets.all(Space.lg),
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: c.bgPrimary,
@@ -450,23 +450,23 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              height: 6,
+              height: PageChrome.band,
               color: spaceColor(
                 'sun',
                 c.dark ? Brightness.dark : Brightness.light,
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(mobile ? 12 : 20, 12, 12, 8),
+              padding: EdgeInsets.fromLTRB(mobile ? Space.md : Space.xl, Space.md, Space.md, Space.sm),
               child: Row(
                 children: [
                   IconBtn(
                     Ico.chevronLeft,
-                    size: mobile ? 44 : 28,
+                    size: context.touch ? ControlSize.xl : ControlSize.sm,
                     semanticLabel: 'Back to Pages',
                     onTap: () => Navigator.of(context).maybePop(),
                   ),
-                  const SizedBox(width: 8),
+                  const Gap(Space.sm),
                   Expanded(
                     child: Hover(
                       onTap: _jump,
@@ -487,7 +487,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
             ),
             if (compactDesktop)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 12, 10),
+                padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.md, Space.md),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: _desktopActions(),
@@ -495,31 +495,31 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
               ),
             if (mobile)
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.sm),
                 child: Row(
                   children: [
                     _viewButtons(),
                     const Spacer(),
                     IconBtn(
                       Ico.chevronLeft,
-                      size: 44,
+                      size: ControlSize.xl,
                       semanticLabel: 'Previous period',
                       onTap: () => _move(-1),
                     ),
                     TextBtn(
                       'Today',
-                      height: 44,
+                      size: ControlSize.xl,
                       onTap: () => _select(clockNow(), scroll: true),
                     ),
                     IconBtn(
                       Ico.chevronRight,
-                      size: 44,
+                      size: ControlSize.xl,
                       semanticLabel: 'Next period',
                       onTap: () => _move(1),
                     ),
                     IconBtn(
                       Ico.settings,
-                      size: 44,
+                      size: ControlSize.xl,
                       semanticLabel: 'Calendars',
                       onTap: () => showCalendarCategories(context),
                     ),
@@ -528,7 +528,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
               ),
             if (_error != null || _store!.error != null)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
+                padding: const EdgeInsets.symmetric(horizontal: Space.lg),
                 child: Row(
                   children: [
                     Expanded(
@@ -549,7 +549,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
               ),
             if (_store!.loading && _store!.items.isEmpty)
               Padding(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(Space.sm),
                 child: Text(
                   'Loading calendar…',
                   style: ts(context.type.uiSmall, c.textSecondary),
@@ -561,7 +561,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                 children: [
                   if (!mobile && _categories)
                     SizedBox(
-                      width: 225,
+                      width: CalendarScreen.categories,
                       child: Container(
                         decoration: BoxDecoration(
                           border: Border(right: BorderSide(color: c.border)),
@@ -608,16 +608,16 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
           child: Hover(
             selected: _period == period,
             onTap: () => _view(period),
-            padding: EdgeInsets.symmetric(horizontal: context.mobile ? 7 : 10),
-            child: SizedBox(
-              height: context.mobile ? 44 : 30,
+            padding: EdgeInsets.symmetric(horizontal: context.touch ? Space.sm : Space.md),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: (context.touch ? ControlSize.xl : ControlSize.md).height),
               child: Center(
                 child: Text(
                   period.name[0].toUpperCase() + period.name.substring(1),
                   style: ts(
                     context.type.uiSmall,
                     context.colors.textPrimary,
-                    weight: _period == period ? 700 : 500,
+                    weight: _period == period ? Weight.strong : Weight.regular,
                   ),
                 ),
               ),
@@ -641,9 +641,9 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
         semanticLabel: 'Next period',
         onTap: () => _move(1),
       ),
-      const SizedBox(width: 12),
+      const Gap(Space.md),
       _viewButtons(),
-      const SizedBox(width: 12),
+      const Gap(Space.md),
       TextBtn('Jump to date', onTap: _jump),
       IconBtn(
         Ico.settings,
@@ -651,11 +651,11 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
         selected: _categories,
         onTap: () => setState(() => _categories = !_categories),
       ),
-      const SizedBox(width: 8),
+      const Gap(Space.sm),
       PrimaryButton(
         label: 'New task',
         icon: Ico.plus,
-        height: 36,
+        size: ControlSize.lg,
         onTap: () => _create(_selected),
       ),
     ],
@@ -668,7 +668,8 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
         selected: _selected,
         store: _store!,
         onSelected: (anchor, day) {
-          if (context.mobile) {
+          // A compact screen lists the day under the month.
+          if (context.sizeClass.isCompact) {
             _select(day);
           } else {
             unawaited(_dayPopup(anchor, day));
@@ -684,15 +685,15 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
           }
         },
       );
-      if (!context.mobile) return month;
+      if (!context.sizeClass.isCompact) return month;
       return Column(
         children: [
-          SizedBox(height: 310, child: month),
+          SizedBox(height: CalendarScreen.compactMonth, child: month),
           Expanded(child: _phoneAgenda()),
         ],
       );
     }
-    if (context.mobile) {
+    if (context.sizeClass.isCompact) {
       return GestureDetector(
         onHorizontalDragEnd: (details) {
           if (details.primaryVelocity!.abs() > 100) {
@@ -728,9 +729,9 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
       children: [
         Expanded(child: grid),
         SizedBox(
-          width: 270,
+          width: CalendarScreen.dayPanel,
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(Space.lg),
             decoration: BoxDecoration(
               border: Border(left: BorderSide(color: context.colors.border)),
             ),
@@ -745,7 +746,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                       context.colors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const Gap(Space.lg),
                   for (final item
                       in _store!
                           .onDay(_selected)
@@ -757,7 +758,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                       .onDay(_selected)
                       .any((i) => !i.hasTime && i.kind != AgendaKind.mention))
                     _empty(context),
-                  const SizedBox(height: 24),
+                  const Gap(Space.xl),
                   Text(
                     'Mentioned in',
                     style: tsDisplay(
@@ -765,7 +766,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                       context.colors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const Gap(Space.lg),
                   for (final item
                       in _store!
                           .onDay(_selected)
@@ -791,7 +792,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
   }
 
   Widget _weekStrip() => Padding(
-    padding: const EdgeInsets.all(12),
+    padding: const EdgeInsets.all(Space.md),
     child: Row(
       children: [
         for (var n = 0; n < 7; n++)
@@ -802,8 +803,8 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                 return Hover(
                   onTap: () => _select(day),
                   selected: sameDay(day, _selected),
-                  child: SizedBox(
-                    height: 62,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: CalendarScreen.weekDay),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -826,11 +827,11 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
                           children: [
                             for (final item in _store!.onDay(day).take(3))
                               Padding(
-                                padding: const EdgeInsets.all(1),
+                                padding: const EdgeInsets.all(Space.hair),
                                 child: _CalendarDot(
                                   item: item,
                                   settings: _store!.settings,
-                                  size: 4,
+                                  size: CalendarMonth.smallDot,
                                 ),
                               ),
                           ],
@@ -847,7 +848,7 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
   );
 
   Widget _phoneAgenda() => SingleChildScrollView(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+    padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, CalendarScreen.endPadding),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -861,13 +862,13 @@ class _VaultCalendarScreenState extends State<VaultCalendarScreen> {
             ),
             IconBtn(
               Ico.plus,
-              size: 44,
+              size: ControlSize.xl,
               semanticLabel: 'New task on ${calendarShortDate(_selected)}',
               onTap: () => _create(_selected),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const Gap(Space.sm),
         for (final item in _store!.onDay(_selected)) _card(item),
         if (_store!.onDay(_selected).isEmpty) _empty(context),
       ],
@@ -913,7 +914,7 @@ class _CalendarDot extends StatelessWidget {
   const _CalendarDot({
     required this.item,
     required this.settings,
-    this.size = 8,
+    this.size = CalendarMonth.dot,
   });
   final AgendaItem item;
   final CalendarSettings settings;
@@ -924,7 +925,7 @@ class _CalendarDot extends StatelessWidget {
     height: size,
     decoration: BoxDecoration(
       color: _calendarColor(context, item, settings),
-      borderRadius: BorderRadius.circular(2),
+      borderRadius: BorderRadius.circular(Radii.sm),
     ),
   );
 }
@@ -936,8 +937,8 @@ Widget _calendarDrag(BuildContext context, AgendaItem item, Widget child) {
     feedback: DefaultTextStyle(
       style: ts(context.type.uiSmall, context.colors.textPrimary),
       child: Container(
-        width: 170,
-        padding: const EdgeInsets.all(8),
+        width: CalendarScreen.dragged,
+        padding: const EdgeInsets.all(Space.sm),
         decoration: BoxDecoration(
           color: context.colors.bgPrimary,
           borderRadius: Radii.ctl,
@@ -946,7 +947,7 @@ Widget _calendarDrag(BuildContext context, AgendaItem item, Widget child) {
         child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
     ),
-    childWhenDragging: Opacity(opacity: .35, child: child),
+    childWhenDragging: Opacity(opacity: Alpha.wash, child: child),
     child: child,
   );
 }
@@ -974,35 +975,35 @@ class _CalendarChip extends StatelessWidget {
         onTap: onOpen,
         background: item.kind == AgendaKind.mention
             ? null
-            : color.withValues(alpha: .18),
-        borderRadius: BorderRadius.circular(12),
+            : color.withValues(alpha: Alpha.tint),
+        borderRadius: BorderRadius.circular(Radii.sheet),
         border: item.kind == AgendaKind.mention
             ? Border.all(color: context.colors.threadStrong)
             : null,
-        padding: const EdgeInsets.symmetric(horizontal: 5),
-        child: SizedBox(
-          height: 22,
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: CalendarMonth.chip),
           child: Row(
             children: [
               if (item.kind == AgendaKind.task && checkbox)
                 StacksCheckbox(
                   checked: item.done,
-                  size: 12,
+                  size: CalendarMonth.chipCheck,
                   onChanged: (_) => onToggle(),
                 )
               else
                 Icon20(
                   item.kind == AgendaKind.mention ? Ico.page : Ico.clock,
-                  size: 12,
+                  size: IconSize.xs,
                   color: context.colors.iconSecondary,
                 ),
-              const SizedBox(width: 4),
+              const Gap(Space.xxs),
               if (item.hasTime) ...[
                 Text(
                   calendarTime(start.hour * 60 + start.minute),
-                  style: tsRaw(10, 14, 400, context.colors.textSecondary),
+                  style: ts(context.type.micro, context.colors.textSecondary, weight: Weight.regular),
                 ),
-                const SizedBox(width: 4),
+                const Gap(Space.xxs),
               ],
               Expanded(
                 child: Text(
@@ -1010,14 +1011,7 @@ class _CalendarChip extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      tsRaw(
-                        12,
-                        16,
-                        500,
-                        item.done
-                            ? context.colors.textTertiary
-                            : context.colors.textPrimary,
-                      ).copyWith(
+                      ts(context.type.uiSmall, item.done ? context.colors.textTertiary : context.colors.textPrimary).copyWith(
                         decoration: item.done
                             ? TextDecoration.lineThrough
                             : null,
@@ -1028,7 +1022,7 @@ class _CalendarChip extends StatelessWidget {
                 Text(
                   'Agent',
                   semanticsLabel: 'Assigned to Agent',
-                  style: tsRaw(10, 14, 700, context.colors.textSecondary),
+                  style: ts(context.type.micro, context.colors.textSecondary, weight: Weight.strong),
                 ),
             ],
           ),
@@ -1164,7 +1158,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
 
   @override
   Widget build(BuildContext context) {
-    _cellHeight = context.mobile ? 60 : 124;
+    _cellHeight = context.sizeClass.isCompact ? CalendarMonth.cellCompact : CalendarMonth.cell;
     if (!_ready) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scroll.hasClients) return;
@@ -1176,11 +1170,11 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
       });
     }
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: context.mobile ? 14 : 16),
+      padding: EdgeInsets.symmetric(horizontal: Space.lg),
       child: Column(
         children: [
           SizedBox(
-            height: 29,
+            height: CalendarMonth.weekdays,
             child: Row(
               children: [
                 for (final name in weekdays)
@@ -1205,7 +1199,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
               slivers: [
                 for (var n = 0; n < _count; n++)
                   ..._monthSlivers(context, calendarMonth(_first, n)),
-                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                const SliverToBoxAdapter(child: SizedBox(height: CalendarMonth.end)),
               ],
             ),
           ),
@@ -1242,7 +1236,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
     ),
   ];
   Widget _dayCell(BuildContext context, DateTime day, DateTime month) {
-    final mobile = context.mobile;
+    final mobile = context.sizeClass.isCompact;
     final items = widget.store.onDay(day);
     final selected = sameDay(day, widget.selected);
     final today = sameDay(day, clockNow());
@@ -1264,7 +1258,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                 : null,
             border: Border(
               right: BorderSide(
-                color: mobile ? const Color(0x00000000) : context.colors.border,
+                color: mobile ? kTransparent : context.colors.border,
               ),
               bottom: BorderSide(color: context.colors.border),
             ),
@@ -1274,12 +1268,12 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
             selected: selected && !mobile,
             radius: 0,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: mobile ? 0 : 4),
+              padding: EdgeInsets.symmetric(horizontal: mobile ? 0 : Space.xxs),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: mobile ? 39 : 32,
+                    height: mobile ? CalendarMonth.numberRowCompact : CalendarMonth.numberRow,
                     child: Row(
                       mainAxisAlignment: mobile
                           ? MainAxisAlignment.center
@@ -1288,8 +1282,8 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                         if (!mobile) ...[
                           IconBtn(
                             Ico.plus,
-                            size: 22,
-                            glyph: 14,
+                            size: ControlSize.xs,
+                            glyph: IconSize.xs,
                             semanticLabel:
                                 'New task on ${calendarShortDate(day)}',
                             onTap: () => widget.onCreate(day),
@@ -1298,8 +1292,8 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                         ],
                         Container(
                           alignment: Alignment.center,
-                          width: mobile ? 30 : 26,
-                          height: mobile ? 30 : 24,
+                          width: mobile ? CalendarMonth.dayCompact : CalendarMonth.dayWidth,
+                          height: mobile ? CalendarMonth.dayCompact : CalendarMonth.dayHeight,
                           decoration: BoxDecoration(
                             color: today
                                 ? context.colors.accent
@@ -1313,15 +1307,14 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                           ),
                           child: Text(
                             '${day.day}',
-                            style: tsRaw(
-                              mobile ? 16 : 14,
-                              20,
-                              today ? 700 : 500,
+                            style: ts(
+                              context.type.item,
                               today
-                                  ? context.colors.onAccent
+                                  ? context.colors.accentInk
                                   : day.month != month.month
                                   ? context.colors.textTertiary
                                   : context.colors.textSecondary,
+                              weight: today ? Weight.strong : Weight.regular,
                             ),
                           ),
                         ),
@@ -1334,11 +1327,11 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                       children: [
                         for (final item in items.take(4))
                           Padding(
-                            padding: const EdgeInsets.all(1.5),
+                            padding: const EdgeInsets.all(Space.hair),
                             child: _CalendarDot(
                               item: item,
                               settings: widget.store.settings,
-                              size: 4,
+                              size: CalendarMonth.smallDot,
                             ),
                           ),
                       ],
@@ -1346,7 +1339,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                   else ...[
                     for (final item in items.take(3))
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
+                        padding: const EdgeInsets.only(bottom: Space.xxs),
                         child: _CalendarChip(
                           item: item,
                           settings: widget.store.settings,
@@ -1360,7 +1353,7 @@ class _ContinuousMonthsState extends State<_ContinuousMonths> {
                         alignment: Alignment.centerLeft,
                         child: TextBtn(
                           '+${items.length - 3} more',
-                          height: 16,
+                          size: ControlSize.xs,
                           onTap: () => widget.onSelected(context, day),
                         ),
                       ),
@@ -1395,7 +1388,7 @@ class _MonthHeading extends SliverPersistentHeaderDelegate {
       color: colors.bgPrimary,
       border: Border(bottom: BorderSide(color: colors.border)),
     ),
-    child: Text(title, style: ts(type, colors.textSecondary, weight: 700)),
+    child: Text(title, style: ts(type, colors.textSecondary, weight: Weight.strong)),
   );
   @override
   bool shouldRebuild(_MonthHeading old) =>
@@ -1434,20 +1427,21 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final now = clockNow();
-    final minute = now.hour * 60 + now.minute;
+    // The grid is one logical pixel per minute.
+    final minute = now.hour * Duration.minutesPerHour + now.minute;
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: Space.lg),
           child: Row(
             children: [
-              const SizedBox(width: 80),
+              const Gap(CalendarTimeGrid.hourColumn),
               for (final day in widget.days)
                 Expanded(
                   child: Hover(
                     onTap: () => widget.onSelect(day),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: Space.md),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -1455,10 +1449,10 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                             weekdays[day.weekday - 1].substring(0, 3),
                             style: ts(context.type.uiSmall, c.textSecondary),
                           ),
-                          const SizedBox(width: 5),
+                          const Gap(Space.xs),
                           Container(
-                            width: 27,
-                            height: 27,
+                            width: CalendarTimeGrid.headerDay,
+                            height: CalendarTimeGrid.headerDay,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
@@ -1468,7 +1462,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                               '${day.day}',
                               style: tsDisplay(
                                 context.type.h3,
-                                sameDay(day, now) ? c.onAccent : c.textPrimary,
+                                sameDay(day, now) ? c.accentInk : c.textPrimary,
                               ),
                             ),
                           ),
@@ -1481,24 +1475,24 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
           ),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: Space.lg),
           decoration: BoxDecoration(
             border: Border(
               top: BorderSide(color: c.border),
               bottom: BorderSide(color: c.border),
             ),
           ),
-          constraints: const BoxConstraints(minHeight: 58, maxHeight: 107),
+          constraints: const BoxConstraints(minHeight: CalendarTimeGrid.allDayMin, maxHeight: CalendarTimeGrid.allDayMax),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 80,
+                width: CalendarTimeGrid.hourColumn,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: Space.sm),
                   child: Text(
                     'All day',
-                    style: tsRaw(10, 14, 500, c.textTertiary),
+                    style: ts(context.type.micro, c.textTertiary, weight: Weight.strong),
                   ),
                 ),
               ),
@@ -1511,7 +1505,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                     onAcceptWithDetails: (d) => widget.onMove(d.data, day),
                     builder: (context, candidates, _) => Container(
                       color: candidates.isNotEmpty ? c.bgSelectedBlock : null,
-                      padding: const EdgeInsets.fromLTRB(3, 5, 3, 5),
+                      padding: const EdgeInsets.fromLTRB(Space.xxs, Space.xs, Space.xxs, Space.xs),
                       child: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1521,7 +1515,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                                     .onDay(day)
                                     .where((i) => !i.hasTime))
                               Padding(
-                                padding: const EdgeInsets.only(bottom: 3),
+                                padding: const EdgeInsets.only(bottom: Space.xxs),
                                 child: _CalendarChip(
                                   item: item,
                                   settings: widget.store.settings,
@@ -1535,7 +1529,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                             if (!widget.store.onDay(day).any((i) => !i.hasTime))
                               Hover(
                                 onTap: () => widget.onCreate(day, null),
-                                child: const SizedBox(height: 40),
+                                child: const SizedBox(height: CalendarTimeGrid.emptyAllDay),
                               ),
                           ],
                         ),
@@ -1550,45 +1544,40 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
           child: SingleChildScrollView(
             key: const ValueKey('calendar-time-scroll'),
             controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+            padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
             child: SizedBox(
-              height: 1440,
+              height: CalendarTimeGrid.hours,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    width: 80,
+                    width: CalendarTimeGrid.hourColumn,
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
                         for (var hour = 0; hour < 24; hour++)
                           Positioned(
-                            top: hour * 60.0 + (hour == 0 ? 2 : -7),
-                            right: 9,
+                            top: hour * CalendarTimeGrid.hour + (hour == 0 ? CalendarTimeGrid.firstLabelDrop : -CalendarTimeGrid.labelLift),
+                            right: CalendarTimeGrid.labelRight,
                             child: Text(
                               '${hour.toString().padLeft(2, '0')}:00',
-                              style: tsRaw(
-                                10,
-                                14,
-                                400,
-                                c.textTertiary,
-                              ).copyWith(fontFamily: monoFamily),
+                              style: ts(context.type.micro, c.textTertiary, weight: Weight.regular, mono: true),
                             ),
                           ),
                         if (widget.days.any((d) => sameDay(d, now)))
                           Positioned(
                             key: const ValueKey('calendar-now-label'),
-                            top: minute - 8.0,
+                            top: minute - CalendarTimeGrid.nowLift,
                             left: 0,
                             child: ColoredBox(
                               color: c.bgPrimary,
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 3,
+                                  horizontal: Space.xxs,
                                 ),
                                 child: Text(
                                   'now ${calendarTime(minute)}',
-                                  style: tsRaw(10, 16, 700, c.accentText),
+                                  style: ts(context.type.micro, c.accentText, weight: Weight.strong),
                                 ),
                               ),
                             ),
@@ -1613,8 +1602,8 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                               children: [
                                 for (var hour = 0; hour < 24; hour++)
                                   Positioned(
-                                    top: hour * 60.0,
-                                    height: 60,
+                                    top: hour * CalendarTimeGrid.hour,
+                                    height: CalendarTimeGrid.hour,
                                     left: 0,
                                     right: 0,
                                     child: DragTarget<Object>(
@@ -1658,9 +1647,9 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                                     top: segment.startMinute.toDouble(),
                                     height: math
                                         .min(
-                                          1440 - segment.startMinute,
+                                          CalendarTimeGrid.hours - segment.startMinute,
                                           math.max(
-                                            22,
+                                            CalendarMonth.chip,
                                             segment.endMinute -
                                                 segment.startMinute,
                                           ),
@@ -1670,10 +1659,10 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                                         constraints.maxWidth *
                                             segment.lane /
                                             segment.lanes +
-                                        3,
+                                        CalendarTimeGrid.blockInset,
                                     width: math.max(
                                       1,
-                                      constraints.maxWidth / segment.lanes - 6,
+                                      constraints.maxWidth / segment.lanes - 2 * CalendarTimeGrid.blockInset,
                                     ),
                                     child: _timedBlock(context, segment),
                                   ),
@@ -1685,7 +1674,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                                     right: 0,
                                     child: IgnorePointer(
                                       child: Container(
-                                        height: 2,
+                                        height: Stroke.bold,
                                         color: c.accentText,
                                       ),
                                     ),
@@ -1718,9 +1707,9 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
               '${item.title}, ${segment.continued ? 'continued, ' : ''}${calendarTime(segment.startMinute)} to ${calendarTime(segment.endMinute)}',
           child: Hover(
             onTap: () => widget.onOpen(item),
-            background: color.withValues(alpha: .24),
-            border: Border.all(color: color.withValues(alpha: .6)),
-            padding: const EdgeInsets.all(5),
+            background: color.withValues(alpha: Alpha.wash),
+            border: Border.all(color: color.withValues(alpha: Alpha.muted)),
+            padding: const EdgeInsets.all(Space.xs),
             child: LayoutBuilder(
               builder: (context, size) => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1729,10 +1718,10 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                     '${item.assignee == 'agent' ? 'Agent · ' : ''}${segment.continued ? 'Continued · ' : ''}${calendarTime(segment.startMinute)}${size.maxHeight > 42 ? ' – ${calendarTime(segment.endMinute)}' : ''}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: tsRaw(10, 12, 500, context.colors.textSecondary),
+                    style: ts(context.type.micro, context.colors.textSecondary, weight: Weight.strong),
                   ),
                   if (size.maxHeight > 25) ...[
-                    const SizedBox(height: 3),
+                    const Gap(Space.xxs),
                     Expanded(
                       child: Text(
                         item.title,
@@ -1742,14 +1731,7 @@ class _CalendarTimeGridState extends State<_CalendarTimeGrid> {
                         ),
                         overflow: TextOverflow.ellipsis,
                         style:
-                            tsRaw(
-                              12,
-                              16,
-                              600,
-                              item.done
-                                  ? context.colors.textTertiary
-                                  : context.colors.textPrimary,
-                            ).copyWith(
+                            ts(context.type.uiSmall, item.done ? context.colors.textTertiary : context.colors.textPrimary, weight: Weight.strong).copyWith(
                               decoration: item.done
                                   ? TextDecoration.lineThrough
                                   : null,
@@ -1805,7 +1787,7 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
     final first = calendarMonday(_month);
     final weeks = calendarMonthWeeks(_month);
     return Padding(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(Space.lg),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1825,7 +1807,7 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const Gap(Space.md),
           Row(
             children: [
               IconBtn(
@@ -1840,7 +1822,7 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
                     style: ts(
                       context.type.ui,
                       context.colors.textPrimary,
-                      weight: 700,
+                      weight: Weight.strong,
                     ),
                   ),
                 ),
@@ -1852,7 +1834,7 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const Gap(Space.md),
           Row(
             children: [
               for (final day in weekdays)
@@ -1869,7 +1851,7 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
                 ),
             ],
           ),
-          const SizedBox(height: 4),
+          const Gap(Space.xxs),
           for (var week = 0; week < weeks; week++)
             Row(
               children: [
@@ -1885,8 +1867,8 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
                           child: Hover(
                             onTap: () => Navigator.of(context).pop(day),
                             selected: sameDay(day, widget.selected),
-                            child: SizedBox(
-                              height: 34,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: CalendarScreen.jumpDay),
                               child: Center(
                                 child: Text(
                                   '${day.day}',
@@ -1906,9 +1888,9 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
                   ),
               ],
             ),
-          const SizedBox(height: 12),
+          const Gap(Space.md),
           FieldFrame(
-            height: 40,
+            height: CalendarScreen.jumpField,
             child: PlainField(
               key: const ValueKey('calendar-jump-date'),
               controller: _text,
@@ -1923,7 +1905,7 @@ class _CalendarJumpPickerState extends State<CalendarJumpPicker> {
               _error!,
               style: ts(context.type.uiSmall, context.colors.inlineCodeText),
             ),
-          const SizedBox(height: 12),
+          const Gap(Space.md),
           SecondaryButton(label: 'Go to date', onTap: _submit),
         ],
       ),

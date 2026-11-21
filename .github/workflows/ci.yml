@@ -116,9 +116,12 @@ jobs:
           # gradle.properties pins a local Android Studio JBR; the runner uses JAVA_HOME.
           sed -i '/^org\.gradle\.java\.home=/d' android/gradle.properties
           flutter pub get
-      - name: flutter analyze
+      # dart analyze, not flutter analyze: only it reports the bb_lints
+      # plugin's diagnostics (analysis_options.yaml), and only when run on the
+      # package root without lib/test arguments.
+      - name: dart analyze (with bb_lints)
         working-directory: scratch/app
-        run: flutter analyze
+        run: dart analyze --fatal-infos
       - name: Add-on import boundaries
         working-directory: scratch
         run: |

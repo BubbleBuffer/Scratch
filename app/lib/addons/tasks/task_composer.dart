@@ -93,7 +93,7 @@ class _TaskComposerState extends State<TaskComposer> {
             widget.initialHour!,
           );
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(Space.xl),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -113,7 +113,7 @@ class _TaskComposerState extends State<TaskComposer> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const Gap(Space.lg),
           if (_calendars == null) ...[
             Text(
               _error ?? 'Loading calendars…',
@@ -319,7 +319,7 @@ class _TaskFieldsState extends State<TaskFields> {
   }
 
   Widget _label(String name, Widget field) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.only(bottom: Space.md),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -327,7 +327,7 @@ class _TaskFieldsState extends State<TaskFields> {
           name,
           style: ts(context.type.uiSmall, context.colors.textTertiary),
         ),
-        const SizedBox(height: 4),
+        const Gap(Space.xxs),
         field,
       ],
     ),
@@ -395,7 +395,7 @@ class _TaskFieldsState extends State<TaskFields> {
                         : (done) =>
                               _change(() => _status = done ? 'done' : 'todo'),
                   ),
-                  const SizedBox(width: 8),
+                  const Gap(Space.sm),
                 ],
                 SelectButton<String>(
                   value: _status,
@@ -440,7 +440,7 @@ class _TaskFieldsState extends State<TaskFields> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: Space.md),
             child: Row(
               children: [
                 StacksCheckbox(
@@ -449,7 +449,7 @@ class _TaskFieldsState extends State<TaskFields> {
                       ? null
                       : (value) => _change(() => _timed = value),
                 ),
-                const SizedBox(width: 8),
+                const Gap(Space.sm),
                 Text('Add time', style: ts(context.type.ui, c.textSecondary)),
               ],
             ),
@@ -463,7 +463,7 @@ class _TaskFieldsState extends State<TaskFields> {
                     _field('Time', _time, placeholder: '09:00'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const Gap(Space.md),
                 Expanded(
                   child: _label(
                     'Duration (min)',
@@ -491,7 +491,7 @@ class _TaskFieldsState extends State<TaskFields> {
           ),
           if (widget.fromToday && selected?.showInToday == false)
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: Space.md),
               child: Text(
                 'This calendar is hidden from Today. Your task will appear in Calendar.',
                 style: ts(context.type.uiSmall, c.textTertiary),
@@ -511,7 +511,7 @@ class _TaskFieldsState extends State<TaskFields> {
           ),
           if (_assignee == 'agent' || widget.initial.assignee == 'agent')
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: Space.md),
               child: Text(
                 taskAgentNote(
                   composer: widget.composer,
@@ -525,7 +525,7 @@ class _TaskFieldsState extends State<TaskFields> {
             ),
           if (_error != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: Space.md),
               child: Semantics(
                 liveRegion: true,
                 child: Text(
@@ -542,7 +542,7 @@ class _TaskFieldsState extends State<TaskFields> {
                   'Open full',
                   onTap: _busy ? null : () => _save(openFull: true),
                 ),
-                const SizedBox(width: 12),
+                const Gap(Space.md),
               ],
               DialogButton(
                 label: _busy

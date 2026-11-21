@@ -68,7 +68,7 @@ class MobileAgentSettings extends StatelessWidget {
                 RunAiOnSetting(store: store, phone: true),
                 if (chosen == AgentHost.local)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.only(top: Space.sm),
                     child: Text(
                       'Your computers use their own agent. This phone uses the hub.',
                       key: const ValueKey('agent-phone-uses-hub'),
@@ -108,7 +108,7 @@ class MobileAgentSettings extends StatelessWidget {
                     ),
                     below: failed
                         ? Padding(
-                            padding: const EdgeInsets.only(top: 10),
+                            padding: const EdgeInsets.only(top: Space.md),
                             child: Align(
                               alignment: Alignment.centerLeft,
                               child: SButton(

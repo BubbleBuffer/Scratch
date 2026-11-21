@@ -16,16 +16,16 @@ import '../../ui/ui.dart';
 /// Gallery entries: (name, colours). One colour is a flat fill; more make a
 /// diagonal gradient.
 const coverGallery = <(String, List<Color>)>[
-  ('Red', [Color(0xFFE16259)]),
-  ('Yellow', [Color(0xFFDFAB01)]),
-  ('Blue', [Color(0xFF0B6E99)]),
-  ('Wood', [Color(0xFFB3906F)]),
-  ('Gradient 1', [Color(0xFFFF4E9B), Color(0xFFFFE5B4), Color(0xFF9EF0D8), Color(0xFF7F9CF5)]),
-  ('Gradient 2', [Color(0xFF3B82F6), Color(0xFF9333EA)]),
-  ('Gradient 3', [Color(0xFFF59E0B), Color(0xFFEF4444)]),
-  ('Gradient 4', [Color(0xFF10B981), Color(0xFF3B82F6)]),
-  ('Gradient 5', [Color(0xFFFDE68A), Color(0xFFFCA5A5)]),
-  ('Gradient 6', [Color(0xFF111827), Color(0xFF6B7280)]),
+  ('Red', [CoverColors.red]),
+  ('Yellow', [CoverColors.yellow]),
+  ('Blue', [CoverColors.blue]),
+  ('Wood', [CoverColors.wood]),
+  ('Gradient 1', CoverGradients.one),
+  ('Gradient 2', CoverGradients.two),
+  ('Gradient 3', CoverGradients.three),
+  ('Gradient 4', CoverGradients.four),
+  ('Gradient 5', CoverGradients.five),
+  ('Gradient 6', CoverGradients.six),
 ];
 
 Gradient _gradient(List<Color> colors) => LinearGradient(
@@ -49,10 +49,10 @@ Future<List<int>> renderCoverPng(List<Color> colors, {int w = 1500, int h = 600}
 /// Completes with a cover attachment id, '' to remove, or null.
 Future<String?> showCoverPicker(BuildContext context, {required String pageId, Rect? anchor, bool hasCover = true}) {
   Widget body(BuildContext ctx) => _CoverPicker(hasCover: hasCover, onDone: (v) => Navigator.of(ctx).pop(v));
-  if (context.mobile || anchor == null) {
+  if (context.sizeClass.isCompact || anchor == null) {
     return showSheet<String>(context, (ctx) => SheetSurface(children: [body(ctx)]));
   }
-  return showPopover<String>(context, anchor, (ctx) => MenuSurface(width: 540, child: body(ctx)));
+  return showPopover<String>(context, anchor, (ctx) => MenuSurface(width: CoverPickerSize.width, child: body(ctx)));
 }
 
 class _CoverPicker extends StatefulWidget {
@@ -137,8 +137,8 @@ class _CoverPickerState extends State<_CoverPicker> {
     final ty = context.type;
     final dialogs = FileDialogs.instance.available;
     final pathField = Container(
-      height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: ControlSize.md.height,
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
         color: c.bgHover,
@@ -150,7 +150,7 @@ class _CoverPickerState extends State<_CoverPicker> {
         controller: _path,
         focusNode: _focus,
         autofocus: !dialogs,
-        style: ts(ty.ui, c.textPrimary, weight: 400),
+        style: ts(ty.ui, c.textPrimary, weight: Weight.regular),
         placeholder: dialogs ? 'Or paste a path to an image…' : 'Path to an image file…',
         textInputAction: TextInputAction.done,
         onSubmitted: (_) => _upload(),
@@ -161,30 +161,30 @@ class _CoverPickerState extends State<_CoverPicker> {
           onTap: () => setState(() => _tab = i),
           radius: 0,
           child: Container(
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            height: PickerTabs.height,
+            padding: const EdgeInsets.symmetric(horizontal: Space.sm),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: _tab == i ? c.textPrimary : const Color(0x00000000), width: 2)),
+              border: Border(bottom: BorderSide(color: _tab == i ? c.textPrimary : kTransparent, width: Stroke.bold)),
             ),
             child: Text(label, style: ts(ty.ui, _tab == i ? c.textPrimary : c.textSecondary)),
           ),
         );
     final content = _tab == 0
         ? Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(Space.md),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
               Text('Color & Gradient', style: ts(ty.uiSmall, c.textSecondary)),
-              const SizedBox(height: 8),
-              Wrap(spacing: 8, runSpacing: 8, children: [
+              const Gap(Space.sm),
+              Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
                 for (var i = 0; i < coverGallery.length; i++)
                   Hover(
                     key: ValueKey('cover-gallery-$i'),
                     onTap: () => _pickGallery(i),
                     radius: Radii.sm,
                     child: Container(
-                      width: 116,
-                      height: 64,
+                      width: CoverPickerSize.swatchWidth,
+                      height: CoverPickerSize.swatchHeight,
                       decoration: BoxDecoration(
                         gradient: _gradient(coverGallery[i].$2),
                         borderRadius: BorderRadius.circular(Radii.sm),
@@ -195,26 +195,26 @@ class _CoverPickerState extends State<_CoverPicker> {
             ]),
           )
         : Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(Space.md),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
               if (dialogs) ...[
-                Center(child: SizedBox(width: 240, child: PrimaryButton(key: const ValueKey('cover-upload'), label: 'Upload file', onTap: _choose))),
-                const SizedBox(height: 10),
+                Center(child: SizedBox(width: CoverPickerSize.upload, child: PrimaryButton(key: const ValueKey('cover-upload'), label: 'Upload file', onTap: _choose))),
+                const Gap(Space.md),
                 pathField,
               ] else ...[
                 pathField,
-                const SizedBox(height: 10),
-                Center(child: SizedBox(width: 240, child: PrimaryButton(key: const ValueKey('cover-upload'), label: 'Upload file', onTap: _upload))),
+                const Gap(Space.md),
+                Center(child: SizedBox(width: CoverPickerSize.upload, child: PrimaryButton(key: const ValueKey('cover-upload'), label: 'Upload file', onTap: _upload))),
               ],
-              const SizedBox(height: 8),
+              const Gap(Space.sm),
               Text(_error ?? 'Images wider than 1500 pixels work best.',
                   textAlign: TextAlign.center,
-                  style: ts(ty.uiSmall, _error == null ? c.textTertiary : c.inlineCodeText, weight: 400)),
+                  style: ts(ty.uiSmall, _error == null ? c.textTertiary : c.inlineCodeText, weight: Weight.regular)),
             ]),
           );
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: Space.sm),
         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border))),
         child: Row(children: [
           tab(0, 'Gallery'),

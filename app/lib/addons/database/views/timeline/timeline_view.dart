@@ -11,7 +11,7 @@ import 'package:flutter/widgets.dart';
 import '../../../../core/models.dart';
 import '../../../../ui/database/config.dart';
 import '../../../../ui/database/db_icons.dart';
-import '../../../../ui/database/db_theme.dart';
+import '../../../../ui/database/db_tokens.dart';
 import '../../../../ui/database/values.dart';
 import '../../../../ui/database/widgets.dart';
 import '../../../../registry/view_registry.dart';
@@ -68,7 +68,7 @@ Future<void> _pickZoom(BuildContext ctx, Rect rect, ViewArgs a) async {
             key: ValueKey('zoom-${z.name}'),
             label: _zoomLabel(z),
             trailing: a.view.cfg.zoom == z
-                ? Icon20(Ico.check, size: 16, color: c.colors.iconPrimary)
+                ? Icon20(Ico.check, size: IconSize.sm, color: c.colors.iconPrimary)
                 : null,
             onTap: () => Navigator.of(c).pop(z),
           ),
@@ -184,7 +184,7 @@ class _TimelineViewState extends State<TimelineView> {
     final c = context.colors;
     if (key == null || a.store.def(key) == null) {
       return Padding(
-        padding: EdgeInsets.fromLTRB(a.gutter, 24, a.gutter, 24),
+        padding: EdgeInsets.fromLTRB(a.gutter, Space.xl, a.gutter, Space.xl),
         child: Builder(
           builder: (b) => ChipBtn(
             key: const ValueKey('timeline-pick-date'),
@@ -216,8 +216,8 @@ class _TimelineViewState extends State<TimelineView> {
           final s = x.startMs.compareTo(y.startMs);
           return s != 0 ? s : x.page.title.compareTo(y.page.title);
         });
-    final m = context.mobile;
-    const rowH = 36.0;
+    final m = context.touch;
+    const rowH = DbTimeline.row;
 
     return LayoutBuilder(
       builder: (context, box) {
@@ -235,19 +235,19 @@ class _TimelineViewState extends State<TimelineView> {
 
         final toolbar = Padding(
           padding: EdgeInsets.fromLTRB(
-            a.inline ? a.gutter : a.gutter,
-            4,
-            a.inline ? 8 : a.gutter,
+            a.gutter,
+            Space.xxs,
+            a.inline ? Space.sm : a.gutter,
             0,
           ),
-          child: SizedBox(
-            height: m ? 40 : 30,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: (m ? ControlSize.xl : ControlSize.md).height),
             child: Row(
               children: [
                 Text(
                   '${monthName(firstDay.month)} ${firstDay.year}',
                   key: const ValueKey('timeline-month'),
-                  style: ts(context.type.ui, c.textPrimary, weight: 600),
+                  style: ts(context.type.ui, c.textPrimary, weight: Weight.strong),
                 ),
                 const Spacer(),
                 Builder(
@@ -255,9 +255,9 @@ class _TimelineViewState extends State<TimelineView> {
                     key: const ValueKey('timeline-zoom'),
                     onTap: () => _pickZoom(b, globalRectOf(b), a),
                     radius: Radii.md,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: SizedBox(
-                      height: 24,
+                    padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: ControlSize.xs.height),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -266,13 +266,13 @@ class _TimelineViewState extends State<TimelineView> {
                             style: ts(
                               context.type.ui,
                               c.textTertiary,
-                              weight: 400,
+                              weight: Weight.regular,
                             ),
                           ),
-                          const SizedBox(width: 2),
+                          const Gap(Space.hair),
                           Icon20(
                             Ico.chevronDown,
-                            size: 14,
+                            size: IconSize.xs,
                             color: c.iconTertiary,
                           ),
                         ],
@@ -282,8 +282,8 @@ class _TimelineViewState extends State<TimelineView> {
                 ),
                 IconBtn(
                   Ico.chevronLeft,
-                  size: 24,
-                  glyph: 16,
+                  size: ControlSize.xs,
+                  glyph: IconSize.sm,
                   color: c.iconSecondary,
                   semanticLabel: 'Earlier',
                   onTap: () => _page(-1),
@@ -291,14 +291,14 @@ class _TimelineViewState extends State<TimelineView> {
                 TextBtn(
                   'Today',
                   key: const ValueKey('timeline-today'),
-                  height: 24,
+                  size: ControlSize.xs,
                   color: c.textSecondary,
                   onTap: _jumpToday,
                 ),
                 IconBtn(
                   Ico.chevronRight,
-                  size: 24,
-                  glyph: 16,
+                  size: ControlSize.xs,
+                  glyph: IconSize.sm,
                   color: c.iconSecondary,
                   semanticLabel: 'Later',
                   onTap: () => _page(1),
@@ -323,7 +323,7 @@ class _TimelineViewState extends State<TimelineView> {
           );
         }
 
-        final lanesH = math.max(entries.length + 1, a.inline ? 4 : 0) * rowH;
+        final lanesH = math.max(entries.length + 1, a.inline ? DbTimeline.inlineLanes : 0) * rowH;
         final Widget lanes = a.inline
             ? SizedBox(
                 height: lanesH,
@@ -337,7 +337,7 @@ class _TimelineViewState extends State<TimelineView> {
                 key: const ValueKey('timeline-rows'),
                 controller: _v,
                 itemExtent: rowH,
-                padding: const EdgeInsets.only(bottom: 80),
+                padding: const EdgeInsets.only(bottom: DbTimeline.endPadding),
                 itemCount: entries.length + 1,
                 itemBuilder: (context, i) => lane(i),
               );
@@ -349,7 +349,7 @@ class _TimelineViewState extends State<TimelineView> {
             mainAxisSize: a.inline ? MainAxisSize.min : MainAxisSize.max,
             children: [
               SizedBox(
-                height: 48,
+                height: DbTimeline.header,
                 child: CustomPaint(
                   painter: _HeaderPainter(
                     origin: _origin,
@@ -420,21 +420,21 @@ class _TimelineViewState extends State<TimelineView> {
     final c = context.colors;
     final s = entryStart(e), f = entryEnd(e);
     final (ds, de) = _drag[e.page.id] ?? (0.0, 0.0);
-    final left = (s - _origin) * _dw + ds + 2;
-    final width = math.max(_dw * 0.5, (f - s + 1) * _dw + de - ds - 4);
+    final left = (s - _origin) * _dw + ds + DbTimeline.barInset / 2;
+    final width = math.max(_dw * DbTimeline.minBarShare, (f - s + 1) * _dw + de - ds - DbTimeline.barInset);
     final title = displayTitle(e.page.title, firstLine: untitledLine(context, e.page));
     final narrow = width < 120;
     final label = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        PageIcon(icon: e.page.icon, size: 16, color: c.iconSecondary),
-        const SizedBox(width: 6),
+        PageIcon(icon: e.page.icon, size: IconSize.sm.px, color: c.iconSecondary),
+        const Gap(Space.xs),
         Flexible(
           child: Text(
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: tsRaw(14, 20, 500, c.textPrimary),
+            style: ts(context.type.ui, c.textPrimary),
           ),
         ),
       ],
@@ -445,7 +445,7 @@ class _TimelineViewState extends State<TimelineView> {
       right: start ? null : 0,
       top: 0,
       bottom: 0,
-      width: 8,
+      width: DbTimeline.handle,
       child: MouseRegion(
         cursor: SystemMouseCursors.resizeLeftRight,
         child: GestureDetector(
@@ -464,9 +464,9 @@ class _TimelineViewState extends State<TimelineView> {
 
     return Positioned(
       left: left,
-      top: (rowH - 26) / 2,
-      height: 26,
-      width: width + (narrow ? 400 : 0),
+      top: (rowH - DbTimeline.bar) / 2,
+      height: DbTimeline.bar,
+      width: width + (narrow ? DbTimeline.narrowLabel : 0),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -485,7 +485,7 @@ class _TimelineViewState extends State<TimelineView> {
               }),
               onHorizontalDragEnd: (_) => _end(e),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: Space.sm),
                 decoration: BoxDecoration(
                   color: eventPillFill(c, a.store.resolvedSpaceColor),
                   borderRadius: Radii.pill,
@@ -501,17 +501,17 @@ class _TimelineViewState extends State<TimelineView> {
           ),
           if (narrow)
             Positioned(
-              left: width + 8,
+              left: width + Space.sm,
               top: 0,
               bottom: 0,
               child: IgnorePointer(child: Center(child: label)),
             ),
           handle(true),
           Positioned(
-            left: width - 8,
+            left: width - DbTimeline.handle,
             top: 0,
             bottom: 0,
-            width: 8,
+            width: DbTimeline.handle,
             child: Stack(children: [handle(false)]),
           ),
         ],
@@ -560,19 +560,9 @@ class _HeaderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final first = (offset / dw).floor() - 1;
     final last = ((offset + viewport) / dw).ceil() + 1;
-    final small = TextStyle(
-      fontFamily: sansFamily,
-      fontSize: 12,
-      height: 1.3,
-      color: colors.textTertiary,
-    );
-    final month = TextStyle(
-      fontFamily: sansFamily,
-      fontSize: 14,
-      height: 1.3,
-      fontWeight: FontWeight.w600,
-      color: colors.textPrimary,
-    );
+    // The header is drawn at fixed offsets, at the pointer sizes.
+    final small = ts(TypeScale.pointer.uiSmall, colors.textTertiary, weight: Weight.regular);
+    final month = ts(TypeScale.pointer.ui, colors.textPrimary, weight: Weight.strong);
     final step = dw >= 30 ? 1 : 7;
     for (var i = first; i <= last; i++) {
       final d = origin.add(i);
@@ -590,7 +580,7 @@ class _HeaderPainter extends CustomPainter {
           canvas,
           '${d.day}',
           Offset(x + dw / 2, 26),
-          small.copyWith(color: colors.bgPrimary, fontWeight: FontWeight.w600),
+          ts(TypeScale.pointer.uiSmall, colors.bgPrimary, weight: Weight.strong),
           center: true,
         );
       } else if (step == 1 || d.weekday0Sunday() == 1) {
@@ -646,7 +636,7 @@ class _GridPainter extends CustomPainter {
       Offset(t, size.height),
       Paint()
         ..color = colors.accentText
-        ..strokeWidth = 1,
+        ..strokeWidth = Stroke.hair,
     );
     canvas.drawCircle(Offset(t, 0), 3, Paint()..color = colors.accentText);
     canvas.drawLine(

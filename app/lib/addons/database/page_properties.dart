@@ -26,6 +26,7 @@ import 'controller.dart';
 import '../../ui/database/db_icons.dart';
 import 'property_menu.dart';
 import '../../ui/database/values.dart';
+import '../../ui/database/db_tokens.dart';
 
 class PageProperties extends StatefulWidget {
   const PageProperties({
@@ -213,8 +214,8 @@ class _PagePropertiesState extends State<PageProperties> {
 
   Widget _build(BuildContext context) {
     final s = _store;
-    final mobile = context.mobile;
-    final pad = EdgeInsets.only(left: widget.left, bottom: 8);
+    final mobile = context.touch;
+    final pad = EdgeInsets.only(left: widget.left, bottom: Space.sm);
     // Pages under a document or a page with properties; other page types
     // (a journal, a mod's type) keep their own children.
     if (s == null ||
@@ -224,7 +225,7 @@ class _PagePropertiesState extends State<PageProperties> {
     }
     final r = _row;
     if (r == null) {
-      return SizedBox(height: s.schema.length * (mobile ? 38.0 : 34.0));
+      return SizedBox(height: s.schema.length * ((mobile ? Db.propRowTouch : Db.propRow) + Space.xxs));
     }
     final shown = <PropDef>[], hidden = <PropDef>[];
     for (final d in s.schema) {
@@ -257,7 +258,7 @@ class _PagePropertiesState extends State<PageProperties> {
                   key: const ValueKey('props-more'),
                   icon: Icon20(
                     _showHidden ? Ico.chevronDown : Ico.chevronRight,
-                    size: 14,
+                    size: IconSize.xs,
                     color: c.iconTertiary,
                   ),
                   label: _showHidden
@@ -268,14 +269,14 @@ class _PagePropertiesState extends State<PageProperties> {
               _footRow(
                 context,
                 key: const ValueKey('props-add'),
-                icon: Icon20(Ico.plus, size: 16, color: c.iconTertiary),
+                icon: Icon20(Ico.plus, size: IconSize.sm, color: c.iconTertiary),
                 label: 'Add a property',
                 onTap: _add,
               ),
               if (s.schema.isNotEmpty) ...[
-                const SizedBox(height: 8),
+                const Gap(Space.sm),
                 HLine(color: c.divider),
-                const SizedBox(height: 4),
+                const Gap(Space.xxs),
               ],
             ],
           ),
@@ -286,15 +287,15 @@ class _PagePropertiesState extends State<PageProperties> {
 
   Widget _propRow(BuildContext context, PropDef d, PageRow r) {
     final c = context.colors;
-    final mobile = context.mobile;
+    final mobile = context.touch;
     final t = propertyRegistry.of(d.kind);
     final v = r.valueOf(d);
-    const labelW = 140.0;
-    final labelStyle = tsRaw(14, 20, 400, c.textSecondary);
+    const labelW = Db.propLabel;
+    final labelStyle = ts(context.type.ui, c.textSecondary, weight: Weight.regular);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: Space.xxs),
       child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: mobile ? 34 : 30),
+        constraints: BoxConstraints(minHeight: mobile ? Db.propRowTouch : Db.propRow),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -305,17 +306,17 @@ class _PagePropertiesState extends State<PageProperties> {
                   key: ValueKey('prop-label-${d.name}'),
                   onTap: () => showPropertyMenu(b, _ctl!, d, inPage: true),
                   radius: Radii.sm,
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: SizedBox(
-                    height: mobile ? 34 : 30,
+                  padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: mobile ? Db.propRowTouch : Db.propRow),
                     child: Row(
                       children: [
                         DbIcon(
                           propIcon(d),
-                          size: mobile ? 18 : 16,
+                          size: (mobile ? IconSize.md : IconSize.sm).px,
                           color: c.textSecondary,
                         ),
-                        SizedBox(width: mobile ? 10 : 8),
+                        Gap(mobile ? Space.md : Space.sm),
                         Expanded(
                           child: Text(
                             d.name,
@@ -330,7 +331,7 @@ class _PagePropertiesState extends State<PageProperties> {
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const Gap(Space.xxs),
             Expanded(
               child: Builder(
                 builder: (b) => Hover(
@@ -340,8 +341,8 @@ class _PagePropertiesState extends State<PageProperties> {
                       : () => _edit(b, d),
                   radius: Radii.sm,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 5,
+                    horizontal: Space.xs,
+                    vertical: Space.xs,
                   ),
                   child: Align(
                     alignment: Alignment.centerLeft,
@@ -379,19 +380,17 @@ class _PagePropertiesState extends State<PageProperties> {
         key: key,
         onTap: () => onTap(b),
         radius: Radii.sm,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: SizedBox(
-          height: context.mobile ? 34 : 30,
+        padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: context.touch ? Db.propRowTouch : Db.propRow),
           child: Row(
             children: [
-              SizedBox(width: 16, child: Center(child: icon)),
-              const SizedBox(width: 8),
+              SizedBox(width: IconSize.sm.px, child: Center(child: icon)),
+              const Gap(Space.sm),
               Text(
                 label,
                 style: ts(
-                  context.mobile
-                      ? const TypeSpec(15, 20, 400)
-                      : const TypeSpec(14, 20, 400),
+                  context.type.ui,
                   c.textTertiary,
                 ),
               ),

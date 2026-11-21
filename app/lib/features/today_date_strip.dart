@@ -55,7 +55,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
       _app = app;
       _origin = calendarDay(app.agenda.selectedDay);
       _selected = _origin;
-      _extent = context.mobile ? 48 : 58;
+      _extent = context.touch ? DateStrip.extentTouch : DateStrip.extent;
       _scroll = ScrollController(initialScrollOffset: _extent / 2)
         ..addListener(_scrolled);
       app.feed.addListener(_changed);
@@ -63,7 +63,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
         if (mounted) _loadVisible();
       });
     } else {
-      final nextExtent = context.mobile ? 48.0 : 58.0;
+      final nextExtent = context.touch ? DateStrip.extentTouch : DateStrip.extent;
       if (_extent != nextExtent) {
         _extent = nextExtent;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -266,7 +266,7 @@ class _TodayDateStripState extends State<TodayDateStrip> {
     final hasNote = _notes.contains(stamp);
     final ink = selected ? c.bgPrimary : c.textPrimary;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(horizontal: Space.hair),
       child: Semantics(
         key: ValueKey('today-date-${todayDateKey(day)}'),
         button: true,
@@ -277,19 +277,19 @@ class _TodayDateStripState extends State<TodayDateStrip> {
           onTap: () => _select(day),
           lift: 0,
           background: selected ? c.textPrimary : null,
-          borderRadius: BorderRadius.circular(999),
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          borderRadius: Radii.pill,
+          padding: const EdgeInsets.symmetric(vertical: Space.xs),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 weekdays[day.weekday - 1].substring(0, 3),
-                style: tsRaw(11, 15, 500, selected ? ink : c.textSecondary),
+                style: ts(context.type.caption, selected ? ink : c.textSecondary, weight: Weight.strong),
               ),
-              const SizedBox(height: 2),
+              const Gap(Space.hair),
               Container(
-                width: 30,
-                height: 30,
+                width: DateStrip.day,
+                height: DateStrip.day,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -300,23 +300,23 @@ class _TodayDateStripState extends State<TodayDateStrip> {
                 child: Text(
                   '${day.day}',
                   style: tsDisplay(
-                    const TypeSpec(21, 25, 640),
+                    context.type.h3,
                     today && !selected ? c.accentText : ink,
-                  ),
+                   weight: Weight.display),
                 ),
               ),
-              const SizedBox(height: 4),
+              const Gap(Space.xxs),
               SizedBox(
-                height: 12,
+                height: DateStrip.dotRow,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     for (final color in colors.values)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                        padding: const EdgeInsets.symmetric(horizontal: Space.hair),
                         child: Container(
-                          width: 5,
-                          height: 5,
+                          width: DateStrip.dot,
+                          height: DateStrip.dot,
                           decoration: BoxDecoration(
                             color: color,
                             shape: BoxShape.circle,
@@ -324,11 +324,11 @@ class _TodayDateStripState extends State<TodayDateStrip> {
                         ),
                       ),
                     if (hasNote) ...[
-                      const SizedBox(width: 3),
+                      const Gap(Space.xxs),
                       Icon20(
                         Ico.page,
                         key: ValueKey('today-note-mark-${todayDateKey(day)}'),
-                        size: 11,
+                        size: IconSize.xs,
                         color: selected ? ink : c.iconSecondary,
                       ),
                     ],
@@ -384,20 +384,20 @@ class _TodayDateStripState extends State<TodayDateStrip> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const Gap(Space.xs),
           Row(
             children: [
               IconBtn(
                 Ico.chevronLeft,
                 key: const ValueKey('today-strip-previous'),
                 semanticLabel: 'Earlier dates',
-                size: context.mobile ? 36 : 28,
-                glyph: 16,
+                size: context.touch ? ControlSize.lg : ControlSize.sm,
+                glyph: IconSize.sm,
                 onTap: () => _browse(-1),
               ),
               Expanded(
                 child: SizedBox(
-                  height: 82,
+                  height: DateStrip.height,
                   child: Listener(
                     onPointerSignal: (event) {
                       if (event is PointerScrollEvent &&
@@ -458,8 +458,8 @@ class _TodayDateStripState extends State<TodayDateStrip> {
                 Ico.chevronRight,
                 key: const ValueKey('today-strip-next'),
                 semanticLabel: 'Later dates',
-                size: context.mobile ? 36 : 28,
-                glyph: 16,
+                size: context.touch ? ControlSize.lg : ControlSize.sm,
+                glyph: IconSize.sm,
                 onTap: () => _browse(1),
               ),
             ],
@@ -471,8 +471,8 @@ class _TodayDateStripState extends State<TodayDateStrip> {
               onTap: () => unawaited(_loadVisible()),
               color: c.textSecondary,
             ),
-          const SizedBox(height: 10),
-          Container(height: 1, color: c.border),
+          const Gap(Space.md),
+          Container(height: Stroke.hair, color: c.border),
         ],
       ),
     );

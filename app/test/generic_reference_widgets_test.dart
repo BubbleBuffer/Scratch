@@ -12,10 +12,10 @@ import 'package:notes_app/ui/ui.dart';
 Widget themed(
   Widget child, {
   bool dark = false,
-  FormFactor formFactor = FormFactor.desktop,
+  Density density = Density.pointer,
 }) => AppTheme(
   colors: dark ? AppColors.darkTheme : AppColors.light,
-  formFactor: formFactor,
+  density: density,
   child: WidgetsApp(
     color: const Color(0xFF000000),
     pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(
@@ -343,7 +343,7 @@ void main() {
             child: const Text('Open'),
           ),
         ),
-        formFactor: FormFactor.mobile,
+        density: Density.touch,
       ),
     );
 

@@ -13,6 +13,7 @@ import '../../src/rust/api/types.dart';
 import '../../state/app_state.dart';
 import '../../ui/app_name.dart';
 import '../settings/settings_kit.dart';
+import '../../ui/tokens.dart';
 
 class MountsSection extends StatefulWidget {
   const MountsSection({super.key});
@@ -90,7 +91,7 @@ class _MountsSectionState extends State<MountsSection> {
       children: [
         if (_mounts.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.only(top: Space.md),
             child: SList(
               foot: _editing ? null : SListFoot(children: [add]),
               children: [
@@ -119,7 +120,7 @@ class _MountsSectionState extends State<MountsSection> {
           )
         else if (!_editing)
           Padding(
-            padding: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.only(top: Space.md),
             child: SEmpty(
               icon: Sx.folderSync,
               title: 'No mounted folders',

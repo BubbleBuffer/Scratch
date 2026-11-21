@@ -44,12 +44,12 @@ class _Card extends StatelessWidget {
     final title = p?.title;
     final desc = p?.description;
     final icon = p?.icon;
-    final fallback = IconX(Ix.bookmark, size: 14, color: c.iconSecondary);
+    final fallback = IconX(Ix.bookmark, size: BookmarkCard.favicon, color: c.iconSecondary);
     return Hover(
       radius: Radii.lg,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 72),
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        constraints: const BoxConstraints(minHeight: BookmarkCard.minHeight),
+        padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.lg),
         decoration: BoxDecoration(
           border: Border.all(color: c.border),
           borderRadius: BorderRadius.circular(Radii.lg),
@@ -59,30 +59,30 @@ class _Card extends StatelessWidget {
               key: ValueKey('bookmark-title-$url'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: tsRaw(14, 20, 400, c.textPrimary)),
+              style: ts(context.type.ui, c.textPrimary, weight: Weight.regular)),
           if (desc != null) ...[
-            const SizedBox(height: 4),
+            const Gap(Space.xxs),
             Text(desc,
                 key: ValueKey('bookmark-description-$url'),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: tsRaw(12, 16, 400, c.textSecondary)),
+                style: ts(context.type.uiSmall, c.textSecondary, weight: Weight.regular)),
           ],
-          const SizedBox(height: 8),
+          const Gap(Space.sm),
           Row(children: [
             if (icon != null)
               SizedBox(
                 key: ValueKey('bookmark-favicon-$url'),
-                width: 14,
-                height: 14,
+                width: BookmarkCard.favicon,
+                height: BookmarkCard.favicon,
                 child: Image.memory(icon,
-                    width: 14, height: 14, fit: BoxFit.contain, errorBuilder: (_, _, _) => fallback),
+                    width: BookmarkCard.favicon, height: BookmarkCard.favicon, fit: BoxFit.contain, errorBuilder: (_, _, _) => fallback),
               )
             else
               fallback,
-            const SizedBox(width: 6),
+            const Gap(Space.xs),
             Flexible(
-              child: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis, style: tsRaw(12, 16, 400, c.textPrimary)),
+              child: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(context.type.uiSmall, c.textPrimary, weight: Weight.regular)),
             ),
           ]),
         ]),
@@ -107,4 +107,4 @@ const bookmarkBlock = BlockType(
   group: 'Media',
 );
 
-double _top(BlockContext b) => (b.mobile ? 3 : 2) + 12;
+double _top(BlockContext b) => BlockRhythm.pad(b.touch) + BookmarkCard.handleDrop;

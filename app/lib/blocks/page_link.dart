@@ -34,30 +34,30 @@ class PageLinkRow extends StatelessWidget {
     return Hover(
       radius: Radii.sm,
       onTap: onTap,
-      child: SizedBox(
-        height: 28,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: PageLinkParts.row),
         child: Row(children: [
           SizedBox(
-            width: 24,
-            height: 24,
+            width: PageLinkParts.icon,
+            height: PageLinkParts.icon,
             child: Stack(clipBehavior: Clip.none, children: [
               Center(
                 child: icon != null && icon.isNotEmpty
-                    ? Text(icon, style: TextStyle(fontSize: 17, height: 1, fontFamilyFallback: emojiFallback))
-                    : Icon20(Ico.page, size: 20, color: c.iconSecondary),
+                    ? Text(icon, style: emojiStyle(PageLinkParts.emoji, emojiFallback))
+                    : Icon20(Ico.page, size: IconSize.lg, color: c.iconSecondary),
               ),
               if (!sub)
-                Positioned(right: -1, bottom: 0, child: IconX(Ix.linkPage, size: 10, color: c.iconPrimary, stroke: 2)),
+                Positioned(right: -1, bottom: 0, child: IconX(Ix.linkPage, size: PageLinkParts.badge, color: c.iconPrimary, stroke: Stroke.bold)),
             ]),
           ),
-          const SizedBox(width: 6),
+          const Gap(Space.xs),
           Flexible(
             child: Container(
               decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.divider))),
               child: Text(title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: tsRaw(16, 20.8, 500, gone ? c.textTertiary : c.textPrimary)),
+                  style: ts(context.type.title, gone ? c.textTertiary : c.textPrimary, weight: Weight.strong)),
             ),
           ),
         ]),

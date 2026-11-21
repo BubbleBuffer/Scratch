@@ -11,8 +11,8 @@ Widget noteChip(BuildContext context, NoteArgs args) => Hover(
   child: Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      PageIcon(icon: args.icon, size: 16, color: context.colors.iconSecondary),
-      const SizedBox(width: 6),
+      PageIcon(icon: args.icon, size: IconSize.sm.px, color: context.colors.iconSecondary),
+      const Gap(Space.xs),
       Flexible(
         child: Text(
           displayTitle(args.title, firstLine: AppScope.maybeOf(context) == null
@@ -27,4 +27,4 @@ Widget noteChip(BuildContext context, NoteArgs args) => Hover(
 );
 
 Widget noteCard(BuildContext context, NoteArgs args) =>
-    Padding(padding: const EdgeInsets.all(12), child: noteChip(context, args));
+    Padding(padding: const EdgeInsets.all(Space.md), child: noteChip(context, args));

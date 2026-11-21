@@ -95,7 +95,7 @@ class MentionMenu extends StatelessWidget {
     required this.active,
     required this.onPick,
     required this.onHover,
-    this.maxHeight = 360,
+    this.maxHeight = Heights.list,
   });
   final List<MentionItem> items;
   final int active;
@@ -106,7 +106,7 @@ class MentionMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final m = context.mobile;
+    final m = context.touch;
     final rows = <Widget>[];
     String? section;
     for (var i = 0; i < items.length; i++) {
@@ -133,10 +133,10 @@ class MentionMenu extends StatelessWidget {
                     '${it.label}${it.label == longDate(it.date!) ? '' : '  ·  ${longDate(it.date!)}'}',
           firstLine: page?.firstLine ?? false,
           leading: it.isDate
-              ? Icon20(Ico.clock, size: m ? 22 : 20, color: c.iconSecondary)
+              ? Icon20(Ico.clock, size: m ? IconSize.xl : IconSize.lg, color: c.iconSecondary)
               : it.isChat
-              ? Icon20(Ico.comment, size: m ? 22 : 20, color: c.iconSecondary)
-              : PageIcon(icon: it.icon, size: m ? 22 : 20),
+              ? Icon20(Ico.comment, size: m ? IconSize.xl : IconSize.lg, color: c.iconSecondary)
+              : PageIcon(icon: it.icon, size: (m ? IconSize.xl : IconSize.lg).px),
           selected: i == active,
           onTap: () => onPick(it),
           onHover: () => onHover(i),
@@ -145,10 +145,10 @@ class MentionMenu extends StatelessWidget {
     }
     if (items.isEmpty) rows.add(const MenuHeader('No results'));
     return MenuSurface(
-      width: m ? null : 324,
-      padding: const EdgeInsets.all(6),
+      width: context.sizeClass.isCompact ? null : EditorMenu.width,
+      padding: const EdgeInsets.all(Space.xs),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight - 12),
+        constraints: BoxConstraints(maxHeight: maxHeight - Space.md),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

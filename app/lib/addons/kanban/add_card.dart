@@ -57,7 +57,7 @@ class _AddCardPanelState extends State<_AddCardPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+          padding: const EdgeInsets.fromLTRB(Space.xxs, Space.xxs, Space.xxs, Space.xxs),
           child: InputBox(
             child: PlainField(
               key: const ValueKey('kanban-card-title'),
