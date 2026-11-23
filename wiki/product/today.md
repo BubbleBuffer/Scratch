@@ -80,7 +80,7 @@ The day note embeds the ordinary page editor, editable on past and future dates 
 
 ## Build
 
-1. **Core and bridge — built 2026-10-06:** status groups, the agenda index and queries, bounded overdue and overdue count, to-do progress, daily notes, space colours and roles, set done. ([Core state](../core/core-state.md).)
+1. **Core and bridge — built 2026-10-06:** status groups, the agenda index and queries, bounded overdue and overdue count, to-do progress, daily notes, space colours and roles, set done. ([Vault core](../core/vault-core.md).)
 2. **App, Today — built 2026-10-06:** home sections, week strip, capture, In motion, to-do dates in the editor, "Show in Today" in database settings, colours in the sidebar and page menu, first-run and demo seeds. ([App state](../app/app-state.md).)
 3. **App, reminders — built 2026-10-07:** notifications on Android and desktop, plus the settings. Android schedules absolute UTC instants with inexact delivery; Windows, Linux and macOS deliver only while the app runs. Settings hold the switch, event lead and morning time on this device. ([App state](../app/app-state.md#reminders).)
 
